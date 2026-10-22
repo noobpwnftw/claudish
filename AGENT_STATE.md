@@ -35,7 +35,8 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - Owner focus (2026-10-23): make the en_US -> cd_AI switch feel natural, without regressions.
   Done: sessions start in continue (keys straight in, literally); F7 is continue, instruct,
   rewrite. Linux X11 25/25, GNOME 10/10, Windows Notepad 12/12, Edge 11/11.
-- Next: keep polishing the switch (watch for regressions); G30 auto-update needs releases.
+- Owner: models are placeholders until G21 (a trained model); polish the framework, not the models.
+- Next: framework polish (demo, switch, onboarding); G30 auto-update needs releases.
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
