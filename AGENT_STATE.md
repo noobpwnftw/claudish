@@ -33,6 +33,17 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   conversation). Gate --model --desktop and CI 39865449511 (5 jobs) pass.
   Next: textbox retrieval tools (textbox.read/search/selection) and Claudish as an
   MCP server for the conversation's agent.
+- Text box retrieval (a7be0e9): textbox.read/search for the model driver (local tools, no
+  MCP SDK needed) and `claudish textbox-mcp` for agents (--mcp-config file, token-gated).
+  CI 39867515381 (5 jobs) and the gate pass. Live check with
+  models/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf (owner: use a better local model for
+  framework checks; llama-server --jinja -ngl 99): retrieval, follow-ups, MCP read/write OK.
+  Script: the session scratchpad's live_instruct.py (rewrite it if lost: long text box,
+  three follow-ups, a short box, two MCP turns).
+- Known flake: X11 desktop "continue: Tab takes the ghost text" fails about 1 in 2 on
+  main too (the ghost is empty when Tab lands). Next to investigate.
+- Integration path still open: a live Claude Code agent run (owner's quota: ask), Claude
+  API tool loop (needs credentials), selection from the adapters.
 - The demo's continue sample must differ from the continue example's input (f5f7ac3):
   otherwise parroted() drops the answer and the demo shows nothing.
 - Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
