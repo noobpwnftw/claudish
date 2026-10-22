@@ -114,7 +114,7 @@ class ClaudishTextService(TextService):
                 self.state.submit()
                 if self.worker:
                     self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
-                                         app=focused_app())
+                                         app=focused_app(), look=self.state.look)
                 self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
                 self.publish()
                 return True
@@ -124,6 +124,12 @@ class ClaudishTextService(TextService):
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
             return True
+        if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.
+            if self.state.toggle_look():
+                self.showMessage("cd_AI: " + ("the window picture goes with this instruction" if self.state.look
+                                              else "no window picture"), 2)
+                self.publish()
+            return bool(self.state.text)
         if key == 0x76:  # F7 switches mode: rewrite, continue, instruct.
             self.state.next_mode()
             self.showMessage("cd_AI: " + self.state.mode, 2)

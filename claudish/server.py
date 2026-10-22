@@ -88,10 +88,13 @@ def make_server(rewriter, port=18765):
                     raise ValueError("app must be a short string")
                 if mode not in rewriter.modes:
                     raise ValueError("unknown mode")
+                look = data.get("look", False)  # F8: the user asked for a picture of the focused window
+                if not isinstance(look, bool) or (look and mode != "instruct"):
+                    raise ValueError("look is a boolean, for instruct only")
             except (ValueError, UnicodeError):
                 return self.reply(400, {"error": "invalid text request"})
             try:
-                result = rewriter.rewrite(text, before, after, mode, app)
+                result = rewriter.rewrite(text, before, after, mode, app, look)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
             self.reply(200, result)

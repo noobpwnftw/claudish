@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import re
@@ -5,6 +6,7 @@ import subprocess
 import threading
 import time
 from urllib.parse import urlsplit
+from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
 SYSTEM = (
@@ -47,6 +49,18 @@ def rules(text):
     return text
 
 
+def user_content(text, image, style):
+    """The user turn: the text, or the text after a picture of the focused window (PNG bytes)."""
+    if image is None:
+        return text
+    data = base64.b64encode(image).decode("ascii")
+    if style == "claude":
+        picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}
+    else:  # OpenAI-compatible: llama.cpp with a vision model (--mmproj), vLLM, Ollama, hosted APIs
+        picture = {"type": "image_url", "image_url": {"url": "data:image/png;base64," + data}}
+    return [picture, {"type": "text", "text": "The picture is the window I am typing in.\n\n" + text}]
+
+
 class Claude:
     """Opt-in hosted backend: typed text is sent to the Anthropic API."""
 
@@ -57,14 +71,14 @@ class Claude:
         self.client = anthropic.Anthropic(timeout=10.0, max_retries=0)
         self.model = model
 
-    def rewrite(self, text, system, examples):
+    def rewrite(self, text, system, examples, image=None):
         options = {}
         if not self.model.startswith("claude-haiku"):  # Haiku has no server-side fallback.
             options = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
         try:
             response = self.client.beta.messages.create(
                 model=self.model, max_tokens=2048, system=system,
-                messages=examples + [{"role": "user", "content": text}],
+                messages=examples + [{"role": "user", "content": user_content(text, image, "claude")}],
                 output_config={"effort": "low"}, **options)
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
@@ -95,6 +109,7 @@ class Rewriter:
                        settings["model"], api_key, settings["timeout"], prompt, context, settings["modes"],
                        settings["command"], settings["hosted"], settings["bindings"])
         rewriter.profile = profile
+        rewriter.look_command = settings.get("look_command")
         return rewriter
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
@@ -110,6 +125,7 @@ class Rewriter:
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
         self.bindings = list(bindings)
+        self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         self.modes = invocation.defaults((self.system, self.examples))
         for name, override in (modes or {}).items():
@@ -126,10 +142,19 @@ class Rewriter:
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
-    def rewrite(self, text, before="", after="", mode="rewrite", app=None):
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False):
+        """look: attach a picture of the focused window (instruct only; the user asked for it with F8)."""
         started = time.perf_counter()
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
+        image = None
+        if look:
+            if mode != "instruct":
+                raise ValueError("a window picture is only taken for an instruction")
+            if self.backend == "command":
+                raise RuntimeError("the command backend cannot take a window picture; use claude or a vision model")
+            from .capture import capture
+            image, width, height = capture(self.look_command)
         spec = self.modes[mode]
         # A supported text box: bindings for the focused app add their context providers.
         extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
@@ -138,12 +163,16 @@ class Rewriter:
             block, consulted = (self.context or Context()).gather(before, after, extra)
         else:
             block, consulted = "", []
+        if image is not None:
+            consulted = consulted + ["window picture (%d×%d)" % (width, height)]
         system = spec["system"] + block
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         if self.backend == "rules":
             # Deterministic stand-ins so the demo and tests work without a model.
             output = {"rewrite": rules(text), "continue": "and then some—naturally.",
                       "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
+            if image is not None:
+                output = output[:-1] + ", having looked at the window."
             usage = {}
         elif self.backend == "command":
             # An agent CLI (claude -p, ollama run, ...): the prompt goes in on stdin, never through a shell.
@@ -166,7 +195,7 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("Claude busy; keep typing or retry")
             try:
-                output, usage = self.claude.rewrite(text, system, examples)
+                output, usage = self.claude.rewrite(text, system, examples, image)
                 if not output:
                     raise RuntimeError("Claude returned no text")
             finally:
@@ -177,7 +206,7 @@ class Rewriter:
                 raise RuntimeError("model busy; keep typing or retry")
             try:
                 payload = {"messages": [{"role": "system", "content": system}] + examples +
-                                        [{"role": "user", "content": text}],
+                                        [{"role": "user", "content": user_content(text, image, "openai")}],
                            "max_tokens": max_tokens, "temperature": 0,
                            "stream": False, "cache_prompt": True}
                 if self.model:
@@ -191,8 +220,14 @@ class Rewriter:
                 # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
                 if self.opener is None:
                     self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
-                with self.opener.open(req, timeout=self.timeout) as response:
-                    data = json.load(response)
+                try:
+                    with self.opener.open(req, timeout=self.timeout) as response:
+                        data = json.load(response)
+                except HTTPError as exc:
+                    if image is not None and exc.code in (400, 500, 501):
+                        raise RuntimeError("this model server did not accept the window picture; it needs a vision "
+                                           "model (llama.cpp: --mmproj)") from exc
+                    raise
                 choice = data["choices"][0]
                 # Never offer a sentence chopped off by the token limit.
                 if choice.get("finish_reason") == "length":

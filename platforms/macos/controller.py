@@ -115,6 +115,9 @@ class ClaudishInputController(IMKInputController):
             return False
         self.pollSuggestions_(None)
         key = event.keyCode()
+        if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
+            self.changed(client)
+            return True
         if key == 98 and self.state.text:  # F7 switches mode: rewrite, continue, instruct.
             self.state.next_mode()
             self.changed(client)
@@ -131,7 +134,7 @@ class ClaudishInputController(IMKInputController):
                 self.state.submit()
                 if self.worker is not None:
                     self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
-                                         app=self.app(client))
+                                         app=self.app(client), look=self.state.look)
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"

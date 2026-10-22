@@ -71,11 +71,12 @@ class Worker:
         self.closed = False
         self.modes = []
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
         self.result = None
         self.modes.append(mode)
         self.app = app
         self.immediate = immediate
+        self.look = look
 
     def poll(self):
         result, self.result = self.result, None
@@ -204,8 +205,10 @@ class MacOSAdapterTests(unittest.TestCase):
         sent = len(worker.modes)
         self.type_text("rite a story")
         self.assertEqual(len(worker.modes), sent)  # no requests while typing an instruction
+        self.assertTrue(self.key(100))  # F8: send a picture of the window too
+        self.assertTrue(state.look)
         self.assertTrue(self.key(36))  # Enter sends
-        self.assertTrue(state.working and worker.immediate)
+        self.assertTrue(state.working and worker.immediate and worker.look)
         self.assertTrue(self.key(36))  # still working: Enter waits
         self.assertEqual(self.client.commits, [])
         worker.result = (state.revision, {"error": "agent failed"})

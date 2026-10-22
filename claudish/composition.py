@@ -13,11 +13,14 @@ class Composition:
         self.mode = MODES[0]
         self.working = False  # An instruction was submitted and its result is pending.
         self.failed = False
+        self.look = False  # F8 in instruct: send a picture of the focused window with the instruction
 
     def change(self, text):
         self.text = text
         self.candidate = ""
         self.working = self.failed = False
+        if not text:
+            self.look = False  # one instruction at a time; never carried to the next
         self.revision += 1
 
     @property
@@ -54,7 +57,17 @@ class Composition:
     def next_mode(self):
         """Switch mode; the current candidate belonged to the old mode, so it is dropped."""
         self.mode = MODES[(MODES.index(self.mode) + 1) % len(MODES)]
+        self.look = False
         self.change(self.text)
+
+    def toggle_look(self):
+        """F8: attach, or stop attaching, a picture of the focused window. Instruct only; a pending
+        result was for the other choice, so it is dropped."""
+        if self.mode != "instruct" or not self.text:
+            return False
+        self.look = not self.look
+        self.change(self.text)
+        return True
 
     def offer(self, revision, text):
         if revision != self.revision or not self.text:

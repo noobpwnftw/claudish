@@ -10,10 +10,12 @@ OPENER = build_opener(ProxyHandler({}))
 
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None):
+def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None, look=False):
     body = {"text": text, "mode": mode}
     if app:
         body["app"] = app
+    if look:
+        body["look"] = True
     request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
     with OPENER.open(request, timeout=timeout) as response:
@@ -31,9 +33,9 @@ class Suggestions:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
         with self.condition:
-            self.pending = (revision, text, mode, app, time.monotonic() + (0 if immediate else self.debounce))
+            self.pending = (revision, text, mode, app, look, time.monotonic() + (0 if immediate else self.debounce))
             self.result = None
             self.condition.notify()
 
@@ -56,7 +58,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, app, due = self.pending
+                revision, text, mode, app, look, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -65,7 +67,7 @@ class Suggestions:
             if len(text.strip()) < 3:
                 continue
             try:
-                result = suggest(text, self.endpoint, mode=mode, app=app)
+                result = suggest(text, self.endpoint, mode=mode, app=app, look=look)
             except Exception as exc:
                 result = {"error": str(exc)}
             with self.condition:

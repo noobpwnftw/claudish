@@ -46,11 +46,12 @@ class ClaudishEngine(IBus.Engine):
         if state.candidate:
             hint = LABELS[state.mode] + state.candidate
         elif state.working:
-            hint = "instruct · working… · Esc: keep your words"
+            hint = "instruct · %s… · Esc: keep your words" % ("looking and working" if state.look else "working")
         elif state.failed:
             hint = "instruct · the request failed · Enter: retry · Esc: keep your words"
         elif state.mode == "instruct":
-            hint = "instruct · Enter: send · F7: mode · Esc: keep your words"
+            hint = ("instruct + window picture · Enter: send · F8: no picture" if state.look else
+                    "instruct · Enter: send · F8: look at the window · F7: mode · Esc: keep your words")
         else:
             hint = "%s · F7: mode · Enter/Esc: keep wording" % state.mode
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
@@ -81,6 +82,9 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F6 and self.composition.text:
             self.render()
             return True
+        if keyval == IBus.KEY_F8 and self.composition.toggle_look():
+            self.render()
+            return True
         if keyval == IBus.KEY_F7 and self.composition.text:
             self.composition.next_mode()
             self.changed()
@@ -90,7 +94,8 @@ class ClaudishEngine(IBus.Engine):
             if action == "submit":  # Instruct: Enter sends the held text now.
                 self.composition.submit()
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
-                                          self.composition.mode, immediate=True, app=self.app)
+                                          self.composition.mode, immediate=True, app=self.app,
+                                          look=self.composition.look)
                 self.render()
             elif action in ("accept", "keep"):
                 self.finish(action == "accept")

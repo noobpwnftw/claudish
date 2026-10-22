@@ -137,6 +137,15 @@ def scenarios():
     wait_for(lambda: state()["view"], what="instruct result")
     check("Enter sends, the next Enter inserts", state()["view"], "As requested—write a story.")
 
+    key("ctrl+a", "BackSpace")
+    type_text("describe this")
+    key("F8")  # look: the service captures this window with ImageMagick and sends it along
+    key("Return")
+    settle(1.5)
+    key("Return")
+    wait_for(lambda: state()["view"], what="instruct result with a window picture")
+    check("F8 sends a real picture of the window", state()["view"], "As requested—describe this, having looked at the window.")
+
     check("binding for the focused app ran its context provider", (WORK / "bound-app.py").exists(), True)
     check("binding for another app did not run", (WORK / "bound-firefox").exists(), False)
 
@@ -192,6 +201,9 @@ def main():
         marker.unlink()
     try:
         scenarios()
+    except TimeoutError:
+        print("--- service log\n" + (WORK / "python3.log").read_text()[-3000:], flush=True)
+        raise
     finally:
         app.terminate()
         service.terminate()

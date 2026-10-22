@@ -47,6 +47,38 @@ The proof that matters is not that an IME can call an agent. Many interfaces
 can. It is that doing so feels as ordinary as switching input languages: no new
 window, no new habit, the same keys. G18 is accepted on that basis (below).
 
+### Principle: candidates, not one answer
+
+A CJK input method is not expected to guess right the first time. You type a
+phonetic sequence, it offers several readings, context ranks them, and you pick
+one with a number key and commit it. This happens thousands of times a day,
+mostly without thought. The interaction is built around ambiguity.
+
+Claudish generalizes the candidate list from *what you meant to say* to *what you
+meant to do*:
+
+| A traditional IME | Claudish |
+| --- | --- |
+| a phonetic composition | an instruction in plain words |
+| character candidates | text, command, or action candidates |
+| ranking by context | the model's reading of your context |
+| pick with a number or Space | pick, which also approves that operation |
+| commit characters | commit text, or run the chosen action |
+| cancel the composition | discard every proposal |
+
+So a model's uncertainty becomes a short list, not one confident guess: *"tell the
+team it's delayed"* might offer a terse Slack line, a fuller email paragraph, and
+a status-page update. Each candidate carries a short legend (what it is, or what
+it will do, such as "runs `git push` in ~/claudish"), and the legend matters more
+than any paragraph of explanation. This is not a concession to unreliable models.
+It is an interaction people already know, and the agent does not have to pretend
+it knows.
+
+Picking a candidate approves that candidate, not everything it leads to. If an
+agent finds a destructive or outgoing step halfway through, that step comes back
+as a new choice (see Safety under G18). Rewrite and continue benefit too: two or
+three readings, with 1–3 to pick and Tab for the first (G27).
+
 ## Three layers, one key grammar
 
 | Layer | Mode | You type | Requests | You get |
