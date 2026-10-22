@@ -147,12 +147,24 @@ def check_ime_windows():
                             "install https://aka.ms/vs/17/release/vc_redist.x86.exe (EasyIME/PIME#983)"))
         else:
             results.append(("x86 VC++ runtime", "ok", "present", None))
+    # A launcher that failed to start (0xc000007b) stays in the process list behind its error dialog,
+    # so require the named pipe a working launcher serves (\\.\pipe\<user>\PIME\Launcher).
     try:
-        tasks = subprocess.run(["tasklist", "/FI", "IMAGENAME eq PIMELauncher.exe"], capture_output=True, text=True, timeout=5).stdout
-        results.append(("PIME launcher", "ok", "running", None) if "PIMELauncher.exe" in tasks else
-                       ("PIME launcher", "fail", "not running", "start \"%s\" or sign out and back in" % (pime / "PIMELauncher.exe")))
-    except (OSError, subprocess.TimeoutExpired):
-        results.append(("PIME launcher", "skip", "could not list processes", None))
+        pipes = os.listdir("\\\\.\\pipe\\")
+    except OSError:
+        pipes = []
+    if any("PIME" in name and "Launcher" in name for name in pipes):
+        results.append(("PIME launcher", "ok", "serving its pipe", None))
+    else:
+        try:
+            listed = "PIMELauncher.exe" in subprocess.run(["tasklist", "/FI", "IMAGENAME eq PIMELauncher.exe"],
+                                                         capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            listed = False
+        results.append(("PIME launcher", "fail",
+                        "a PIMELauncher process exists but serves no pipe (it crashed on start)" if listed else "not running",
+                        "on ARM64 install the x86 VC++ runtime; then start \"%s\" or sign out and back in"
+                        % (pime / "PIMELauncher.exe")))
     return results
 
 
