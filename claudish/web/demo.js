@@ -523,7 +523,8 @@ async function loadInBrowser() {
   const strip = $("model-strip");
   strip.classList.add("loading");
   try {
-    const templates = await (await fetch("templates.json")).json();
+    // Revalidated: Pages caches for 10 minutes, and stale templates after a deploy can drop every answer.
+    const templates = await (await fetch("templates.json", { cache: "no-cache" })).json();
     const { createBrowserBackend } = await import("./browser.js");
     // ?model=URL overrides the default (tests serve a local copy); the default is pinned in the build.
     const modelUrl = new URLSearchParams(location.search).get("model") || templates.model_url;
