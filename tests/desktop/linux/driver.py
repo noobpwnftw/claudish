@@ -66,6 +66,12 @@ def check(name, actual, expected):
           flush=True)
 
 
+def doctor():
+    out = subprocess.run([sys.executable, "-m", "claudish", "doctor", "--json"], capture_output=True, text=True,
+                         cwd=str(SRC)).stdout
+    return json.loads(out)
+
+
 def scenarios():
     focus("entry")
     type_text("hello-world")
@@ -142,7 +148,12 @@ def scenarios():
 
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
+    status = lambda name: next((c["status"], c["fix"]) for c in doctor() if c["check"] == name)
+    check("doctor: not installed yet", status("Input method")[0], "fail")
     sh(sys.executable, str(SRC / "platforms/linux/install.py"))
+    # Installed, but this session predates the environment.d file: IBus cannot see the component.
+    search_path = status("IBus search path")
+    check("doctor: stale session flagged", (search_path[0], "log out and back in" in (search_path[1] or "")), ("fail", True))
     # A login session would load install.py's environment.d file; load the same file here.
     session = dict(line.strip().split("=", 1) for line in
                    (Path.home() / ".config/environment.d/90-claudish-ibus.conf").read_text().splitlines() if "=" in line)
@@ -173,6 +184,10 @@ def main():
     app = background(sys.executable, str(Path(__file__).with_name("app.py")), str(STATE), str(COMMANDS))
     wait_for(lambda: state(), what="test app")
     print("IBus %s, engine %s" % (sh("ibus", "version").strip(), sh("ibus", "engine").strip()), flush=True)
+    statuses = {c["check"]: c["status"] for c in doctor()}
+    check("doctor: healthy session all green", sorted(c for c, s in statuses.items() if s == "fail" or s == "warn"), [])
+    for marker in WORK.glob("bound-*"):  # doctor runs every provider to check it; start the binding test clean
+        marker.unlink()
     try:
         scenarios()
     finally:

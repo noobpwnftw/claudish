@@ -45,6 +45,8 @@ def main():
     fixer.add_argument("--profile")
     fixer.add_argument("--status", type=int, default=1, help="Exit status, with an explicit command")
     fixer.add_argument("words", nargs="*", metavar="-- COMMAND", help="Fix this command instead of the last failure")
+    doctor = commands.add_parser("doctor", help="Check the setup end to end and say how to fix problems")
+    doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
@@ -60,6 +62,9 @@ def main():
         return
     if args.command == "fix":
         return fix_command(parser, args)
+    if args.command == "doctor":
+        from . import doctor as checkup
+        sys.exit(checkup.main(args.json))
     if args.command == "init":
         try:
             path = config.write_starter(args.config)
