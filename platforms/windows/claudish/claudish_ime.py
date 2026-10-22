@@ -245,6 +245,8 @@ class ClaudishTextService(TextService):
     def onCompositionTerminated(self, forced):
         keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
+        if self.state.live and not forced:
+            return  # continue commits every key, which ends a composition: the context stays
         self.state.change("")
         if self.worker:
             self.worker.schedule(self.state.revision, "")
