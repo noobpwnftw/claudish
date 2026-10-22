@@ -67,10 +67,31 @@ async def check(url, executable, screenshots=None):
         draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
         await keys.press("Enter")  # inserts
         await expect(committed).to_have_attribute("data-text", before + rewrite + draft)
+        # The model is kept in this browser, and can be removed.
+        await expect(page.locator("#remove-model")).to_contain_text("Stored here", timeout=10000)
+        stored = await page.evaluate("async () => (await navigator.storage.estimate()).usage")
+        await page.locator("#remove-model").click()
+        await expect(page.locator("#remove-model")).to_be_hidden(timeout=10000)
+        after = await page.evaluate("async () => (await navigator.storage.estimate()).usage")
+        assert after < stored - 400e6, (stored, after)
         assert not any("/suggest" in u or "/health" in u for u in requests), "the static page called a server"
         assert not errors, errors
+        # A browser without room for the model runs it from memory and stores nothing.
+        tight = await browser.new_page()
+        await tight.add_init_script(
+            "navigator.storage.estimate = async () => ({usage: 0, quota: 50 * 1024 * 1024})")
+        await tight.goto(url + "?model=model.gguf")
+        await tight.wait_for_function("() => self.crossOriginIsolated", timeout=15000)
+        await tight.locator("#load-model").click()
+        await expect(tight.locator("#model-strip.ready")).to_be_visible(timeout=120000)
+        await expect(tight.locator("#model-copy")).to_contain_text("runs from memory")
+        assert not await tight.evaluate("""async () => {
+            const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('cache', {create: true});
+            for await (const _ of dir.values()) return true;
+            return false; }"""), "the model was written to storage"
         await browser.close()
-    print("Static demo passed: isolation, in-browser model, continue %r, rewrite %r, instruct, no server calls" % (ghost, rewrite))
+    print("Static demo passed: isolation, in-browser model, continue %r, rewrite %r, instruct, stored and removed, "
+          "runs from memory without room, no server calls" % (ghost, rewrite))
 
 
 def main():

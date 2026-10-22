@@ -1,6 +1,6 @@
 // In-browser backend for the static demo: llama.cpp compiled to WebAssembly (wllama), same templates
 // as the service (templates.json is generated from claudish/modes.py). Typed text never leaves the page.
-import { Wllama } from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js";
+import { CacheManager, Wllama } from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js";
 
 const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm" };
 
@@ -17,12 +17,53 @@ function finish(mode, text, output) {
   return text + joiner + output;
 }
 
-export async function createBrowserBackend(templates, modelUrl, onProgress) {
+// What this page keeps in the browser's storage, and a way to remove it.
+export async function storedBytes() {
+  const files = await new CacheManager().list();
+  return files.reduce((sum, file) => sum + Math.max(0, file.size || 0), 0);
+}
+export async function removeStored() {
+  await new CacheManager().clear();
+}
+
+// Without room to store the model (a small quota: a guest profile, a full disk), it runs from memory:
+// downloaded each visit, never half-written into storage. wllama's own "no cache" path still writes.
+async function inMemory(modelUrl, onProgress) {
+  const response = await fetch(modelUrl);
+  if (!response.ok) throw new Error(`model download failed (${response.status})`);
+  const total = Number(response.headers.get("content-length")) || 0;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    onProgress(loaded, total);
+  }
+  return new Blob(chunks);
+}
+
+export async function createBrowserBackend(templates, modelUrl, onProgress, onNote = () => {}) {
   const wllama = new Wllama(WASM);
-  await wllama.loadModelFromUrl(modelUrl, {
-    n_ctx: 2048,
-    progressCallback: ({ loaded, total }) => onProgress(loaded, total),
-  });
+  const options = { n_ctx: 2048, progressCallback: ({ loaded, total }) => onProgress(loaded, total) };
+  const cached = (await wllama.modelManager.getModels()).some((model) => model.url === modelUrl);
+  const { usage = 0, quota = Infinity } = (await navigator.storage?.estimate?.()) || {};
+  const fits = cached || quota - usage > templates.model_bytes * 1.05;
+  if (fits) {
+    try {
+      await wllama.loadModelFromUrl(modelUrl, options);
+    } catch (error) {
+      if (!/quota/i.test(`${error.name} ${error.message}`)) throw error;
+      await removeStored();  // a half-written copy only takes up room
+      onNote("This browser ran out of room for the model, so it runs from memory and downloads each visit.");
+      await wllama.loadModel([await inMemory(modelUrl, onProgress)], { n_ctx: 2048 });
+    }
+  } else {
+    onNote("This browser has no room to keep the model, so it runs from memory and downloads each visit.");
+    await wllama.loadModel([await inMemory(modelUrl, onProgress)], { n_ctx: 2048 });
+  }
   return {
     async suggest(text, mode) {
       const spec = templates.modes[mode];
