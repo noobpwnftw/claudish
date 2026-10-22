@@ -38,9 +38,18 @@ try:
     engine.composition.offer(engine.composition.revision, "A considered draft.")
     engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
     assert commits[-1] == "A considered draft."
+    for char in "say hi":
+        engine.do_process_key_event(ord(char), 0, 0)
+    engine.composition.offer(engine.composition.revision, "A rewrite.")
+    assert engine.do_process_key_event(IBus.KEY_F7, 0, 0)
+    assert engine.composition.mode == "continue" and not engine.composition.candidate
+    engine.do_process_key_event(IBus.KEY_F7, 0, 0)
+    engine.composition.offer(engine.composition.revision, "Hello—truly.")
+    engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
+    assert commits[-1] == "Hello—truly." and engine.composition.mode == "instruct"
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: composition, modifiers, commit, candidate, password bypass")
+    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, password bypass")
 finally:
     engine.destroy()

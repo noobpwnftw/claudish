@@ -66,9 +66,11 @@ class Worker:
     def __init__(self):
         self.result = None
         self.closed = False
+        self.modes = []
 
-    def schedule(self, revision, text):
+    def schedule(self, revision, text, mode="rewrite"):
         self.result = None
+        self.modes.append(mode)
 
     def poll(self):
         result, self.result = self.result, None
@@ -173,6 +175,21 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.client.commits)
         self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
         self.assertEqual(self.client.commits, ["Hi—€"])
+
+    def test_f7_switches_mode_and_drops_the_old_candidate(self):
+        self.type_text("thank the team")
+        state = self.controller.state
+        state.offer(state.revision, "A rewrite.")
+        self.assertTrue(self.key(98))
+        self.assertEqual((state.mode, state.candidate), ("continue", ""))
+        self.assertEqual(self.controller.worker.modes[-1], "continue")
+        self.key(98)
+        self.assertEqual(state.mode, "instruct")
+        self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
+        self.controller.pollSuggestions_(None)
+        self.key(48)
+        self.assertEqual(self.client.commits, ["Thank you, team—truly."])
+        self.assertFalse(self.key(98))  # Without a composition, F7 belongs to the app.
 
     def test_deactivation_commits_and_closes_worker_timer(self):
         self.type_text("keep me")

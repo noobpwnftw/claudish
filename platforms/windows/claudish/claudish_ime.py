@@ -45,7 +45,7 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         if self.worker:
-            self.worker.schedule(self.state.revision, self.state.text)
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
         self.publish()
 
     def onKeyDown(self, event):
@@ -58,6 +58,11 @@ class ClaudishTextService(TextService):
         key = event.keyCode
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
+            return True
+        if key == 0x76:  # F7 switches mode: rewrite, continue, instruct.
+            self.state.next_mode()
+            self.showMessage("cd_AI: " + self.state.mode, 2)
+            self.changed()
             return True
         if key == 0x09 and not self.state.candidate:
             self.publish()

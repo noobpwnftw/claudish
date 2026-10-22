@@ -4,6 +4,7 @@ python tests/pime_smoke.py --pime-source /path/to/PIME/python/textService.py
 This does not register or exercise the native TSF component.
 """
 import argparse
+import json
 import importlib.util
 import shutil
 import sys
@@ -67,6 +68,16 @@ def main():
             assert key(0x75)["candidateList"] == ["A nuanced draft."]
             worker_class.return_value.poll.return_value = None
             assert key(9)["commitString"] == "A nuanced draft."
+            for char in "say hi":
+                key(ord(char.upper()), ord(char))
+            assert key(0x76, method="filterKeyDown")["return"]
+            reply = key(0x76)
+            assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
+            assert worker_class.return_value.schedule.call_args.args[2] == "continue"
+            key(0x76)
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Hello—truly."})
+            assert key(9)["commitString"] == "Hello—truly."
+            worker_class.return_value.poll.return_value = None
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
             service.handleRequest({"method": "onDeactivate"})
