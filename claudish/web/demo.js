@@ -8,6 +8,8 @@ let timer;
 let inflight = false;
 let queued = false;
 let composing = false;
+let hosted = false;  // true when the service sends text to a hosted model
+let backend = "";
 
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
@@ -15,7 +17,7 @@ function resetCandidate() {
   $("accept").disabled = true;
   $("candidate").textContent = draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
   $("candidate").classList.add("placeholder");
-  $("timing").textContent = "LOCAL MODEL · NO CLOUD REQUIRED";
+  $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL MODEL · NO CLOUD REQUIRED";
   status(draft.value.trim() ? "COMPOSING" : "AWAITING A THOUGHT");
 }
 
@@ -42,9 +44,9 @@ async function requestSuggestion() {
   const text = draft.value;
   const started = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), hosted ? 15000 : 5000);
   document.querySelector(".workspace").classList.add("busy");
-  status("THINKING LOCALLY");
+  status(hosted ? "THINKING REMOTELY" : "THINKING LOCALLY");
   $("rewrite").disabled = true;
   try {
     const response = await fetch("/suggest", {
@@ -137,10 +139,18 @@ async function checkConnection() {
     const response = await fetch("/health", { signal: AbortSignal.timeout(3000) });
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
+    if (hosted !== Boolean(data.hosted) || backend !== data.backend) {
+      hosted = Boolean(data.hosted);
+      backend = data.backend;
+      $("inference-note").textContent = hosted ? "Hosted inference, as configured." : "Actual local inference.";
+      if (!candidate) resetCandidate();
+    }
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
-      document.createTextNode(data.backend === "rules" ? "Rules demo connected" : "Local service connected"));
-    $("backend").textContent = data.backend === "rules" ? "RULES MODE · NO MODEL" : "cd_AI · LOCAL LLM";
+      document.createTextNode(data.backend === "rules" ? "Rules demo connected"
+        : data.backend === "claude" ? "Claude API connected" : hosted ? "Remote model connected" : "Local service connected"));
+    $("backend").textContent = data.backend === "rules" ? "RULES MODE · NO MODEL"
+      : data.backend === "claude" ? "cd_AI · CLAUDE API" : hosted ? "cd_AI · REMOTE MODEL" : "cd_AI · LOCAL LLM";
   } catch {
     $("connection").className = "connection offline";
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Service unavailable"));

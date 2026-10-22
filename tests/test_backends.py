@@ -1,0 +1,159 @@
+"""Configurable backends: Claude via a stand-in SDK, and OpenAI-compatible endpoints (no live services)."""
+import json
+import tempfile
+import threading
+from io import BytesIO
+import types
+import unittest
+from unittest.mock import patch
+from urllib.request import urlopen
+
+from claudish.model import EXAMPLES, SYSTEM, Rewriter, load_prompt
+from claudish.server import make_server
+
+
+def response(text="A considered rewrite—truly.", stop_reason="end_turn"):
+    return types.SimpleNamespace(
+        stop_reason=stop_reason, usage=types.SimpleNamespace(input_tokens=90, output_tokens=12),
+        content=[types.SimpleNamespace(type="thinking", thinking=""), types.SimpleNamespace(type="text", text=text)])
+
+
+class FakeSDK:
+    def __init__(self):
+        self.calls = []
+        self.reply = response()
+        sdk = self
+
+        class Anthropic:
+            def __init__(self, **options):
+                sdk.options = options
+                self.beta = types.SimpleNamespace(messages=types.SimpleNamespace(create=sdk.create))
+
+        self.module = types.ModuleType("anthropic")
+        self.module.Anthropic = Anthropic
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.reply
+
+
+class ClaudeBackendTests(unittest.TestCase):
+    def setUp(self):
+        self.sdk = FakeSDK()
+        patcher = patch.dict("sys.modules", {"anthropic": self.sdk.module})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_request_shape_and_result(self):
+        rewriter = Rewriter("claude")
+        result = rewriter.rewrite("Ship it.")
+        self.assertEqual((result["text"], result["backend"]), ("A considered rewrite—truly.", "claude"))
+        self.assertEqual(result["usage"], {"input_tokens": 90, "output_tokens": 12})
+        call = self.sdk.calls[0]
+        self.assertEqual(call["model"], "claude-opus-5-5")
+        self.assertEqual((call["system"], call["messages"]), (SYSTEM, EXAMPLES + [{"role": "user", "content": "Ship it."}]))
+        self.assertEqual(call["output_config"], {"effort": "low"})
+        self.assertEqual((call["fallbacks"], call["betas"]), ("default", ["server-side-fallback-2026-07-01"]))
+        self.assertNotIn("temperature", call)
+        self.assertEqual(self.sdk.options["max_retries"], 0)
+
+    def test_haiku_omits_server_side_fallback(self):
+        Rewriter("claude", claude_model="claude-haiku-5-5").rewrite("Ship it.")
+        self.assertNotIn("fallbacks", self.sdk.calls[0])
+        self.assertNotIn("betas", self.sdk.calls[0])
+
+    def test_refusal_truncation_and_empty_output_are_never_offered(self):
+        rewriter = Rewriter("claude")
+        for reply, message in [(response("", "refusal"), "declined"),
+                               (response("A half-fin", "max_tokens"), "token budget"),
+                               (response("  "), "no text")]:
+            self.sdk.reply = reply
+            with self.assertRaisesRegex(RuntimeError, message):
+                rewriter.rewrite("Ship it.")
+        self.sdk.reply = response()
+        self.assertEqual(rewriter.rewrite("Ship it.")["text"], "A considered rewrite—truly.")
+
+    def test_missing_credentials_get_a_clear_message(self):
+        def create(**kwargs):
+            raise TypeError('"Could not resolve authentication method. Expected one of api_key"')
+        self.sdk.create = create
+        rewriter = Rewriter("claude")
+        rewriter.claude.client.beta.messages.create = create
+        with self.assertRaisesRegex(RuntimeError, "ANTHROPIC_API_KEY"):
+            rewriter.rewrite("Ship it.")
+
+    def test_one_request_at_a_time(self):
+        rewriter = Rewriter("claude")
+        with rewriter.lock:
+            with self.assertRaisesRegex(RuntimeError, "busy"):
+                rewriter.rewrite("Ship it.")
+        self.assertEqual(self.sdk.calls, [])
+
+    def test_health_reports_hosted_backend(self):
+        for backend, hosted in [("claude", True), ("rules", False)]:
+            server = make_server(Rewriter(backend), 0)
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            try:
+                with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
+                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "hosted": hosted})
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
+
+class EndpointBackendTests(unittest.TestCase):
+    def call(self, rewriter):
+        reply = {"choices": [{"message": {"content": "Indeed—so."}, "finish_reason": "stop"}]}
+        with patch("claudish.model.build_opener") as opener:
+            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+            self.assertEqual(rewriter.rewrite("so")["text"], "Indeed—so.")
+            request = opener.return_value.open.call_args.args[0]
+            return opener.call_args.args, request, json.loads(request.data)
+
+    def test_local_server_any_model_and_no_proxy(self):
+        rewriter = Rewriter("openai", "http://localhost:11434/", model="qwen2.5:7b")
+        self.assertFalse(rewriter.hosted)
+        handlers, request, payload = self.call(rewriter)
+        self.assertEqual(request.full_url, "http://localhost:11434/v1/chat/completions")
+        self.assertEqual(payload["model"], "qwen2.5:7b")
+        self.assertIsNone(request.get_header("Authorization"))
+        self.assertEqual(handlers[0].proxies, {})  # loopback bypasses HTTP_PROXY
+
+    def test_remote_endpoint_is_hosted_and_sends_key(self):
+        rewriter = Rewriter("openai", "https://models.example.com", model="any-model", api_key="k-123")
+        self.assertTrue(rewriter.hosted)
+        handlers, request, _ = self.call(rewriter)
+        self.assertEqual(request.get_header("Authorization"), "Bearer k-123")
+        self.assertEqual(handlers, ())  # default opener: system proxy settings apply
+
+
+class PromptTemplateTests(unittest.TestCase):
+    def write(self, data):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        with handle:
+            json.dump(data, handle)
+        self.addCleanup(lambda: __import__("os").unlink(handle.name))
+        return handle.name
+
+    def test_custom_template_reaches_both_backends(self):
+        prompt = load_prompt(self.write({"system": "Be grand.", "examples": [["hi", "Greetings—hello."]]}))
+        self.assertEqual(prompt[1], [{"role": "user", "content": "hi"},
+                                     {"role": "assistant", "content": "Greetings—hello."}])
+        sdk = FakeSDK()
+        with patch.dict("sys.modules", {"anthropic": sdk.module}):
+            Rewriter("claude", prompt=prompt).rewrite("so")
+        self.assertEqual(sdk.calls[0]["system"], "Be grand.")
+        self.assertEqual(sdk.calls[0]["messages"][:2], prompt[1])
+        _, _, payload = EndpointBackendTests.call(self, Rewriter("openai", prompt=prompt))
+        self.assertEqual(payload["messages"][0], {"role": "system", "content": "Be grand."})
+
+    def test_malformed_templates_are_rejected(self):
+        for data in [{"examples": []}, {"system": " "}, {"system": "x", "examples": [["only one"]]}]:
+            with self.assertRaises(ValueError):
+                load_prompt(self.write(data))
+
+
+if __name__ == "__main__":
+    unittest.main()

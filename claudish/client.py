@@ -5,7 +5,8 @@ import time
 from urllib.request import Request, build_opener, ProxyHandler
 
 
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=4):
+# Runs on the background worker, never on an input event, so a hosted backend may take longer.
+def suggest(text, endpoint="http://127.0.0.1:18765", timeout=12):
     request = Request(endpoint + "/suggest", data=json.dumps({"text": text}).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
     # Local typing must not be routed through HTTP_PROXY.

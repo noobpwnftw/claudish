@@ -48,7 +48,8 @@ def make_server(rewriter, port=18765):
                 body = files("claudish").joinpath("web", filename).read_bytes()
                 return self.send_body(200, body, content_type)
             if self.path == "/health":
-                return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend})
+                return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
+                                        "hosted": rewriter.hosted})
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):

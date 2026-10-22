@@ -90,6 +90,46 @@ To run against an existing llama-server instead of starting one:
 python -m claudish serve --model-url http://127.0.0.1:18766
 ```
 
+## Backends and rewrite templates
+
+Claudish supplies the plumbing: the input method, a rewrite template, and the
+service between them. The model is your choice, and how well it follows the
+template depends on that model. `benchmarks/evaluate.py` measures any backend
+on the same cases.
+
+Use any OpenAI-compatible server and any model, such as llama.cpp, vLLM, Ollama,
+LM Studio, or a hosted endpoint:
+
+```sh
+python -m claudish serve --backend openai --model-url http://127.0.0.1:11434 --model qwen2.5:7b
+# A remote endpoint, with a key read from an environment variable that you name:
+python -m claudish serve --backend openai --model-url https://api.example.com \
+    --model some-model --api-key-env EXAMPLE_API_KEY --timeout 10
+```
+
+Or use Claude through the official SDK. It is an optional dependency. The
+credentials are yours: set `ANTHROPIC_API_KEY`, or run `ant auth login`.
+
+```sh
+pip install "claudish-ime[claude]"
+python -m claudish serve --backend claude                     # claude-opus-5-5
+python -m claudish serve --backend claude --claude-model claude-haiku-5-5
+```
+
+The Claude backend runs one request at a time, uses low effort, and turns on
+server-side refusal fallbacks (except on Haiku, which has none). It never
+offers a declined or truncated rewrite; your wording stays. Typed text goes
+only where you point the service. A non-loopback `--model-url` and the Claude
+backend are reported as `"hosted": true` in `/health`, and the browser demo
+labels them as hosted. Local inference remains the default.
+
+Replace the rewrite template with `--prompt FILE` for any backend:
+
+```json
+{"system": "Rewrite, do not reply. Keep names and numbers exactly. Use an em dash.",
+ "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]}
+```
+
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
