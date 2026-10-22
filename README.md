@@ -37,9 +37,13 @@ for inputs, outputs, fidelity, and model comparisons.
 Status:
 
 - **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
-  key events in a container (17 scenarios, `scripts/check.py --desktop`), plus
-  `claudish service` under a real systemd user manager. Wayland/GNOME sessions and
-  Qt apps are not yet tested.
+  key events in containers (`scripts/check.py --desktop`): X11 (24 scenarios), and
+  GNOME Shell 46 on Wayland, headless, with IBus started by the shell and keys typed
+  through Mutter's RemoteDesktop API (9 scenarios); plus `claudish service` under a
+  real systemd user manager. Qt apps and KDE are not yet tested. On GNOME, a
+  composition left in a field when you click another one lands in the field you
+  clicked: GNOME commits it after GTK has moved focus, as for every input method.
+  Your words survive exactly once; Enter or Esc before you click keeps them in place.
 - **Windows:** verified on Windows 11 ARM64 in a KVM VM through PIME/TSF: classic
   Notepad 9/9 typing scenarios, Edge 8/8 with one known issue (a shortcut right
   after a cleared field can lose the composed word). x64 hardware is untested;

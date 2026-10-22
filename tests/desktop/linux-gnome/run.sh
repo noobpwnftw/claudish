@@ -13,7 +13,7 @@ user python3 /claudish/platforms/linux/install.py >/dev/null
 user gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'claudish')]"
 # A login would load install.py's environment.d file; GNOME Shell starts ibus-daemon with it.
 user sh -c 'set -a; . ~/.config/environment.d/90-claudish-ibus.conf; set +a;
-  nohup gnome-shell --headless --wayland --virtual-monitor 1280x800 >/tmp/gnome-shell.log 2>&1 &'
+  nohup gnome-shell --headless --unsafe-mode --wayland --virtual-monitor 1280x800 >/tmp/gnome-shell.log 2>&1 &'
 for i in $(seq 60); do user test -S /run/user/1001/wayland-0 2>/dev/null && break; sleep 0.5; done
 for i in $(seq 60); do user ibus list-engine 2>/dev/null | grep -q claudish && break; sleep 0.5; done
 user python3 /claudish/tests/desktop/linux-gnome/driver.py || { user tail -20 /tmp/gnome-shell.log; exit 1; }

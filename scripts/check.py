@@ -2,7 +2,7 @@
 
 python scripts/check.py            # unit tests, compile, diff, IBus and PIME smokes
 python scripts/check.py --model    # also: real model, rewrite, fidelity eval, browser demo, static demo
-python scripts/check.py --desktop  # also: real IBus + GTK typing in a container (needs docker)
+python scripts/check.py --desktop  # also: real IBus + GTK typing (X11, and GNOME Shell on Wayland) in containers
 
 Each check reports PASS, FAIL, or SKIP with a reason. Remote CI (push a ci/*
 branch) is still the only Windows and macOS coverage; use it for adapter or
@@ -149,6 +149,7 @@ def main():
         if shutil.which("docker"):
             run("Linux desktop", ["sh", "tests/desktop/linux/run.sh"], timeout=900)
             run("Linux service", ["sh", "tests/desktop/linux-systemd/run.sh"], timeout=600)
+            run("GNOME Wayland", ["sh", "tests/desktop/linux-gnome/run.sh"], timeout=900)
         else:
             skip("Linux desktop", "needs docker")
 

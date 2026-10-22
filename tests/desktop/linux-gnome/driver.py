@@ -62,6 +62,9 @@ class Keyboard:
         self.session = Gio.DBusProxy.new_sync(bus, 0, None, "org.gnome.Mutter.RemoteDesktop", path,
                                               "org.gnome.Mutter.RemoteDesktop.Session", None)
         self.session.call_sync("Start", None, 0, -1, None)
+        # Headless GNOME has no keyboard until this session's virtual one sends a key, and a Wayland
+        # seat without a keyboard gives no window keyboard focus: tap Shift to create it.
+        self.press("Shift_L")
 
     def keysym(self, value, pressed):
         self.session.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (value, pressed)), 0, -1, None)
@@ -90,9 +93,26 @@ class Keyboard:
             time.sleep(delay)
 
 
+def shell_eval(code):
+    """Evaluate in GNOME Shell (test plumbing); returns the result as Python, or None on failure."""
+    out = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", "/org/gnome/Shell",
+                          "--method", "org.gnome.Shell.Eval", code], capture_output=True, text=True).stdout.strip()
+    if not out.startswith("(true, "):
+        return None
+    try:
+        return json.loads(eval(out[len("(true, "):-1]) or "null")  # gdbus prints a quoted JSON string
+    except (SyntaxError, ValueError):
+        return None
+
+
 def focus(name):
     COMMANDS.write_text(name)
-    wait_for(lambda: state().get("focus") == name, what="focus on " + name)
+    try:
+        wait_for(lambda: state().get("focus") == name, what="focus on " + name)
+    except TimeoutError:
+        print("app state:", state(), "| shell focus:", shell_eval(
+            "global.display.focus_window ? global.display.focus_window.title : null"), flush=True)
+        raise
     time.sleep(0.3)
 
 
@@ -116,12 +136,21 @@ def scenarios(keys):
     wait_for(lambda: state()["other"], what="candidate commit")
     check("Tab accepts the rewrite", state()["other"], "particularly crucial")
 
+    focus("view")
+    keys.press("ctrl+a", "BackSpace")
     focus("entry")
     keys.press("ctrl+a", "BackSpace")
     keys.type("keep me")
-    focus("other")  # focus moves while composing
+    focus("view")  # focus moves while composing
     time.sleep(0.5)
-    check("focus change keeps composed text", state()["entry"], "keep me")
+    # GNOME commits the composition after GTK has moved focus, so it lands in the newly focused
+    # field (the same for every input method that commits on focus-out). Claudish's guarantee
+    # is that the words survive exactly once: never lost, never doubled.
+    landed = state()
+    check("focus change keeps your words exactly once", (landed["entry"] + landed["view"]).count("keep me"), 1)
+    print("  (GNOME put them in the %s field)" % ("original" if landed["entry"] else "newly focused"), flush=True)
+    focus("view")
+    keys.press("ctrl+a", "BackSpace")
 
     focus("entry")
     keys.press("ctrl+a", "BackSpace")
@@ -160,17 +189,22 @@ def main():
     config = Path.home() / ".config/claudish"
     config.mkdir(parents=True, exist_ok=True)
     (config / "config.json").write_text(json.dumps({"profiles": {"desk": {"backend": "rules"}}}))
-    # GNOME opens the Activities overview at login; close it, as a user would, so the app gets focus.
-    subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path", "/org/gnome/Shell",
-                    "--method", "org.freedesktop.DBus.Properties.Set", "org.gnome.Shell", "OverviewActive",
-                    "<false>"], capture_output=True)
     service = background(sys.executable, "-m", "claudish", "serve", "--profile", "desk", cwd=str(SRC))
     app = background(sys.executable, str(SRC / "tests/desktop/linux/app.py"), str(STATE), str(COMMANDS),
                      env=dict(os.environ, GDK_BACKEND="wayland"))
     wait_for(lambda: state(), what="test app")
     keys = Keyboard()
-    time.sleep(1.0)
-    keys.click()  # activate the window, as a user would; Wayland gives new windows no focus by themselves
+    # GNOME opens the Activities overview at login and gives a new window no focus by itself; do
+    # what a user's first click does: leave the overview and activate the window (Eval needs
+    # --unsafe-mode, which run.sh passes; it is test plumbing, not part of what is tested).
+    wait_for(lambda: shell_eval('global.get_window_actors().some(a => a.meta_window.title == "Claudish test app")'),
+             what="the app window")
+    shell_eval("Main.overview.hide()")
+    wait_for(lambda: shell_eval("!Main.overview.visible && !Main.overview.animationInProgress"), what="overview closed")
+    shell_eval('global.get_window_actors().map(a => a.meta_window).find(w => w.title == "Claudish test app")'
+               '.activate(global.get_current_time())')
+    wait_for(lambda: shell_eval('global.display.focus_window && global.display.focus_window.title == "Claudish test app"'),
+             what="the app window to have focus")
     engine = subprocess.run(["ibus", "engine"], capture_output=True, text=True).stdout.strip()
     print("IBus engine:", engine or "(none)", flush=True)
     try:

@@ -43,7 +43,8 @@ def tick():
         pass
     focused = next((name for name, widget in widgets.items() if widget.has_focus()), None)
     with open(STATE + ".tmp", "w") as out:
-        json.dump({"focus": focused, **{name: text(widget) for name, widget in widgets.items()}}, out)
+        json.dump({"focus": focused, "active": window.is_active(),
+                   **{name: text(widget) for name, widget in widgets.items()}}, out)
     os.replace(STATE + ".tmp", STATE)
     return True
 
