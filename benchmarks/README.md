@@ -130,3 +130,39 @@ some claims ("14 minutes—quite a short time, isn't it?", "No one reviewed the
 change—this needs addressing"), and "back in 20" became "meet back at 20".
 "Thanks!" still becomes "You're welcome!". Paired with the shipped prompt, it
 scores below 0.5B. It is not proposed as a preset.
+
+## Meaning judge (G12)
+
+The mechanical checks miss meaning changes, so [`judge.py`](judge.py) asks a much
+larger local model whether each rewrite keeps its meaning. Its verdicts are
+same, adds, reply, changed, or language, constrained to a JSON schema. The model
+was calibrated against 82 hand-labelled pairs in
+[`eval/judge_labels.json`](eval/judge_labels.json): the shipped prompt's 41
+outputs and the G11 terse-system variant's 41, labelled by the maintainer.
+
+Judge: Qwen2.5 14B Instruct Q4_K_M (bartowski GGUF, revision `05244aa5`,
+8,988,110,976 bytes, SHA-256
+`e47ad95dad6ff848b431053b375adb5d39321290ea2c638682577dafca87c008`), on the
+Spark, temperature 0.
+
+| Run | Same vs. not same | Exact label | Time |
+| --- | ---: | ---: | ---: |
+| First prompt | 89.0% | 76.8% | 162 s |
+| Plus a "check the language first" rule | **91.5%** | 76.8% | 153 s |
+
+Full output: [eval/judge-calibration-qwen2.5-14b.json](eval/judge-calibration-qwen2.5-14b.json).
+The prompt was revised once, on the same set it is scored on, so expect a little
+optimism. Exact-label misses are mostly changed versus adds, which does not
+matter for flagging. The judge still calls some language switches "same"; the
+mechanical language check covers those. It is also stricter than the labels in
+places: it flagged "Shipped it" becoming "It was delivered", arguably correctly.
+
+On the shipped default model's 41 rewrites, the judge finds **26 meaning-
+preserving**, against 38 that pass the mechanical checks. The hand labels give
+27. The mechanical score overstates fidelity by about a third.
+
+```sh
+llama-server -m models/Qwen2.5-14B-Instruct-Q4_K_M.gguf --port 18766 -ngl 99
+python benchmarks/judge.py --calibrate
+python benchmarks/judge.py --results benchmarks/eval/spark-small.json
+```
