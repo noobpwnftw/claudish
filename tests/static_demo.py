@@ -26,7 +26,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-async def check(url, executable):
+async def check(url, executable, screenshots=None):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(**({"executable_path": executable} if executable else {}))
         page = await browser.new_page(viewport={"width": 1280, "height": 900})
@@ -36,7 +36,10 @@ async def check(url, executable):
         await page.goto(url + "?model=model.gguf")
         await page.wait_for_function("() => self.crossOriginIsolated", timeout=15000)  # after one reload
         await page.locator("#load-model").click()
-        await expect(page.locator("#load-model")).to_have_count(0, timeout=120000)
+        await expect(page.locator("#model-strip.loading .model-progress")).to_be_visible(timeout=10000)
+        await expect(page.locator("#model-strip.ready")).to_be_visible(timeout=120000)
+        if screenshots:
+            await page.screenshot(path=str(screenshots / "static-ready.png"))
         await page.locator("#draft").fill("This is very important.")
         await expect(page.locator("#accept")).to_be_enabled(timeout=60000)
         rewrite = await page.locator("#candidate").inner_text()
@@ -61,6 +64,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", required=True, type=Path, help="Local GGUF served as model.gguf")
     parser.add_argument("--executable", help="Chromium executable for Playwright")
+    parser.add_argument("--screenshots", type=Path, help="Save a screenshot of the ready state here")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as directory:
         site = build(Path(directory) / "demo")
@@ -68,7 +72,7 @@ def main():
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(site)))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
-            asyncio.run(check("http://127.0.0.1:%d/" % server.server_port, args.executable))
+            asyncio.run(check("http://127.0.0.1:%d/" % server.server_port, args.executable, args.screenshots))
         finally:
             server.shutdown()
 

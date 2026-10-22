@@ -28,7 +28,8 @@ function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
   candidate = "";
   $("accept").disabled = true;
-  $("candidate").textContent = mode === "instruct"
+  $("candidate").textContent = IN_BROWSER && !browserBackend ? "Run the model above,\nthen type something ordinary."
+    : mode === "instruct"
     ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction,\nthen press Enter.")
     : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
   $("candidate").classList.add("placeholder");
@@ -211,23 +212,27 @@ async function checkConnection() {
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Service unavailable"));
   }
 }
-async function loadInBrowser(button) {
-  button.disabled = true;
+async function loadInBrowser() {
+  const strip = $("model-strip");
+  strip.classList.add("loading");
   try {
     const templates = await (await fetch("templates.json")).json();
     const { createBrowserBackend } = await import("./browser.js");
     // ?model=URL overrides the default (tests serve a local copy); the default is pinned in the build.
     const modelUrl = new URLSearchParams(location.search).get("model") || templates.model_url;
     browserBackend = await createBrowserBackend(templates, modelUrl, (loaded, total) => {
-      button.textContent = `Downloading the model… ${Math.round(100 * loaded / (total || templates.model_bytes))}%`;
+      const percent = Math.round(100 * loaded / (total || templates.model_bytes));
+      $("model-progress").value = percent;
+      $("model-progress-label").textContent = `${percent}%`;
     });
-    button.remove();
-    $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Model running in this browser"));
+    strip.classList.replace("loading", "ready");
+    $("model-copy").textContent = "The model is running in this browser. Type below; nothing leaves this page.";
+    $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Model ready in browser"));
     $("connection").className = "connection online";
     edited();
   } catch (error) {
-    button.disabled = false;
-    button.textContent = "Try loading the model again";
+    strip.classList.remove("loading");
+    $("load-model").textContent = "Try loading the model again";
     $("feedback").textContent = `The model could not start here: ${error.message}`;
   }
 }
@@ -246,17 +251,21 @@ if (IN_BROWSER && !self.crossOriginIsolated && "serviceWorker" in navigator) {
 
 if (IN_BROWSER) {
   // Nothing is downloaded until the visitor asks; the model is then cached by the browser.
-  const button = document.createElement("button");
-  button.type = "button";
-  button.id = "load-model";
-  button.className = "accept-button";
-  button.textContent = document.querySelector('meta[name="claudish-model-label"]')?.content || "Run the model in this browser";
-  button.addEventListener("click", () => loadInBrowser(button));
-  $("candidate").after(button);
+  const model = document.querySelector('meta[name="claudish-model"]')?.content || "A small model";
+  const strip = document.createElement("section");
+  strip.id = "model-strip";
+  strip.className = "model-strip";
+  strip.setAttribute("aria-label", "In-browser model");
+  strip.innerHTML = `<div><div class="strip-label">IN-BROWSER MODEL</div><p id="model-copy"></p></div>
+    <div class="model-action"><button id="load-model" class="accept-button" type="button">Run the model in this browser</button>
+    <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
+    <span id="model-progress-label">0%</span></div></div>`;
+  document.querySelector(".workspace").before(strip);
+  $("model-copy").textContent = `${model} runs right here: downloaded once, then cached. Nothing you type leaves this page.`;
+  $("load-model").addEventListener("click", loadInBrowser);
   $("connection").className = "connection";
-  $("connection").replaceChildren(document.createElement("i"), document.createTextNode("No server: the model runs in your browser"));
+  $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
   $("backend").textContent = "cd_AI · IN-BROWSER LLM";
-  $("timing").textContent = "NOTHING YOU TYPE LEAVES THIS PAGE";
 } else {
   checkConnection();
   setInterval(checkConnection, 15000);

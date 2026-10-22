@@ -39,7 +39,7 @@ def build(out):
     page = re.sub(r'(href|src)="/(?!/)', r'\1="', page)  # relative paths: hosts may serve from a subpath
     page = page.replace('  <link rel="icon" href="favicon.ico">\n', "")
     head = ('  <meta name="claudish-backend" content="browser">\n'
-            '  <meta name="claudish-model-label" content="Run the model in this browser (%d MB, downloaded once)">\n'
+            '  <meta name="claudish-model" content="Qwen2.5 0.5B (%d MB)">\n'
             '  <meta http-equiv="Content-Security-Policy" content="%s">\n' % (MODEL_BYTES // 1_000_000, CSP))
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n' + head, 1)
     # As the project home page, point visitors to the source and the install instructions.
