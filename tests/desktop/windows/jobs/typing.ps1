@@ -8,7 +8,13 @@ public static class Keys {
   [StructLayout(LayoutKind.Explicit, Size = 40)] struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public KEYBDINPUT ki; }
   [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
   [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
-  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  // A background process may not take the foreground; a synthetic Alt press lifts that lock.
+  public static bool Focus(IntPtr hwnd) {
+    for (int i = 0; i < 10 && GetForegroundWindow() != hwnd; i++) { Press(0x12); SetForegroundWindow(hwnd); Thread.Sleep(200); }
+    return GetForegroundWindow() == hwnd;
+  }
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, System.Text.StringBuilder l);
   [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
@@ -75,7 +81,7 @@ $notepad = Start-Process notepad -PassThru
 Start-Sleep 3
 $window = (Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1)
 "Notepad: $($window.Id) $(($window | Select-Object -ExpandProperty Path))"
-[Keys]::SetForegroundWindow($window.MainWindowHandle) | Out-Null
+if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
 function Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
 function Clear { [Keys]::Press(0x41, 0x11); [Keys]::Press(0x2E); Start-Sleep -Milliseconds 300 }
@@ -84,7 +90,8 @@ function Clear { [Keys]::Press(0x41, 0x11); [Keys]::Press(0x2E); Start-Sleep -Mi
 [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
 Check 'composition is not committed while typing' (Text) ''
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500
-Check 'Enter commits your wording, dash substituted' (Text) 'hello—world'
+$dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
+Check 'Enter commits your wording, dash substituted' (Text) "hello${dash}world"
 Clear
 [Keys]::Type('very important'); Start-Sleep -Milliseconds 800
 [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
@@ -100,7 +107,7 @@ Clear
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
 Check 'instruct holds the text until it is inserted' (Text) ''
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
-Check 'F7 to instruct, Enter sends, Enter inserts' (Text) 'As requested—say hi.'
+Check 'F7 to instruct, Enter sends, Enter inserts' (Text) "As requested${dash}say hi."
 Clear
 [Keys]::Type('draft'); [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400
 Check 'Ctrl shortcut commits the wording first' (Text) 'draft'
