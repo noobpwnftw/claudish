@@ -2,6 +2,7 @@ import hmac
 import json
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from .composition import MAX_COMPOSITION
 
 
@@ -209,6 +210,13 @@ def make_server(rewriter, port=18765):
 
     class Server(ThreadingHTTPServer):
         daemon_threads = True
+
+        def server_bind(self):
+            # HTTPServer looks up the host's name (socket.getfqdn), a reverse lookup that on macOS
+            # can go out over multicast DNS and raise the Local Network privacy prompt. Loopback
+            # needs no name.
+            TCPServer.server_bind(self)
+            self.server_name, self.server_port = "localhost", self.server_address[1]
 
         def get_request(self):
             sock, address = super().get_request()

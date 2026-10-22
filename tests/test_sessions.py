@@ -154,6 +154,16 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(events[-1]["candidates"][0], "As requested—hi.")
 
 
+class BindTests(unittest.TestCase):
+    def test_the_service_binds_without_a_name_lookup(self):
+        # socket.getfqdn can go out over multicast DNS on macOS: the Local Network privacy prompt.
+        from unittest.mock import patch
+        with patch("socket.getfqdn", side_effect=AssertionError("name lookup")):
+            server = make_server(Rewriter("rules"), 0)
+        server.server_close()
+        self.assertEqual(server.server_name, "localhost")
+
+
 class SessionTests(unittest.TestCase):
     def test_no_events_after_the_end_and_answers_are_validated(self):
         class Quiet:
