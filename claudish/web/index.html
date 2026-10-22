@@ -44,16 +44,16 @@
         <div class="editors">
           <div class="draft-pane">
             <div class="pane-heading"><label for="draft"><span class="step">01</span> YOUR WORDS</label><span id="count">0 / 512</span></div>
-            <textarea id="draft" maxlength="512" spellcheck="false" placeholder="We should use a smaller model." aria-describedby="draft-help"></textarea>
+            <textarea id="draft" maxlength="512" spellcheck="false" placeholder="Type something ordinary…" aria-describedby="draft-help" autofocus></textarea>
             <div class="draft-bottom"><span id="draft-help">A thought, a sentence, a perfectly normal email.</span><button id="rewrite" class="text-button" type="button"><span id="rewrite-label">Rewrite</span> <span>↗</span></button></div>
           </div>
           <div class="candidate-pane">
             <div class="pane-heading"><span><span class="step">02</span> <span id="candidate-title">THE CLAUDISH EDIT</span></span><span class="candidate-state" id="candidate-state" role="status">AWAITING A THOUGHT</span></div>
-            <div class="candidate-body"><p class="candidate placeholder" id="candidate">A nuanced perspective is<br>just a keystroke away.</p></div>
-            <div class="candidate-bottom"><span id="timing">LOCAL MODEL · NO CLOUD REQUIRED</span><button id="accept" class="accept-button" type="button" disabled><span id="accept-label">Accept rewrite</span> <kbd>Tab</kbd></button></div>
+            <div class="candidate-body"><p class="candidate placeholder" id="candidate">A nuanced perspective is just a keystroke away.</p></div>
+            <div class="candidate-bottom"><span id="timing">LOCAL&nbsp;MODEL&nbsp;· NO&nbsp;CLOUD&nbsp;REQUIRED</span><button id="accept" class="accept-button" type="button" disabled><span id="accept-label">Accept rewrite</span> <kbd>Tab</kbd></button></div>
           </div>
         </div>
-        <div class="desk-footer"><span><kbd>Tab</kbd> accept <span class="separator">/</span> <kbd>Enter</kbd> <span id="enter-hint">keep your wording</span> <span class="separator">/</span> <kbd>Shift ↵</kbd> new line</span><button id="keep" class="text-button" type="button" disabled>Keep my wording →</button></div>
+        <div class="desk-footer"><span><span class="hint"><kbd>Tab</kbd> accept</span> <span class="separator">/</span> <span class="hint"><kbd>Enter</kbd> <span id="enter-hint">keep your wording</span></span> <span class="separator">/</span> <span class="hint"><kbd>Shift ↵</kbd> new line</span></span><button id="keep" class="text-button" type="button" disabled>Keep my wording →</button></div>
       </section>
 
       <div class="samples" id="samples" aria-label="Example phrases"><span id="samples-label">NEED A FIRST THOUGHT?</span><button type="button" data-sample="This is very important.">This is very important. ↗</button><button type="button" data-sample="Let's explore the options.">Let's explore the options. ↗</button><button type="button" data-sample="We should use a smaller model.">We should use a smaller model. ↗</button></div>
