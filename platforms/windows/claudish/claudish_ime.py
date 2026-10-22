@@ -4,6 +4,18 @@ from .composition import Composition
 from .client import Suggestions
 
 
+def keylog(*fields):
+    """Opt-in diagnostics: CLAUDISH_KEYLOG=path appends key routing events. Never logs typed text."""
+    import os
+    path = os.environ.get("CLAUDISH_KEYLOG")
+    if path:
+        try:
+            with open(path, "a") as log:
+                log.write(" ".join(str(field) for field in fields) + "\n")
+        except OSError:
+            pass
+
+
 def focused_app():
     """The foreground window's program name (for bindings), such as "notepad.exe"; None elsewhere."""
     try:
@@ -46,6 +58,7 @@ class ClaudishTextService(TextService):
         self.state.change("")
 
     def filterKeyDown(self, event):
+        keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
         if not self.keyboardOpen:
             return False
         if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
@@ -76,6 +89,7 @@ class ClaudishTextService(TextService):
         self.publish()
 
     def onKeyDown(self, event):
+        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         result = self.worker.poll() if self.worker else None
         if result:
@@ -138,6 +152,7 @@ class ClaudishTextService(TextService):
         return True
 
     def onCompositionTerminated(self, forced):
+        keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
         self.state.change("")
         if self.worker:
