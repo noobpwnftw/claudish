@@ -1,7 +1,7 @@
 """InputMethodKit controller; all Cocoa client operations stay on the main thread."""
 import objc
 from AppKit import NSEventMaskKeyDown, NSEventTypeKeyDown
-from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagOption
+from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController, IMKCandidates
 from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCandidatesBelowHint
@@ -99,7 +99,8 @@ class ClaudishInputController(IMKInputController):
         if not self.active or event.type() != NSEventTypeKeyDown:
             return False
         flags = event.modifierFlags()
-        if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption):
+        # Option types characters such as — and €; it is not a shortcut by itself.
+        if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl):
             self.finish(client)
             return False
         self.pollSuggestions_(None)

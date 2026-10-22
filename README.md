@@ -166,8 +166,9 @@ performance has not been measured. Alternatively, forward the Spark's service
 to the Mac's `127.0.0.1:18765` over SSH and leave inference running on the Spark.
 
 The candidate panel refreshes automatically; Tab accepts, Enter/Escape keeps
-your wording, and F6 reopens a ready candidate. Navigation, Command, Control,
-and Option shortcuts commit the current wording before being passed through.
+your wording, and F6 reopens a ready candidate. Navigation keys and Command or
+Control shortcuts commit the current wording before being passed through.
+Characters typed with Option, such as — and €, stay in the composition.
 Composition edits currently work at the end of the buffer. Secure fields and
 application-specific composition behavior need native acceptance testing.
 
@@ -193,7 +194,8 @@ Enter commits composition first; press it again to send a newline. This first
 version edits composition at its end. Linux commits original wording before
 forwarding navigation and shortcuts. On Windows, the first navigation key
 commits composition and is consumed; press again to navigate. Ctrl/Alt/Win
-shortcuts pass through to TSF and the application. Application-driven focus
+shortcuts pass through to TSF and the application; characters typed with AltGr
+(Ctrl+Alt) stay in the composition, as they do on Linux. Application-driven focus
 changes and composition termination need particular attention in Windows testing.
 
 Linux refreshes the candidate automatically. PIME's Python protocol delivers

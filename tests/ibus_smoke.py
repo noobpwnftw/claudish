@@ -25,6 +25,12 @@ try:
     assert engine.composition.text == "hello—world"
     assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
     assert engine.composition.text == "hello—world"
+    # AltGr, Num Lock, and similar keys alone must not end the phrase.
+    for keyval in (IBus.KEY_ISO_Level3_Shift, IBus.KEY_Num_Lock, IBus.KEY_Meta_L, IBus.KEY_Hyper_L):
+        assert not engine.do_process_key_event(keyval, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_EuroSign, 0, IBus.ModifierType.MOD5_MASK)
+    assert engine.composition.text == "hello—world€" and not commits
+    engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     assert commits == ["hello—world"]
     for char in "draft":

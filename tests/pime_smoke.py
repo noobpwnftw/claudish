@@ -48,6 +48,12 @@ def main():
             # A modifier and a shortcut must not consume or rewrite composition.
             assert not key(0x10, method="filterKeyDown")["return"]
             assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
+            assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"]
+            assert service.state.text == "hello—world"
+            # AltGr arrives as Ctrl+Alt; a printable result belongs in the phrase.
+            assert key(ord("Q"), ord("@"), "filterKeyDown", modifiers=(0x11, 0x12))["return"]
+            assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello—world@"
+            key(0x08)
             assert service.state.text == "hello—world"
             # Pending Tab leaves the original available instead of committing it.
             assert "commitString" not in key(9)
