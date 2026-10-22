@@ -72,7 +72,12 @@ class FixTests(unittest.TestCase):
             cli.main()
         printed.assert_called_once_with("git push origin main")
 
-    @unittest.skipUnless(shutil.which("bash") and hasattr(os, "getuid"), "needs bash")
+    @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "the shell hooks are POSIX-only")
+    def test_bash_hook_parses_in_this_bash(self):
+        result = subprocess.run(["bash", "-n"], input=fix.shell_hook("bash"), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "the shell hooks are POSIX-only")
     def test_bash_hook_records_failures_privately_without_rerunning(self):
         with tempfile.TemporaryDirectory() as directory:
             environment = dict(os.environ, XDG_RUNTIME_DIR=directory, HOME=directory)
