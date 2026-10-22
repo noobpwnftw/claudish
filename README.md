@@ -405,6 +405,8 @@ own licenses. Their source and weights are dependencies, not part of this Git re
 
 ## Verify
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture, which check to run for which change, and how to report bugs.
+
 ```sh
 python scripts/check.py           # tests, compile, IBus and PIME smokes (fetches pinned PIME source)
 python scripts/check.py --model   # also: real model, rewrite, fidelity eval, browser demo
