@@ -148,8 +148,9 @@ branches or a manual dispatch. Run one for `main` before notable merges, since
 Windows-only failures are invisible locally.
 Push a `ci/<topic>` branch when a change touches the Windows or macOS adapters,
 packaging, or anything the Spark cannot run. It provides the only Windows and
-macOS coverage. Only report remote CI as passing after inspecting the run for the
-actual commit.
+macOS coverage. Only report remote CI as passing after every job of the run for
+the actual commit has a conclusion: a run's summary can read "success" while jobs
+are still queued, so check the jobs (`gh api .../runs/ID/jobs`).
 
 ## Git and external actions
 
