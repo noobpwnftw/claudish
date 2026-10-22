@@ -49,7 +49,8 @@ def make_server(rewriter, port=18765):
                 return self.send_body(200, body, content_type)
             if self.path == "/health":
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
-                                        "hosted": rewriter.hosted})
+                                        "hosted": rewriter.hosted,
+                                        "profile": getattr(rewriter, "profile", None)})
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):
