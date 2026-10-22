@@ -102,7 +102,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed; native Windows TSF remains untested")
+    print("PIME Python contract smoke passed (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":
