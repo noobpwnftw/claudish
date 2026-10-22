@@ -87,7 +87,8 @@ The most useful reports say:
 - the input framework version (`ibus version`, the PIME version, or the macOS
   version);
 - the keys you pressed, what you expected, and what you got;
-- `curl http://127.0.0.1:18765/health` output (backend, hosted, profile, modes).
+- `python -m claudish doctor --json` output, which covers the backend, the service, the
+  input method's registration, and context sources, and contains no typed text.
 
 Leave out the text you typed if it is private. A made-up phrase that reproduces
 the problem is just as good. The service never logs typed text, so it cannot

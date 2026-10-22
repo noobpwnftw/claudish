@@ -64,7 +64,12 @@ Status:
 3. **Install the input method** for [Linux](#linux-input-method),
    [Windows](#windows-input-method), or [macOS](#macos-input-method), and add
    **cd_AI — Claudish** in your input sources.
-4. **Learn four keys.** Everything else is typing.
+4. **Check the setup.** `python -m claudish doctor` walks the whole chain (model,
+   service, config, the input method's registration on your OS, and context
+   sources) and prints a fix for anything wrong. On Linux, for example, it
+   catches a session that started before the installer's search-path change
+   ("log out and back in"); on Windows on ARM, PIME's missing x86 runtime.
+5. **Learn four keys.** Everything else is typing.
 
 | Key | Does |
 | --- | --- |
