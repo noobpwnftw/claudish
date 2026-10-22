@@ -1,5 +1,10 @@
 name: Check
-on: [push, pull_request]
+# Opt-in: local `python scripts/check.py --model` is the merge gate. Run this for
+# Windows/macOS coverage (adapters, packaging) by pushing a ci/* branch or manually.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['ci/**']
 jobs:
   core:
     strategy:

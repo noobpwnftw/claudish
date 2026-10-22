@@ -310,6 +310,13 @@ own licenses. Their source and weights are dependencies, not part of this Git re
 ## Verify
 
 ```sh
+python scripts/check.py           # tests, compile, IBus and PIME smokes (fetches pinned PIME source)
+python scripts/check.py --model   # also: real model, rewrite, fidelity eval, browser demo
+```
+
+The individual checks:
+
+```sh
 python -m unittest discover -s tests -v
 python -m compileall -q claudish platforms scripts
 # Linux: actual IBus bindings on a private bus, without desktop registration:
@@ -330,9 +337,9 @@ python tests/browser_demo.py --executable /path/to/chromium --screenshots .tools
 This checks actual backend inference, keyboard commits, the dash toggle,
 clipboard, stale-result rejection, error recovery, and mobile overflow.
 
-CI is configured to run the shared tests on Windows, Linux, and macOS, plus a
-macOS bundle build, native controller import, and signature check. These remote
-CI jobs have not been run from this session. The macOS routing tests use test
+Remote CI covers Windows, Linux, and macOS, plus a macOS bundle build, native
+controller import, and signature check. It is opt-in: push a `ci/*` branch or run
+the workflow manually. The macOS routing tests use test
 doubles and do not verify Cocoa, InputMethodKit, or native application behavior.
 Native desktop acceptance should
 cover a text editor, browser, terminal, focus switches, selection/caret movement,
