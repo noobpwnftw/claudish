@@ -26,9 +26,9 @@ class Suggestions:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
-    def schedule(self, revision, text, mode="rewrite"):
+    def schedule(self, revision, text, mode="rewrite", immediate=False):
         with self.condition:
-            self.pending = (revision, text, mode, time.monotonic() + self.debounce)
+            self.pending = (revision, text, mode, time.monotonic() + (0 if immediate else self.debounce))
             self.result = None
             self.condition.notify()
 

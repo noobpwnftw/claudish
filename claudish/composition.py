@@ -2,7 +2,7 @@
 
 MAX_COMPOSITION = 512
 MODES = ("rewrite", "continue", "instruct")  # F7 cycles through these in every adapter.
-LABELS = {"rewrite": "Tab: ", "continue": "Tab continues: ", "instruct": "Tab writes: "}
+LABELS = {"rewrite": "Tab: ", "continue": "Tab continues: ", "instruct": "Enter inserts: "}
 
 
 class Composition:
@@ -11,11 +11,36 @@ class Composition:
         self.candidate = ""
         self.revision = 0
         self.mode = MODES[0]
+        self.working = False  # An instruction was submitted and its result is pending.
+        self.failed = False
 
     def change(self, text):
         self.text = text
         self.candidate = ""
+        self.working = self.failed = False
         self.revision += 1
+
+    @property
+    def automatic(self):
+        """Rewrite and continue ask on every pause; an instruction is sent only on Enter."""
+        return self.mode != "instruct"
+
+    def enter(self):
+        """What Enter does now: "pass", "submit", "wait", "accept" (the candidate), or "keep" (your wording)."""
+        if not self.text:
+            return "pass"
+        if self.mode != "instruct":
+            return "keep"
+        if self.candidate:
+            return "accept"
+        return "wait" if self.working else "submit"
+
+    def submit(self):
+        self.working, self.failed = True, False
+
+    def fail(self, revision):
+        if revision == self.revision and self.working:
+            self.working, self.failed = False, True
 
     def insert(self, char):
         if len(self.text) >= MAX_COMPOSITION:
@@ -35,6 +60,7 @@ class Composition:
         if revision != self.revision or not self.text:
             return False
         self.candidate = text
+        self.working = False
         return True
 
     def commit(self, suggested=False):

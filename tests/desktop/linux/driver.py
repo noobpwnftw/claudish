@@ -115,10 +115,21 @@ def scenarios():
     key("ctrl+a", "BackSpace")
     type_text("say hi")
     key("F7", "F7")  # rewrite -> continue -> instruct
+    key("Return")  # Instruct sends on Enter.
     settle()
-    key("Tab")
+    key("Tab")  # Tab accepts too.
     wait_for(lambda: state()["view"], what="instruct draft")
-    check("F7 to instruct, Tab writes the draft", state()["view"], "As requested—say hi.")
+    check("F7 to instruct, Enter sends, Tab inserts", state()["view"], "As requested—say hi.")
+
+    key("ctrl+a", "BackSpace")
+    type_text("write a story")  # Still in instruct mode: held until Enter.
+    settle()
+    check("instruct holds the text while typing", state()["view"], "")
+    key("Return")  # send
+    settle()
+    key("Return")  # insert
+    wait_for(lambda: state()["view"], what="instruct result")
+    check("Enter sends, the next Enter inserts", state()["view"], "As requested—write a story.")
 
     focus("password")
     type_text("pass-word")

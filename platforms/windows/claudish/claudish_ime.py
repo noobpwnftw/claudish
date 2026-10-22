@@ -44,7 +44,7 @@ class ClaudishTextService(TextService):
         self.setShowCandidates(bool(candidate))
 
     def changed(self):
-        if self.worker:
+        if self.worker and (self.state.automatic or not self.state.text):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
         self.publish()
 
@@ -55,7 +55,24 @@ class ClaudishTextService(TextService):
             revision, data = result
             if "text" in data:
                 self.state.offer(revision, data["text"])
+            elif "error" in data:
+                self.state.fail(revision)
+                if self.state.failed:
+                    self.showMessage("cd_AI: the request failed; Enter retries", 3)
         key = event.keyCode
+        if key == 0x0D:
+            # Instruct holds the text until Enter sends it; the next Enter inserts the result.
+            action = self.state.enter()
+            if action == "submit":
+                self.state.submit()
+                if self.worker:
+                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True)
+                self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
+                self.publish()
+                return True
+            if action == "wait":
+                self.showMessage("cd_AI: still working…", 2)
+                return True
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
             return True
@@ -68,7 +85,8 @@ class ClaudishTextService(TextService):
             self.publish()
             return True
         if key in (0x09, 0x0D, 0x1B):
-            self.setCommitString(self.state.commit(key == 0x09))
+            # Enter reaches here in instruct mode only with a result ready (see above).
+            self.setCommitString(self.state.commit(key == 0x09 or (key == 0x0D and self.state.mode == "instruct")))
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar():

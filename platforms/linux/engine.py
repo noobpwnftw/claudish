@@ -32,19 +32,31 @@ class ClaudishEngine(IBus.Engine):
             revision, data = result
             if "text" in data and self.composition.offer(revision, data["text"]):
                 self.render()
+            elif "error" in data:
+                self.composition.fail(revision)
+                self.render()
         return True
 
     def render(self):
         text = self.composition.text
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
-        candidate, mode = self.composition.candidate, self.composition.mode
-        self.update_auxiliary_text(IBus.Text.new_from_string(
-            LABELS[mode] + candidate if candidate
-            else "%s · F7: mode · Enter/Esc: keep wording" % mode), bool(text))
+        state = self.composition
+        if state.candidate:
+            hint = LABELS[state.mode] + state.candidate
+        elif state.working:
+            hint = "instruct · working… · Esc: keep your words"
+        elif state.failed:
+            hint = "instruct · the request failed · Enter: retry · Esc: keep your words"
+        elif state.mode == "instruct":
+            hint = "instruct · Enter: send · F7: mode · Esc: keep your words"
+        else:
+            hint = "%s · F7: mode · Enter/Esc: keep wording" % state.mode
+        self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
 
     def changed(self):
-        self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode)
+        if self.composition.automatic or not self.composition.text:
+            self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode)
         self.render()
 
     def finish(self, suggested=False):
@@ -71,7 +83,17 @@ class ClaudishEngine(IBus.Engine):
             self.composition.next_mode()
             self.changed()
             return True
-        if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter, IBus.KEY_Escape, IBus.KEY_Tab):
+        if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
+            action = self.composition.enter()
+            if action == "submit":  # Instruct: Enter sends the held text now.
+                self.composition.submit()
+                self.suggestions.schedule(self.composition.revision, self.composition.text,
+                                          self.composition.mode, immediate=True)
+                self.render()
+            elif action in ("accept", "keep"):
+                self.finish(action == "accept")
+            return action != "pass"
+        if keyval in (IBus.KEY_Escape, IBus.KEY_Tab):
             if not self.composition.text:
                 return False
             if keyval == IBus.KEY_Tab and not self.composition.candidate:

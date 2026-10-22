@@ -78,6 +78,18 @@ def main():
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Hello—truly."})
             assert key(9)["commitString"] == "Hello—truly."
             worker_class.return_value.poll.return_value = None
+            # Instruct: no request while typing; Enter sends; the next Enter inserts.
+            calls = worker_class.return_value.schedule.call_count
+            for char in "story":
+                key(ord(char.upper()), ord(char))
+            assert worker_class.return_value.schedule.call_count == calls
+            reply = key(0x0D)
+            assert service.state.working and "working" in json.dumps(reply.get("showMessage"))
+            assert worker_class.return_value.schedule.call_args.kwargs == {"immediate": True}
+            assert "commitString" not in key(0x0D)  # still working
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
+            assert key(0x0D)["commitString"] == "Once upon a time."
+            worker_class.return_value.poll.return_value = None
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
             service.handleRequest({"method": "onDeactivate"})
