@@ -10,6 +10,13 @@ from gi.repository import GLib, IBus
 from claudish.composition import Composition
 from claudish.client import Suggestions
 
+# Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
+MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
+    "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R",
+    "Meta_L", "Meta_R", "Hyper_L", "Hyper_R", "Caps_Lock", "Shift_Lock", "Num_Lock",
+    "Scroll_Lock", "ISO_Level3_Shift", "ISO_Level5_Shift", "Mode_switch",
+    "ISO_Next_Group", "ISO_Prev_Group")}
+
 
 class ClaudishEngine(IBus.Engine):
     def __init__(self, *args, **kwargs):
@@ -48,9 +55,7 @@ class ClaudishEngine(IBus.Engine):
     def do_process_key_event(self, keyval, keycode, state):
         if state & IBus.ModifierType.RELEASE_MASK or self.sensitive:
             return False
-        if keyval in (IBus.KEY_Shift_L, IBus.KEY_Shift_R, IBus.KEY_Control_L,
-                      IBus.KEY_Control_R, IBus.KEY_Alt_L, IBus.KEY_Alt_R,
-                      IBus.KEY_Super_L, IBus.KEY_Super_R, IBus.KEY_Caps_Lock):
+        if keyval in MODIFIER_KEYS:
             return False
         modifiers = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
                      IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)

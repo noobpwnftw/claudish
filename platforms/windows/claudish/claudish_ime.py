@@ -28,7 +28,10 @@ class ClaudishTextService(TextService):
         if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
         # Preserve Ctrl/Alt/Win shortcuts. TSF owns external composition termination.
-        if any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C)):
+        # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
+        altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and event.isPrintableChar()
+                 and not (event.isKeyDown(0x5B) or event.isKeyDown(0x5C)))
+        if not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C)):
             return False
         return event.isPrintableChar() or bool(self.state.text)
 

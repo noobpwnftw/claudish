@@ -164,6 +164,16 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.key(123, "\uf702"))
         self.assertEqual(self.client.commits[-1], "next")
 
+    def test_option_characters_stay_in_composition(self):
+        option = 1 << 19  # NSEventModifierFlagOption
+        self.type_text("Hi")
+        self.assertTrue(self.key(27, "—", option))  # Option+Shift+- on a US layout
+        self.assertTrue(self.key(5, "€", option))
+        self.assertEqual(self.client.marked, "Hi—€")
+        self.assertFalse(self.client.commits)
+        self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
+        self.assertEqual(self.client.commits, ["Hi—€"])
+
     def test_deactivation_commits_and_closes_worker_timer(self):
         self.type_text("keep me")
         worker, timer = self.controller.worker, self.controller.timer
