@@ -26,8 +26,8 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - claudish.io: bought by the owner; DNS not resolving yet (no NS on 2026-10-23). When it does:
   set the Pages custom domain, wait for HTTPS, switch README and repo homepage. Not before:
   a custom domain redirects the github.io home page.
-- Next: G18 (sessions; approval of side-effecting tools as candidate choices) (agentic instruct,
-  candidate-list choices); then G21 (browser model data).
+- Next: G18 (agent sessions at the caret; approval of side-effecting tools as
+  candidate choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
