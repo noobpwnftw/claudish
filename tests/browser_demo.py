@@ -56,6 +56,17 @@ async def check(args):
             await keys.type("ls -la", delay=20)  # literal: the hyphen stays a hyphen
             await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost + "\nls -la")
             await keys.press("Enter")
+            # A paste goes in like typing, and is the next suggestion's context.
+            continued = []
+            page.on("request", lambda request: continued.append(request.post_data_json.get("text"))
+                    if request.url.endswith("/suggest") and request.post_data_json else None)
+            await page.evaluate("() => navigator.clipboard.writeText('The release is ready. ')")
+            await keys.press("Control+v")
+            await keys.type("We ship ", delay=20)
+            await expect(page.locator("#ghost")).not_to_be_empty(timeout=10000)
+            assert any(t and t.endswith("The release is ready. We ship ") for t in continued), continued
+            await keys.press("Escape")  # dismiss it
+            await keys.press("Enter")
 
             # Rewrite (F7 twice): your words are a composition; the candidate window is under it.
             await keys.press("F7")
@@ -181,7 +192,7 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
             print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (candidate window, "
-                  "dash, Tab, Enter), clipboard, clear, stale responses, service failure, instruct, samples, "
+                  "dash, Tab, Enter), paste as context, clipboard, selection, clear, stale responses, service failure, instruct, samples, "
                   "theme toggle, and mobile layout")
         finally:
             await browser.close()

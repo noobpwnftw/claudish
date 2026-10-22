@@ -21,6 +21,17 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(modes.finish("continue", "Thanks for", "Thanks for the review."), "Thanks for the review.")
         self.assertEqual(modes.finish("continue", "Thanks", "  "), "")
         self.assertEqual(modes.finish("instruct", "say hi", "Hello—truly."), "Hello—truly.")
+        # An echo of the text's last words (any case), quotes, and stray punctuation after a space.
+        self.assertEqual(modes.finish("continue", "hello ", "Hello, how are you today?"), "hello how are you today?")
+        self.assertEqual(modes.finish("continue", "Dear Sam,", '"I hope this finds you well."'),
+                         "Dear Sam, I hope this finds you well.")
+
+    def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
+        rewriter = Rewriter(max_tokens=64)
+        _, payload = self.call(rewriter, "hello ", "continue")
+        self.assertEqual(payload["messages"][-1]["content"], 'Text so far: "hello "\nThe next few words:')
+        _, payload = self.call(rewriter, "so", "rewrite")
+        self.assertEqual(payload["messages"][-1]["content"], "so")  # other modes send the text itself
 
     def call(self, rewriter, text, mode):
         reply = {"choices": [{"message": {"content": "the parser change."}, "finish_reason": "stop"}]}

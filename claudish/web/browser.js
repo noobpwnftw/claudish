@@ -7,8 +7,11 @@ const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/w
 // Port of claudish.modes.finish: a continuation is joined onto the typed text.
 function finish(mode, text, output) {
   if (mode !== "continue") return output;
+  // Small models sometimes echo the text, or its last words, before continuing it.
   if (output.startsWith(text)) output = output.slice(text.length);
-  output = output.trim();
+  else if (text.trim() && output.toLowerCase().startsWith(text.trim().toLowerCase())) output = output.slice(text.trim().length);
+  output = output.trim().replace(/^"|"$/g, "").trim();
+  if (/[ \n]$/.test(text)) output = output.replace(/^[,;: ]+/, "");
   if (!output) return "";
   const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) ? "" : " ";
   return text + joiner + output;
@@ -26,7 +29,9 @@ export async function createBrowserBackend(templates, modelUrl, onProgress) {
       if (!spec) throw new Error(`Unknown mode: ${mode}`);
       const started = performance.now();
       const response = await wllama.createChatCompletion({
-        messages: [{ role: "system", content: spec.system }, ...spec.examples, { role: "user", content: text }],
+        // Continue quotes the text as a task (spec.frame), so the model continues it instead of answering it.
+        messages: [{ role: "system", content: spec.system }, ...spec.examples,
+                   { role: "user", content: spec.frame ? spec.frame.replace("{text}", text) : text }],
         max_tokens: spec.max_tokens || templates.max_tokens,
         temperature: 0,  // greedy, as on the service
       });

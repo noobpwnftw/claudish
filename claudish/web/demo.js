@@ -65,9 +65,13 @@ const ghost = () => live() && !selected() && state.candidate.length > state.text
 const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
 function automatic() {
   if (state.mode === "instruct") return false;
-  if (live()) return Boolean(state.text) && !/[\p{L}\p{N}]$/u.test(state.text);  // a word boundary
+  // Continue asks at a word boundary, not at the start of an empty line.
+  if (live()) return Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
   return true;
 }
+// Continue's context is the text before the caret, as an input method reads the app's surrounding
+// text: typed, pasted, or already there.
+const context = () => doc.text.slice(Math.max(0, doc.caret - MAX), doc.caret);
 // Committing inserts at the caret, replacing any selection, as typing into a text box does.
 function commit(text) {
   if (selected()) removeSelection();
@@ -78,7 +82,7 @@ function commit(text) {
 // words (navigation and shortcuts end a composition) and continue starts a fresh context.
 function settle() {
   if (composing()) commit(state.text);
-  change("");
+  change(live() ? context() : "");
 }
 
 // What happens after every change: ask the model after a pause, then draw.
@@ -135,7 +139,7 @@ function key(name, shift = false) {
     if (state.mode === "rewrite" && state.text) commit(state.text);  // continue types into the box
     const leavingLive = live();
     state.mode = MODES[(MODES.indexOf(state.mode) + 1) % MODES.length];
-    change(leavingLive ? "" : state.text);
+    change(live() ? context() : leavingLive ? "" : state.text);
     showMode();
     changed();
     return true;
@@ -155,7 +159,7 @@ function key(name, shift = false) {
   if (name === "Delete") {
     if (composing()) return true;
     if (selected()) removeSelection(); else doc.text = doc.text.slice(0, doc.caret) + doc.text.slice(doc.caret + 1);
-    change(""); changed();
+    change(live() ? context() : ""); changed();
     return true;
   }
   if (live()) return liveKey(name);
@@ -205,7 +209,7 @@ function liveKey(name) {
   if (name === "Tab") {
     const rest = ghost();
     if (!rest) return false;  // nothing offered: Tab is the app's
-    commit(rest); change((state.text + rest).slice(-MAX)); changed();
+    commit(rest); change(context()); changed();
     return true;
   }
   if (name === "Escape") {
@@ -214,21 +218,14 @@ function liveKey(name) {
     return true;
   }
   if (name === "Backspace") {
-    if (selected()) { removeSelection(); change(""); }
-    else if (doc.caret) {
-      doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret);
-      moveTo(doc.caret - 1);
-      change(state.text.slice(0, -1));
-    }
-    changed();
+    if (selected()) removeSelection();
+    else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
+    change(context()); changed();
     return true;
   }
-  if (name === "Enter") { commit("\n"); change(""); changed(); return true; }
+  if (name === "Enter") { commit("\n"); change(context()); changed(); return true; }
   if (name.length === 1) {  // exactly the key: continue types like en_US
-    const fresh = selected();
-    commit(name);
-    change(fresh ? name : (state.text + name).slice(-MAX));
-    changed();
+    commit(name); change(context()); changed();
     return true;
   }
   return false;
@@ -356,6 +353,10 @@ sink.addEventListener("beforeinput", (event) => {
     event.preventDefault(); key("Backspace");
   } else if (event.inputType === "deleteContentForward") {
     event.preventDefault(); key("Delete");
+  } else if (event.inputType === "insertFromPaste" || event.inputType === "insertFromDrop") {
+    // Some browsers deliver a paste only as an input event: same as the paste handler below.
+    event.preventDefault();
+    paste(event.dataTransfer?.getData("text/plain") || event.data || "");
   }
 });
 sink.addEventListener("compositionend", (event) => {
@@ -371,11 +372,16 @@ function clip(event, cut) {
 }
 sink.addEventListener("copy", (event) => clip(event, false));
 sink.addEventListener("cut", (event) => clip(event, true));
+function paste(text) {
+  stopTyping();
+  if (composing()) commit(state.text);
+  commit(text.slice(0, 5000));
+  change(live() ? context() : "");
+  changed();
+}
 sink.addEventListener("paste", (event) => {
   event.preventDefault();
-  settle();
-  commit((event.clipboardData.getData("text/plain") || "").slice(0, 5000));
-  changed();
+  paste(event.clipboardData.getData("text/plain") || "");
 });
 
 // The mouse: click places the caret, a drag selects, a double click selects a word, Shift extends.

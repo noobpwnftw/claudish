@@ -222,6 +222,8 @@ class Rewriter:
             consulted = consulted + ["window picture (%d×%d)" % (width, height)]
         system = spec["system"] + block
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
+        # What the model is sent: the text itself, or the mode's frame around it (continue).
+        sent = spec["frame"].replace("{text}", text) if spec.get("frame") else text
         count = spec.get("candidates") or 1
         if self.backend == "rules":
             # Deterministic stand-ins so the demo and tests work without a model.
@@ -237,7 +239,7 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("the agent is still working; keep typing or retry")
             try:
-                prompt = system + "\n\nText:\n" + text
+                prompt = system + "\n\nText:\n" + sent
                 try:
                     done = subprocess.run(self.command, input=prompt, capture_output=True, text=True,
                                           errors="replace", timeout=self.timeout)
@@ -253,7 +255,7 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("Claude busy; keep typing or retry")
             try:
-                output, usage = self.claude.rewrite(text, system, examples, image)
+                output, usage = self.claude.rewrite(sent, system, examples, image)
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost
@@ -275,7 +277,7 @@ class Rewriter:
                 guide = ("\n\nYou have tools. When the instruction needs facts you do not have (status, numbers, "
                          "names, contents), call a tool first and write from its result; never invent such facts.")
                 output, called = self.toolbox.run(ask, [{"role": "system", "content": system + guide}] + examples +
-                                                  [{"role": "user", "content": user_content(text, image, "openai")}])
+                                                  [{"role": "user", "content": user_content(sent, image, "openai")}])
                 outputs, usage, consulted = [output], {}, consulted + called
             finally:
                 self.lock.release()
@@ -285,7 +287,7 @@ class Rewriter:
                 raise RuntimeError("model busy; keep typing or retry")
             try:
                 payload = {"messages": [{"role": "system", "content": system}] + examples +
-                                        [{"role": "user", "content": user_content(text, image, "openai")}],
+                                        [{"role": "user", "content": user_content(sent, image, "openai")}],
                            "max_tokens": max_tokens, "temperature": 0,
                            "stream": False, "cache_prompt": True}
                 if self.model:
