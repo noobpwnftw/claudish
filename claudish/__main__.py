@@ -115,19 +115,12 @@ def main():
             profile, settings, prompt, context = config.resolve(args.config, args.profile, overrides)
         except (OSError, ValueError) as exc:
             parser.error(str(exc))
-        api_key = None
-        if settings["api_key_env"]:
-            api_key = os.environ.get(settings["api_key_env"])
-            if not api_key:
-                parser.error("environment variable %s is not set" % settings["api_key_env"])
         try:
-            rewriter = Rewriter(settings["backend"], settings["model_url"], settings["max_tokens"],
-                                settings["claude_model"], settings["model"], api_key, settings["timeout"], prompt,
-                                context, settings["modes"], settings["command"], settings["hosted"],
-                                settings["bindings"])
+            rewriter = Rewriter.from_settings(settings, prompt, context, profile)
+        except ValueError as exc:
+            parser.error(str(exc))
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
-        rewriter.profile = profile
         server = make_server(rewriter, args.port)
         if rewriter.hosted:
             target = ("the Anthropic API (%s)" % settings["claude_model"] if rewriter.claude

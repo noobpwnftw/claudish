@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import threading
@@ -80,6 +81,21 @@ class Claude:
 
 class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
+
+    @classmethod
+    def from_settings(cls, settings, prompt=None, context=None, profile=None):
+        """Build from config.resolve() output. ValueError if the profile's key variable is unset;
+        ImportError if the claude backend lacks the Anthropic SDK."""
+        api_key = None
+        if settings["api_key_env"]:
+            api_key = os.environ.get(settings["api_key_env"])
+            if not api_key:
+                raise ValueError("environment variable %s is not set" % settings["api_key_env"])
+        rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
+                       settings["model"], api_key, settings["timeout"], prompt, context, settings["modes"],
+                       settings["command"], settings["hosted"], settings["bindings"])
+        rewriter.profile = profile
+        return rewriter
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
