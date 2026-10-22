@@ -172,8 +172,9 @@ def check_ime_windows():
             listed = False
         results.append(("PIME launcher", "fail",
                         "a PIMELauncher process exists but serves no pipe (it crashed on start)" if listed else "not running",
-                        "on ARM64 install the x86 VC++ runtime; then start \"%s\" or sign out and back in"
-                        % (pime / "PIMELauncher.exe")))
+                        "%sstart \"%s\" or sign out and back in"
+                        % ("install the x86 VC++ runtime (above), then " if any(r[1] == "fail" for r in results)
+                           else "", pime / "PIMELauncher.exe")))
     return results
 
 

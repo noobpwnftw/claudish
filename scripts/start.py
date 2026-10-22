@@ -1,6 +1,7 @@
 """Start the model and IME service together; Ctrl+C stops both."""
 import argparse
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -33,6 +34,36 @@ def local_rewriter(endpoint, profile=None):
     return Rewriter.from_settings(settings, prompt, context, name)
 
 
+def bind_to_this_process(process):
+    """Windows: put the model in a job object that is killed when this process ends, however it
+    ends. `schtasks /end` (service uninstall) terminates start.py without running its cleanup,
+    which left llama-server running, holding its port and locking its DLLs."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class Limits(ctypes.Structure):  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION; only LimitFlags is set
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                    ("SchedulingClass", wintypes.DWORD), ("IoCounters", ctypes.c_uint64 * 6),
+                    ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    job = kernel32.CreateJobObjectW(None, None)
+    limits = Limits(LimitFlags=0x2000)  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not (job and kernel32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits))
+            and kernel32.AssignProcessToJobObject(job, int(process._handle))):
+        print("warning: could not tie llama-server to this process (error %d)" % ctypes.get_last_error(), flush=True)
+    return job  # the handle must stay open for the life of this process
+
+
 def main():
     parser = argparse.ArgumentParser(description="Start Claudish and its local model")
     arguments(parser)
@@ -55,6 +86,7 @@ def main():
     process = None
     try:
         process = subprocess.Popen(cmd)
+        job = bind_to_this_process(process)  # noqa: F841 (kept open until exit)
         opener = build_opener(ProxyHandler({}))
         deadline = time.monotonic() + 60
         while True:

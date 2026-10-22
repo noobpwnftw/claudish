@@ -6,7 +6,7 @@ Set-Location C:\claudish
 # remove it so the download_model fallback (curl.exe primes the store) is exercised.
 Get-ChildItem Cert:\LocalMachine\Root, Cert:\CurrentUser\Root | Where-Object Thumbprint -eq '925A8F8D2C6D04E0665F596AFF22D863E8256F3F' |
     ForEach-Object { "removing root: $($_.Subject)"; Remove-Item $_.PSPath }
-Remove-Item -Recurse -Force "$env:USERPROFILE\.config\claudish" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:USERPROFILE\.config\claudish", C:\claudish\models\*.gguf -ErrorAction SilentlyContinue
 function Health { try { (Invoke-RestMethod http://127.0.0.1:18765/health -TimeoutSec 2).backend } catch { 'down' } }
 python -m claudish setup --dry-run
 "--- yes"
@@ -17,3 +17,5 @@ try { "rewrite: " + (Invoke-RestMethod http://127.0.0.1:18765/suggest -Method Po
 "--- steps left"
 python -m claudish setup --dry-run | Select-String 'download|write|register|start '
 python -m claudish service uninstall
+Start-Sleep 2
+"llama-server left after uninstall: $([bool](Get-Process llama-server -ErrorAction SilentlyContinue))"

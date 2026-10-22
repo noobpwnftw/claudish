@@ -108,7 +108,8 @@ def step_ime():
         return "skip", "no input method for %s" % system, None
     if not problems:
         return "done", "; ".join(r[2] for r in results), None
-    return "manual", problems[0][2], "; then ".join(r[3] for r in problems if r[3])
+    return "manual", "; ".join("%s: %s" % (r[0], r[2]) for r in problems), \
+        "; then ".join(r[3] for r in problems if r[3])
 
 
 def step_service(name, settings):
