@@ -24,6 +24,7 @@ case "$1" in
     name=$(basename "$2" .ps1); rm -f "$vm/shared/results/$name.txt"
     cp "$2" "$vm/shared/jobs/$name.ps1"
     while [ ! -f "$vm/shared/results/$name.txt" ]; do sleep 2; done
-    cat "$vm/shared/results/$name.txt" ;;
+    # Windows PowerShell 5 may write UTF-16; print either as UTF-8.
+    python3 -c 'import sys; d = open(sys.argv[1], "rb").read(); print(d.decode("utf-16" if d[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"))' "$vm/shared/results/$name.txt" ;;
   *) echo "usage: $0 start|stop|logs|sync|bootstrap|run JOB.ps1" >&2; exit 2 ;;
 esac

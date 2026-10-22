@@ -7,7 +7,7 @@ foreach ($d in "jobs", "results", "done") { New-Item -ItemType Directory -Force 
 while ($true) {
   Get-ChildItem "$shared\jobs\*.ps1" -ErrorAction SilentlyContinue | ForEach-Object {
     $out = "$shared\results\$($_.BaseName).txt"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $_.FullName *> "$out.partial"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $_.FullName *>&1 | Out-File -Encoding utf8 "$out.partial"
     "exit=$LASTEXITCODE" | Out-File "$out.partial" -Append -Encoding utf8
     Move-Item -Force "$out.partial" $out
     Move-Item -Force $_.FullName "$shared\done\"

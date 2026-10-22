@@ -11,6 +11,12 @@ if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 "Python: $(python --version) $(python -c 'import platform; print(platform.machine())')"
 $pime = "${env:ProgramFiles(x86)}\PIME"
+# PIME's installer asks about the VC++ runtime in a dialog even with /S; install it silently first.
+# On ARM64 it wants both the ARM64 and the x64 runtime, and runs the x64 one interactively.
+foreach ($arch in 'arm64', 'x64') {
+  Invoke-WebRequest "https://aka.ms/vs/17/release/vc_redist.$arch.exe" -OutFile "C:\setup\vc_redist.$arch.exe"
+  Start-Process "C:\setup\vc_redist.$arch.exe" -ArgumentList '/install /quiet /norestart' -Wait
+}
 if (-not (Test-Path "$pime\python\textService.py")) {
   Invoke-WebRequest https://github.com/EasyIME/PIME/releases/download/v2.0.0-beta3/PIME-2.0.0-beta3-setup.exe -OutFile C:\setup\pime.exe
   Start-Process C:\setup\pime.exe -ArgumentList '/S' -Wait
