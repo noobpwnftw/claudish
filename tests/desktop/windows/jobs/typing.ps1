@@ -10,8 +10,7 @@ Start-Sleep 1
 function Get-Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
 function Reset-Target { [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
 Invoke-Scenarios
-# Classic Notepad is an IMM app: once the IME claims a key, the app gets VK_PROCESSKEY, so the
-# first shortcut press only commits; the second one reaches the app (as with navigation keys).
+# The first shortcut press commits (and is consumed); the second reaches the app.
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300
 Check 'a second Ctrl+A reaches Notepad (all selected)' ([Keys]::Selection($window.MainWindowHandle)) '0..5'
 

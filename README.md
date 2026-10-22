@@ -472,7 +472,7 @@ Enter commits composition first; press it again to send a newline. This first
 version edits composition at its end. Linux commits original wording before
 forwarding navigation and shortcuts. On Windows, the first navigation key
 commits composition and is consumed; press again to navigate. Ctrl/Alt/Win
-shortcuts commit your wording first; TSF-native apps then receive the shortcut, while classic (IMM) apps such as the classic Notepad need a second press, as with navigation keys. Characters typed with AltGr
+shortcuts pressed while composing commit your wording and are consumed; press the shortcut again to run it, as with navigation keys. Characters typed with AltGr
 (Ctrl+Alt) stay in the composition, as they do on Linux. Application-driven focus
 changes and composition termination need particular attention in Windows testing.
 

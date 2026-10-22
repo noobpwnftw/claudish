@@ -19,8 +19,9 @@ $area.SetFocus(); Start-Sleep 1
 function Get-Text { $value.Current.Value.TrimEnd("`r", "`n") }
 function Reset-Target { $value.SetValue(''); Start-Sleep -Milliseconds 200 }
 Invoke-Scenarios
-# TSF-native: the first shortcut press commits and then reaches the app.
+# The first shortcut press commits (and is consumed); the second reaches the app.
+[Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x2E); Start-Sleep -Milliseconds 300  # Delete removes the selection Ctrl+A made
-Check 'the same Ctrl+A reached Edge (all selected)' (Get-Text) ''
+Check 'a second Ctrl+A reaches Edge (all selected)' (Get-Text) ''
 Stop-Process -Name msedge -Force
 Complete-Scenarios

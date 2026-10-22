@@ -51,7 +51,7 @@ def main():
             # Ctrl/Alt shortcuts mid-composition: commit the wording first, then pass the key on.
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
             reply = key(ord("C"), modifiers=(0x11,))
-            assert reply["commitString"] == "hello—world" and not reply["return"], reply
+            assert reply["commitString"] == "hello—world" and reply["return"], reply  # committed, key consumed
             for char in "hello-world":
                 key(ord(char.upper()), ord(char))
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True

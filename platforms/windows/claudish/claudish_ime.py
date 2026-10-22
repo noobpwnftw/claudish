@@ -52,8 +52,8 @@ class ClaudishTextService(TextService):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
-            # Mid-composition, take the key so onKeyDown can commit the wording first; it then
-            # passes the shortcut on. Left to TSF, the composition was discarded (Ctrl+A lost it).
+            # Mid-composition, take the key so onKeyDown commits the wording. Left to TSF, the
+            # composition was discarded (Ctrl+A lost the typed text).
             return bool(self.state.text)
         return event.isPrintableChar() or bool(self.state.text)
 
@@ -88,10 +88,11 @@ class ClaudishTextService(TextService):
                     self.showMessage("cd_AI: the request failed; Enter retries", 3)
         key = event.keyCode
         if self.shortcut(event):
-            # Commit the wording, then let the app have its shortcut (not eaten).
+            # Commit the wording and consume the key; pressing the shortcut again runs it. Passing
+            # it on (not eaten after the test phase said eaten) made Edge drop the composition.
             self.setCommitString(self.state.commit())
             self.changed()
-            return False
+            return True
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
