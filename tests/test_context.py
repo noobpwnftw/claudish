@@ -106,5 +106,36 @@ class ContextTests(unittest.TestCase):
             thread.join()
 
 
+class MCPContextTests(unittest.TestCase):
+    """Real stdio MCP round trips; skipped unless the optional MCP SDK is installed."""
+
+    def setUp(self):
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        self.server = [sys.executable, str(Path(__file__).with_name("mcp_server.py"))]
+
+    def test_tool_resource_env_and_failures(self):
+        with patch.dict("os.environ", {"SECRET_FOR_TEST": "t-42"}):
+            context = Context([
+                {"type": "mcp", "name": "pr", "command": self.server, "tool": "pull_request_diff",
+                 "arguments": {"number": 7}, "env": {"TEST_TOKEN": "$SECRET_FOR_TEST"}, "timeout": 20},
+                {"type": "mcp", "command": self.server, "resource": "notes://style", "timeout": 20},
+                {"type": "mcp", "name": "broken", "command": self.server, "tool": "broken", "timeout": 20}])
+        block = context.render()
+        self.assertIn('<context name="pr">\nPR #7: + retry the flaky upload (token t-42)\n</context>', block)
+        self.assertIn("Prefer em dashes.", block)
+        self.assertNotIn('name="broken"', block)
+        self.assertIn("broken", context.providers[2].error)
+
+    def test_spec_validation(self):
+        for spec, message in [({"type": "mcp", "command": self.server}, "exactly one"),
+                              ({"type": "mcp", "command": self.server, "tool": "a", "resource": "b"}, "exactly one"),
+                              ({"type": "mcp", "command": self.server, "tool": "a", "env": {"A": 1}}, "env")]:
+            with self.assertRaisesRegex(ValueError, message):
+                Context([spec])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -174,7 +174,21 @@ blocking a rewrite. Context goes into the system prompt, ahead of your text, so 
 local llama.cpp server reuses its prompt cache while you type. Adapters may also
 send the text around the caret as `before`/`after` in `/suggest`. Context goes
 to the profile's backend, so with a hosted backend it leaves the machine like
-your text does. MCP context sources are next.
+your text does.
+
+MCP servers can supply context too (`pip install "claudish-ime[mcp]"`). Claudish
+starts the configured stdio server, calls one tool or reads one resource, and
+caches the text:
+
+```json
+{"type": "mcp", "name": "PR diff", "command": ["github-mcp-server", "stdio"],
+ "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"},
+ "tool": "get_pull_request_diff", "arguments": {"owner": "me", "repo": "app", "pullNumber": 42},
+ "ttl": 120, "timeout": 15}
+```
+
+`"$NAME"` values in `env` are read from your environment, so tokens stay out of
+the config file. Use `"resource": "uri"` instead of `"tool"` to read a resource.
 
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies

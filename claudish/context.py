@@ -3,6 +3,8 @@
 Providers come only from the user's config file, never from a request:
   {"type": "file", "path": "~/notes/style.md"}
   {"type": "command", "command": ["git", "-C", "~/repo", "diff", "main...HEAD"], "ttl": 30}
+  {"type": "mcp", "command": ["github-mcp-server", "stdio"], "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},
+   "tool": "get_pull_request_diff", "arguments": {"owner": "o", "repo": "r", "pullNumber": 1}}
 The request may add the text around the caret ("before"/"after").
 """
 import os
@@ -13,7 +15,8 @@ import time
 from pathlib import Path
 
 PROVIDER_KEYS = {"file": {"type", "name", "path", "ttl"},
-                 "command": {"type", "name", "command", "ttl", "timeout", "cwd"}}
+                 "command": {"type", "name", "command", "ttl", "timeout", "cwd"},
+                 "mcp": {"type", "name", "command", "env", "cwd", "tool", "arguments", "resource", "ttl", "timeout"}}
 
 
 class Provider:
@@ -45,10 +48,27 @@ class Provider:
             self.timeout = float(spec.get("timeout", 5))
             self.cwd = os.path.expanduser(spec["cwd"]) if spec.get("cwd") else None
             self.name = spec.get("name") or " ".join(command)
+        if kind == "mcp":
+            try:
+                import mcp  # noqa: F401  Optional dependency: pip install "claudish-ime[mcp]"
+            except ImportError:
+                raise ValueError('mcp context needs the MCP SDK: pip install "claudish-ime[mcp]"')
+            self.tool, self.resource = spec.get("tool"), spec.get("resource")
+            if bool(self.tool) == bool(self.resource):
+                raise ValueError('mcp context needs exactly one of "tool" or "resource"')
+            self.arguments = spec.get("arguments") or {}
+            env = spec.get("env") or {}
+            if not (isinstance(env, dict) and all(isinstance(v, str) for v in env.values())):
+                raise ValueError("mcp env must map names to strings")
+            # "$NAME" values come from the environment, so tokens stay out of the config file.
+            self.env = {key: os.path.expandvars(value) for key, value in env.items()}
+            self.name = spec.get("name") or self.tool or self.resource
 
     def read(self):
         if self.kind == "file":
             return self.path.read_text(encoding="utf-8", errors="replace")
+        if self.kind == "mcp":
+            return read_mcp(self)
         # A list of arguments, no shell: the command is exactly what the config says.
         result = subprocess.run(self.command, capture_output=True, text=True, errors="replace",
                                 timeout=self.timeout, cwd=self.cwd)
@@ -62,11 +82,40 @@ class Provider:
             if time.monotonic() >= self.expires:
                 try:
                     self.cached = self.read().strip()
-                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                except (OSError, RuntimeError, TimeoutError, subprocess.TimeoutExpired) as exc:
                     self.cached = None
                     self.error = str(exc)
                 self.expires = time.monotonic() + self.ttl
             return self.cached
+
+
+def read_mcp(provider):
+    """Start the configured stdio MCP server, call one tool or read one resource, and return its text."""
+    import anyio
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    async def fetch():
+        with anyio.fail_after(provider.timeout):
+            parameters = StdioServerParameters(command=provider.command[0], args=provider.command[1:],
+                                               env={**os.environ, **provider.env}, cwd=provider.cwd)
+            async with stdio_client(parameters) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+                    if provider.tool:
+                        result = await session.call_tool(provider.tool, provider.arguments)
+                        if getattr(result, "is_error", False) or not hasattr(result, "content"):
+                            raise RuntimeError("MCP tool %s failed" % provider.tool)
+                        return "\n".join(block.text for block in result.content if getattr(block, "type", "") == "text")
+                    result = await session.read_resource(provider.resource)
+                    return "\n".join(item.text for item in getattr(result, "contents", []) if getattr(item, "text", None))
+
+    try:
+        return anyio.run(fetch)
+    except TimeoutError:
+        raise
+    except Exception as exc:  # The SDK raises various types; a failed source must not break the rewrite.
+        raise RuntimeError("MCP %s: %s" % (provider.name, exc))
 
 
 class Context:
