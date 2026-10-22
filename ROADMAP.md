@@ -6,12 +6,18 @@ field. Claudish makes that input method the way you talk to machines, in three
 layers: translation (rewrite), autocomplete (continue), and instruction
 (instruct). An agent CLI is a text box and Enter, and even its interactive parts
 are choices that fit an input method's candidate list. So the input method can
-host the whole agent loop in any app, and in a terminal. Configure the brain
+host a turn of an agent in any app, and in a terminal. Configure the brain
 once (local models, APIs, agent CLIs, context, MCP), then just type. Each step
 must earn trust: typed text is never lost, nothing lands without a key you
 pressed, local is the default and nothing goes where the user did not
 configure, and latency feels like typing. See
 [docs/design/interaction.md](docs/design/interaction.md).
+
+Scope (owner, 2026-10-23): an input method, not a chat app. Turn-based
+autocomplete and one-line tasks, done extremely well, with context carried
+between invocations; no chat window, transcript, or panels ("you do that in a
+real app"). Every goal below is held to that; see the scope section of the
+design.
 
 All work through G13 was merged to `main` on 2026-10-22 (`4cdebf8`), and CI passed on every branch.
 

@@ -1,5 +1,9 @@
 # Design: how instruct calls models and tools
 
+Scope: each instruction is one turn at the caret; the conversation is only the
+context carried between turns in a text box, never a chat surface
+([interaction.md](interaction.md#scope-an-input-method-not-a-chat-app)).
+
 Instruct is the AI integration path: an instruction typed at the caret becomes model
 calls, tool calls, and finally text you choose to insert. Today it has three
 separate paths that behave differently. This page makes them one pipeline.
@@ -86,8 +90,8 @@ the next turn resumes it by session id (`--resume`).
 
 - the text box goes away (its input context is destroyed);
 - it has been idle for a while (30 minutes by default);
-- you ask: a slash command such as `/new`, if it ever comes to that (owner); the
-  idle timeout and the text box's lifetime cover the common cases.
+- nothing else: no slash commands or history to manage (scope: an input method,
+  not a chat app); the idle timeout and the text box's lifetime cover it.
 
 Conversations live only in the service's memory, never on disk, and are dropped
 when they end.

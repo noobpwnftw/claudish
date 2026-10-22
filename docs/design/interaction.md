@@ -2,6 +2,25 @@
 
 Status: proposal, 2026-10-22. Owner direction; maintained in ROADMAP as G18–G19.
 
+## Scope: an input method, not a chat app
+
+Owner, 2026-10-23: "this is an IME, it does not bring a chat window, you do that
+in a real app, we do turn based autocompletes and one line tasks extremely well,
+and have some context along the invocations, that's all we gonna do."
+
+- **In:** suggestions while you type (continue, rewrite); one-line tasks typed at
+  the caret (instruct), answered with drafts to pick; small choices in the
+  candidate list (an agent's permission question); and context carried between
+  invocations in the same text box (earlier instructions, tool results, the text
+  box itself) so a follow-up works.
+- **Out:** a chat window, a transcript you scroll or reopen, a history browser,
+  panels, slash-command menus, long-running tasks you supervise, or anything
+  else that belongs in a real app. The agent's loop runs out of sight; what you
+  see is a status line, a question, and drafts.
+- **Test for new work:** does it make one turn at the caret better? If it needs a
+  surface beyond the composition, the candidate list, and the status line, it is
+  out of scope.
+
 ## The idea
 
 We operate computers with a keyboard and a mouse, and in a terminal only the
@@ -22,7 +41,7 @@ An input method already has every piece of that interaction:
 | "put the result here" | commit at the caret, which becomes one undo step in the app |
 | cancel | Esc |
 
-So anything more capable than a flat notepad can host the whole loop, and it
+So anything more capable than a flat notepad can host a turn of the loop, and it
 works the same in an editor, a browser, a chat app, or a terminal. Users of
 Chinese and Japanese input methods have used these exact controls (candidates,
 number keys, Enter, Esc) all day for decades. None of it is new to them.
