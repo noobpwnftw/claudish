@@ -396,6 +396,15 @@ Sign out/in and select **cd_AI — Claudish** using Win+Space. Run the model and
 service in a normal user terminal. The plugin uses PIME's embedded Python;
 the model/service use your separate Python 3.10+ installation.
 
+**Windows on ARM:** use a PIME build with ARM64X support (newer than
+2.0.0-beta3; the [AppVeyor master builds](https://ci.appveyor.com/project/EasyIME/pime)
+have it), and install the
+[x86 VC++ runtime](https://aka.ms/vs/17/release/vc_redist.x86.exe). PIME's launcher is
+an x86 program; without that runtime it finds an ARM64 `vcruntime140.dll` on your
+`PATH` (Python for ARM64 puts one there) and fails with error `0xc000007b`, so every
+PIME input method types plain text. Verified on Windows 11 ARM64 (build 26100) in
+classic Notepad: 9 typing scenarios, `tests/desktop/windows`.
+
 To remove Claudish, remove its input profile in Windows settings, then remove
 `PIME\python\input_methods\claudish`. Keep PIME itself if you use other PIME input
 methods.
@@ -463,7 +472,7 @@ Enter commits composition first; press it again to send a newline. This first
 version edits composition at its end. Linux commits original wording before
 forwarding navigation and shortcuts. On Windows, the first navigation key
 commits composition and is consumed; press again to navigate. Ctrl/Alt/Win
-shortcuts pass through to TSF and the application; characters typed with AltGr
+shortcuts pressed while composing commit your wording and are consumed; press the shortcut again to run it, as with navigation keys. Characters typed with AltGr
 (Ctrl+Alt) stay in the composition, as they do on Linux. Application-driven focus
 changes and composition termination need particular attention in Windows testing.
 

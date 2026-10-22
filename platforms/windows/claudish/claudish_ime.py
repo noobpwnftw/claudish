@@ -4,6 +4,18 @@ from .composition import Composition
 from .client import Suggestions
 
 
+def keylog(*fields):
+    """Opt-in diagnostics: CLAUDISH_KEYLOG=path appends key routing events. Never logs typed text."""
+    import os
+    path = os.environ.get("CLAUDISH_KEYLOG")
+    if path:
+        try:
+            with open(path, "a") as log:
+                log.write(" ".join(str(field) for field in fields) + "\n")
+        except OSError:
+            pass
+
+
 def focused_app():
     """The foreground window's program name (for bindings), such as "notepad.exe"; None elsewhere."""
     try:
@@ -46,17 +58,22 @@ class ClaudishTextService(TextService):
         self.state.change("")
 
     def filterKeyDown(self, event):
+        keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
         if not self.keyboardOpen:
             return False
         if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
-        # Preserve Ctrl/Alt/Win shortcuts. TSF owns external composition termination.
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
+        if self.shortcut(event):
+            # Mid-composition, take the key so onKeyDown commits the wording. Left to TSF, the
+            # composition was discarded (Ctrl+A lost the typed text).
+            return bool(self.state.text)
+        return event.isPrintableChar() or bool(self.state.text)
+
+    def shortcut(self, event):
         altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and event.isPrintableChar()
                  and not (event.isKeyDown(0x5B) or event.isKeyDown(0x5C)))
-        if not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C)):
-            return False
-        return event.isPrintableChar() or bool(self.state.text)
+        return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 
     def publish(self):
         self.setCompositionString(self.state.text)
@@ -72,6 +89,7 @@ class ClaudishTextService(TextService):
         self.publish()
 
     def onKeyDown(self, event):
+        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         result = self.worker.poll() if self.worker else None
         if result:
@@ -83,6 +101,12 @@ class ClaudishTextService(TextService):
                 if self.state.failed:
                     self.showMessage("cd_AI: the request failed; Enter retries", 3)
         key = event.keyCode
+        if self.shortcut(event):
+            # Commit the wording and consume the key; pressing the shortcut again runs it. Passing
+            # it on (not eaten after the test phase said eaten) made Edge drop the composition.
+            self.setCommitString(self.state.commit())
+            self.changed()
+            return True
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
@@ -128,6 +152,7 @@ class ClaudishTextService(TextService):
         return True
 
     def onCompositionTerminated(self, forced):
+        keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
         self.state.change("")
         if self.worker:

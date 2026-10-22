@@ -48,8 +48,13 @@ def main():
             assert reply["compositionString"] == "hello—world"
             # A modifier and a shortcut must not consume or rewrite composition.
             assert not key(0x10, method="filterKeyDown")["return"]
-            assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
-            assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"]
+            # Ctrl/Alt shortcuts mid-composition: commit the wording first, then pass the key on.
+            assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
+            reply = key(ord("C"), modifiers=(0x11,))
+            assert reply["commitString"] == "hello—world" and reply["return"], reply  # committed, key consumed
+            for char in "hello-world":
+                key(ord(char.upper()), ord(char))
+            assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True
             assert service.state.text == "hello—world"
             # AltGr arrives as Ctrl+Alt; a printable result belongs in the phrase.
             assert key(ord("Q"), ord("@"), "filterKeyDown", modifiers=(0x11, 0x12))["return"]
@@ -90,6 +95,8 @@ def main():
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
             assert key(0x0D)["commitString"] == "Once upon a time."
             worker_class.return_value.poll.return_value = None
+            assert service.state.text == ""  # nothing composed: shortcuts are not taken at all
+            assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
             service.handleRequest({"method": "onDeactivate"})

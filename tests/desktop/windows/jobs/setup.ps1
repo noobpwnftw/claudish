@@ -12,8 +12,9 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [En
 "Python: $(python --version) $(python -c 'import platform; print(platform.machine())')"
 $pime = "${env:ProgramFiles(x86)}\PIME"
 # PIME's installer asks about the VC++ runtime in a dialog even with /S; install it silently first.
-# On ARM64 it wants both the ARM64 and the x64 runtime, and runs the x64 one interactively.
-foreach ($arch in 'arm64', 'x64') {
+# On ARM64 it wants the ARM64 and x64 runtimes (the x64 one interactively), and PIMELauncher.exe is x86:
+# without the x86 runtime it finds an ARM64 vcruntime140.dll on PATH and fails with 0xc000007b.
+foreach ($arch in 'arm64', 'x64', 'x86') {
   Invoke-WebRequest "https://aka.ms/vs/17/release/vc_redist.$arch.exe" -OutFile "C:\setup\vc_redist.$arch.exe"
   Start-Process "C:\setup\vc_redist.$arch.exe" -ArgumentList '/install /quiet /norestart' -Wait
 }

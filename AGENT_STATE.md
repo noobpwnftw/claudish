@@ -14,12 +14,11 @@ Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
   - G05: CONTRIBUTING.md.
 
   The full gate `check.py --model --desktop` passes.
-- Windows: `tests/desktop/windows` is merged. VM `claudish-windows` (dockur Windows 11
-  ARM64 Enterprise evaluation; `~/vm/claudish-windows`; account Docker/admin, a local
-  throwaway) is installed and set up with PIME 2.0.0-beta3 and Claudish. Typing is
-  blocked upstream: the TSF client never reaches PIME's backend (see ROADMAP G01
-  for the evidence and next steps). Use `vm.sh run jobs/*.ps1`; after a sign-out,
-  sign in with `vmkeys.py admin --enter`.
+- Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
+  `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
+  master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
+  jobs/deploy.ps1 40`, `vm.sh run jobs/typing.ps1 90`. `vmscreen.sh OUT.png
+  ['sendkey …']` gives a screenshot in about 1 s; `vmkeys.py` types exact text.
 - Owner direction: Claudish is a configurable entry point for AI at the caret
   (models, then context, then modes, then agentic instruct, G17). Model quality
   belongs to the model. The name and the em dashes stay. Use the Spark
