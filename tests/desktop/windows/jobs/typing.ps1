@@ -1,3 +1,4 @@
+# Status: blocked upstream on Windows 11 ARM64 + PIME 2.0.0-beta3 (keys arrive as plain text; see ROADMAP G01).
 # Inside the Windows VM: real keystrokes through TSF and PIME into classic Notepad (an IMM32 Edit
 # control, reached through Windows' TSF compatibility layer); text read back with WM_GETTEXT.
 $ErrorActionPreference = 'Stop'
