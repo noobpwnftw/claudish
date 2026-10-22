@@ -90,7 +90,7 @@ $window = (Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Ob
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
 function Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
-function Clear { [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
+function Reset-Notepad {  # not "Clear": the clear alias (Clear-Host) would win [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
 
 # 4. Scenarios (same intent as the Linux desktop test).
 [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
@@ -98,23 +98,23 @@ Check 'composition is not committed while typing' (Text) ''
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500
 $dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
 Check 'Enter commits your wording, dash substituted' (Text) "hello${dash}world"
-Clear
+Reset-Notepad
 [Keys]::Type('very important'); Start-Sleep -Milliseconds 800
 [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
 Check 'Tab accepts the rewrite' (Text) 'particularly crucial'
-Clear
+Reset-Notepad
 [Keys]::Type('very'); Start-Sleep -Milliseconds 800
 [Keys]::Type(' good'); [Keys]::Press(0x09); Start-Sleep -Milliseconds 300
 Check 'Tab right after an edit commits nothing stale' (Text) ''
 Start-Sleep -Milliseconds 800; [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
 Check 'fresh candidate after the edit' (Text) 'particularly good'
-Clear
+Reset-Notepad
 [Keys]::Type('say hi'); [Keys]::Press(0x76); [Keys]::Press(0x76)
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
 Check 'instruct holds the text until it is inserted' (Text) ''
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
 Check 'F7 to instruct, Enter sends, Enter inserts' (Text) "As requested${dash}say hi."
-Clear
+Reset-Notepad
 [Keys]::Type('draft'); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400  # Ctrl+A mid-composition
 Check 'Ctrl shortcut keeps the composed text' (Text) 'draft'
