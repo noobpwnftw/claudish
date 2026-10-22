@@ -27,9 +27,13 @@ session. The browser demo has been tested with actual inference in Chromium.
 ## Start the model and service
 
 Python 3.10+ runs the service. It has no pip runtime dependencies. Run commands
-from this project directory. Install the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli)
-and obtain a [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build for
-your OS/GPU. Keep its DLLs/shared libraries beside its executable.
+from this project directory. Obtain a [llama.cpp](https://github.com/ggml-org/llama.cpp/releases)
+build for your OS/GPU. Keep its DLLs/shared libraries beside its executable.
+
+The download script uses only the standard library. It fetches the pinned
+upstream revision of the model into `models/` and installs it only after its size
+and SHA-256 match the tested file; an interrupted download leaves nothing behind.
+A verified model is not downloaded again. Set `HF_ENDPOINT` to use a mirror.
 
 ```sh
 python scripts/download_model.py small
