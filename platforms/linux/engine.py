@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
-from claudish.composition import LABELS, Composition
+from claudish.composition import LABELS, MAX_COMPOSITION, Composition
 from claudish.client import Suggestions
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
@@ -98,6 +98,17 @@ class ClaudishEngine(IBus.Engine):
                                       app=self.app)
         self.render()
 
+    def before_caret(self):
+        """The app's text before the caret, when the client shares it (IBus surrounding text; GTK
+        refreshes it before each key event). "" when it does not."""
+        if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
+            return ""
+        try:
+            text, cursor, _anchor = self.get_surrounding_text()
+        except Exception:  # not every client implements it
+            return ""
+        return (text.get_text() if text else "")[:cursor][-MAX_COMPOSITION:]
+
     def live_key(self, keyval):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.composition
@@ -121,6 +132,8 @@ class ClaudishEngine(IBus.Engine):
             return False  # the app deletes the character
         char = IBus.keyval_to_unicode(keyval)
         if char and char.isprintable():
+            if not state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
+                state.change(self.before_caret())
             typed = state.type_live(char)
             self.changed()
             self.commit_text(IBus.Text.new_from_string(typed))
@@ -133,6 +146,7 @@ class ClaudishEngine(IBus.Engine):
         if self.composition.live:  # nothing is held back in continue mode: just start over
             self.composition.change("")
             self.changed()
+            self.refresh_surrounding()
             return
         text = self.composition.commit(suggested)
         self.changed()
@@ -222,6 +236,7 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
+        self.refresh_surrounding()
 
     def do_focus_out(self):
         # IBus commits the visible preedit through PreeditFocusMode.COMMIT.
@@ -230,9 +245,19 @@ class ClaudishEngine(IBus.Engine):
     def do_disable(self):
         self.finish()
 
+    def refresh_surrounding(self):
+        """Ask the client for fresh surrounding text now; IBus answers a later read from its cache,
+        so asking only when a key arrives returns stale text."""
+        if getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
+            try:
+                self.get_surrounding_text()
+            except Exception:
+                pass
+
     def do_reset(self):
         self.composition.change("")
         self.changed()
+        self.refresh_surrounding()
 
     def do_destroy(self):
         GLib.source_remove(self.timer)

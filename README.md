@@ -39,7 +39,7 @@ for inputs, outputs, fidelity, and model comparisons.
 Status:
 
 - **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
-  key events in containers (`scripts/check.py --desktop`): X11 (25 scenarios), and
+  key events in containers (`scripts/check.py --desktop`): X11 (26 scenarios), and
   GNOME Shell 46 on Wayland, headless, with IBus started by the shell and keys typed
   through Mutter's RemoteDesktop API (10 scenarios); plus `claudish service` under a
   real systemd user manager. Qt apps and KDE are not yet tested. On GNOME, a

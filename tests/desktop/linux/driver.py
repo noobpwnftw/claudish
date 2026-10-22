@@ -215,6 +215,54 @@ def agent_session(service):
     return service
 
 
+def surrounding_context(service):
+    """Continue begins from the app's text before the caret (IBus surrounding text). The service
+    never logs typed text, so a recording stub takes its port for this one check."""
+    import http.server
+    import threading
+    service.terminate()
+    service.wait(timeout=5)
+    received = []
+
+    class Stub(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"backend": "stub", "modes": ["continue", "instruct", "rewrite"]}')
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path == "/suggest":
+                received.append(body.get("text"))
+                reply = {"text": body["text"] + "and then some.", "candidates": [body["text"] + "and then some."]}
+                self.send_response(200)
+            else:  # no agent sessions here
+                reply = {"error": "no sessions"}
+                self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(reply).encode())
+
+    stub = http.server.ThreadingHTTPServer(("127.0.0.1", 18765), Stub)
+    threading.Thread(target=stub.serve_forever, daemon=True).start()
+    try:
+        focus("other")
+        key("ctrl+a", "BackSpace")
+        key("F7")  # instruct -> rewrite
+        type_text("Pasted words.")
+        key("Return")  # commits your words: the field now holds text that was never typed in continue
+        key("F7")  # rewrite -> continue, with nothing typed in continue yet
+        type_text(" We ship ")
+        wait_for(lambda: received, what="a continue request")
+        check("continue begins from the text already there", received[-1], "Pasted words. We ship ")
+    finally:
+        stub.shutdown()
+        stub.server_close()
+
+
 def health():
     try:
         from urllib.request import urlopen
@@ -271,6 +319,7 @@ def main():
     try:
         scenarios()
         service = agent_session(service)
+        surrounding_context(service)
     except TimeoutError:
         print("--- service log\n" + (WORK / "python3.log").read_text()[-3000:], flush=True)
         raise

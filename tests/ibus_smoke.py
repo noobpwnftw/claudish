@@ -63,6 +63,12 @@ try:
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.ghost
     assert not engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)  # the app deletes; the context follows
     assert engine.composition.text == "say hi! Hello—truly"
+    # A fresh start in continue (after a click or a paste) begins from the app's text before the caret.
+    engine.composition.change("")
+    engine.before_caret = lambda: "Pasted words. "
+    assert engine.do_process_key_event(ord("W"), 0, 0)
+    assert engine.composition.text == "Pasted words. W", engine.composition.text
+    del engine.before_caret
     assert engine.do_process_key_event(IBus.KEY_F7, 0, 0) and engine.composition.mode == "instruct"
     assert engine.composition.text == ""  # the words are in the app already
     # Instruct holds the text; Enter sends it, and the next Enter inserts the result.
