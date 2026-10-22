@@ -10,6 +10,11 @@ from urllib.request import Request, build_opener, ProxyHandler
 
 from claudish import capture
 from claudish.composition import Composition
+
+
+def to_mode(state, mode):
+    while state.mode != mode:
+        state.next_mode()
 from claudish.model import Rewriter, user_content
 from claudish.server import make_server
 
@@ -22,7 +27,7 @@ class CompositionTests(unittest.TestCase):
         state.insert("x")
         self.assertFalse(state.toggle_look())  # rewrite mode
         state.commit()
-        state.next_mode(), state.next_mode()
+        to_mode(state, "instruct")
         state.insert("x")
         revision = state.revision
         self.assertTrue(state.toggle_look() and state.look)

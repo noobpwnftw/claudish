@@ -1,7 +1,10 @@
 """Platform-neutral IME state. Keep compatible with PIME's Python 3.6+."""
 
 MAX_COMPOSITION = 512
-MODES = ("rewrite", "continue", "instruct")  # F7 cycles through these in every adapter.
+# F7 cycles through these in every adapter. Switching to cd_AI starts in continue, which types like
+# en_US (your keys go straight in) and only adds a suggestion you can take with Tab; one F7 asks
+# for something (instruct), a second polishes your words (rewrite).
+MODES = ("continue", "instruct", "rewrite")
 LABELS = {"rewrite": "Tab: ", "continue": "Tab continues: ", "instruct": "Enter inserts: "}
 
 
@@ -115,10 +118,10 @@ class Composition:
         return self.mode == "continue"
 
     def type_live(self, char):
-        """Continue mode: what to commit for this key now (the dash substitution included)."""
-        typed = "—" if char == "-" else char
-        self.change((self.text + typed)[-MAX_COMPOSITION:])
-        return typed
+        """Continue mode: what to commit for this key now. Exactly the key: continue types like
+        en_US (hyphens in URLs and commands stay hyphens); em dashes come from the model."""
+        self.change((self.text + char)[-MAX_COMPOSITION:])
+        return char
 
     def take_ghost(self):
         """Tab in continue mode: the suggestion to commit, or "" (then Tab belongs to the app)."""

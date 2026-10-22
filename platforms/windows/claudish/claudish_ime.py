@@ -196,7 +196,7 @@ class ClaudishTextService(TextService):
                                               else "no window picture"), 2)
                 self.publish()
             return bool(self.state.text)
-        if key == 0x76:  # F7 switches mode: rewrite, continue, instruct.
+        if key == 0x76:  # F7 switches mode: continue, instruct, rewrite.
             if self.state.mode == "rewrite" and self.state.text:
                 self.setCommitString(self.state.text)  # continue types into the app: the held words go in
             self.state.next_mode()

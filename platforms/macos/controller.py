@@ -209,7 +209,7 @@ class ClaudishInputController(IMKInputController):
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True
-        if key == 98:  # F7 switches mode: rewrite, continue, instruct (the input method's key while active).
+        if key == 98:  # F7 switches mode: continue, instruct, rewrite (the input method's key while active).
             entering_live = self.state.mode == "rewrite" and self.state.text
             self.state.next_mode()
             if entering_live:  # continue types into the app: the held words go in, and stay as context

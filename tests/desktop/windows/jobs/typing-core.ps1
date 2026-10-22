@@ -91,6 +91,10 @@ for ($i = 0; $i -lt 50; $i++) { try { Invoke-RestMethod http://127.0.0.1:18765/h
 
 function Invoke-Scenarios {
   # Scenarios (same intent as the Linux desktop test).
+  [Keys]::Type('ls -la'); Start-Sleep -Milliseconds 300  # switching to cd_AI types like en_US
+  Check 'cd_AI starts in continue: keys go straight in' (Get-Text) 'ls -la'
+  Reset-Target
+  [Keys]::Press(0x76); [Keys]::Press(0x76)  # continue -> instruct -> rewrite
   [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
   Check 'composition is not committed while typing' (Get-Text) ''
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500

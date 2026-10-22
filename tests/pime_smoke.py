@@ -42,6 +42,13 @@ def main():
                     "charCode": char, "keyCode": code, "repeatCount": 1,
                     "scanCode": 0, "isExtended": False, "keyStates": states})
 
+            # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
+            assert service.state.mode == "continue"
+            typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
+            assert typed == "ls -la", typed
+            assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
+            service.state.mode = "rewrite"  # the rest exercises rewrite
+            service.state.change("")
             for char in "hello-world":
                 assert key(ord(char.upper()), ord(char), "filterKeyDown")["return"]
                 reply = key(ord(char.upper()), ord(char))
@@ -135,7 +142,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, continue by default, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":

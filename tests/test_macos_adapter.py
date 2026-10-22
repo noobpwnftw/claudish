@@ -127,9 +127,24 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller = self.module.ClaudishInputController().initWithServer_delegate_client_(
             object(), None, self.client)
         self.controller.activateServer_(None)
+        self.controller.state.mode = "rewrite"  # these tests exercise rewrite; a new session starts in continue
 
     def tearDown(self):
         self.controller.inputControllerWillClose()
+
+    def test_switching_to_cd_ai_types_like_en_us(self):
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, self.client)
+        fresh.activateServer_(None)
+        try:
+            self.assertEqual(fresh.state.mode, "continue")
+            for char in "ls -la":
+                self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
+                    type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0, characters=lambda c=char: c), self.client))
+            self.assertEqual("".join(self.client.commits), "ls -la")  # straight in; the hyphen stays a hyphen
+            self.assertFalse(fresh.handleEvent_client_(types.SimpleNamespace(  # Tab with nothing offered is the app's
+                type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t"), self.client))
+        finally:
+            fresh.inputControllerWillClose()
 
     def key(self, code, text="", flags=0):
         event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: code,

@@ -74,6 +74,11 @@ def doctor():
 
 def scenarios():
     focus("entry")
+    type_text("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
+    time.sleep(0.3)
+    check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
+    key("ctrl+a", "BackSpace")
+    key("F7", "F7")  # continue -> instruct -> rewrite
     type_text("hello-world")
     settle()
     check("composition is not committed while typing", state()["entry"], "")

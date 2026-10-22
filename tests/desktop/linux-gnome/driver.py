@@ -122,6 +122,11 @@ def settle(seconds=0.8):
 
 def scenarios(keys):
     focus("entry")
+    keys.type("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
+    time.sleep(0.4)
+    check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
+    keys.press("ctrl+a", "BackSpace")
+    keys.press("F7", "F7")  # continue -> instruct -> rewrite
     keys.type("hello-world")
     settle()
     check("composition is not committed while typing", state()["entry"], "")

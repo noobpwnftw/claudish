@@ -6,7 +6,9 @@ English goes in. Em dashes come out.
 
 An input method for Linux (IBus), Windows (PIME/TSF), and macOS
 (InputMethodKit) that puts AI at the caret of every app. It works in three
-layers, one per mode; F7 switches between them while you type:
+layers, one per mode; F7 switches between them while you type. Switching from
+en_US to cd_AI starts in the second: you type as usual, keys go straight in, and
+AI only appears as a suggestion you can ignore.
 
 1. **Translation**, which is what an input method does. Keystrokes go in and text
    comes out in another language; here, the language is Claudish: polished,
@@ -104,9 +106,9 @@ Or step by step:
 
 | Key | Does |
 | --- | --- |
-| F7 | switch layer: rewrite → continue → instruct |
+| F7 | switch layer: continue → instruct → rewrite |
 | Tab | accept the candidate; in continue, take the rest of the sentence (with nothing offered, Tab is the app's) |
-| Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
+| Enter | the app's in continue; send, then insert (instruct); keep your wording (rewrite) |
 | Esc | keep what you typed |
 | F8 | in instruct, also send a picture of the window you are typing in |
 | 1–3 | when an instruction comes back as a numbered list, insert that reading; when an agent asks, answer |
@@ -615,7 +617,7 @@ refuses to overwrite an existing installed app.
 | `-` | Insert `—` immediately |
 | Pause for 180 ms | Request a local rewrite in the background |
 | F6 | Preview a completed candidate; useful on Windows |
-| F7 | Switch mode: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
+| F7 | Switch mode: continue → instruct → rewrite (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
 | Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as marked text on macOS, and in the candidate window on Windows (F6 shows it). Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
 | Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result; Esc keeps your text |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |

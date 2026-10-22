@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
 p,li,td,figcaption{text-wrap:pretty}
-h2,h3,.example,.ime-panel li{text-wrap:balance}
+h2,h3,.ime-panel li{text-wrap:balance}
 a{color:inherit}
 a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .shell{max-width:clamp(1280px,85vw,1440px);margin:0 auto;padding:0 54px}
@@ -45,11 +45,10 @@ h2{font-family:var(--serif);font-weight:400;font-size:clamp(28px,3vw,38px);lette
 h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 10px}
 .body{font-size:15px;line-height:1.75;color:var(--muted);max-width:640px}
 .small{font-size:13px}
+.card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label)}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1}.io-key{margin:0 0 0 auto}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.card{border:1px solid var(--line);border-radius:6px;padding:22px;background:var(--editor-bg)}
-.card p{font-size:14px;line-height:1.65;color:var(--muted);margin:0 0 14px}
-.card .example{font-family:var(--serif);font-size:15px;color:var(--label);margin:0}
-.card .example span:last-child{color:var(--ink)}
+.card{border:1px solid var(--line);border-radius:6px;background:var(--editor-bg);display:flex;flex-direction:column;overflow:hidden}
+.card-body{padding:22px 22px 18px}.card-body p{font-size:14px;line-height:1.65;color:var(--muted);margin:0}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start}
 table{border-collapse:collapse;width:100%}
 td{padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.55;vertical-align:top}

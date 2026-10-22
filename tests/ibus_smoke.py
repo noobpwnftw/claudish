@@ -20,6 +20,15 @@ engine = module.ClaudishEngine(connection=connection, object_path="/org/claudish
 commits = []
 engine.commit_text = lambda text: commits.append(text.get_text())
 try:
+    # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
+    assert engine.composition.mode == "continue"
+    for char in "ls -la":
+        assert engine.do_process_key_event(ord(char), 0, 0)
+    assert "".join(commits) == "ls -la", commits
+    assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # nothing offered: Tab is the app's
+    commits.clear()
+    engine.composition.mode = "rewrite"  # the rest exercises rewrite
+    engine.composition.change("")
     for char in "hello-world":
         assert engine.do_process_key_event(ord(char), 0, 0)
     assert engine.composition.text == "hello—world"
@@ -79,6 +88,6 @@ try:
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, live continue, F8, candidate list, password bypass")
+    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, candidate, modes, live continue, F8, candidate list, password bypass")
 finally:
     engine.destroy()

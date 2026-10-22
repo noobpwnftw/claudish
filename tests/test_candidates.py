@@ -4,6 +4,11 @@ from io import BytesIO
 from unittest.mock import patch
 
 from claudish.composition import Composition
+
+
+def to_mode(state, mode):
+    while state.mode != mode:
+        state.next_mode()
 from claudish.model import Rewriter
 
 
@@ -14,7 +19,7 @@ def reply(text):
 class CompositionTests(unittest.TestCase):
     def instruct(self):
         state = Composition()
-        state.next_mode(), state.next_mode()
+        to_mode(state, "instruct")
         state.insert("x")
         return state
 
