@@ -27,6 +27,26 @@ works the same in an editor, a browser, a chat app, or a terminal. Users of
 Chinese and Japanese input methods have used these exact controls (candidates,
 number keys, Enter, Esc) all day for decades. None of it is new to them.
 
+### Principle: you take the initiative
+
+Claudish does not summon an assistant, and you do not hand your workspace to an
+agent. It changes what your keyboard means, the way switching EN to a Chinese
+input method does. The OS input switcher already exists, and for people who
+switch input methods it is muscle memory. Comparable products treat AI as a place
+you go: a separate overlay or app (Click to Do, then "Ask Copilot"), an assistant
+you summon, or an agent you supervise. Here it is a way of typing you choose.
+
+That sets the limits on autonomy. Claudish runs only on what you type. It never
+acts unprompted, watches the screen, or decides what you should do next. Every
+change goes through the input method's contract: you compose, you see what it
+becomes, and you accept or discard it. An agent may do the work behind an
+accepted instruction, but each side effect it proposes is another explicit
+choice. Restraint is the product, not a missing feature.
+
+The proof that matters is not that an IME can call an agent. Many interfaces
+can. It is that doing so feels as ordinary as switching input languages: no new
+window, no new habit, the same keys. G18 is accepted on that basis (below).
+
 ## Three layers, one key grammar
 
 | Layer | Mode | You type | Requests | You get |
