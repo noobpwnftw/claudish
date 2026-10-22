@@ -45,6 +45,8 @@ def main():
     fixer.add_argument("--profile")
     fixer.add_argument("--status", type=int, default=1, help="Exit status, with an explicit command")
     fixer.add_argument("words", nargs="*", metavar="-- COMMAND", help="Fix this command instead of the last failure")
+    init = commands.add_parser("init", help="Write a starter config with example profiles")
+    init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
     hook.add_argument("shell", choices=sorted(fix.HOOKS))
     args = parser.parse_args()
@@ -58,6 +60,15 @@ def main():
         return
     if args.command == "fix":
         return fix_command(parser, args)
+    if args.command == "init":
+        try:
+            path = config.write_starter(args.config)
+        except (OSError, FileExistsError) as exc:
+            sys.exit(str(exc))
+        print("Wrote %s with profiles: %s (default: %s)." % (
+            path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
+        print("Try one: claudish serve --profile ollama   (or claude, agent)")
+        return
     if args.command == "serve":
         # Only real flags override the profile; other profile keys (and args.command, the
         # subcommand's name) must not.

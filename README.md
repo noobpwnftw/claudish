@@ -42,6 +42,35 @@ Status:
   bundle build in CI; not yet run on a Mac.
 - **Browser demo:** tested with real inference in Chromium.
 
+## Quick start
+
+1. **Try the three layers in your browser.** With Python 3.10+ and a
+   [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build:
+
+   ```sh
+   python scripts/download_model.py small
+   python scripts/start.py --server /path/to/llama-server
+   ```
+
+   Open http://127.0.0.1:18765, then switch between Rewrite, Continue, and
+   Instruct. Each mode has its own sample phrases. No model handy? `python -m
+   claudish serve --backend rules` runs the demo with simple stand-ins.
+2. **Pick a brain.** `python -m claudish init` writes `~/.config/claudish/config.json`
+   with four profiles: `local` (the default), `ollama` (any OpenAI-compatible
+   server), `claude` (your API key), and `agent` (an agent CLI such as
+   `claude -p`). Choose one with `python -m claudish serve --profile NAME`.
+3. **Install the input method** for [Linux](#linux-input-method),
+   [Windows](#windows-input-method), or [macOS](#macos-input-method), and add
+   **cd_AI — Claudish** in your input sources.
+4. **Learn four keys.** Everything else is typing.
+
+| Key | Does |
+| --- | --- |
+| F7 | switch layer: rewrite → continue → instruct |
+| Tab | accept the candidate |
+| Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
+| Esc | keep what you typed |
+
 ## Start the model and service
 
 Python 3.10+ runs the service. It has no pip runtime dependencies. Run commands

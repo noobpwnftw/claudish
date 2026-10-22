@@ -100,3 +100,30 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError("profile %r: context must be a list of objects" % name)
         context = Context(settings["context"], base, settings["max_context_chars"])
     return name, settings, prompt, context
+
+
+STARTER = {
+    "about": [
+        "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
+        "Keys never go in this file: name an environment variable with api_key_env.",
+        "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
+        "prompt, context, max_context_chars, modes, command, hosted. See README.md.",
+    ],
+    "profile": "local",
+    "profiles": {
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766"},
+        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
+        "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+        "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
+    },
+}
+
+
+def write_starter(path=None):
+    """Write the starter config; never overwrite an existing one. Returns the path."""
+    path = Path(path or default_path())
+    if path.exists():
+        raise FileExistsError("%s already exists; edit it, or move it aside to start over" % path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(STARTER, indent=2) + "\n", encoding="utf-8")
+    return path
