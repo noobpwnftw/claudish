@@ -75,7 +75,7 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def changed(self, client):
         if self.worker is not None:
-            self.worker.schedule(self.state.revision, self.state.text)
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
         self.panel.hide()
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(self.state.text.encode("utf-16-le")) // 2
@@ -105,6 +105,10 @@ class ClaudishInputController(IMKInputController):
             return False
         self.pollSuggestions_(None)
         key = event.keyCode()
+        if key == 98 and self.state.text:  # F7 switches mode: rewrite, continue, instruct.
+            self.state.next_mode()
+            self.changed(client)
+            return True
         if key == 97 and self.state.text:  # F6
             if self.state.candidate:
                 self.panel.updateCandidates()

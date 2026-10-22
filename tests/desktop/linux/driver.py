@@ -111,6 +111,15 @@ def scenarios():
     time.sleep(0.3)
     check("...and the app received Ctrl+A (all selected)", state()["other"], "")
 
+    focus("view")
+    key("ctrl+a", "BackSpace")
+    type_text("say hi")
+    key("F7", "F7")  # rewrite -> continue -> instruct
+    settle()
+    key("Tab")
+    wait_for(lambda: state()["view"], what="instruct draft")
+    check("F7 to instruct, Tab writes the draft", state()["view"], "As requested—say hi.")
+
     focus("password")
     type_text("pass-word")
     time.sleep(0.3)

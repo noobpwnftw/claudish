@@ -349,6 +349,7 @@ refuses to overwrite an existing installed app.
 | `-` | Insert `—` immediately |
 | Pause for 180 ms | Request a local rewrite in the background |
 | F6 | Preview a completed candidate; useful on Windows |
+| F7 | Switch mode while composing: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice) |
 | Tab | Commit an available rewrite; if none is ready, keep composing |
 | Enter / Escape | Commit your wording, including the em-dash substitution |
 | Backspace | Edit the composition and invalidate its candidate |

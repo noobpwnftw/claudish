@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
-from claudish.composition import Composition
+from claudish.composition import LABELS, Composition
 from claudish.client import Suggestions
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
@@ -38,12 +38,13 @@ class ClaudishEngine(IBus.Engine):
         text = self.composition.text
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
-        candidate = self.composition.candidate
+        candidate, mode = self.composition.candidate, self.composition.mode
         self.update_auxiliary_text(IBus.Text.new_from_string(
-            "Tab: " + candidate if candidate else "Typing… · Enter/Esc: keep wording"), bool(text))
+            LABELS[mode] + candidate if candidate
+            else "%s · F7: mode · Enter/Esc: keep wording" % mode), bool(text))
 
     def changed(self):
-        self.suggestions.schedule(self.composition.revision, self.composition.text)
+        self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode)
         self.render()
 
     def finish(self, suggested=False):
@@ -65,6 +66,10 @@ class ClaudishEngine(IBus.Engine):
         self.poll()
         if keyval == IBus.KEY_F6 and self.composition.text:
             self.render()
+            return True
+        if keyval == IBus.KEY_F7 and self.composition.text:
+            self.composition.next_mode()
+            self.changed()
             return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter, IBus.KEY_Escape, IBus.KEY_Tab):
             if not self.composition.text:
