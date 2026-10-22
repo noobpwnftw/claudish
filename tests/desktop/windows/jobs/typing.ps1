@@ -24,6 +24,11 @@ public static class Keys {
   public static void ClearEdit(IntPtr window) {
     SendText(FindWindowEx(window, IntPtr.Zero, "Edit", null), 0x000C, IntPtr.Zero, "");
   }
+  public static string Selection(IntPtr window) {
+    IntPtr edit = FindWindowEx(window, IntPtr.Zero, "Edit", null);
+    long r = (long)SendMessage(edit, 0x00B0, IntPtr.Zero, IntPtr.Zero);  // EM_GETSEL
+    return (r & 0xFFFF) + ".." + ((r >> 16) & 0xFFFF);
+  }
   public static string EditText(IntPtr window) {
     IntPtr edit = FindWindowEx(window, IntPtr.Zero, "Edit", null);
     int length = (int)SendMessage(edit, 0x000E, IntPtr.Zero, IntPtr.Zero);
@@ -118,8 +123,10 @@ Reset-Notepad
 [Keys]::Type('draft'); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400  # Ctrl+A mid-composition
 Check 'Ctrl shortcut keeps the composed text' (Text) 'draft'
-[Keys]::Press(0x2E); Start-Sleep -Milliseconds 300  # Delete: proves Ctrl+A reached Notepad
-Check '...and Notepad received Ctrl+A (all selected)' (Text) ''
+# Classic Notepad is an IMM app: once the IME claims a key, the app gets VK_PROCESSKEY, so the
+# first shortcut press only commits; the second one reaches the app (as with navigation keys).
+[Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300
+Check 'a second Ctrl+A reaches Notepad (all selected)' ([Keys]::Selection($window.MainWindowHandle)) '0..5'
 
 Stop-Process $service -Force; Stop-Process -Name Notepad -Force
 "{0}/{1} scenarios passed" -f ($results | Where-Object { $_ }).Count, $results.Count
