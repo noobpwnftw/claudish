@@ -5,6 +5,8 @@
 // keyboards and the browser's own input methods still work.
 const $ = (id) => document.getElementById(id);
 const sink = $("input");
+// Rendered by moving these nodes around the text; held here so they are never lost from a render.
+const PREEDIT = $("preedit"), CARET = $("caret"), GHOST = $("ghost"), PLACEHOLDER = $("placeholder");
 const MAX = 512;
 const MODES = ["continue", "instruct", "rewrite"];  // F7 order, as in every adapter
 const HINTS = {
@@ -23,9 +25,22 @@ let hosted = false;
 let backend = "";
 let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 
+// The app's text box: its text, the caret, and the selection anchor (anchor == caret: no selection).
+const doc = {text: "", caret: 0, anchor: 0};
+const selection = () => [Math.min(doc.caret, doc.anchor), Math.max(doc.caret, doc.anchor)];
+const selected = () => doc.caret !== doc.anchor;
+function removeSelection() {
+  const [start, end] = selection();
+  doc.text = doc.text.slice(0, start) + doc.text.slice(end);
+  doc.caret = doc.anchor = start;
+}
+function moveTo(index, extend) {
+  doc.caret = Math.max(0, Math.min(index, doc.text.length));
+  if (!extend) doc.anchor = doc.caret;
+}
+
 const state = {
-  committed: "",     // the app's text: what the input method has committed
-  text: "",          // continue: the model's context (already in the app); else the composition
+  text: "",          // continue: the model's context (already in the text box); else the composition
   mode: "continue",
   candidate: "",
   candidates: [],
@@ -44,16 +59,26 @@ function change(text) {
   state.revision++;
 }
 const live = () => state.mode === "continue";
-const ghost = () => live() && state.candidate.length > state.text.length && state.candidate.startsWith(state.text)
-  ? state.candidate.slice(state.text.length) : "";
+const composing = () => !live() && Boolean(state.text);
+const ghost = () => live() && !selected() && state.candidate.length > state.text.length
+  && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
 function automatic() {
   if (state.mode === "instruct") return false;
   if (live()) return Boolean(state.text) && !/[\p{L}\p{N}]$/u.test(state.text);  // a word boundary
   return true;
 }
+// Committing inserts at the caret, replacing any selection, as typing into a text box does.
 function commit(text) {
-  state.committed = (state.committed + text).slice(-20000);
+  if (selected()) removeSelection();
+  doc.text = (doc.text.slice(0, doc.caret) + text + doc.text.slice(doc.caret)).slice(0, 20000);
+  moveTo(doc.caret + text.length);
+}
+// Before the caret moves, a selection is edited, or a shortcut runs, the input method commits your
+// words (navigation and shortcuts end a composition) and continue starts a fresh context.
+function settle() {
+  if (composing()) commit(state.text);
+  change("");
 }
 
 // What happens after every change: ask the model after a pause, then draw.
@@ -104,16 +129,33 @@ async function ask(revision) {
 }
 
 // Keys, as an input method sees them. Returns true when the key was taken.
-function key(name) {
+function key(name, shift = false) {
   flash(name);
   if (name === "F7") {
-    const enteringLive = state.mode === "rewrite" && state.text;
-    if (enteringLive) commit(state.text);  // continue types into the app: the held words go in
+    if (state.mode === "rewrite" && state.text) commit(state.text);  // continue types into the box
     const leavingLive = live();
     state.mode = MODES[(MODES.indexOf(state.mode) + 1) % MODES.length];
     change(leavingLive ? "" : state.text);
     showMode();
     changed();
+    return true;
+  }
+  if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(name)) {
+    settle();
+    const lineStart = doc.text.lastIndexOf("\n", doc.caret - 1) + 1;
+    const lineEnd = doc.text.indexOf("\n", doc.caret) < 0 ? doc.text.length : doc.text.indexOf("\n", doc.caret);
+    const [start, end] = selection();
+    const target = name === "Home" ? lineStart : name === "End" ? lineEnd
+      : selected() && !shift ? (name === "ArrowLeft" ? start : end)
+      : doc.caret + (name === "ArrowLeft" ? -1 : 1);
+    moveTo(target, shift);
+    changed();
+    return true;
+  }
+  if (name === "Delete") {
+    if (composing()) return true;
+    if (selected()) removeSelection(); else doc.text = doc.text.slice(0, doc.caret) + doc.text.slice(doc.caret + 1);
+    change(""); changed();
     return true;
   }
   if (live()) return liveKey(name);
@@ -143,11 +185,14 @@ function key(name) {
     return true;
   }
   if (name === "Backspace") {
-    if (state.text) { change(state.text.slice(0, -1)); changed(); }
-    else { state.committed = state.committed.slice(0, -1); render(); }
+    if (state.text) change(state.text.slice(0, -1));
+    else if (selected()) removeSelection();
+    else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
+    changed();
     return true;
   }
   if (name.length === 1) {
+    if (selected() && !state.text) removeSelection();  // typing replaces the selection
     if (state.text.length >= MAX) { commit(state.text); change(""); }
     change(state.text + (name === "-" && state.mode === "rewrite" ? "—" : name));
     changed();
@@ -169,37 +214,64 @@ function liveKey(name) {
     return true;
   }
   if (name === "Backspace") {
-    state.committed = state.committed.slice(0, -1);
-    if (state.text) change(state.text.slice(0, -1));
+    if (selected()) { removeSelection(); change(""); }
+    else if (doc.caret) {
+      doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret);
+      moveTo(doc.caret - 1);
+      change(state.text.slice(0, -1));
+    }
     changed();
     return true;
   }
   if (name === "Enter") { commit("\n"); change(""); changed(); return true; }
   if (name.length === 1) {  // exactly the key: continue types like en_US
-    commit(name); change((state.text + name).slice(-MAX)); changed();
+    const fresh = selected();
+    commit(name);
+    change(fresh ? name : (state.text + name).slice(-MAX));
+    changed();
     return true;
   }
   return false;
 }
 
-// Drawing: committed text, the composition (underlined), the suggestion (grey), the caret, and the
-// candidate window under the caret.
+// Drawing: the text box's text (with the selection), and at the caret the composition (underlined),
+// the caret, and the suggestion (grey); the candidate window sits under the composition.
+function segment(text, start, className) {
+  const span = document.createElement("span");
+  span.className = "seg" + (className ? " " + className : "");
+  span.dataset.start = start;
+  span.textContent = text;
+  return span;
+}
 function render() {
-  const composing = !live() && state.text;
-  $("committed").textContent = state.committed;
-  $("preedit").textContent = composing ? state.text : "";
-  $("ghost").textContent = ghost();
-  $("placeholder").hidden = Boolean(state.committed || state.text);
+  const page = $("page");
+  page.dataset.text = doc.text;
+  const [start, end] = selection();
+  const preedit = PREEDIT, caret = CARET, suggestion = GHOST;
+  preedit.textContent = composing() ? state.text : "";
+  suggestion.textContent = ghost();
+  const nodes = [];
+  if (selected()) {
+    const atCaret = [preedit, caret, suggestion];  // empty while a selection shows, but kept in the page
+    nodes.push(segment(doc.text.slice(0, start), 0), ...(doc.caret === start ? atCaret : []),
+               segment(doc.text.slice(start, end), start, "selected"), ...(doc.caret === end ? atCaret : []),
+               segment(doc.text.slice(end), end));
+  } else {
+    nodes.push(segment(doc.text.slice(0, doc.caret), 0), preedit, caret, suggestion,
+               segment(doc.text.slice(doc.caret), doc.caret));
+  }
+  page.replaceChildren(...nodes, PLACEHOLDER);
+  PLACEHOLDER.hidden = Boolean(doc.text || state.text);
   const window = $("candidates");
   window.replaceChildren();
   const lines = [];
-  if (composing && state.mode === "instruct") {
+  if (composing() && state.mode === "instruct") {
     if (state.working) lines.push(["", "working…"]);
     else if (state.failed) lines.push(["", "the request failed · Enter retries · Esc keeps your words"]);
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
     else lines.push(["", "Enter sends"]);
-  } else if (composing && state.candidate) {
+  } else if (composing() && state.candidate) {
     lines.push(["Tab", state.candidate]);
   }
   window.hidden = !lines.length;
@@ -224,15 +296,15 @@ function render() {
     window.append(foot);
   }
   placeCandidateWindow();
-  $("copy").disabled = $("clear").disabled = !state.committed;
+  $("copy").disabled = $("clear").disabled = !doc.text;
 }
 
 function placeCandidateWindow() {
   const window = $("candidates");
   const editor = $("editor").getBoundingClientRect();
-  const caret = $("caret").getBoundingClientRect();
+  const caret = CARET.getBoundingClientRect();
   // As input methods do, the window sits under the start of the composition (or the caret).
-  const start = $("preedit").getClientRects()[0] || caret;
+  const start = PREEDIT.getClientRects()[0] || caret;
   const left = Math.max(12, Math.min(start.left - editor.left - 8, editor.width - window.offsetWidth - 12));
   window.style.left = `${left}px`;
   window.style.top = `${caret.bottom - editor.top + 8}px`;
@@ -255,13 +327,21 @@ function flash(name) {
 
 // Input from the hidden textarea.
 sink.addEventListener("keydown", (event) => {
-  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
-  const named = ["F7", "Tab", "Enter", "Escape", "Backspace"].includes(event.key)
-    || (choosing() && /^[1-9]$/.test(event.key));
+  if (event.isComposing) return;
+  if (event.ctrlKey || event.metaKey) {
+    if (event.altKey) return;
+    settle();  // a shortcut ends a composition: your words go in first
+    if (event.key.toLowerCase() === "a") { event.preventDefault(); doc.anchor = 0; doc.caret = doc.text.length; }
+    changed();
+    return;  // copy, cut, and paste arrive as events below
+  }
+  if (event.altKey) return;
+  const named = ["F7", "Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
+    .includes(event.key) || (choosing() && /^[1-9]$/.test(event.key));
   if (named) {
     if (event.key === "Enter" && event.shiftKey) return;
     stopTyping();
-    if (key(event.key)) event.preventDefault();
+    if (key(event.key, event.shiftKey)) event.preventDefault();
   }
 });
 sink.addEventListener("beforeinput", (event) => {
@@ -274,17 +354,72 @@ sink.addEventListener("beforeinput", (event) => {
     event.preventDefault(); key("Enter");
   } else if (event.inputType === "deleteContentBackward") {
     event.preventDefault(); key("Backspace");
+  } else if (event.inputType === "deleteContentForward") {
+    event.preventDefault(); key("Delete");
   }
 });
 sink.addEventListener("compositionend", (event) => {
   for (const char of event.data || "") key(char);
   sink.value = "";
 });
+function clip(event, cut) {
+  if (!selected()) return;
+  const [start, end] = selection();
+  event.clipboardData.setData("text/plain", doc.text.slice(start, end));
+  event.preventDefault();
+  if (cut) { removeSelection(); change(""); changed(); }
+}
+sink.addEventListener("copy", (event) => clip(event, false));
+sink.addEventListener("cut", (event) => clip(event, true));
+sink.addEventListener("paste", (event) => {
+  event.preventDefault();
+  settle();
+  commit((event.clipboardData.getData("text/plain") || "").slice(0, 5000));
+  changed();
+});
+
+// The mouse: click places the caret, a drag selects, a double click selects a word, Shift extends.
+function offsetAt(x, y) {
+  let node, offset;
+  if (document.caretPositionFromPoint) {
+    const position = document.caretPositionFromPoint(x, y);
+    if (position) { node = position.offsetNode; offset = position.offset; }
+  } else if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(x, y);
+    if (range) { node = range.startContainer; offset = range.startOffset; }
+  }
+  const seg = node && (node.nodeType === 3 ? node.parentElement : node)?.closest?.(".seg");
+  if (seg) return Number(seg.dataset.start) + Math.min(offset, seg.textContent.length);
+  if (node && node.closest?.(".preedit, .caret, .ghost")) return doc.caret;
+  return doc.text.length;  // below or beside the text: the end
+}
+let dragging = false;
 $("editor").addEventListener("mousedown", (event) => {
   if (event.target.closest(".candidate-window")) return;
-  event.preventDefault();
+  event.preventDefault();  // any button keeps the keyboard here (a right click used to lose it)
   sink.focus();
+  if (event.button !== 0) return;
+  stopTyping();
+  settle();
+  const at = offsetAt(event.clientX, event.clientY);
+  if (event.detail === 2) {  // a word
+    const before = doc.text.slice(0, at).match(/[\p{L}\p{N}_'-]*$/u)[0].length;
+    const after = doc.text.slice(at).match(/^[\p{L}\p{N}_'-]*/u)[0].length;
+    doc.anchor = at - before;
+    doc.caret = at + after;
+  } else {
+    moveTo(at, event.shiftKey);
+    dragging = true;
+  }
+  changed();
 });
+document.addEventListener("mousemove", (event) => {
+  if (!dragging) return;
+  if (!(event.buttons & 1)) { dragging = false; return; }
+  moveTo(offsetAt(event.clientX, event.clientY), true);
+  render();
+});
+document.addEventListener("mouseup", () => { dragging = false; });
 sink.addEventListener("focus", () => $("editor").classList.add("focused"));
 sink.addEventListener("blur", () => $("editor").classList.remove("focused"));
 $("source").addEventListener("click", () => { key("F7"); sink.focus(); });
@@ -296,8 +431,9 @@ $("samples").addEventListener("click", (event) => {
   if (!button) return;
   stopTyping();
   sink.focus();
+  settle();
   while (state.mode !== button.dataset.mode) key("F7");
-  if (state.text && !live()) { commit(state.text); change(""); }
+  if (doc.text && !doc.text.endsWith("\n")) commit("\n");
   const chars = [...button.dataset.sample];
   typing = setInterval(() => {
     if (!chars.length) {
@@ -323,15 +459,17 @@ function renderSamples() {
   $("samples").replaceChildren($("samples-label"), ...buttons);
 }
 $("copy").addEventListener("click", async () => {
+  const [start, end] = selection();
   try {
-    await navigator.clipboard.writeText(state.committed);
-    setStatus("Copied to the clipboard.");
+    await navigator.clipboard.writeText(selected() ? doc.text.slice(start, end) : doc.text);
+    setStatus(selected() ? "Copied the selection." : "Copied to the clipboard.");
   } catch {
     setStatus("The clipboard is not available here.");
   }
 });
 $("clear").addEventListener("click", () => {
-  state.committed = "";
+  doc.text = "";
+  moveTo(0);
   change("");
   changed();
   setStatus("Cleared.");

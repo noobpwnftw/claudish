@@ -22,12 +22,12 @@ async def check(args):
         page = await context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        committed = page.locator("#committed")
+        committed = page.locator("#page")
         window = page.locator("#candidates")
         keys = page.keyboard
 
         async def committed_text():
-            return await committed.text_content()
+            return await committed.get_attribute("data-text")
 
         try:
             await page.goto(args.url)
@@ -43,7 +43,7 @@ async def check(args):
             await page.locator("#editor").click()
             await expect(page.locator("#source-mode")).to_have_text("continue")
             await keys.type("Thanks for the review ", delay=20)
-            await expect(committed).to_have_text("Thanks for the review ")
+            await expect(committed).to_have_attribute("data-text", "Thanks for the review ")
             await expect(page.locator("#ghost")).not_to_be_empty(timeout=10000)
             ghost = await page.locator("#ghost").text_content()
             print("Real backend, continue:", repr(ghost), "|", await page.locator("#timing").text_content())
@@ -51,10 +51,10 @@ async def check(args):
                 args.screenshots.mkdir(parents=True, exist_ok=True)
                 await page.screenshot(path=str(args.screenshots / "continue.png"))
             await keys.press("Tab")
-            await expect(committed).to_have_text("Thanks for the review " + ghost)
+            await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost)
             await keys.press("Enter")
             await keys.type("ls -la", delay=20)  # literal: the hyphen stays a hyphen
-            await expect(committed).to_have_text("Thanks for the review " + ghost + "\nls -la")
+            await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost + "\nls -la")
             await keys.press("Enter")
 
             # Rewrite (F7 twice): your words are a composition; the candidate window is under it.
@@ -70,15 +70,32 @@ async def check(args):
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "rewrite.png"))
             await keys.press("Tab")
-            await expect(committed).to_have_text(before + rewrite)
+            await expect(committed).to_have_attribute("data-text", before + rewrite)
             await keys.type("hello-world", delay=20)  # in rewrite, the dash is Claudish
             await expect(page.locator("#preedit")).to_have_text("hello—world")
             await keys.press("Enter")  # keeps your words
-            await expect(committed).to_have_text(before + rewrite + "hello—world")
+            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world")
             await page.locator("#copy").click()
             assert await page.evaluate("() => navigator.clipboard.readText()") == await committed_text()
-            await page.locator("#clear").click()
-            await expect(committed).to_have_text("")
+            # A text box: a right click keeps the keyboard; select, copy, and type over a selection.
+            await page.locator("#editor").click(button="right")
+            await keys.press("Escape")  # close the browser's context menu
+            await keys.press("F7")  # rewrite -> continue
+            await keys.press("End")
+            await keys.type("!", delay=10)
+            text = await committed_text()
+            assert text.endswith("!"), text
+            await keys.press("Control+a")
+            await keys.press("Control+c")
+            assert await page.evaluate("() => navigator.clipboard.readText()") == text
+            await keys.type("Replaced", delay=10)
+            await expect(committed).to_have_attribute("data-text", "Replaced")
+            await keys.press("Shift+Home")
+            await keys.press("Delete")
+            await expect(committed).to_have_attribute("data-text", "")
+            await keys.press("F7")
+            await keys.press("F7")  # back to rewrite
+            await expect(page.locator("#clear")).to_be_disabled()  # nothing left to clear
 
             # A stale answer must never appear: hold the first request, type on, then release it.
             first_started, release = asyncio.Event(), asyncio.Event()
@@ -120,7 +137,7 @@ async def check(args):
             await expect(page.locator("#status")).to_contain_text("model unavailable")
             await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
             await keys.press("Escape")  # keeps your words
-            await expect(committed).to_have_text("Keep this thought intact.")
+            await expect(committed).to_have_attribute("data-text", "Keep this thought intact.")
             await page.unroute("**/suggest", unavailable)
             await page.locator("#clear").click()
 
@@ -144,12 +161,12 @@ async def check(args):
                 count = await choices.count()
                 second = (await choices.nth(1).text_content())[1:]
                 await keys.press("2")
-                await expect(committed).to_have_text(second)
+                await expect(committed).to_have_attribute("data-text", second)
                 print("instruct offered %d readings; 2 inserted the second" % count)
             else:
                 draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
                 await keys.press("Enter")
-                await expect(committed).to_have_text(draft)
+                await expect(committed).to_have_attribute("data-text", draft)
             await page.locator("#clear").click()
 
             # A sample types itself, key by key, in its own mode.
