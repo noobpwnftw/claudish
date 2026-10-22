@@ -17,23 +17,23 @@ const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.cont
 let browserBackend = null;
 const MODES = {
   rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", prompt: "NEED A FIRST THOUGHT?",
-    samples: ["This is very important.", "Let's explore the options.", "We should use a smaller model."], placeholder: "We should use a smaller model."},
+    samples: ["This is very important.", "Let's explore the options.", "We should use a smaller model."], placeholder: "Type something ordinary…"},
   continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", prompt: "START A SENTENCE",
-    samples: ["Thanks for the quick review on", "We should postpone the launch until", "The best part of this release is"], placeholder: "Thanks for the quick review on"},
+    samples: ["Thanks for the quick review on", "We should postpone the launch until", "The best part of this release is"], placeholder: "Start a sentence…"},
   instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", prompt: "TRY AN INSTRUCTION",
-    samples: ["decline the meeting politely, propose Thursday", "thank the team for shipping the release", "write a two-line story about a cat"], placeholder: "decline the meeting politely, propose Thursday"},
+    samples: ["decline the meeting politely, propose Thursday", "thank the team for shipping the release", "write a two-line story about a cat"], placeholder: "Type an instruction, then press Enter…"},
 };
 
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
   candidate = "";
   $("accept").disabled = true;
-  $("candidate").textContent = IN_BROWSER && !browserBackend ? "Run the model above,\nthen type something ordinary."
+  $("candidate").textContent = IN_BROWSER && !browserBackend ? "Run the model above, then type something ordinary."
     : mode === "instruct"
-    ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction,\nthen press Enter.")
-    : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
+    ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction, then press Enter.")
+    : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is just a keystroke away.";
   $("candidate").classList.add("placeholder");
-  $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL MODEL · NO CLOUD REQUIRED";
+  $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL\u00a0MODEL\u00a0· NO\u00a0CLOUD\u00a0REQUIRED";
   status(!draft.value.trim() ? "AWAITING A THOUGHT" : mode === "instruct" ? "ENTER SENDS" : "COMPOSING");
 }
 
