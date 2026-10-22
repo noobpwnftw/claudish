@@ -1,7 +1,7 @@
 """Run the project's checks on this machine; the merge gate in place of remote CI.
 
 python scripts/check.py            # unit tests, compile, diff, IBus and PIME smokes
-python scripts/check.py --model    # also: real model, rewrite, fidelity eval, browser demo
+python scripts/check.py --model    # also: real model, rewrite, fidelity eval, browser demo, static demo
 python scripts/check.py --desktop  # also: real IBus + GTK typing in a container (needs docker)
 
 Each check reports PASS, FAIL, or SKIP with a reason. Remote CI (push a ci/*
@@ -98,6 +98,10 @@ def model_checks(args):
         else:
             command = [str(browser), "tests/browser_demo.py"] + (["--executable", chromium] if chromium else [])
             run("browser demo", command, timeout=300)
+            model = ROOT / "models" / ("qwen2.5-0.5b-instruct-q4_k_m.gguf" if args.preset == "small"
+                                       else "SmolLM2-135M-Instruct-Q4_K_M.gguf")
+            run("static demo", [str(browser), "tests/static_demo.py", "--model", str(model)]
+                + (["--executable", chromium] if chromium else []), timeout=300)
     finally:
         launcher.terminate()
         try:

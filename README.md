@@ -71,6 +71,19 @@ Status:
 | Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
 | Esc | keep what you typed |
 
+## Static demo: the model in your browser
+
+`python scripts/build_static_demo.py` writes `dist/demo/`, the same browser demo
+with the model running in the page through [wllama](https://github.com/ngxson/wllama)
+(llama.cpp compiled to WebAssembly). It needs no inference server, so any static
+host can serve it. Nothing is downloaded until the visitor clicks **Run the model
+in this browser**; the 491 MB model (pinned Qwen2.5 0.5B) is then cached by the
+browser, and nothing typed leaves the page. A small service worker (`coi-sw.js`)
+supplies the cross-origin isolation headers static hosts cannot set, so the
+multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
+takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
+A purpose-trained model of about 150 MB is planned (ROADMAP G21).
+
 ## Start the model and service
 
 Python 3.10+ runs the service. It has no pip runtime dependencies. Run commands
