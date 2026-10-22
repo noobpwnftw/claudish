@@ -24,7 +24,7 @@ It excludes model startup, the adapter's 180 ms debounce, and UI delivery.
 Linux UI polling adds up to 40 ms. Thus the measured small-model median implies
 roughly 245–285 ms after the last keystroke for an idle short phrase; that is an
 estimate, not a measured graphical latency. Windows previews need a subsequent
-host event (F6), as explained in the project README.
+host event (F6), as explained in [docs/using.md](../docs/using.md#typing).
 
 The 135M model often repeats input, copies the prompt example, or emits
 explanations. The 500M model produced usable stylistic rewrites on these four

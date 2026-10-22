@@ -167,7 +167,7 @@ class Rewriter:
     def make_driver(self, app=None):
         """The driver for a new agent session; the profile's session_command runs the agent."""
         if not self.session_command:
-            raise ValueError('this profile has no agent sessions: set "session_command" (see README, Agent sessions)')
+            raise ValueError('this profile has no agent sessions: set "session_command" (see docs/configuration.md, Agent sessions)')
         from .agent import ClaudeCodeDriver
         return ClaudeCodeDriver(self.session_command)
 

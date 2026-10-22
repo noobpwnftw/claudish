@@ -119,7 +119,7 @@ STARTER = {
         "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
         "Keys never go in this file: name an environment variable with api_key_env.",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
-        "prompt, context, max_context_chars, modes, command, hosted, bindings, look_command, tools, session_command. See README.md.",
+        "prompt, context, max_context_chars, modes, command, hosted, bindings, look_command, tools, session_command. See docs/configuration.md.",
     ],
     "profile": "local",
     "profiles": {
