@@ -154,6 +154,28 @@ profile is relative to the config file. Keys are never stored in the file: name
 an environment variable with `api_key_env`. Unknown keys, a literal `api_key`,
 and wrong types are rejected at startup. `/health` reports the active profile.
 
+### Context
+
+A profile can attach reference context that the model sees with your text: a
+file such as a style guide or glossary, or any local command's output. For
+example, the diff of the branch whose PR description you are writing:
+
+```json
+{"profiles": {"pr": {"backend": "claude", "context": [
+  {"type": "command", "name": "branch diff", "command": ["git", "-C", "~/src/app", "diff", "main...HEAD"], "ttl": 60},
+  {"type": "file", "path": "~/notes/style.md"}
+], "max_context_chars": 6000}}}
+```
+
+Commands run exactly as configured, without a shell, and only from your config
+file; requests cannot add them. Results are cached for `ttl` seconds (default
+30). A failing or slow provider (`timeout`, default 5 s) is skipped, never
+blocking a rewrite. Context goes into the system prompt, ahead of your text, so a
+local llama.cpp server reuses its prompt cache while you type. Adapters may also
+send the text around the caret as `before`/`after` in `/suggest`. Context goes
+to the profile's backend, so with a hosted backend it leaves the machine like
+your text does. MCP context sources are next.
+
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.

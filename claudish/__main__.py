@@ -39,9 +39,9 @@ def main():
     bench.add_argument("--url", default="http://127.0.0.1:18765")
     args = parser.parse_args()
     if args.command == "serve":
-        overrides = {key: getattr(args, key) for key in config.DEFAULTS}
+        overrides = {key: getattr(args, key, None) for key in config.DEFAULTS}  # file-only keys have no flag
         try:
-            profile, settings, prompt = config.resolve(args.config, args.profile, overrides)
+            profile, settings, prompt, context = config.resolve(args.config, args.profile, overrides)
         except (OSError, ValueError) as exc:
             parser.error(str(exc))
         api_key = None
@@ -51,7 +51,8 @@ def main():
                 parser.error("environment variable %s is not set" % settings["api_key_env"])
         try:
             rewriter = Rewriter(settings["backend"], settings["model_url"], settings["max_tokens"],
-                                settings["claude_model"], settings["model"], api_key, settings["timeout"], prompt)
+                                settings["claude_model"], settings["model"], api_key, settings["timeout"], prompt,
+                                context)
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         rewriter.profile = profile

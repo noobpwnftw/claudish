@@ -68,7 +68,7 @@ def make_server(rewriter, port=18765):
                 return self.reply(415, {"error": "application/json required"})
             try:
                 size = int(self.headers.get("Content-Length", "0"))
-                if not 0 < size <= 8192:
+                if not 0 < size <= 32768:
                     return self.reply(413, {"error": "invalid body size"})
                 data = json.loads(self.rfile.read(size))
                 if not isinstance(data, dict):
@@ -76,10 +76,14 @@ def make_server(rewriter, port=18765):
                 text = data.get("text")
                 if not isinstance(text, str) or not text.strip() or len(text) > MAX_COMPOSITION:
                     raise ValueError("text must be 1–512 characters")
+                # Optional text around the caret, supplied by an adapter.
+                before, after = data.get("before", ""), data.get("after", "")
+                if not all(isinstance(s, str) and len(s) <= 4000 for s in (before, after)):
+                    raise ValueError("before/after must be strings of at most 4000 characters")
             except (ValueError, UnicodeError):
                 return self.reply(400, {"error": "invalid text request"})
             try:
-                result = rewriter.rewrite(text)
+                result = rewriter.rewrite(text, before, after)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
             self.reply(200, result)

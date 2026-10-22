@@ -1,0 +1,110 @@
+import json
+import sys
+import tempfile
+import threading
+import unittest
+from io import BytesIO
+from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from claudish import config
+from claudish.context import Context
+from claudish.model import Rewriter
+from claudish.server import make_server
+
+
+class ContextTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        (self.root / "glossary.md").write_text("Fjordline: the ferry company.", encoding="utf-8")
+
+    def test_file_and_command_providers_render_with_caret(self):
+        context = Context([{"type": "file", "path": "glossary.md"},
+                           {"type": "command", "name": "diff", "command": [sys.executable, "-c", "print('+ add retry')"]},
+                           {"type": "command", "command": "%s -c \"print('string form')\"" % sys.executable}],
+                          base=self.root)
+        block = context.render(before="Summary: ", after=" Thanks.")
+        self.assertIn('<context name="glossary.md">\nFjordline: the ferry company.\n</context>', block)
+        self.assertIn('<context name="diff">\n+ add retry\n</context>', block)
+        self.assertIn("string form", block)
+        self.assertIn("Summary: ▮ Thanks.", block)
+        self.assertEqual(Context().render(), "")
+
+    def test_cache_ttl(self):
+        context = Context([{"type": "file", "path": "glossary.md", "ttl": 60}], base=self.root)
+        context.render()
+        (self.root / "glossary.md").write_text("changed", encoding="utf-8")
+        self.assertIn("Fjordline", context.render())  # still cached
+        context.providers[0].expires = 0
+        self.assertIn("changed", context.render())
+
+    def test_failing_or_slow_providers_do_not_block_rewrites(self):
+        context = Context([{"type": "command", "command": [sys.executable, "-c", "import sys; sys.exit(3)"]},
+                           {"type": "command", "timeout": 0.2,
+                            "command": [sys.executable, "-c", "import time; time.sleep(5)"]},
+                           {"type": "file", "path": "missing.md"}], base=self.root)
+        self.assertEqual(context.render(), "")
+        self.assertIn("exit status 3", context.providers[0].error)
+
+    def test_budget_truncates(self):
+        (self.root / "big.md").write_text("x" * 5000, encoding="utf-8")
+        context = Context([{"type": "file", "path": "big.md"}, {"type": "file", "path": "glossary.md"}],
+                          base=self.root, max_chars=1000)
+        block = context.render()
+        self.assertIn("x" * 1000, block)
+        self.assertNotIn("x" * 1001, block)
+        self.assertNotIn("Fjordline", block)
+
+    def test_config_validation_and_relative_paths(self):
+        path = self.root / "config.json"
+        for spec, message in [({"type": "web"}, "type must be"), ({"type": "file", "path": "a", "x": 1}, "unknown keys x"),
+                              ({"type": "command"}, "needs a"), ("not an object", "list of objects")]:
+            path.write_text(json.dumps({"profiles": {"p": {"context": [spec]}}}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, message):
+                config.resolve(path)
+        path.write_text(json.dumps({"profiles": {"p": {"context": [{"type": "file", "path": "glossary.md"}],
+                                                       "max_context_chars": 500}}}), encoding="utf-8")
+        _, _, _, context = config.resolve(path)
+        self.assertEqual(context.max_chars, 500)
+        self.assertIn("Fjordline", context.render())
+
+    def test_context_reaches_the_model_prompt(self):
+        rewriter = Rewriter(context=Context([{"type": "file", "path": "glossary.md"}], base=self.root))
+        reply = {"choices": [{"message": {"content": "Very well."}, "finish_reason": "stop"}]}
+        with patch("claudish.model.build_opener") as opener:
+            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+            rewriter.rewrite("ok", before="Dear Zoë,")
+            system = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][0]["content"]
+        self.assertTrue(system.startswith(rewriter.system))
+        self.assertIn("Fjordline: the ferry company.", system)
+        self.assertIn("Dear Zoë,▮", system)
+
+    def test_service_validates_caret_text(self):
+        server = make_server(Rewriter("rules"), 0)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            url = "http://127.0.0.1:%s/suggest" % server.server_port
+            for body, status in [({"text": "very good", "before": "x" * 4000}, 200),
+                                 ({"text": "very good", "before": "x" * 4001}, 400),
+                                 ({"text": "very good", "after": 5}, 400)]:
+                request = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                if status == 200:
+                    with urlopen(request) as reply:
+                        self.assertEqual(json.load(reply)["text"], "particularly good")
+                else:
+                    with self.assertRaises(HTTPError) as error:
+                        urlopen(request)
+                    self.assertEqual(error.exception.code, status)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -15,13 +15,15 @@ import json
 import os
 from pathlib import Path
 
+from .context import Context
 from .model import load_prompt
 
 BACKENDS = ("llama", "openai", "claude", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
-            "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None}
+            "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
+            "context": None, "max_context_chars": 6000}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str}
+         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int}
 
 
 def default_path():
@@ -30,7 +32,7 @@ def default_path():
 
 
 def resolve(path=None, profile=None, overrides=None):
-    """Return (profile name, settings, prompt) from the file, then non-None overrides."""
+    """Return (profile name, settings, prompt, context) from the file, then non-None overrides."""
     settings, name, base = dict(DEFAULTS), None, Path.cwd()
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
@@ -69,4 +71,9 @@ def resolve(path=None, profile=None, overrides=None):
         if not prompt_path.is_absolute() and not (overrides or {}).get("prompt"):
             prompt_path = base / prompt_path  # Template paths in a profile are relative to the file.
         prompt = load_prompt(prompt_path)
-    return name, settings, prompt
+    context = None
+    if settings["context"]:
+        if not all(isinstance(spec, dict) for spec in settings["context"]):
+            raise ValueError("profile %r: context must be a list of objects" % name)
+        context = Context(settings["context"], base, settings["max_context_chars"])
+    return name, settings, prompt, context

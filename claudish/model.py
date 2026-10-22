@@ -81,7 +81,8 @@ class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
-                 claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None):
+                 claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
+                 context=None):
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
         self.max_tokens = max_tokens
@@ -89,13 +90,15 @@ class Rewriter:
         self.api_key = api_key
         self.timeout = timeout
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
+        self.context = context
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
         self.claude = Claude(claude_model) if backend == "claude" else None
 
-    def rewrite(self, text):
+    def rewrite(self, text, before="", after=""):
         started = time.perf_counter()
+        system = self.system + (self.context.render(before, after) if self.context else "")
         if self.backend == "rules":
             output = rules(text)
             usage = {}
@@ -104,7 +107,7 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("Claude busy; keep typing or retry")
             try:
-                output, usage = self.claude.rewrite(text, self.system, self.examples)
+                output, usage = self.claude.rewrite(text, system, self.examples)
                 if not output:
                     raise RuntimeError("Claude returned no text")
             finally:
@@ -114,7 +117,7 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("model busy; keep typing or retry")
             try:
-                payload = {"messages": [{"role": "system", "content": self.system}] + self.examples +
+                payload = {"messages": [{"role": "system", "content": system}] + self.examples +
                                         [{"role": "user", "content": text}],
                            "max_tokens": self.max_tokens, "temperature": 0,
                            "stream": False, "cache_prompt": True}
