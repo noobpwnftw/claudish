@@ -34,6 +34,72 @@ def make_server(rewriter, port=18765):
                 "localhost:%s" % self.server.server_port,
             )
 
+        def json_request(self):
+            """The checked JSON body of a request from this machine's own pages, or None after replying."""
+            origin = self.headers.get("Origin")  # the local demo may call its own API; websites may not
+            if origin is not None and origin != "http://" + self.headers["Host"]:
+                return self.reply(403, {"error": "cross-origin requests are not accepted"})
+            if self.headers.get("Sec-Fetch-Site") == "cross-site":
+                return self.reply(403, {"error": "cross-site requests are not accepted"})
+            if self.headers.get_content_type() != "application/json":
+                return self.reply(415, {"error": "application/json required"})
+            size = int(self.headers.get("Content-Length", "0") or 0)
+            if not 0 < size <= 32768:
+                return self.reply(413, {"error": "invalid body size"})
+            try:
+                data = json.loads(self.rfile.read(size))
+            except (ValueError, UnicodeError):
+                data = None
+            if not isinstance(data, dict):
+                return self.reply(400, {"error": "expected a JSON object"})
+            return data
+
+        def post_session(self):
+            """POST /sessions {text, app?}; /sessions/ID/answer {question, choice | text}; /sessions/ID/cancel."""
+            data = self.json_request()
+            if data is None:
+                return
+            parts = self.path.strip("/").split("/")
+            if parts == ["sessions"]:
+                text, app = data.get("text"), data.get("app")
+                if not (isinstance(text, str) and text.strip() and len(text) <= MAX_COMPOSITION):
+                    return self.reply(400, {"error": "text must be 1–512 characters"})
+                if app is not None and not (isinstance(app, str) and len(app) <= 200):
+                    return self.reply(400, {"error": "app must be a short string"})
+                try:
+                    session = rewriter.start_session(text, app)
+                except ValueError as exc:
+                    return self.reply(400, {"error": str(exc)})
+                except RuntimeError as exc:
+                    return self.reply(503, {"error": str(exc)})
+                return self.reply(200, {"id": session.id})
+            session = rewriter.sessions.get(parts[1]) if len(parts) == 3 else None
+            if session is None:
+                return self.reply(404, {"error": "no such session"})
+            if parts[2] == "cancel":
+                session.cancel()
+                return self.reply(200, {"ok": True})
+            if parts[2] != "answer":
+                return self.reply(404, {"error": "not found"})
+            choice, text = data.get("choice"), data.get("text")
+            if text is not None and not (isinstance(text, str) and 0 < len(text) <= MAX_COMPOSITION):
+                return self.reply(400, {"error": "text must be 1–512 characters"})
+            try:
+                session.answer(data.get("question"), None if text is not None else choice, text)
+            except ValueError as exc:
+                return self.reply(400, {"error": str(exc)})
+            return self.reply(200, {"ok": True})
+
+        def get_session(self):
+            """GET /sessions/ID?after=N: new events, waiting up to a second for the first."""
+            path, _, query = self.path.partition("?")
+            session = rewriter.sessions.get(path[len("/sessions/"):])
+            if session is None:
+                return self.reply(404, {"error": "no such session"})
+            after = query[len("after="):] if query.startswith("after=") else "0"
+            events, done = session.wait(int(after) if after.isdigit() else 0, timeout=1.0)
+            return self.reply(200, {"events": events, "done": done})
+
         def do_GET(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
@@ -47,6 +113,8 @@ def make_server(rewriter, port=18765):
                 filename, content_type = assets[self.path]
                 body = files("claudish").joinpath("web", filename).read_bytes()
                 return self.send_body(200, body, content_type)
+            if self.path.startswith("/sessions/"):
+                return self.get_session()
             if self.path == "/health":
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
                                         "hosted": rewriter.hosted,
@@ -58,6 +126,8 @@ def make_server(rewriter, port=18765):
         def do_POST(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
+            if self.path.startswith("/sessions"):
+                return self.post_session()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})
             # The local demo may call its own API; other websites may not.

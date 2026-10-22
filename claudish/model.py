@@ -110,6 +110,7 @@ class Rewriter:
                        settings["command"], settings["hosted"], settings["bindings"])
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
+        rewriter.session_command = settings.get("session_command")
         if settings.get("tools"):
             if settings["backend"] not in ("llama", "openai"):
                 raise ValueError("tools need an OpenAI-compatible backend with tool calls (llama.cpp, vLLM, Ollama) "
@@ -131,6 +132,9 @@ class Rewriter:
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
         self.bindings = list(bindings)
+        from .sessions import Sessions
+        self.sessions = Sessions()  # agent sessions at the caret (G18)
+        self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
@@ -159,6 +163,16 @@ class Rewriter:
         if not output:
             raise RuntimeError("model returned no text")
         return output, usage
+
+    def make_driver(self, app=None):
+        """The driver for a new agent session; the profile's session_command runs the agent."""
+        if not self.session_command:
+            raise ValueError('this profile has no agent sessions: set "session_command" (see README, Agent sessions)')
+        from .agent import ClaudeCodeDriver
+        return ClaudeCodeDriver(self.session_command)
+
+    def start_session(self, text, app=None):
+        return self.sessions.start(self.make_driver(app), text)
 
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
