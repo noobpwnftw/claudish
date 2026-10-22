@@ -82,7 +82,8 @@ class Rewriter:
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
-                 context=None):
+                 context=None, modes=None):
+        from . import modes as invocation
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
         self.max_tokens = max_tokens
@@ -91,23 +92,34 @@ class Rewriter:
         self.timeout = timeout
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
+        # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
+        self.modes = invocation.defaults((self.system, self.examples))
+        for name, override in (modes or {}).items():
+            self.modes[name] = dict(self.modes.get(name, {"max_tokens": None}), **override)
+        self.finish = invocation.finish
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
         self.claude = Claude(claude_model) if backend == "claude" else None
 
-    def rewrite(self, text, before="", after=""):
+    def rewrite(self, text, before="", after="", mode="rewrite"):
         started = time.perf_counter()
-        system = self.system + (self.context.render(before, after) if self.context else "")
+        if mode not in self.modes:
+            raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
+        spec = self.modes[mode]
+        system = spec["system"] + (self.context.render(before, after) if self.context else "")
+        examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         if self.backend == "rules":
-            output = rules(text)
+            # Deterministic stand-ins so the demo and tests work without a model.
+            output = {"rewrite": rules(text), "continue": "and then some—naturally.",
+                      "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
             usage = {}
         elif self.claude:
             # One request at a time: no backlog of paid requests while typing.
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("Claude busy; keep typing or retry")
             try:
-                output, usage = self.claude.rewrite(text, system, self.examples)
+                output, usage = self.claude.rewrite(text, system, examples)
                 if not output:
                     raise RuntimeError("Claude returned no text")
             finally:
@@ -117,9 +129,9 @@ class Rewriter:
             if not self.lock.acquire(blocking=False):
                 raise RuntimeError("model busy; keep typing or retry")
             try:
-                payload = {"messages": [{"role": "system", "content": system}] + self.examples +
+                payload = {"messages": [{"role": "system", "content": system}] + examples +
                                         [{"role": "user", "content": text}],
-                           "max_tokens": self.max_tokens, "temperature": 0,
+                           "max_tokens": max_tokens, "temperature": 0,
                            "stream": False, "cache_prompt": True}
                 if self.model:
                     payload["model"] = self.model
@@ -142,6 +154,9 @@ class Rewriter:
                     raise RuntimeError("model returned no text")
             finally:
                 self.lock.release()
-        return {"text": output, "backend": self.backend,
+        output = self.finish(mode, text, output)
+        if not output:
+            raise RuntimeError("the model offered nothing for this %s" % mode)
+        return {"text": output, "backend": self.backend, "mode": mode,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}

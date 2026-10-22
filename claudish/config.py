@@ -21,9 +21,9 @@ from .model import load_prompt
 BACKENDS = ("llama", "openai", "claude", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
-            "context": None, "max_context_chars": 6000}
+            "context": None, "max_context_chars": 6000, "modes": None}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int}
+         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict}
 
 
 def default_path():
@@ -32,7 +32,9 @@ def default_path():
 
 
 def resolve(path=None, profile=None, overrides=None):
-    """Return (profile name, settings, prompt, context) from the file, then non-None overrides."""
+    """Return (profile name, settings, prompt, context) from the file, then non-None overrides.
+
+    settings["modes"] becomes name -> {"system", "examples", "max_tokens"} overrides for Rewriter."""
     settings, name, base = dict(DEFAULTS), None, Path.cwd()
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
@@ -71,6 +73,22 @@ def resolve(path=None, profile=None, overrides=None):
         if not prompt_path.is_absolute() and not (overrides or {}).get("prompt"):
             prompt_path = base / prompt_path  # Template paths in a profile are relative to the file.
         prompt = load_prompt(prompt_path)
+    modes = {}
+    for mode, spec in (settings["modes"] or {}).items():
+        if not isinstance(spec, dict) or set(spec) - {"prompt", "max_tokens"}:
+            raise ValueError('profile %r: mode %r takes only "prompt" and "max_tokens"' % (name, mode))
+        override = {}
+        if spec.get("prompt"):
+            mode_path = Path(spec["prompt"]).expanduser()
+            override["system"], override["examples"] = load_prompt(mode_path if mode_path.is_absolute() else base / mode_path)
+        if spec.get("max_tokens") is not None:
+            if not isinstance(spec["max_tokens"], int) or isinstance(spec["max_tokens"], bool):
+                raise ValueError("profile %r: mode %r max_tokens must be an integer" % (name, mode))
+            override["max_tokens"] = spec["max_tokens"]
+        if mode not in ("rewrite", "continue", "instruct") and "system" not in override:
+            raise ValueError('profile %r: new mode %r needs a "prompt"' % (name, mode))
+        modes[mode] = override
+    settings["modes"] = modes
     context = None
     if settings["context"]:
         if not all(isinstance(spec, dict) for spec in settings["context"]):

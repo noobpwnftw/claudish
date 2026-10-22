@@ -87,6 +87,24 @@ async def check(args):
             await expect(page.locator("#output")).to_have_value("Keep this thought intact.")
             await page.unroute("**/suggest", unavailable)
 
+            # Instruct mode: the typed text is an instruction; the candidate is the draft.
+            sent = []
+            page.on("request", lambda request: sent.append(request.post_data_json)
+                    if request.url.endswith("/suggest") else None)
+            await page.locator("#clear").click()
+            await page.get_by_role("radio", name="INSTRUCT").check()
+            await expect(page.locator("#candidate-title")).to_have_text("THE DRAFT")
+            await expect(page.locator("#accept-label")).to_have_text("Accept draft")
+            await page.locator("#draft").fill("thank the team for shipping the release")
+            await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
+            draft_text = await page.locator("#candidate").inner_text()
+            assert draft_text.strip() and any(body and body.get("mode") == "instruct" for body in sent), sent
+            await page.locator("#draft").press("Tab")
+            await expect(page.locator("#output")).to_have_value(draft_text)
+            await page.get_by_role("radio", name="REWRITE").check()
+            await expect(page.locator("#candidate-title")).to_have_text("THE CLAUDISH EDIT")
+            await page.locator("#clear").click()
+
             await page.set_viewport_size({"width": 390, "height": 844})
             await page.get_by_role("button", name="Let's explore the options.").click()
             await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
@@ -95,7 +113,7 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
             print("Browser acceptance passed: inference, Tab/Enter/Escape, dashes, clipboard, "
-                  "clear, stale responses, service failure, and mobile layout")
+                  "clear, stale responses, service failure, instruct mode, and mobile layout")
         finally:
             await browser.close()
 

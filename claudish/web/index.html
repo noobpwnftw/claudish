@@ -34,18 +34,23 @@
       <section class="workspace" aria-label="Try the input method">
         <div class="workspace-bar">
           <div class="room-title"><span class="live-dot"></span> THE COMPOSITION DESK</div>
+          <div class="modes" role="radiogroup" aria-label="What the model does">
+            <label><input type="radio" name="mode" value="rewrite" checked><span>REWRITE</span></label>
+            <label><input type="radio" name="mode" value="continue"><span>CONTINUE</span></label>
+            <label><input type="radio" name="mode" value="instruct"><span>INSTRUCT</span></label>
+          </div>
           <label class="toggle"><input id="dash-toggle" type="checkbox" checked><span>Em dashes by default</span></label>
         </div>
         <div class="editors">
           <div class="draft-pane">
             <div class="pane-heading"><label for="draft"><span class="step">01</span> YOUR WORDS</label><span id="count">0 / 512</span></div>
             <textarea id="draft" maxlength="512" spellcheck="false" placeholder="We should use a smaller model." aria-describedby="draft-help"></textarea>
-            <div class="draft-bottom"><span id="draft-help">A thought, a sentence, a perfectly normal email.</span><button id="rewrite" class="text-button" type="button">Rewrite <span>↗</span></button></div>
+            <div class="draft-bottom"><span id="draft-help">A thought, a sentence, a perfectly normal email.</span><button id="rewrite" class="text-button" type="button"><span id="rewrite-label">Rewrite</span> <span>↗</span></button></div>
           </div>
           <div class="candidate-pane">
-            <div class="pane-heading"><span><span class="step">02</span> THE CLAUDISH EDIT</span><span class="candidate-state" id="candidate-state" role="status">AWAITING A THOUGHT</span></div>
+            <div class="pane-heading"><span><span class="step">02</span> <span id="candidate-title">THE CLAUDISH EDIT</span></span><span class="candidate-state" id="candidate-state" role="status">AWAITING A THOUGHT</span></div>
             <div class="candidate-body"><p class="candidate placeholder" id="candidate">A nuanced perspective is<br>just a keystroke away.</p></div>
-            <div class="candidate-bottom"><span id="timing">LOCAL MODEL · NO CLOUD REQUIRED</span><button id="accept" class="accept-button" type="button" disabled>Accept rewrite <kbd>Tab</kbd></button></div>
+            <div class="candidate-bottom"><span id="timing">LOCAL MODEL · NO CLOUD REQUIRED</span><button id="accept" class="accept-button" type="button" disabled><span id="accept-label">Accept rewrite</span> <kbd>Tab</kbd></button></div>
           </div>
         </div>
         <div class="desk-footer"><span><kbd>Tab</kbd> accept <span class="separator">/</span> <kbd>Enter</kbd> keep your wording <span class="separator">/</span> <kbd>Shift ↵</kbd> new line</span><button id="keep" class="text-button" type="button" disabled>Keep my wording →</button></div>
