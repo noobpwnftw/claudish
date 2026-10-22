@@ -25,4 +25,8 @@ def style() -> str:
 
 
 if __name__ == "__main__":
-    server.run("stdio")
+    import sys
+    if sys.argv[1:2] == ["http"]:  # An app exposing MCP on a local socket.
+        server.run("streamable-http", host="127.0.0.1", port=int(sys.argv[2]))
+    else:
+        server.run("stdio")

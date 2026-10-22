@@ -282,6 +282,18 @@ caches the text:
 `"$NAME"` values in `env` are read from your environment, so tokens stay out of
 the config file. Use `"resource": "uri"` instead of `"tool"` to read a resource.
 
+Apps that publish MCP on a local socket are read with `url` instead of
+`command`: streamable HTTP by default, or `"transport": "sse"`. Headers may use
+`"$NAME"` values from your environment:
+
+```json
+{"type": "mcp", "name": "editor", "url": "http://127.0.0.1:3920/mcp",
+ "headers": {"Authorization": "Bearer $EDITOR_MCP_TOKEN"}, "tool": "get_selection"}
+```
+
+Paired with a binding, this lets an app hand its context to the input method
+without knowing Claudish exists.
+
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.

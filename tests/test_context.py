@@ -179,10 +179,41 @@ class MCPContextTests(unittest.TestCase):
         self.assertNotIn('name="broken"', block)
         self.assertIn("broken", context.providers[2].error)
 
+    def test_url_transport_to_an_app_exposing_mcp(self):
+        import socket
+        import subprocess
+        import time
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        server = subprocess.Popen(self.server + ["http", str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(server.wait)
+        self.addCleanup(server.terminate)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            with socket.socket() as probe:
+                if probe.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.1)
+        url = "http://127.0.0.1:%d/mcp" % port
+        with patch.dict("os.environ", {"APP_TOKEN": "t-7"}):
+            context = Context([
+                {"type": "mcp", "name": "app", "url": url, "headers": {"Authorization": "Bearer $APP_TOKEN"},
+                 "tool": "pull_request_diff", "arguments": {"number": 9}, "timeout": 20},
+                {"type": "mcp", "url": url, "resource": "notes://style", "timeout": 20}])
+        self.assertEqual(context.providers[0].headers, {"Authorization": "Bearer t-7"})
+        block = context.render()
+        self.assertIn("PR #9: + retry the flaky upload", block)
+        self.assertIn("Prefer em dashes.", block)
+
     def test_spec_validation(self):
         for spec, message in [({"type": "mcp", "command": self.server}, "exactly one"),
                               ({"type": "mcp", "command": self.server, "tool": "a", "resource": "b"}, "exactly one"),
-                              ({"type": "mcp", "command": self.server, "tool": "a", "env": {"A": 1}}, "env")]:
+                              ({"type": "mcp", "command": self.server, "tool": "a", "env": {"A": 1}}, "env"),
+                              ({"type": "mcp", "url": "http://x", "command": self.server, "tool": "a"}, "not both"),
+                              ({"type": "mcp", "url": "file:///etc/passwd", "tool": "a"}, "http"),
+                              ({"type": "mcp", "url": "http://x", "transport": "ws", "tool": "a"}, "transport"),
+                              ({"type": "mcp", "url": "http://x", "tool": "a", "env": {"A": "b"}}, "started server")]:
             with self.assertRaisesRegex(ValueError, message):
                 Context([spec])
 

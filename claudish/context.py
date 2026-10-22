@@ -16,7 +16,8 @@ from pathlib import Path
 
 PROVIDER_KEYS = {"file": {"type", "name", "path", "ttl"},
                  "command": {"type", "name", "command", "ttl", "timeout", "cwd"},
-                 "mcp": {"type", "name", "command", "env", "cwd", "tool", "arguments", "resource", "ttl", "timeout"}}
+                 "mcp": {"type", "name", "command", "env", "cwd", "url", "transport", "headers",
+                         "tool", "arguments", "resource", "ttl", "timeout"}}
 
 
 class Provider:
@@ -31,7 +32,24 @@ class Provider:
         self.ttl = float(spec.get("ttl", 30))
         self.lock = threading.Lock()
         self.cached, self.expires = None, 0.0
-        if kind == "file":
+        if kind == "mcp" and spec.get("url"):
+            # An app that exposes MCP on a local socket: connect instead of starting a server.
+            if spec.get("command"):
+                raise ValueError('mcp context takes "command" (stdio) or "url", not both')
+            if not str(spec["url"]).startswith(("http://", "https://")):
+                raise ValueError("mcp url must be http:// or https://")
+            self.url, self.command = spec["url"], None
+            self.transport = spec.get("transport", "http")
+            if self.transport not in ("http", "sse"):
+                raise ValueError('mcp transport must be "http" (streamable HTTP) or "sse"')
+            headers = spec.get("headers") or {}
+            if not (isinstance(headers, dict) and all(isinstance(v, str) for v in headers.values())):
+                raise ValueError("mcp headers must map names to strings")
+            # "$NAME" values come from the environment, so tokens stay out of the config file.
+            self.headers = {key: os.path.expandvars(value) for key, value in headers.items()}
+            self.timeout = float(spec.get("timeout", 5))
+            self.cwd, self.name = None, spec.get("name") or spec["url"]
+        elif kind == "file":
             if not isinstance(spec.get("path"), str):
                 raise ValueError('context file needs a "path"')
             self.path = Path(os.path.expanduser(spec["path"]))
@@ -58,6 +76,8 @@ class Provider:
                 raise ValueError('mcp context needs the MCP SDK: pip install "claudish-ime[mcp]"')
             if isinstance(self.command, str):
                 raise ValueError('mcp "command" must be a list on Windows: ["program", "arg", ...]')
+            if self.command is None and (spec.get("env") or spec.get("cwd")):
+                raise ValueError("mcp env/cwd apply to a started server, not a url")
             self.tool, self.resource = spec.get("tool"), spec.get("resource")
             if bool(self.tool) == bool(self.resource):
                 raise ValueError('mcp context needs exactly one of "tool" or "resource"')
@@ -68,6 +88,8 @@ class Provider:
             # "$NAME" values come from the environment, so tokens stay out of the config file.
             self.env = {key: os.path.expandvars(value) for key, value in env.items()}
             self.name = spec.get("name") or self.tool or self.resource
+            if self.command is None:
+                self.name = spec.get("name") or self.url
 
     def read(self):
         if self.kind == "file":
@@ -100,11 +122,22 @@ def read_mcp(provider):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
+    def connect():
+        if provider.command is None and provider.transport == "sse":
+            from mcp.client.sse import sse_client
+            return sse_client(provider.url, headers=provider.headers, timeout=provider.timeout)
+        if provider.command is None:
+            import httpx2
+            from mcp.client.streamable_http import streamable_http_client
+            client = httpx2.AsyncClient(headers=provider.headers, timeout=provider.timeout)
+            return streamable_http_client(provider.url, http_client=client)
+        return stdio_client(StdioServerParameters(command=provider.command[0], args=provider.command[1:],
+                                                  env={**os.environ, **provider.env}, cwd=provider.cwd))
+
     async def fetch():
         with anyio.fail_after(provider.timeout):
-            parameters = StdioServerParameters(command=provider.command[0], args=provider.command[1:],
-                                               env={**os.environ, **provider.env}, cwd=provider.cwd)
-            async with stdio_client(parameters) as (read_stream, write_stream):
+            async with connect() as streams:
+                read_stream, write_stream = streams[0], streams[1]
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
                     if provider.tool:

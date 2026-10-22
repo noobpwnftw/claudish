@@ -162,6 +162,24 @@ other app's assistant, Claudish sits underneath all of them and grows by
   commit boxes, mail composers) is how support grows.
 - **Show:** every result lists what was consulted.
 
+### Apps publish MCP; the input method reads it
+
+The integration runs the other way from today's assistants. An app does not
+embed an assistant; it **publishes** what it knows over MCP, such as the open
+file, the selection, diagnostics, the PR under review, or the ticket you are
+answering. Claudish is the client that reads all of them. Type in VS Code, and
+the IME sees what VS Code publishes; type in the browser, and it sees what the
+web app or its extension publishes. Claude, GPT, and local models become
+providers behind your keyboard instead of destination apps that each try to
+connect to everything. Longer conversations and approvals can go in a
+companion panel, while the caret remains where results land.
+
+What Claudish needs for this is a binding (app → MCP server) and an MCP client
+that can reach the server: stdio for servers it starts, and streamable HTTP or
+SSE for apps that publish on a local socket (headers from environment
+variables, never stored). App-specific internal channels, such as an IDE
+extension's private socket, are not targets; published MCP endpoints are.
+
 ## Onboarding (G19)
 
 People already know how to use this: you type. Onboarding should take three
