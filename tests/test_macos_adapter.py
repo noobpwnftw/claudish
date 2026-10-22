@@ -24,6 +24,9 @@ class Client:
         self.commits.append(text)
         self.marked = ""
 
+    def bundleIdentifier(self):
+        return "com.apple.TextEdit"
+
 
 class BaseController:
     def initWithServer_delegate_client_(self, server, delegate, client):
@@ -68,9 +71,10 @@ class Worker:
         self.closed = False
         self.modes = []
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None):
         self.result = None
         self.modes.append(mode)
+        self.app = app
         self.immediate = immediate
 
     def poll(self):
@@ -212,6 +216,10 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.key(36)  # the second Enter inserts the result
         self.assertEqual(self.client.commits, ["Once upon a time—a cat."])
+
+    def test_requests_name_the_focused_app(self):
+        self.type_text("hi")
+        self.assertEqual(self.controller.worker.app, "com.apple.TextEdit")
 
     def test_deactivation_commits_and_closes_worker_timer(self):
         self.type_text("keep me")

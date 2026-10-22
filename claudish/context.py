@@ -128,17 +128,21 @@ class Context:
         self.providers = [Provider(spec, base) for spec in specs]
         self.max_chars = max_chars
 
-    def render(self, before="", after=""):
+    def render(self, before="", after="", extra=()):
         """Return a block to append to the system prompt, or "" when there is no context."""
+        return self.gather(before, after, extra)[0]
+
+    def gather(self, before="", after="", extra=()):
+        """(block, names of the providers that contributed); extra providers come from app bindings."""
         sections = []
-        for provider in self.providers:
+        for provider in list(self.providers) + list(extra):
             text = provider.get()
             if text:
                 sections.append((provider.name, text))
         if before or after:
             sections.append(("text around the caret", (before[-1500:] + "▮" + after[:500]).strip()))
         if not sections:
-            return ""
+            return "", []
         budget, parts = self.max_chars, []
         for name, text in sections:
             if budget <= 0:
@@ -146,5 +150,20 @@ class Context:
             text = text[:budget]
             budget -= len(text)
             parts.append('<context name="%s">\n%s\n</context>' % (name.replace('"', "'"), text))
-        return ("\n\nReference context for this text. Use it for names, terms, and facts; "
-                "do not copy it into the rewrite unless the text refers to it.\n" + "\n".join(parts))
+        block = ("\n\nReference context for this text. Use it for names, terms, and facts; "
+                 "do not copy it into the rewrite unless the text refers to it.\n" + "\n".join(parts))
+        return block, [name for name, _ in sections]
+
+
+class Binding:
+    """Context for one kind of text box: an app pattern, such as "firefox*" or "com.apple.Terminal"."""
+
+    def __init__(self, spec, base=Path.cwd()):
+        if not isinstance(spec, dict) or not isinstance(spec.get("app"), str) or set(spec) - {"app", "context"}:
+            raise ValueError('a binding is {"app": "pattern", "context": [providers]}')
+        self.pattern = spec["app"]
+        self.providers = [Provider(item, base) for item in spec.get("context") or []]
+
+    def matches(self, app):
+        import fnmatch
+        return bool(app) and fnmatch.fnmatch(app.lower(), self.pattern.lower())

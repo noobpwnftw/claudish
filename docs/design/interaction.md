@@ -140,6 +140,28 @@ adapter ──/sessions──▶ service ──stdin/stdout (stream-json)──�
 - Wayland: IBus behavior differs across compositors; the session UI needs a
   test there.
 
+## Supported text boxes (G20)
+
+The future of this integration is simple. Type in a *supported* text box, and
+Claudish reads its context and an agent works for you; anywhere else, it is an
+input method. Instead of shipping an app per workflow and competing with every
+other app's assistant, Claudish sits underneath all of them and grows by
+**context providers**: which app or field this is, and what it can read there.
+
+- **Identify:** adapters report the focused app. IBus gives
+  `focus_in_id(client)`, as "im module:program"; IMK gives the client's
+  `bundleIdentifier`; TSF gives the foreground process. Next comes the field
+  as well: IBus content purpose and hints, the window title, the browser URL
+  (through accessibility APIs or a small browser extension), and the terminal
+  working directory (through the `claudish fix` shell hook).
+- **Bind:** profile `bindings` map app patterns to context providers. In time, a
+  binding should also choose the default mode, such as instruct in a terminal
+  prompt, and its own templates.
+- **Read:** providers are files, commands, and MCP servers today. A community
+  catalogue of providers per app (GitHub in browsers, Jira, terminals, IDE
+  commit boxes, mail composers) is how support grows.
+- **Show:** every result lists what was consulted.
+
 ## Onboarding (G19)
 
 People already know how to use this: you type. Onboarding should take three

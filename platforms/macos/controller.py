@@ -75,9 +75,17 @@ class ClaudishInputController(IMKInputController):
             self.finish(self.client(), suggested=True)
 
     @objc.python_method
+    def app(self, client):
+        """The focused app's bundle identifier (for bindings), such as "com.apple.Terminal"."""
+        try:
+            return str(client.bundleIdentifier()) if client is not None else None
+        except Exception:  # Not every client implements it.
+            return None
+
+    @objc.python_method
     def changed(self, client):
         if self.worker is not None and (self.state.automatic or not self.state.text):
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
         self.panel.hide()
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(self.state.text.encode("utf-16-le")) // 2
@@ -122,7 +130,8 @@ class ClaudishInputController(IMKInputController):
             if action == "submit":
                 self.state.submit()
                 if self.worker is not None:
-                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True)
+                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                                         app=self.app(client))
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"
