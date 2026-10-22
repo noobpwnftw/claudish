@@ -1,4 +1,8 @@
 """InputMethodKit controller; all Cocoa client operations stay on the main thread."""
+import os
+import time
+import traceback
+
 import objc
 from AppKit import NSEventMaskKeyDown, NSEventTypeKeyDown
 from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl
@@ -9,6 +13,15 @@ from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCa
 
 from claudish.composition import MAX_COMPOSITION, Composition
 from claudish.client import Suggestions
+
+TRACE = os.environ.get("CLAUDISH_TRACE")  # a file path: event kinds and errors, never typed text
+
+
+def trace(*fields):
+    if TRACE:
+        with open(TRACE, "a") as out:
+            out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
+
 
 SURROUNDING = 8000  # characters each side of the caret an instruction takes along (as on Linux)
 
@@ -59,9 +72,19 @@ class ClaudishInputController(IMKInputController):
 
     @objc.signature(b"v@:@")
     def pollSuggestions_(self, timer):
+        try:
+            self.poll()
+        except Exception:  # an error here would vanish into the host app's run loop
+            trace("poll failed", traceback.format_exc())
+            raise
+
+    @objc.python_method
+    def poll(self):
         if not self.active or self.worker is None:
             return
         result = self.worker.poll()
+        if result:
+            trace("result", sorted(result[1]), "current" if result[0] == self.state.revision else "stale")
         if result:
             revision, data = result
             if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
@@ -164,6 +187,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def changed(self, client):
+        trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and (self.state.automatic or not self.state.text):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
         self.panel.hide()
@@ -230,6 +254,17 @@ class ClaudishInputController(IMKInputController):
         self.finish(self.client())
 
     def handleEvent_client_(self, event, client):
+        try:
+            handled = self.handle(event, client)
+            special = {36: "Return", 48: "Tab", 51: "Backspace", 53: "Escape", 97: "F6", 98: "F7", 100: "F8"}
+            trace("key", special.get(event.keyCode(), "char"), self.state.mode, "handled" if handled else "passed")
+            return handled
+        except Exception:
+            trace("key failed", traceback.format_exc())
+            raise
+
+    @objc.python_method
+    def handle(self, event, client):
         if not self.active or event.type() != NSEventTypeKeyDown:
             return False
         flags = event.modifierFlags()
