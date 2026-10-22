@@ -185,7 +185,9 @@ def main():
     wait_for(lambda: state(), what="test app")
     print("IBus %s, engine %s" % (sh("ibus", "version").strip(), sh("ibus", "engine").strip()), flush=True)
     statuses = {c["check"]: c["status"] for c in doctor()}
-    check("doctor: healthy session all green", sorted(c for c, s in statuses.items() if s == "fail" or s == "warn"), [])
+    # "Starts at login" is tested in tests/desktop/linux-systemd; here the harness starts the service.
+    check("doctor: healthy session all green",
+          sorted(c for c, s in statuses.items() if s in ("fail", "warn") and c != "Starts at login"), [])
     for marker in WORK.glob("bound-*"):  # doctor runs every provider to check it; start the binding test clean
         marker.unlink()
     try:
