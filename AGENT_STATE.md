@@ -1,19 +1,24 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
+Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 
-- `main` (`a1f567a`) adds since the last checkpoint:
-  - G01 Linux: real IBus/GTK desktop tests (`check.py --desktop`) and the fixed
-    installer (environment.d search path, `--system`, `--uninstall`, layout
-    `default`).
-  - G15: rewrite/continue/instruct modes in the service, the browser demo, and
-    F7 in all three adapters.
-  - G12: a local 14B meaning judge, with 91.5% same-vs-not agreement on hand
-    labels.
-  - G16: `claudish fix` (bash 3 and Windows fixes included).
-  - G05: CONTRIBUTING.md.
+- `main` adds the onboarding priority (owner, 2026-10-23: "the IME and MCP side
+  of things for a better on-boarding experience"):
+  - G22 `claudish doctor`, G23 `claudish service`, G24 `claudish mcp
+    import|list` and `claudish context test`.
+  - G25 `claudish setup`, a wizard over all of them, plus
+    `scripts/download_llama.py` (pinned b11822, digest-verified). It was verified
+    for real in `tests/desktop/linux-systemd`: a fresh copy, `setup --yes`, and
+    the login service answers from the downloaded CPU llama-server.
+  - `start.py` now uses the local profile's context and bindings.
+  - URL openers are built once: this fixed an exit-time segfault (the IBus smoke
+    failed 5 in 60, now 0 in 60) and halved the gate's median latency (63 to 33 ms).
 
-  The full gate `check.py --model --desktop` passes.
+  The full gate `check.py --model --desktop` and CI run 39828326815 (all 5 jobs)
+  pass on `265f0ec`.
+- Next: the wizard's Windows path in the VM (PIME present, admin step printed).
+  Then G26 design (window picture as context) and G17/G18 (agentic instruct,
+  candidate-list choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
