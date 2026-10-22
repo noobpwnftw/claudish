@@ -35,11 +35,13 @@ for inputs, outputs, fidelity, and model comparisons.
 Status:
 
 - **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
-  key events in a container (12 scenarios, `scripts/check.py --desktop`).
-  Wayland/GNOME sessions and Qt apps are not yet tested.
-- **Windows:** passes PIME's Python contract on every OS, and CI runs on Windows.
-  Typing through TSF into real apps is being set up in a Windows-on-ARM VM and
-  is not yet verified.
+  key events in a container (17 scenarios, `scripts/check.py --desktop`), plus
+  `claudish service` under a real systemd user manager. Wayland/GNOME sessions and
+  Qt apps are not yet tested.
+- **Windows:** verified on Windows 11 ARM64 in a KVM VM through PIME/TSF: classic
+  Notepad 9/9 typing scenarios, Edge 8/8 with one known issue (a shortcut right
+  after a cleared field can lose the composed word). x64 hardware is untested;
+  CI runs the unit tests on Windows.
 - **macOS:** covered by event-routing tests with Cocoa test doubles and a native
   bundle build in CI; not yet run on a Mac.
 - **Browser demo:** tested with real inference in Chromium.

@@ -194,6 +194,32 @@ needs G17 (instruct may call tools), G18 (sessions and choices), and G24 (MCP
 import and bindings); each must keep tool calls visible and side effects
 confirmed.
 
+### The composition is a command buffer; commit is the authorization boundary
+
+An input method already separates *composing* from *committing*: nothing reaches
+the app until you accept a candidate. Instruct mode extends that from language
+conversion (pinyin → characters) to intent conversion (an instruction → an
+operation). A composed instruction can end in text committed at the caret, in
+an action the agent runs once you approve it (with nothing committed), or in
+both: the action, plus a short confirmation inserted. Where you type is a
+routing hint (a terminal suggests a command, an address bar navigation, a mail
+composer a reply), not a limit on what the instruction may touch. Approval must
+say what will happen, where, and with what permissions; destructive or outgoing
+actions need their own explicit choice (see Safety above).
+
+### Context, best source first
+
+Supported text boxes are a progressive enhancement, never a prerequisite:
+
+1. **The app's MCP server:** structured, reliable, published by the app.
+2. **The OS:** focused app and field, window title, surrounding text and
+   selection (IBus surrounding text, TSF, accessibility APIs).
+3. **A picture of the focused window:** the universal fallback for apps that
+   publish nothing, for a vision-capable backend. Only on an explicit request
+   (a key or an instruction), visibly indicated, limited to the focused window,
+   never for secure fields, and labelled as hosted when the backend is.
+4. **The text alone:** what you typed and what the field exposes.
+
 ## Onboarding (G19)
 
 People already know how to use this: you type. Onboarding should take three
