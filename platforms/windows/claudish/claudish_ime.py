@@ -50,13 +50,17 @@ class ClaudishTextService(TextService):
             return False
         if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
-        # Preserve Ctrl/Alt/Win shortcuts. TSF owns external composition termination.
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
+        if self.shortcut(event):
+            # Mid-composition, take the key so onKeyDown can commit the wording first; it then
+            # passes the shortcut on. Left to TSF, the composition was discarded (Ctrl+A lost it).
+            return bool(self.state.text)
+        return event.isPrintableChar() or bool(self.state.text)
+
+    def shortcut(self, event):
         altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and event.isPrintableChar()
                  and not (event.isKeyDown(0x5B) or event.isKeyDown(0x5C)))
-        if not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C)):
-            return False
-        return event.isPrintableChar() or bool(self.state.text)
+        return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 
     def publish(self):
         self.setCompositionString(self.state.text)
@@ -83,6 +87,11 @@ class ClaudishTextService(TextService):
                 if self.state.failed:
                     self.showMessage("cd_AI: the request failed; Enter retries", 3)
         key = event.keyCode
+        if self.shortcut(event):
+            # Commit the wording, then let the app have its shortcut (not eaten).
+            self.setCommitString(self.state.commit())
+            self.changed()
+            return False
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
