@@ -47,10 +47,33 @@ field switches conversation; coming back resumes it.
   call with its result (large results trimmed); your answers; approvals given "for
   this session". Long conversations are compacted (older turns summarized), never
   silently dropped.
-- **Fresh every turn:** the text box itself, as the current document with the
-  caret marked, plus the profile's context, the app's bindings, and the window
-  picture if you pressed F8. If you edited the inserted draft, the model sees your
-  edits, not its own old text.
+- **Fresh every turn:** a window around the caret, not the whole text box (see
+  below), plus the profile's context, the app's bindings, and the window picture if
+  you pressed F8. If you edited the inserted draft, the model sees your edits, not
+  its own old text.
+
+### The text box: a window, plus retrieval
+
+Sending the whole text box every turn would paste a long email, document, or code
+file into every call. Instead:
+
+- **Always sent:** about 1,500 characters before the caret and 500 after, with the
+  caret marked; the selection, if any; the box's length and the app. Short text
+  boxes (most of them) fit whole, and a model always has enough to stay coherent,
+  even one that never calls a tool.
+- **Retrieved when needed:** the full text box is a tool: `textbox.read` (a range),
+  `textbox.search` (lexical first; embeddings if it earns them), and
+  `textbox.selection`. The model calls it when the instruction needs it
+  ("summarize this thread", "fix the second paragraph"). A read is a read-only tool
+  under the policy, listed in "consulted", and kept in the conversation like any
+  tool result, so later turns need not read it again.
+- **Live, not a snapshot:** retrieval reads the text box as it is at the moment of
+  the call (adapters send the current text with each request; the service holds
+  the latest), so edits between turns are what it finds.
+- **For agents:** Claudish serves the text box as an MCP server to the
+  conversation's agent process, so an agent such as Claude Code reads the current
+  document with tools like any other MCP source: the "apps publish MCP" idea, with
+  Claudish as the publisher.
 
 ### Agents keep their own state
 
@@ -71,8 +94,9 @@ when they end.
 
 ### Each turn
 
-1. **Assemble:** the mode's template, the conversation so far, the fresh text box,
-   context and picture, then the instruction.
+1. **Assemble:** the mode's template, the conversation so far, the window around
+   the caret, context and picture, then the instruction; the rest of the text box
+   is a tool.
 2. **Drive:** one of two drivers behind one interface:
    - **Model driver:** Claudish runs the loop. It sends the conversation and the
      offered tools to the backend; for each tool call it applies the policy below,
