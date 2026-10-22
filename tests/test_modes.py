@@ -24,10 +24,10 @@ class ModeTests(unittest.TestCase):
 
     def call(self, rewriter, text, mode):
         reply = {"choices": [{"message": {"content": "the parser change."}, "finish_reason": "stop"}]}
-        with patch("claudish.model.build_opener") as opener:
-            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+        with patch.object(rewriter, "opener") as opener:
+            opener.open.return_value = BytesIO(json.dumps(reply).encode())
             result = rewriter.rewrite(text, mode=mode)
-            return result, json.loads(opener.return_value.open.call_args.args[0].data)
+            return result, json.loads(opener.open.call_args.args[0].data)
 
     def test_each_mode_sends_its_template_and_budget(self):
         rewriter = Rewriter(max_tokens=64)

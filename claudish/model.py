@@ -101,6 +101,7 @@ class Rewriter:
         self.finish = invocation.finish
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
+        self.opener = None
         self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
         if backend == "command":
             if not command:
@@ -171,8 +172,10 @@ class Rewriter:
                 req = Request(self.endpoint + "/v1/chat/completions",
                               data=json.dumps(payload).encode(), headers=headers)
                 # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
-                opener = build_opener(ProxyHandler({})) if self.local else build_opener()
-                with opener.open(req, timeout=self.timeout) as response:
+                # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
+                if self.opener is None:
+                    self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
+                with self.opener.open(req, timeout=self.timeout) as response:
                     data = json.load(response)
                 choice = data["choices"][0]
                 # Never offer a sentence chopped off by the token limit.

@@ -4,6 +4,9 @@ import threading
 import time
 from urllib.request import Request, build_opener, ProxyHandler
 
+# Local typing must not be routed through HTTP_PROXY. Built once: build_opener() loads the system
+# CA bundle (about 12 ms), and doing that on the worker raced OpenSSL's cleanup at process exit.
+OPENER = build_opener(ProxyHandler({}))
 
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
@@ -13,8 +16,7 @@ def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite"
         body["app"] = app
     request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
-    # Local typing must not be routed through HTTP_PROXY.
-    with build_opener(ProxyHandler({})).open(request, timeout=timeout) as response:
+    with OPENER.open(request, timeout=timeout) as response:
         return json.load(response)
 
 
