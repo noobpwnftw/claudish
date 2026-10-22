@@ -7,7 +7,7 @@ $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Obj
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
 [Keys]::Type('Thanks for the review ')
-"typed; waiting for the screenshot"
+Set-Content \\host.lan\Data\results\ghost-ready.txt "ready"  # the host takes its screenshot now
 Start-Sleep 8
 Stop-Process -Name Notepad -Force
 Stop-Process $service -Force

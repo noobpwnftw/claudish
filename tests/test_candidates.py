@@ -53,6 +53,12 @@ class ContinueTests(unittest.TestCase):
                             ("Hi Sam,", True), ("it seems", False), ("über", False), ("done.", True)):
             state.change(typed)
             self.assertEqual(state.automatic, asks, typed)
+        state.change("Thanks for the review ")
+        state.candidate = "Thanks for the review on the parser change."
+        self.assertEqual(state.take_ghost(), "on the parser change.")
+        self.assertFalse(state.automatic)  # taking it is not a pause: nothing more until the next key
+        state.change(state.text + " ")
+        self.assertTrue(state.automatic)
         state.next_mode(), state.next_mode()  # rewrite asks on every pause
         state.change("very")
         self.assertTrue(state.automatic)

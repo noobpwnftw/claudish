@@ -209,7 +209,9 @@ function liveKey(name) {
   if (name === "Tab") {
     const rest = ghost();
     if (!rest) return false;  // nothing offered: Tab is the app's
-    commit(rest); change(context()); changed();
+    // Taking it is not a pause in your writing: nothing more until you type again (asking at once
+    // made the model repeat its sentence ending).
+    commit(rest); change(context()); render();
     return true;
   }
   if (name === "Escape") {

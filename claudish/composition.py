@@ -18,6 +18,7 @@ class Composition:
         self.working = False  # An instruction was submitted and its result is pending.
         self.failed = False
         self.look = False  # F8 in instruct: send a picture of the focused window with the instruction
+        self.taken = False  # continue: a suggestion was just taken; wait for the next key
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.status = ""  # what the agent is doing, or its draft so far
 
@@ -26,6 +27,7 @@ class Composition:
         self.candidate = ""
         self.candidates = []
         self.question, self.status = None, ""
+        self.taken = False
         self.working = self.failed = False
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
@@ -38,7 +40,7 @@ class Composition:
         if self.mode == "instruct":
             return False
         if self.mode == "continue":
-            return bool(self.text) and not self.text[-1].isalnum()
+            return bool(self.text) and not self.text[-1].isalnum() and not self.taken
         return True
 
     def enter(self):
@@ -129,10 +131,13 @@ class Composition:
         return char
 
     def take_ghost(self):
-        """Tab in continue mode: the suggestion to commit, or "" (then Tab belongs to the app)."""
+        """Tab in continue mode: the suggestion to commit, or "" (then Tab belongs to the app).
+        Taking it is not a pause in your writing: nothing more is offered until you type again
+        (asking at once made a model repeat its own sentence ending)."""
         ghost = self.ghost
         if ghost:
             self.change((self.text + ghost)[-MAX_COMPOSITION:])
+            self.taken = True
         return ghost
 
     def dismiss(self):

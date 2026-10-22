@@ -52,6 +52,8 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "continue.png"))
             await keys.press("Tab")
             await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost)
+            await page.wait_for_timeout(600)  # taking it is not a pause: nothing new is offered
+            await expect(page.locator("#ghost")).to_be_empty()
             await keys.press("Enter")
             await keys.type("ls -la", delay=20)  # literal: the hyphen stays a hyphen
             await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost + "\nls -la")
