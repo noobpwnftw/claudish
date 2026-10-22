@@ -1,0 +1,172 @@
+{
+ "baseline": {
+  "system": "Rewrite the user's text in polished, slightly verbose English. Keep its meaning, names, numbers and language. Use an em dash where natural. Output only the rewritten text, no explanation.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ]
+  ]
+ },
+ "speaker": {
+  "system": "You rewrite text that the user is about to send. Rewrite it as the same speaker—never reply to it. Make it polished and slightly verbose, and include an em dash (—). Keep the meaning, every name, number, identifier and URL exactly, and the original language. Output only the rewritten text.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thanks, see you at 9",
+    "Thank you—I look forward to seeing you at 9."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—a little restraint goes a long way."
+   ]
+  ]
+ },
+ "speaker4": {
+  "system": "You rewrite text that the user is about to send. Rewrite it as the same speaker—never reply to it. Make it polished and slightly verbose, and include an em dash (—). Keep the meaning, every name, number, identifier and URL exactly, and the original language. Output only the rewritten text.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thanks, see you at 9",
+    "Thank you—I look forward to seeing you at 9."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—a little restraint goes a long way."
+   ],
+   [
+    "Nos vemos el lunes.",
+    "Nos vemos el lunes—será un placer."
+   ]
+  ]
+ },
+ "terse-system": {
+  "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Polished, slightly verbose, with an em dash (—). Output only the rewrite.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thanks, see you at 9",
+    "Thank you—I look forward to seeing you at 9."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—a little restraint goes a long way."
+   ],
+   [
+    "Nos vemos el lunes.",
+    "Nos vemos el lunes—será un placer."
+   ]
+  ]
+ },
+ "restate": {
+  "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates or elaborates what is already said. Output only the rewrite.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thanks, see you at 9",
+    "Thank you—truly—and I will see you at 9."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—not under any circumstances."
+   ],
+   [
+    "the server is down again",
+    "The server is down once more—yet again unavailable."
+   ]
+  ]
+ },
+ "restate-framed": {
+  "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates or elaborates what is already said. Output only the rewrite.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thanks, see you at 9",
+    "Thank you—truly—and I will see you at 9."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—not under any circumstances."
+   ],
+   [
+    "the server is down again",
+    "The server is down once more—yet again unavailable."
+   ]
+  ],
+  "frame": true
+ },
+ "varied-framed": {
+  "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates what is already said. Output only the rewrite.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thank you so much",
+    "Thank you—my gratitude is considerable."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—it must remain untouched."
+   ],
+   [
+    "the server is down",
+    "The server is down—currently unreachable."
+   ],
+   [
+    "Lena fixed 2 bugs.",
+    "Lena has fixed 2 bugs—two defects, resolved."
+   ],
+   [
+    "ok",
+    "Understood—entirely."
+   ]
+  ],
+  "frame": true
+ },
+ "varied": {
+  "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates what is already said. Output only the rewrite.",
+  "examples": [
+   [
+    "We need to think about this.",
+    "This warrants thoughtful consideration—a chance to examine the nuances."
+   ],
+   [
+    "thank you so much",
+    "Thank you—my gratitude is considerable."
+   ],
+   [
+    "Don't push to main.",
+    "Please do not push to main—it must remain untouched."
+   ],
+   [
+    "the server is down",
+    "The server is down—currently unreachable."
+   ],
+   [
+    "Lena fixed 2 bugs.",
+    "Lena has fixed 2 bugs—two defects, resolved."
+   ],
+   [
+    "ok",
+    "Understood—entirely."
+   ]
+  ]
+ }
+}

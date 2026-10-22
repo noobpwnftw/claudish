@@ -1,15 +1,16 @@
 {
   "label": "tiny",
   "cases": 41,
-  "faithful": 18,
+  "faithful": 17,
   "errors": 0,
-  "faithful_and_changed": 16,
+  "faithful_and_changed": 15,
   "added_em_dash": 3,
   "median_ms": 57.58,
   "p95_ms": 71.94,
   "failures_by_check": {
     "error": 0,
     "missing": 15,
+    "new-number": 1,
     "language": 2,
     "negation": 4,
     "preamble": 0,
@@ -388,7 +389,9 @@
       "input": "Please find the attached report for your review.",
       "wall_ms": 62.68,
       "output": "This report provides a comprehensive overview of the impact of the COVID-19 pandemic on the economy.",
-      "failures": [],
+      "failures": [
+        "new-number"
+      ],
       "changed": true,
       "em_dash": false
     },

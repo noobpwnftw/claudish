@@ -22,6 +22,9 @@ class EvaluationCheckTests(unittest.TestCase):
                          ["missing:Priya"])
         self.assertIn("preamble", evaluate.check({"text": "Sounds good."}, "Sure! That sounds excellent."))
         self.assertIn("quoted", evaluate.check({"text": "Sounds good."}, "“That sounds excellent.”"))
+        counted = {"text": "Only 3 of the 40 tests failed.", "keep": ["3", "40"]}
+        self.assertEqual(evaluate.check(counted, "Only 3 of 40 failed—three out of four."), ["new-number"])
+        self.assertEqual(evaluate.check(counted, "Merely 3 (three) of the 40 tests failed."), [])
         self.assertIn("length", evaluate.check({"text": "The build takes 14 minutes today."}, "Slow."))
 
     def test_summary_counts_errors_and_unchanged_output(self):

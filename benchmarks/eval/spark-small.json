@@ -10,6 +10,7 @@
   "failures_by_check": {
     "error": 0,
     "missing": 1,
+    "new-number": 0,
     "language": 2,
     "negation": 0,
     "preamble": 0,

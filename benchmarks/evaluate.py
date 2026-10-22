@@ -1,7 +1,7 @@
 """Score rewrites from a running Claudish service against benchmarks/eval/cases.json.
 
 The checks are mechanical fidelity guards, not a judgment of prose quality:
-kept names/numbers, preserved negation, no chat preamble or quoting, no
+kept names/numbers, no invented numbers, preserved negation, no chat preamble or quoting, no
 truncation, and a sane length. Style is reported separately.
 """
 import argparse
@@ -22,6 +22,15 @@ NEGATION = re.compile(r"\b(not|no|never|none|nobody|nothing|neither|nor|cannot|w
 PREAMBLE = re.compile(r"^(sure|certainly|of course|here(?:'s| is)|okay|rewritten|rewrite|"
                       r"polished|revised)\b", re.IGNORECASE)
 QUOTES = "\"'“”‘’"
+WORDS = ("zero _ two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+         "sixteen seventeen eighteen nineteen twenty").split()
+NUMBER_WORDS = dict({word: i for i, word in enumerate(WORDS) if word != "_"},  # "one" is usually a pronoun
+                    **{word: 10 * i for i, word in enumerate("thirty forty fifty sixty seventy eighty ninety".split(), 3)})
+NUMBER = re.compile(r"\d+(?:\.\d+)?|\b(?:%s)\b" % "|".join(NUMBER_WORDS), re.IGNORECASE)
+
+
+def numbers(text):
+    return {float(NUMBER_WORDS.get(token.lower(), token)) for token in NUMBER.findall(text)}
 
 
 def check(case, output):
@@ -30,6 +39,8 @@ def check(case, output):
     failures = ["missing:" + item for item in case.get("keep", []) if item not in output]
     if case.get("any_of") and not any(word in output for word in case["any_of"]):
         failures.append("language")
+    if numbers(output) - numbers(source):
+        failures.append("new-number")
     if NEGATION.search(source) and not NEGATION.search(output):
         failures.append("negation")
     if PREAMBLE.match(output) and not PREAMBLE.match(source):
@@ -63,7 +74,7 @@ def score(cases, outputs):
         "median_ms": statistics.median(latencies),
         "p95_ms": latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))],
         "failures_by_check": {name: sum(any(f.split(":")[0] == name for f in row["failures"]) for row in rows)
-                              for name in ["error", "missing", "language", "negation", "preamble",
+                              for name in ["error", "missing", "new-number", "language", "negation", "preamble",
                                            "quoted", "length"]},
         "results": rows,
     }

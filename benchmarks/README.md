@@ -52,6 +52,7 @@ Spanish. [`evaluate.py`](evaluate.py) sends each case to a running service and
 applies mechanical checks:
 
 - required names, numbers, and identifiers are kept;
+- no number is invented, whether written as digits or as words;
 - negation is preserved;
 - the language is kept;
 - no chat preamble or added quotes;
@@ -70,7 +71,7 @@ HTTP hops:
 
 | Model / Q4_K_M | Pass checks | Pass and changed | Added em dash | Median | p95 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| SmolLM2 135M Instruct | 18 / 41 | 16 | 3 | 57.6 ms | 71.9 ms |
+| SmolLM2 135M Instruct | 17 / 41 | 15 | 3 | 57.6 ms | 71.9 ms |
 | Qwen2.5 0.5B Instruct | 38 / 41 | 34 | 0 | 70.0 ms | 89.8 ms |
 
 Full outputs: [eval/spark-small.json](eval/spark-small.json) and
@@ -91,3 +92,25 @@ yet. SmolLM2 usually drops names and numbers or copies the prompt's example
 sentence, and its three em dashes come from that copied example. Greedy
 decoding makes the outputs repeatable for a given model, prompt, and llama.cpp
 build.
+
+## Prompt experiments (G11)
+
+The aim was to make the default model add em dashes without losing meaning.
+[`prompt_variants.py`](prompt_variants.py) scores the system-prompt and example
+variants in [`eval/prompt-variants.json`](eval/prompt-variants.json) directly
+against llama-server, using the same cases and checks. Results for Qwen2.5 0.5B
+on the Spark:
+
+| Variant | Pass checks | Added em dash | Failure seen on reading the outputs |
+| --- | ---: | ---: | --- |
+| baseline (shipped) | 38 / 41 | 0 | a few replies and meaning shifts (see above) |
+| speaker / speaker4 | 38–39 / 41 | 26–31 | not graded by hand |
+| terse-system | 41 / 41 | 30 | adds claims: "$2.5 million—thank you for your generous support", "14 minutes—please proceed with caution"; Spanish leaks into French |
+| restate (± framing) | 38 / 41 | 20–28 | copies its example's "—yet again" everywhere: "We raised $2.5 million—yet again" |
+| varied (± framing) | 35 / 41 | 26–27 | garbles restated facts: "14 minutes—ten minutes", "3 out of 40—three out of four" |
+
+At this size, pressure toward em dashes makes the model attach a clause. That
+clause either adds a claim or restates a fact wrongly. A 41/41 score on the
+checks hid the worst variant, terse-system. The shipped prompt is unchanged.
+Framing the input as quoted text stopped one question from being answered
+instead of rewritten. No variant stopped "Thanks!" becoming "You're welcome!".
