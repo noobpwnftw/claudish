@@ -123,15 +123,12 @@ after a context reset and continue from verified state rather than starting over
 
 ## Verification
 
-Start with the checks relevant to your change:
-
-```sh
-python -m unittest discover -s tests -v
-python -m compileall -q claudish platforms scripts tests benchmarks
-git diff --check
-dbus-run-session -- /usr/bin/python3 tests/ibus_smoke.py          # adapter changes
-python tests/pime_smoke.py --pime-source /path/to/PIME/python/textService.py
-```
+The Spark is the test machine. `python scripts/check.py --model` runs the
+unit tests, compile, diff check, IBus and PIME smokes, a real-model rewrite, the
+fidelity evaluation, and the browser demo in seconds. It is the merge gate. Use
+`python scripts/check.py` without `--model` while iterating. Use the Spark's
+inference freely for local test workflows: evaluations, larger models, local
+judges.
 
 For template or model changes, run `benchmarks/evaluate.py` and read the outputs,
 not only the scores: the mechanical checks miss meaning changes.
@@ -143,17 +140,20 @@ the documented IBus/PIME checks and native platform builds. Test actual target
 applications when hardware is available. Add meaningful regression coverage for
 bugs and state transitions; avoid tests that merely mirror trivial code.
 
-Read `.github/workflows/check.yml` rather than assuming the current CI matrix.
-Only report remote CI as passing after inspecting the run for the actual commit.
-Do not rerun expensive checks repeatedly without a new change or unresolved risk.
+Remote CI is opt-in: it runs only for `ci/*` branches or a manual dispatch.
+Push a `ci/<topic>` branch when a change touches the Windows or macOS adapters,
+packaging, or anything the Spark cannot run. It provides the only Windows and
+macOS coverage. Only report remote CI as passing after inspecting the run for the
+actual commit.
 
 ## Git and external actions
 
 Work inside this project and preserve owner edits. Prefer small commits on
 `agent/<goal>` branches. The owner has authorized (2026-10-22) local commits,
 pushing branches, merging to `main`, and revising this file and the roadmap.
-Merge to `main` only after the branch's own CI passed and the merged result
-passed the full local checks; push `main` as a fast-forward. The presence of
+Merge to `main` after `python scripts/check.py --model` passes on the merged
+result (plus a `ci/*` run when the change needs Windows or macOS coverage); push
+`main` as a fast-forward. The presence of
 credentials alone grants no further authority. Do not force-push, delete remote
 branches, publish releases/packages, deploy public services, or change
 repository/account settings without applicable owner authorization. Prepare the concrete result

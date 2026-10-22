@@ -1,5 +1,6 @@
 """Start the model and IME service together; Ctrl+C stops both."""
 import argparse
+import signal
 import subprocess
 import sys
 import time
@@ -21,6 +22,12 @@ def main():
     except ValueError as exc:
         parser.error(str(exc))
     endpoint = "http://127.0.0.1:" + args.port
+
+    def interrupt(signum, frame):
+        raise KeyboardInterrupt
+
+    # SIGTERM (kill, service managers) must stop the model too, not orphan it.
+    signal.signal(signal.SIGTERM, interrupt)
     # Bind the service first, so port conflicts do not leave an orphan model.
     server = make_server(Rewriter(endpoint=endpoint))
     process = None
