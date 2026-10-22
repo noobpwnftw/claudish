@@ -71,6 +71,9 @@ class Worker:
         self.closed = False
         self.modes = []
 
+    def answer(self, session, question, choice=None, text=None):
+        self.answered = (session, question, choice)
+
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
         self.result = None
         self.modes.append(mode)
@@ -209,6 +212,22 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(19, "2"))
         self.assertEqual(self.client.commits, ["Hi there."])
         self.assertEqual(state.text, "")
+
+    def test_an_agents_question_is_answered_with_a_digit(self):
+        self.key(0, "x")
+        self.key(98)
+        self.key(98)  # instruct
+        state, worker = self.controller.state, self.controller.worker
+        self.assertTrue(self.key(36))  # send: the agent starts working
+        question = {"id": "perm-1", "text": "Allow Bash?", "choices": [
+            {"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
+        worker.result = (state.revision, {"question": question, "session": "s1"})
+        self.controller.pollSuggestions_(None)
+        self.assertEqual(self.controller.candidates_(None), ["Allow — Bash: git status", "Deny"])
+        self.assertTrue(self.key(19, "2"))
+        self.assertEqual(worker.answered, ("s1", "perm-1", 1))
+        self.assertIsNone(state.question)
+        self.assertEqual(self.client.commits, [])  # an answer is not text
 
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
         self.key(0, "x")

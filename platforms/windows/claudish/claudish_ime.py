@@ -79,7 +79,12 @@ class ClaudishTextService(TextService):
         self.setCompositionString(self.state.text)
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(self.state.text.encode("utf-16-le")) // 2)
-        candidates = self.state.candidates if self.state.choosing else [self.state.candidate] if self.state.candidate else []
+        if self.state.question:
+            candidates = [c.get("label", "") + (" - " + c["legend"] if c.get("legend") else "")
+                          for c in self.state.question.get("choices") or []]
+        else:
+            candidates = (self.state.candidates if self.state.choosing else
+                          [self.state.candidate] if self.state.candidate else [])
         self.setCandidateList(candidates)
         self.setShowCandidates(bool(candidates))
 
@@ -96,6 +101,13 @@ class ClaudishTextService(TextService):
             revision, data = result
             if "text" in data:
                 self.state.offer(revision, data["text"], data.get("candidates", ()))
+            elif "question" in data:
+                if self.state.ask(revision, data["question"], data["session"]):
+                    self.showMessage("cd_AI asks: %s (1-%d)" % (data["question"].get("text", ""),
+                                                                len(data["question"].get("choices") or [])), 5)
+            elif "progress" in data or "partial" in data:
+                if self.state.note(revision, data.get("progress") or data.get("partial")):
+                    self.showMessage("cd_AI: " + " ".join(self.state.status.split())[-60:], 2)
             elif "error" in data:
                 self.state.fail(revision)
                 if self.state.failed:
@@ -121,6 +133,13 @@ class ClaudishTextService(TextService):
             if action == "wait":
                 self.showMessage("cd_AI: still working…", 2)
                 return True
+        if self.state.question and 0x31 <= key <= 0x39:  # an agent's question: the digit is the answer
+            chosen = self.state.answer_choice(key - 0x30)
+            if chosen and self.worker:
+                self.worker.answer(*chosen)
+                self.showMessage("cd_AI: " + self.state.status, 2)
+            self.publish()
+            return True
         if self.state.choosing and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
             text = self.state.pick(key - 0x30)
             if text is not None:

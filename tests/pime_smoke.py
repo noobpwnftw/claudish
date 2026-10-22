@@ -108,6 +108,21 @@ def main():
             assert reply.get("candidateList") == ["Hello.", "Hi there."], reply
             worker_class.return_value.poll.return_value = None
             assert key(0x32)["commitString"] == "Hi there."
+            # An agent session asks a question: the choices are the list, and a digit answers.
+            for char in "check":
+                key(ord(char.upper()), ord(char))
+            key(0x0D)
+            question = {"id": "perm-1", "text": "Allow Bash?",
+                        "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
+            worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
+            reply = key(0x10)
+            assert reply.get("candidateList") == ["Allow - Bash: git status", "Deny"], reply
+            assert "Allow Bash?" in json.dumps(reply.get("showMessage")), reply
+            worker_class.return_value.poll.return_value = None
+            reply = key(0x31)
+            assert "commitString" not in reply, reply
+            assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
+            assert key(0x1B)["commitString"] == "check"  # Esc keeps the words and stops the session
             assert service.state.text == ""  # nothing composed: shortcuts are not taken at all
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
@@ -115,7 +130,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, F8 and candidate lists included (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":

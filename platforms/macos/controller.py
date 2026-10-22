@@ -64,15 +64,31 @@ class ClaudishInputController(IMKInputController):
             if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
+            elif "question" in data and self.state.ask(revision, data["question"], data["session"]):
+                self.panel.updateCandidates()  # the choices, numbered by the panel
+                self.panel.show(kIMKLocateCandidatesBelowHint)
+            elif "progress" in data or "partial" in data:
+                self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "error" in data:
                 self.state.fail(revision)
 
     def candidates_(self, sender):
+        if self.state.question:
+            return [c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
+                    for c in self.state.question.get("choices") or []]
         if self.state.choosing:
             return list(self.state.candidates)
         return [self.state.candidate] if self.state.candidate else []
 
     def candidateSelected_(self, candidate):
+        if self.active and self.state.question:  # a click on one of the agent's choices
+            lines = self.candidates_(None)
+            if str(candidate) in lines:
+                chosen = self.state.answer_choice(lines.index(str(candidate)) + 1)
+                if chosen and self.worker is not None:
+                    self.worker.answer(*chosen)
+                    self.panel.hide()
+            return
         if not (self.active and self.state.candidate):
             return
         if self.state.choosing and str(candidate) in self.state.candidates:
@@ -134,6 +150,12 @@ class ClaudishInputController(IMKInputController):
         self.pollSuggestions_(None)
         key = event.keyCode()
         chars = event.characters() or ""
+        if self.state.question and len(chars) == 1 and "1" <= chars <= "9":  # the answer to the agent
+            chosen = self.state.answer_choice(int(chars))
+            if chosen and self.worker is not None:
+                self.worker.answer(*chosen)
+                self.panel.hide()
+            return True
         if self.state.choosing and len(chars) == 1 and "1" <= chars <= "9":
             self.commit_pick(client, int(chars))
             return True

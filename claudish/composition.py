@@ -15,11 +15,14 @@ class Composition:
         self.working = False  # An instruction was submitted and its result is pending.
         self.failed = False
         self.look = False  # F8 in instruct: send a picture of the focused window with the instruction
+        self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
+        self.status = ""  # what the agent is doing, or its draft so far
 
     def change(self, text):
         self.text = text
         self.candidate = ""
         self.candidates = []
+        self.question, self.status = None, ""
         self.working = self.failed = False
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
@@ -46,6 +49,29 @@ class Composition:
     def fail(self, revision):
         if revision == self.revision and self.working:
             self.working, self.failed = False, True
+            self.question, self.status = None, ""
+
+    def ask(self, revision, question, session):
+        """An agent asks something while working on this instruction: its choices become the list."""
+        if revision != self.revision or not self.working:
+            return False
+        self.question = dict(question, session=session)
+        return True
+
+    def note(self, revision, text):
+        """Progress or a partial draft from the agent, for the status line."""
+        if revision != self.revision or not self.working:
+            return False
+        self.status = text
+        return True
+
+    def answer_choice(self, number):
+        """(session, question id, choice index) for the numbered choice, or None."""
+        question = self.question
+        if not question or not 1 <= number <= len(question.get("choices") or []):
+            return None
+        self.question, self.status = None, "answered: " + question["choices"][number - 1].get("label", "")
+        return question["session"], question["id"], number - 1
 
     def insert(self, char):
         if len(self.text) >= MAX_COMPOSITION:
@@ -77,17 +103,18 @@ class Composition:
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.working = False
+        self.question, self.status = None, ""
         return True
 
     @property
     def choosing(self):
         """A numbered list is shown: number keys pick. Only for an instruction, whose result you
         asked for and are waiting on; while you type, digits are text."""
-        return self.mode == "instruct" and len(self.candidates) > 1
+        return bool(self.question) or (self.mode == "instruct" and len(self.candidates) > 1)
 
     def pick(self, number):
         """Commit the numbered candidate (1-based); None if there is no such candidate."""
-        if not (self.choosing and 1 <= number <= len(self.candidates)):
+        if self.question or not (self.choosing and 1 <= number <= len(self.candidates)):
             return None
         text = self.candidates[number - 1]
         self.change("")

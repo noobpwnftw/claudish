@@ -33,6 +33,11 @@ class ClaudishEngine(IBus.Engine):
             revision, data = result
             if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
                 self.render()
+            elif "question" in data and self.composition.ask(revision, data["question"], data["session"]):
+                self.render()
+            elif ("progress" in data or "partial" in data) and \
+                    self.composition.note(revision, data.get("progress") or data.get("partial")):
+                self.render()
             elif "error" in data:
                 self.composition.fail(revision)
                 self.render()
@@ -46,12 +51,19 @@ class ClaudishEngine(IBus.Engine):
         # Several readings of an instruction: a numbered list, like any CJK input method's.
         if state.choosing:
             table = IBus.LookupTable.new(9, 0, True, False)
-            for candidate in state.candidates:
-                table.append_candidate(IBus.Text.new_from_string(candidate))
+            lines = ([c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
+                      for c in state.question["choices"]] if state.question else state.candidates)
+            for line in lines:
+                table.append_candidate(IBus.Text.new_from_string(line))
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
-        if state.choosing:
+        if state.question:
+            hint = "agent asks: %s · 1–%d: choose · Esc: stop" % (state.question.get("text", ""),
+                                                                  len(state.question["choices"]))
+        elif state.working and state.status:
+            hint = "instruct · %s · Esc: stop" % " ".join(state.status.split())[-90:]
+        elif state.choosing:
             hint = "instruct · 1–%d: insert that one · Enter: the first · Esc: keep your words" % len(state.candidates)
         elif state.candidate:
             hint = LABELS[state.mode] + state.candidate
@@ -98,6 +110,12 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F7 and self.composition.text:
             self.composition.next_mode()
             self.changed()
+            return True
+        if self.composition.question and IBus.KEY_1 <= keyval <= IBus.KEY_9:
+            chosen = self.composition.answer_choice(keyval - IBus.KEY_0)
+            if chosen:
+                self.suggestions.answer(*chosen)
+                self.render()
             return True
         if self.composition.choosing and IBus.KEY_1 <= keyval <= IBus.KEY_9:
             text = self.composition.pick(keyval - IBus.KEY_0)

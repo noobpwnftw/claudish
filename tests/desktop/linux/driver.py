@@ -163,6 +163,35 @@ def scenarios():
     check("password field bypasses the engine", state()["password"], "pass-word")
 
 
+def agent_session(service):
+    """G18: restart the service with an agent profile (the scripted stream-json agent) and run a
+    session at the caret: a partial draft, a permission question answered with 1, then Enter."""
+    service.terminate()
+    service.wait(timeout=5)
+    service = background(sys.executable, "-m", "claudish", "serve", "--profile", "agent", cwd=str(SRC))
+    wait_for(health, what="agent service")
+    focus("view")
+    key("ctrl+a", "BackSpace")
+    type_text("is my branch clean")
+    key("Return")  # starts the session
+    time.sleep(2.0)  # partial draft, then the permission question
+    check("the agent waits for an answer", state()["view"], "")
+    key("1")  # Allow
+    time.sleep(1.0)
+    key("Return")  # insert the result
+    wait_for(lambda: state()["view"], what="agent result")
+    check("agent session: 1 allows the tool, Enter inserts", state()["view"], "The branch is clean—nothing to commit.")
+    return service
+
+
+def health():
+    try:
+        from urllib.request import urlopen
+        return urlopen("http://127.0.0.1:18765/health", timeout=1).status == 200
+    except OSError:
+        return False
+
+
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
     status = lambda name: next((c["status"], c["fix"]) for c in doctor() if c["check"] == name)
@@ -183,7 +212,8 @@ def main():
     config_dir = Path.home() / ".config/claudish"
     config_dir.mkdir(parents=True, exist_ok=True)
     marker = "import pathlib, sys; pathlib.Path(sys.argv[1]).touch(); print('context for ' + sys.argv[1])"
-    (config_dir / "config.json").write_text(json.dumps({"profiles": {"desk": {"backend": "rules", "bindings": [
+    agent = {"backend": "rules", "session_command": [sys.executable, str(SRC / "tests/fake_agent.py")]}
+    (config_dir / "config.json").write_text(json.dumps({"profiles": {"agent": agent, "desk": {"backend": "rules", "bindings": [
         {"app": "app.py", "context": [{"type": "command", "ttl": 0,
                                         "command": [sys.executable, "-c", marker, str(WORK / "bound-app.py")]}]},
         {"app": "firefox*", "context": [{"type": "command", "ttl": 0,
@@ -209,6 +239,7 @@ def main():
         marker.unlink()
     try:
         scenarios()
+        service = agent_session(service)
     except TimeoutError:
         print("--- service log\n" + (WORK / "python3.log").read_text()[-3000:], flush=True)
         raise

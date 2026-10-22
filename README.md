@@ -103,7 +103,7 @@ Or step by step:
 | Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
 | Esc | keep what you typed |
 | F8 | in instruct, also send a picture of the window you are typing in |
-| 1–3 | when an instruction comes back as a numbered list, insert that reading |
+| 1–3 | when an instruction comes back as a numbered list, insert that reading; when an agent asks, answer |
 
 ## Static demo: the model in your browser
 
@@ -415,6 +415,35 @@ profile:
   after 30 seconds", 3.1 s), and called none for a haiku. Qwen2.5-1.5B never
   called a tool and wrote around the gap. Claude and agent CLIs come later; an
   agent CLI behind the `command` backend already uses its own tools.
+
+### Agent sessions: an agent at the caret
+
+With `"session_command"` in a profile, a sent instruction (instruct mode, Enter)
+runs an agent instead of a single model call. Claudish is the agent's host: its
+progress and partial draft show in the input method's status line, its
+permission questions become the candidate list, and its final answer is a
+candidate like any other. For Claude Code:
+
+```json
+{"profiles": {"code": {"backend": "llama",
+  "session_command": ["claude", "--print", "--input-format", "stream-json",
+    "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+    "--permission-prompts", "host"]}}}
+```
+
+- *"is my branch clean?"* → `Allow — Bash: git status` / `Deny`: **1** allows that one
+  call, **2** denies it (the agent carries on without it). Nothing runs without
+  your choice unless your own Claude Code settings already allow it.
+- **Esc** at any point stops the agent and keeps your words. Editing the
+  instruction stops it too.
+- The agent runs with your Claude Code login, settings, and working directory
+  (the service's), and its usage counts as yours. A session is limited to five
+  minutes and four at a time.
+- Status: tested end to end in the Linux desktop container (real IBus and GTK)
+  with a scripted agent that speaks Claude Code's stream-json protocol (the
+  message shapes come from the Agent SDK's control protocol), plus the PIME smoke
+  and the macOS doubles. On Windows, a question shows at your next key press
+  (F6). A live run against Claude Code itself is pending.
 
 ## Modes
 

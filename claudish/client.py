@@ -1,7 +1,9 @@
 """A single coalescing worker: UI callbacks never wait for inference."""
+import collections
 import json
 import threading
 import time
+from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
 # Local typing must not be routed through HTTP_PROXY. Built once: build_opener() loads the system
@@ -22,34 +24,98 @@ def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite"
         return json.load(response)
 
 
+def call(endpoint, path, body=None, timeout=10):
+    """A JSON request to the local service: POST with a body, else GET."""
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    request = Request(endpoint + path, data=data, headers={"Content-Type": "application/json"})
+    with OPENER.open(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+# Agent session events, as the adapters see them (the same queue as suggestions).
+EVENTS = {"progress": "progress", "partial": "partial", "question": "question"}
+
+
 class Suggestions:
     def __init__(self, endpoint="http://127.0.0.1:18765", debounce=0.18):
         self.endpoint = endpoint
         self.debounce = debounce
         self.condition = threading.Condition()
         self.pending = None
-        self.result = None
+        self.results = collections.deque()  # (revision, data); a session yields several
         self.closed = False
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
         with self.condition:
-            self.pending = (revision, text, mode, app, look, time.monotonic() + (0 if immediate else self.debounce))
-            self.result = None
+            self.pending = (revision, text, mode, app, look, immediate,
+                            time.monotonic() + (0 if immediate else self.debounce))
+            self.results.clear()
             self.condition.notify()
 
     def poll(self):
+        """The oldest unread (revision, data), or None."""
         with self.condition:
-            result, self.result = self.result, None
-            return result
+            return self.results.popleft() if self.results else None
+
+    def answer(self, session, question, choice=None, text=None):
+        """Answer an agent's question; off the input thread, so a key press never waits."""
+        body = {"question": question}
+        body.update({"text": text} if text is not None else {"choice": choice})
+
+        def send():
+            try:
+                call(self.endpoint, "/sessions/%s/answer" % session, body, timeout=5)
+            except Exception:
+                pass  # the session reports its own failure
+        threading.Thread(target=send, daemon=True).start()
 
     def close(self):
         with self.condition:
             self.closed = True
             self.pending = None
-            self.result = None
+            self.results.clear()
             self.condition.notify()
+
+    def deliver(self, revision, data):
+        with self.condition:
+            if not self.closed and self.pending is None:
+                self.results.append((revision, data))
+                return True
+            return False
+
+    def session(self, revision, text, app):
+        """Run an instruction as an agent session; False if the profile has none."""
+        try:
+            started = call(self.endpoint, "/sessions", dict({"text": text}, **({"app": app} if app else {})))
+        except HTTPError as exc:
+            if exc.code == 400:  # this profile has no agent: a plain instruction (about 1 ms to find out)
+                return False
+            raise
+        key, after = started["id"], 0
+        while True:
+            with self.condition:
+                if self.closed or self.pending is not None:  # edited, committed, or Esc: stop the agent
+                    break
+            data = call(self.endpoint, "/sessions/%s?after=%d" % (key, after), timeout=5)
+            for event in data["events"]:
+                after = event["seq"] + 1
+                kind = event["type"]
+                if kind == "result":
+                    self.deliver(revision, {"text": event["text"], "candidates": [event["text"]], "session": key})
+                elif kind == "error":
+                    self.deliver(revision, {"error": event["text"], "session": key})
+                elif kind in EVENTS:
+                    self.deliver(revision, {EVENTS[kind]: event if kind == "question" else event["text"],
+                                            "session": key})
+            if data["done"]:
+                return True
+        try:
+            call(self.endpoint, "/sessions/%s/cancel" % key, {}, timeout=5)
+        except Exception:
+            pass
+        return True
 
     def _run(self):
         while True:
@@ -58,7 +124,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, app, look, due = self.pending
+                revision, text, mode, app, look, immediate, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -67,9 +133,10 @@ class Suggestions:
             if len(text.strip()) < 3:
                 continue
             try:
+                # A sent instruction runs as an agent session when the profile has an agent.
+                if mode == "instruct" and immediate and not look and self.session(revision, text, app):
+                    continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look)
             except Exception as exc:
                 result = {"error": str(exc)}
-            with self.condition:
-                if not self.closed and self.pending is None:
-                    self.result = (revision, result)
+            self.deliver(revision, result)
