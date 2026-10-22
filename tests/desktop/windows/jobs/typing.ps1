@@ -88,9 +88,11 @@ Check 'Tab right after an edit commits nothing stale' (Text) ''
 Start-Sleep -Milliseconds 800; [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
 Check 'fresh candidate after the edit' (Text) 'particularly good'
 Clear
-[Keys]::Type('say hi'); [Keys]::Press(0x76); [Keys]::Press(0x76); Start-Sleep -Milliseconds 800
-[Keys]::Press(0x09); Start-Sleep -Milliseconds 500
-Check 'F7 to instruct, Tab writes the draft' (Text) 'As requested—say hi.'
+[Keys]::Type('say hi'); [Keys]::Press(0x76); [Keys]::Press(0x76)
+[Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
+Check 'instruct holds the text until it is inserted' (Text) ''
+[Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
+Check 'F7 to instruct, Enter sends, Enter inserts' (Text) 'As requested—say hi.'
 Clear
 [Keys]::Type('draft'); [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400
 Check 'Ctrl shortcut commits the wording first' (Text) 'draft'
