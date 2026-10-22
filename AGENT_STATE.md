@@ -19,7 +19,9 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - G25 is verified on Windows ARM64 too (VM job `setup-wizard.ps1`). That run
   found and fixed an orphaned llama-server after `service uninstall` (job object)
   and added a curl.exe fallback for certificate failures on Windows.
-- Next: G26 design (window picture as context) and G17/G18 (agentic instruct,
+- G26 done: F8 window pictures (Windows PrintWindow, X11 ImageMagick, look_command);
+  verified with Qwen2.5-VL-3B (models/, with its mmproj) on the Spark.
+- Next: G27 (several candidates with legends), then G17/G18 (agentic instruct,
   candidate-list choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
