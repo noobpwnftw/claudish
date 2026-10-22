@@ -1,6 +1,6 @@
-# Inside the Windows VM: real keystrokes through TSF and PIME into Notepad; text read back with UI Automation.
+# Inside the Windows VM: real keystrokes through TSF and PIME into classic Notepad (an IMM32 Edit
+# control, reached through Windows' TSF compatibility layer); text read back with WM_GETTEXT.
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @'
 using System; using System.Runtime.InteropServices; using System.Threading;
 public static class Keys {
@@ -9,6 +9,17 @@ public static class Keys {
   [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
   [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, System.Text.StringBuilder l);
+  [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
+  // Classic Notepad: read its Edit control (WM_GETTEXTLENGTH, WM_GETTEXT).
+  public static string EditText(IntPtr window) {
+    IntPtr edit = FindWindowEx(window, IntPtr.Zero, "Edit", null);
+    int length = (int)SendMessage(edit, 0x000E, IntPtr.Zero, IntPtr.Zero);
+    var text = new System.Text.StringBuilder(length + 1);
+    SendMessage(edit, 0x000D, (IntPtr)(length + 1), text);
+    return text.ToString();
+  }
   static void Send(ushort vk, bool up) {
     var input = new INPUT { type = 1 };
     input.ki.vk = vk; input.ki.scan = (ushort)MapVirtualKey(vk, 0); input.ki.flags = up ? 2u : 0u;
@@ -66,10 +77,7 @@ $window = (Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Ob
 "Notepad: $($window.Id) $(($window | Select-Object -ExpandProperty Path))"
 [Keys]::SetForegroundWindow($window.MainWindowHandle) | Out-Null
 Start-Sleep 1
-$root = [System.Windows.Automation.AutomationElement]::FromHandle($window.MainWindowHandle)
-$condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Document)
-function Text { $doc = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
-  $doc.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1).TrimEnd("`r", "`n") }
+function Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
 function Clear { [Keys]::Press(0x41, 0x11); [Keys]::Press(0x2E); Start-Sleep -Milliseconds 300 }
 
 # 4. Scenarios (same intent as the Linux desktop test).
