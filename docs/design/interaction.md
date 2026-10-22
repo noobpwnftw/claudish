@@ -286,6 +286,17 @@ Supported text boxes are a progressive enhancement, never a prerequisite:
 
 ## Onboarding (G19)
 
+### The pathway: nothing to learn on day one
+
+Switching from en_US to cd_AI changes nothing you have to learn. Continue, where
+an installed input method starts, types exactly what you type; a suggestion
+appears in grey after a pause, and you can leave it there forever without
+pressing Tab. Then, at your own pace, you find F7: instruct (ask for something)
+and rewrite (polish your words). The demo leads with rewrite because it is the
+pitch; the installed input method leads with continue because it is the habit.
+Changes must keep this pathway: continue never holds your words, never takes a
+key it does not need, and never asks for attention.
+
 People already know how to use this: you type. Onboarding should take three
 minutes, in this order:
 
