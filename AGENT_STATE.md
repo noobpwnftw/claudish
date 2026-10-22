@@ -25,8 +25,14 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - G17 second step done: profile "tools" (read-only MCP tools in a bounded loop, OpenAI-compatible).
 - claudish.io (owner's domain, name.com DNS): the Pages custom domain since 2026-10-23,
   HTTPS enforced, www and the old github.io URL redirect; verified isolated in Chromium.
-- Next: G18 (agent sessions at the caret; approval of side-effecting tools as
-  candidate choices); then G21 (browser model data).
+- G18 first slice: agent sessions (Claude Code stream-json host; questions as choices).
+  Scripted-agent tested; a live Claude Code run waits for the owner's OK (their quota).
+- Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
+  are a placeholder (owner: no rush; CHANGELOG.md drafts 0.1.0).
+- G28: continue types into the app, the suggestion waits after the caret; F7 always
+  switches modes. Linux 24/24, Windows Notepad 11/11 and Edge 10/10.
+- Next: a configurable accept key; G18 follow-ups ("Tell it…", follow-up turns);
+  macOS grey suggestion on a real Mac (needs hardware); G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
