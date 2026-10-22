@@ -125,7 +125,8 @@ after a context reset and continue from verified state rather than starting over
 
 The Spark is the test machine. `python scripts/check.py --model` runs the
 unit tests, compile, diff check, IBus and PIME smokes, a real-model rewrite, the
-fidelity evaluation, and the browser demo in seconds. It is the merge gate. Use
+fidelity evaluation, and the browser demo in seconds. It is the merge gate; add
+`--desktop` for adapter changes (real IBus and GTK typing in a container). Use
 `python scripts/check.py` without `--model` while iterating. Use the Spark's
 inference freely for local test workflows: evaluations, larger models, local
 judges.
@@ -140,7 +141,11 @@ the documented IBus/PIME checks and native platform builds. Test actual target
 applications when hardware is available. Add meaningful regression coverage for
 bugs and state transitions; avoid tests that merely mirror trivial code.
 
-Remote CI is opt-in: it runs only for `ci/*` branches or a manual dispatch.
+Use the Spark for cross-platform work where it can: containers for Linux
+desktops, and qemu/KVM (aarch64) for Windows on ARM. macOS needs Apple
+hardware, so it stays on remote CI. Remote CI is opt-in: it runs only for `ci/*`
+branches or a manual dispatch. Run one for `main` before notable merges, since
+Windows-only failures are invisible locally.
 Push a `ci/<topic>` branch when a change touches the Windows or macOS adapters,
 packaging, or anything the Spark cannot run. It provides the only Windows and
 macOS coverage. Only report remote CI as passing after inspecting the run for the

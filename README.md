@@ -233,14 +233,21 @@ On Ubuntu/Debian:
 
 ```sh
 sudo apt install ibus python3-gi gir1.2-ibus-1.0
-/usr/bin/python3 platforms/linux/install.py
+/usr/bin/python3 platforms/linux/install.py            # per user, no sudo
+# or, for sessions that do not read ~/.config/environment.d:
+sudo /usr/bin/python3 platforms/linux/install.py --system
 ```
 
-The installer registers a per-user component; it does not change the active
-keyboard. Log out/in, then add **English → cd_AI — Claudish** to Input Sources.
-Select it with your desktop's input-source shortcut while the service is running.
-The project directory must remain at its installed path. To unregister, remove
-`~/.local/share/ibus/component/claudish.xml`, then log out/in.
+IBus only reads engine definitions from `IBUS_COMPONENT_PATH`, which defaults to
+`/usr/share/ibus/component`. The per-user install therefore writes
+`~/.config/environment.d/90-claudish-ibus.conf` to add `~/.local/share/ibus/component`.
+systemd-managed sessions, including GNOME, apply it at the next login. The
+installer does not change the active keyboard. Log out and back in, then add
+**English → cd_AI — Claudish** to Input Sources and select it with your input-source
+shortcut while the service is running. The engine keeps your keyboard layout, so
+AltGr and dead keys still work. The project directory must stay at its
+installed path. Remove with `install.py --uninstall` (add `--system` if you
+installed that way), then log out and back in.
 
 Wayland/X11 application coverage depends on the desktop's IBus integration.
 This adapter does not support an Fcitx-only session or a raw terminal console.

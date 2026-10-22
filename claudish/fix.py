@@ -42,7 +42,11 @@ PROMPT_COMMAND="__claudish_record${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 fix() {
   local suggestion
   suggestion=$(__CLAUDISH__ fix "$@") || return
-  read -e -i "$suggestion" -p "fix> " suggestion && history -s -- "$suggestion" && eval -- "$suggestion"
+  if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
+    read -e -i "$suggestion" -p "fix> " suggestion && history -s -- "$suggestion" && eval -- "$suggestion"
+  else  # bash 3 (macOS) has no read -i: offer it through history; Up arrow recalls it.
+    history -s -- "$suggestion" && printf 'fix> %s  (press Up to edit, Enter to run)\n' "$suggestion"
+  fi
 }''',
     "zsh": r'''__claudish_preexec() { __claudish_command=$1 }
 __claudish_precmd() {
