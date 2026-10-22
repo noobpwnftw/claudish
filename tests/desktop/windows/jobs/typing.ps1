@@ -90,7 +90,8 @@ $window = (Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Ob
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
 function Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
-function Reset-Notepad {  # not "Clear": the clear alias (Clear-Host) would win [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
+# Not named "Clear": the built-in clear alias (Clear-Host) would take precedence.
+function Reset-Notepad { [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
 
 # 4. Scenarios (same intent as the Linux desktop test).
 [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
