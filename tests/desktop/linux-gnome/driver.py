@@ -167,7 +167,7 @@ def scenarios(keys):
     check("continue: focus change keeps only your words", state()["entry"], "Only my words")
     focus("entry")
     keys.press("ctrl+a", "BackSpace")
-    keys.type("Thanks for the review")
+    keys.type("Thanks for the review ")  # a pause after a word: continue asks
     settle()
     keys.press("Tab")
     wait_for(lambda: state()["entry"].endswith("."), what="continuation")

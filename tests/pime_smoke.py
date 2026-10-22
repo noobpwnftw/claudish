@@ -86,8 +86,9 @@ def main():
             reply = key(0x76)
             assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
             assert reply["commitString"] == "say hi"  # continue types into the app: the held words go in
-            assert worker_class.return_value.schedule.call_args.args[2] == "continue"
+            assert worker_class.return_value.schedule.call_args.args[2] != "continue"  # mid-word: no suggestion yet
             assert key(ord("!"), ord("!"))["commitString"] == "!"
+            assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
             assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours

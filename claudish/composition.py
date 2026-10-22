@@ -33,8 +33,13 @@ class Composition:
 
     @property
     def automatic(self):
-        """Rewrite and continue ask on every pause; an instruction is sent only on Enter."""
-        return self.mode != "instruct"
+        """Ask on this pause? Rewrite: always. Continue: only at a word boundary (after a space or
+        punctuation), so a pause mid-word never splits it ("rev" + " iew"). Instruct: only on Enter."""
+        if self.mode == "instruct":
+            return False
+        if self.mode == "continue":
+            return bool(self.text) and not self.text[-1].isalnum()
+        return True
 
     def enter(self):
         """What Enter does now: "pass", "submit", "wait", "accept" (the candidate), or "keep" (your wording)."""

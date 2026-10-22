@@ -45,6 +45,19 @@ class CompositionTests(unittest.TestCase):
         self.assertFalse(state.choosing)
 
 
+class ContinueTests(unittest.TestCase):
+    def test_continue_asks_only_at_a_word_boundary(self):
+        state = Composition()
+        self.assertEqual(state.mode, "continue")
+        for typed, asks in (("Thanks for the rev", False), ("Thanks for the review ", True),
+                            ("Hi Sam,", True), ("it seems", False), ("über", False), ("done.", True)):
+            state.change(typed)
+            self.assertEqual(state.automatic, asks, typed)
+        state.next_mode(), state.next_mode()  # rewrite asks on every pause
+        state.change("very")
+        self.assertTrue(state.automatic)
+
+
 class RewriterTests(unittest.TestCase):
     def test_rules_offer_three_readings_of_an_instruction_and_one_rewrite(self):
         rewriter = Rewriter("rules")

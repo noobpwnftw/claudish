@@ -208,7 +208,9 @@ class MacOSAdapterTests(unittest.TestCase):
         # Continue types into the app: the held words go in, and stay as the model's context.
         self.assertEqual((state.mode, state.candidate, state.text), ("continue", "", "thank the team"))
         self.assertEqual(self.client.commits, ["thank the team"])
-        self.assertEqual(self.controller.worker.modes[-1], "continue")
+        self.assertNotEqual(self.controller.worker.modes[-1], "continue")  # mid-word: no suggestion yet
+        self.key(49, " ")
+        self.assertEqual(self.controller.worker.modes[-1], "continue")  # a word boundary asks
         self.key(98)
         self.assertEqual((state.mode, state.text), ("instruct", ""))  # the words are in the app already
         self.type_text("say thanks")
@@ -216,7 +218,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
         self.controller.pollSuggestions_(None)
         self.key(48)
-        self.assertEqual(self.client.commits, ["thank the team", "Thank you, team—truly."])
+        self.assertEqual(self.client.commits, ["thank the team", " ", "Thank you, team—truly."])
         self.assertTrue(self.key(98))  # F7 is the input method's while it is active
         self.assertEqual(state.mode, "rewrite")
 

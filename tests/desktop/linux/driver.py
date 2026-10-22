@@ -115,7 +115,7 @@ def scenarios():
     # Continue: the rest of the sentence shows greyed after the caret (ghost text).
     focus("entry")
     key("ctrl+a", "BackSpace")
-    type_text("Thanks for the review")
+    type_text("Thanks for the review ")  # a pause after a word: continue asks
     key("F7")  # rewrite -> continue
     settle()
     key("Tab")  # takes the rest
