@@ -1,4 +1,3 @@
-# Status: blocked upstream on Windows 11 ARM64 + PIME 2.0.0-beta3 (keys arrive as plain text; see ROADMAP G01).
 # Inside the Windows VM: real keystrokes through TSF and PIME into classic Notepad (an IMM32 Edit
 # control, reached through Windows' TSF compatibility layer); text read back with WM_GETTEXT.
 $ErrorActionPreference = 'Stop'
@@ -119,6 +118,8 @@ Reset-Notepad
 [Keys]::Type('draft'); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400  # Ctrl+A mid-composition
 Check 'Ctrl shortcut keeps the composed text' (Text) 'draft'
+[Keys]::Press(0x2E); Start-Sleep -Milliseconds 300  # Delete: proves Ctrl+A reached Notepad
+Check '...and Notepad received Ctrl+A (all selected)' (Text) ''
 
 Stop-Process $service -Force; Stop-Process -Name Notepad -Force
 "{0}/{1} scenarios passed" -f ($results | Where-Object { $_ }).Count, $results.Count
