@@ -54,9 +54,9 @@
         <div class="eyebrow">01 / THREE LAYERS, ONE KEYBOARD</div>
         <h2 id="layers">Continue, instruct, rewrite<span class="dash">—</span>F7 switches.</h2>
         <div class="cards">
-          <article class="card"><div class="card-body"><h3>Continue</h3><p>What cd_AI starts in: you type as usual; pause, and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">YOU TYPE</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">CD_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">YOU TYPE</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">CD_AI</span><span class="io-result">three drafts to pick from</span><kbd class="io-key">1–3</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Ordinary English becomes unnecessarily polished prose.</p></div><div class="card-io"><div class="io"><span class="io-label">YOU TYPE</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">CD_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Continue</h3><p>What cd_AI starts in: you type as usual; pause, and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to pick from</span><kbd class="io-key">1–3</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Ordinary English becomes unnecessarily polished prose.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
 
@@ -117,7 +117,7 @@ python3 -m claudish setup</pre>
         <div class="eyebrow">05 / WHERE IT STANDS</div>
         <h2 id="status">An experiment, tested honestly.</h2>
         <table class="status">
-          <tr><td>Linux (IBus)</td><td>Verified with real IBus and GTK typing in containers: X11 (24 scenarios) and GNOME on Wayland (9). Qt and KDE are not yet tested.</td></tr>
+          <tr><td>Linux (IBus)</td><td>Verified with real IBus and GTK typing in containers: X11 (25 scenarios) and GNOME on Wayland (10). Qt and KDE are not yet tested.</td></tr>
           <tr><td>Windows (PIME/TSF)</td><td>Verified on Windows 11 ARM64: Notepad and Edge, setup end to end. x64 hardware untested.</td></tr>
           <tr><td>macOS (IMK)</td><td>Builds in CI and passes event tests; not yet run on a Mac.</td></tr>
           <tr><td>Browser demo</td><td>The model runs in the page through WebAssembly; nothing you type leaves it.</td></tr>
