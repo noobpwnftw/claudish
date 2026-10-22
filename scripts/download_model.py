@@ -30,19 +30,16 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def open_url(url):
-    """urlopen, plus a fix for fresh Windows installs: Windows fetches missing root certificates
-    on demand, but only for its own TLS stack, so Python fails until something else has
-    connected. curl.exe (Windows 10+) uses that stack; one request installs the root. Downloads
-    stay safe either way: every file is checked against its pinned SHA-256."""
-    try:
-        return urlopen(url, timeout=30)
-    except URLError as exc:
-        curl = shutil.which("curl.exe")
-        if not (platform.system() == "Windows" and curl and isinstance(exc.reason, ssl.SSLCertVerificationError)):
-            raise
-        subprocess.run([curl, "-sIL", "-o", "NUL", url], capture_output=True, timeout=60)
-        return urlopen(url, timeout=30)
+def windows_curl(error):
+    """curl.exe, when a Windows certificate failure is what stopped urlopen.
+
+    A fresh Windows fetches missing root certificates on demand, but only for its own TLS
+    stack (Schannel), so Python can fail where a browser succeeds. curl.exe (Windows 10+) uses
+    Schannel. Safe either way: every file is checked against its pinned size and SHA-256."""
+    curl = shutil.which("curl.exe")
+    if platform.system() == "Windows" and curl and isinstance(getattr(error, "reason", None), ssl.SSLCertVerificationError):
+        return curl
+    return None
 
 
 def download(url, target, size, digest, progress=None):
@@ -55,15 +52,23 @@ def download(url, target, size, digest, progress=None):
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(target.name + ".part")
     try:
-        hasher, received = hashlib.sha256(), 0
-        with open_url(url) as response, open(partial, "wb") as output:
-            for block in iter(lambda: response.read(1 << 20), b""):
-                output.write(block)
-                hasher.update(block)
-                received += len(block)
-                if progress:
-                    progress(received, size)
-        if received != size or hasher.hexdigest() != digest:
+        try:
+            hasher, received = hashlib.sha256(), 0
+            with urlopen(url, timeout=30) as response, open(partial, "wb") as output:
+                for block in iter(lambda: response.read(1 << 20), b""):
+                    output.write(block)
+                    hasher.update(block)
+                    received += len(block)
+                    if progress:
+                        progress(received, size)
+            actual = hasher.hexdigest()
+        except URLError as exc:
+            curl = windows_curl(exc)
+            if not curl:
+                raise
+            subprocess.run([curl, "-fsSL", "--retry", "2", "-o", str(partial), url], check=True, timeout=3600)
+            received, actual = partial.stat().st_size, sha256(partial)
+        if received != size or actual != digest:
             raise ValueError("downloaded file failed verification (%d of %d bytes); retry" % (received, size))
         os.replace(partial, target)
     finally:
