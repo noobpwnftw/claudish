@@ -23,6 +23,7 @@ MODEL_BYTES = 491400032
 CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; "
        "worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https:; style-src 'self'; "
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
+REPO = "https://github.com/noobpwnftw/claudish"
 FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js"]
 
 
@@ -41,6 +42,8 @@ def build(out):
             '  <meta name="claudish-model-label" content="Run the model in this browser (%d MB, downloaded once)">\n'
             '  <meta http-equiv="Content-Security-Policy" content="%s">\n' % (MODEL_BYTES // 1_000_000, CSP))
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n' + head, 1)
+    # As the project home page, point visitors to the source and the install instructions.
+    page = page.replace('<footer class="page-footer">', '<footer class="page-footer"><a href="%s">Source, install, and docs on GitHub ↗</a>' % REPO, 1)
     (out / "index.html").write_text(page, encoding="utf-8")
     templates = {"model_url": MODEL_URL, "model_bytes": MODEL_BYTES, "max_tokens": 64,
                  "modes": {name: {"system": spec["system"], "examples": spec["examples"],

@@ -19,6 +19,7 @@ class StaticDemoBuildTests(unittest.TestCase):
             self.assertNotIn('href="/', page)
             self.assertIn('<meta name="claudish-backend" content="browser">', page)
             self.assertIn("Content-Security-Policy", page)
+            self.assertIn('href="https://github.com/noobpwnftw/claudish"', page)
             for name in ("demo.js", "browser.js", "coi-sw.js", "theme.js", "demo.css"):
                 self.assertTrue((site / name).is_file(), name)
             templates = json.loads((site / "templates.json").read_text(encoding="utf-8"))
