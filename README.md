@@ -48,6 +48,23 @@ Status:
 
 ## Quick start
 
+**One command:** with Python 3.10+, from this checkout:
+
+```sh
+python -m claudish setup
+```
+
+It shows each step and asks before doing it: write a config, import MCP servers
+from your Claude setup, download a pinned llama.cpp build and the model (both
+SHA-256 verified), register the input method, start Claudish at login, then run
+`doctor`. Steps already done are skipped, so it is safe to run again.
+`--dry-run` shows the plan, `--yes` does it all, and `--profile claude` sets up a
+hosted profile instead (no model download). Installing the input method on
+Windows and macOS needs an administrator, so setup prints that command. Verified
+end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-systemd`).
+
+Or step by step:
+
 1. **Try the three layers in your browser.** With Python 3.10+:
 
    ```sh

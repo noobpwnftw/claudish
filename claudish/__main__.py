@@ -45,6 +45,15 @@ def main():
     fixer.add_argument("--profile")
     fixer.add_argument("--status", type=int, default=1, help="Exit status, with an explicit command")
     fixer.add_argument("words", nargs="*", metavar="-- COMMAND", help="Fix this command instead of the last failure")
+    setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "
+                                "input method, start at login, then doctor")
+    setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "local")')
+    setup.add_argument("--yes", action="store_true", help="Do every step without asking")
+    setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
+    setup.add_argument("--variant", choices=["cpu", "vulkan"], default="cpu", help="llama.cpp build to download")
+    setup.add_argument("--skip", action="append", default=[], metavar="STEP",
+                       choices=["config", "mcp", "llama.cpp", "model", "input", "starts"],
+                       help="Skip a step (repeatable): config, mcp, llama.cpp, model, input, starts")
     doctor = commands.add_parser("doctor", help="Check the setup end to end and say how to fix problems")
     doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
     service = commands.add_parser("service", help="Start Claudish at login (systemd, logon task, launchd)")
@@ -81,6 +90,9 @@ def main():
         return
     if args.command == "fix":
         return fix_command(parser, args)
+    if args.command == "setup":
+        from . import setup as wizard
+        sys.exit(wizard.run(args.profile, args.yes, args.dry_run, args.variant, args.skip))
     if args.command == "doctor":
         from . import doctor as checkup
         sys.exit(checkup.main(args.json))

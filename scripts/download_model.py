@@ -52,23 +52,31 @@ def download(url, target, size, digest, progress=None):
     return True
 
 
+def target(preset):
+    return Path(__file__).resolve().parents[1] / "models" / PRESETS[preset][2]
+
+
+def fetch(preset="small", progress=None):
+    """Download and verify a preset; returns (path, whether anything was fetched)."""
+    repo, revision, filename, size, digest = PRESETS[preset]
+    endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co").rstrip("/")
+    url = "%s/%s/resolve/%s/%s" % (endpoint, repo, revision, filename)
+    return target(preset), download(url, target(preset), size, digest, progress)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Download a tested Claudish model into models/")
     parser.add_argument("preset", choices=PRESETS, default="small", nargs="?")
     args = parser.parse_args()
-    repo, revision, filename, size, digest = PRESETS[args.preset]
-    endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co").rstrip("/")
-    url = "%s/%s/resolve/%s/%s" % (endpoint, repo, revision, filename)
-    target = Path(__file__).resolve().parents[1] / "models" / filename
 
     def progress(received, total):
-        sys.stderr.write("\r%s: %d/%d MB" % (filename, received >> 20, total >> 20))
+        sys.stderr.write("\r%s: %d/%d MB" % (PRESETS[args.preset][2], received >> 20, total >> 20))
 
     try:
-        fetched = download(url, target, size, digest, progress if sys.stderr.isatty() else None)
+        path, fetched = fetch(args.preset, progress if sys.stderr.isatty() else None)
     except (OSError, ValueError) as exc:
         parser.exit(1, "\ndownload failed: %s\n" % exc)
-    print(("\nDownloaded and verified " if fetched else "Already present and verified: ") + str(target))
+    print(("\nDownloaded and verified " if fetched else "Already present and verified: ") + str(path))
 
 
 if __name__ == "__main__":

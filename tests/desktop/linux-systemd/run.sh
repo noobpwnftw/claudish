@@ -1,10 +1,11 @@
 #!/bin/sh
-# Install, autostart (user manager restart = new login), and uninstall the systemd user unit, in a container.
+# Install, autostart (user manager restart = new login), and uninstall the systemd user unit, in a container;
+# then `claudish setup --yes` on a fresh copy: real llama.cpp download, config, login service, a real rewrite.
 set -e
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../../.." && pwd)
 docker build -q -t claudish-systemd "$here" >/dev/null
 id=$(docker run -d --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
-     -v "$root:/claudish:ro" claudish-systemd)
+     -v "$root:/claudish:ro" -v "$root/models:/models:ro" claudish-systemd)
 trap 'docker stop -t 5 "$id" >/dev/null' EXIT
 as_tester() { docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus -w /claudish "$id" "$@"; }
 health() { as_tester python3 -c "
@@ -24,3 +25,19 @@ as_tester python3 -m claudish doctor | grep -E "Service|Starts at login" || true
 as_tester python3 -m claudish service uninstall
 echo "after uninstall: $(health)"
 as_tester sh -c 'ls ~/.config/systemd/user/claudish.service 2>/dev/null || echo "unit removed"'
+
+# A fresh copy, as a new user would have it (tracked and new files; no .tools/, no config).
+(cd "$root" && git ls-files -co --exclude-standard -z | xargs -0 tar cf - 2>/dev/null) | \
+    docker exec -i -u tester "$id" sh -c 'mkdir -p ~/fresh && tar xf - -C ~/fresh'
+model=qwen2.5-0.5b-instruct-q4_k_m.gguf   # mounted, not downloaded again: setup still verifies its SHA-256
+as_tester sh -c "mkdir -p ~/fresh/models && ln -s /models/$model ~/fresh/models/$model"
+docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus \
+    -w /home/tester/fresh "$id" python3 -m claudish setup --yes || echo "setup exit $? (doctor: no IBus in this image)"
+echo "after setup: $(health)"
+as_tester python3 -c "
+import json, urllib.request
+request = urllib.request.Request('http://127.0.0.1:18765/suggest', json.dumps({'text': 'this is important'}).encode(),
+                                 {'Content-Type': 'application/json'})
+print('setup rewrite:', json.load(urllib.request.urlopen(request, timeout=30)).get('text'))"
+docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus \
+    -w /home/tester/fresh "$id" python3 -m claudish setup --dry-run | grep -c "→" | sed 's/^/steps left after setup: /'
