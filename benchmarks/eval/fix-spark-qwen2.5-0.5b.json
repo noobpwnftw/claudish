@@ -1,0 +1,252 @@
+{
+  "label": "qwen2.5-0.5b-instruct-q4_k_m",
+  "cases": 30,
+  "fixed": 15,
+  "wrong": 3,
+  "no fix": 5,
+  "kept": 6,
+  "harmful": 1,
+  "median_ms": 37.5,
+  "results": [
+    {
+      "id": "typo-git",
+      "command": "gti log --oneline",
+      "suggestion": null,
+      "error": null,
+      "verdict": "no fix",
+      "ms": 64.9
+    },
+    {
+      "id": "typo-ls",
+      "command": "sl -la",
+      "suggestion": null,
+      "error": null,
+      "verdict": "no fix",
+      "ms": 31.0
+    },
+    {
+      "id": "typo-python",
+      "command": "pyhton3 -m venv .venv",
+      "suggestion": "python3 -m venv .venv",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 47.8
+    },
+    {
+      "id": "typo-docker",
+      "command": "dokcer ps -a",
+      "suggestion": "docker ps",
+      "error": null,
+      "verdict": "wrong",
+      "ms": 28.2
+    },
+    {
+      "id": "typo-grep",
+      "command": "gerp -rn TODO src",
+      "suggestion": "grep -rn TODO src",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 37.3
+    },
+    {
+      "id": "typo-clear",
+      "command": "claer",
+      "suggestion": "clear",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 25.3
+    },
+    {
+      "id": "typo-mkdir",
+      "command": "mkidr -p build/out",
+      "suggestion": "mkdir build/out",
+      "error": null,
+      "verdict": "wrong",
+      "ms": 30.1
+    },
+    {
+      "id": "typo-cat",
+      "command": "cta notes.txt",
+      "suggestion": "cat notes.txt",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 31.3
+    },
+    {
+      "id": "typo-sudo",
+      "command": "suod apt update",
+      "suggestion": "sudo apt update",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 31.8
+    },
+    {
+      "id": "typo-make",
+      "command": "mkae -j8",
+      "suggestion": null,
+      "error": null,
+      "verdict": "no fix",
+      "ms": 38.5
+    },
+    {
+      "id": "typo-curl",
+      "command": "crul -fsSL https://example.com/install.sh",
+      "suggestion": "curl install.sh",
+      "error": null,
+      "verdict": "wrong",
+      "ms": 32.1
+    },
+    {
+      "id": "space-cd",
+      "command": "cd..",
+      "suggestion": null,
+      "error": null,
+      "verdict": "no fix",
+      "ms": 28.4
+    },
+    {
+      "id": "git-push",
+      "command": "git psuh origin main",
+      "suggestion": "git push origin main",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 43.8
+    },
+    {
+      "id": "git-commit",
+      "command": "git comit -m \"Add retry\"",
+      "suggestion": "git commit -m \"Add retry\"",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 53.1
+    },
+    {
+      "id": "git-checkout",
+      "command": "git chekcout feature/login",
+      "suggestion": "git checkout feature/login",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 33.6
+    },
+    {
+      "id": "git-status",
+      "command": "git stauts",
+      "suggestion": "git status",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 36.0
+    },
+    {
+      "id": "git-branch",
+      "command": "git brnach -a",
+      "suggestion": "git branch -a",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 42.7
+    },
+    {
+      "id": "git-merge",
+      "command": "git merg develop",
+      "suggestion": "git merge develop",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 30.6
+    },
+    {
+      "id": "pip-install",
+      "command": "pip instal requests",
+      "suggestion": "pip install requests",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 40.0
+    },
+    {
+      "id": "npm-install",
+      "command": "npm isntall",
+      "suggestion": "npm install",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 37.7
+    },
+    {
+      "id": "sudo-apt",
+      "command": "apt install htop",
+      "suggestion": "sudo apt install htop",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 34.8
+    },
+    {
+      "id": "sudo-apt-get",
+      "command": "apt-get update",
+      "suggestion": "sudo apt-get update",
+      "error": null,
+      "verdict": "fixed",
+      "ms": 32.9
+    },
+    {
+      "id": "sudo-systemctl",
+      "command": "systemctl restart nginx",
+      "suggestion": null,
+      "error": null,
+      "verdict": "no fix",
+      "ms": 41.6
+    },
+    {
+      "id": "flag-tar",
+      "command": "tar -xzf release.tar.gz -C",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 55.3
+    },
+    {
+      "id": "keep-grep",
+      "command": "grep -r TODO .",
+      "suggestion": "grep -r 'TODO .'",
+      "error": null,
+      "verdict": "harmful",
+      "ms": 45.7
+    },
+    {
+      "id": "keep-docker",
+      "command": "docker ps",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 36.3
+    },
+    {
+      "id": "keep-ping",
+      "command": "ping -c 1 example.invalid",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 48.9
+    },
+    {
+      "id": "keep-test",
+      "command": "test -f config.yml",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 44.1
+    },
+    {
+      "id": "keep-diff",
+      "command": "diff old.txt new.txt",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 42.2
+    },
+    {
+      "id": "keep-ssh",
+      "command": "ssh deploy@10.0.0.5",
+      "suggestion": null,
+      "error": null,
+      "verdict": "kept",
+      "ms": 60.0
+    }
+  ]
+}

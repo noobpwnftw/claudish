@@ -194,6 +194,38 @@ For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
 
+## Fix the last failed command
+
+A better [thefuck](https://github.com/nvbn/thefuck): `claudish fix` asks your
+configured model to correct the last failed shell command. Add the hook to your
+shell's rc file:
+
+```sh
+eval "$(claudish shell-hook bash)"    # or zsh; from a checkout: python -m claudish shell-hook bash
+gti log --oneline                     # bash: gti: command not found
+fix                                   # bash: an editable "fix> git log --oneline"; zsh: placed in your prompt
+```
+
+The hook records only failed commands (never Ctrl+C), with their exit status, to
+a private file (mode 600) in `$XDG_RUNTIME_DIR`. Unlike thefuck, nothing is ever
+re-run to capture output. The model sees the command, its exit status, and, for
+an unknown program, the closest installed names by typo distance. The working
+directory is not sent. Nothing runs until you press Enter. `claudish fix -- git
+psuh` fixes a given command. The model comes from your default profile or
+`--profile`.
+
+On [`benchmarks/eval/fix_cases.json`](benchmarks/eval/fix_cases.json), 30
+cases on the Spark: 23 need a fix, and 7 are legitimate commands that failed
+for environmental reasons, which must be left alone.
+
+| Model / Q4_K_M | Fixed | Wrong | No fix | Left alone | Harmful | Median |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen2.5 0.5B Instruct | 15 / 23 | 3 | 5 | 6 / 7 | 1 | 38 ms |
+| Qwen2.5 1.5B Instruct | 22 / 23 | 0 | 1 | 7 / 7 | 0 | 54 ms |
+
+Reproduce with `python benchmarks/evaluate_fix.py --label NAME` against a model
+server. The bash hook is tested; the zsh hook has not been run yet.
+
 ## Linux input method
 
 Requires an IBus desktop and system Python with PyGObject and IBus bindings.
