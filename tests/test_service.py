@@ -1,0 +1,69 @@
+import plistlib
+import shlex
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from claudish import service
+
+
+class ServiceDefinitionTests(unittest.TestCase):
+    def test_systemd_unit_quotes_the_command(self):
+        argv = ["/opt/py 3/python", "-m", "claudish", "serve", "--profile", "my profile"]
+        unit = service.systemd_unit(argv)
+        exec_line = next(line for line in unit.splitlines() if line.startswith("ExecStart="))
+        self.assertEqual(shlex.split(exec_line[len("ExecStart="):]), argv)
+        self.assertIn("WantedBy=default.target", unit)
+
+    def test_launchd_plist_is_a_valid_plist(self):
+        argv = ["/usr/bin/python3", "-m", "claudish", "serve", "--profile", "a&b"]
+        plist = plistlib.loads(service.launchd_plist(argv).encode())
+        self.assertEqual(plist["ProgramArguments"], argv)
+        self.assertTrue(plist["RunAtLoad"] and plist["KeepAlive"])
+
+    def test_windows_task_prefers_pythonw(self):
+        with tempfile.TemporaryDirectory() as directory:
+            python, pythonw = Path(directory, "python.exe"), Path(directory, "pythonw.exe")
+            python.write_text(""), pythonw.write_text("")
+            task = service.windows_task([str(python), "-m", "claudish", "serve"])
+        self.assertEqual(task[:6], ["schtasks", "/create", "/tn", "claudish", "/sc", "onlogon"])
+        self.assertIn("pythonw.exe", task[-1])
+
+
+class SafetyTests(unittest.TestCase):
+    """A dry run must not run anything or write anything; the CLI must not swallow --dry-run."""
+
+    def test_cli_keeps_flags_before_the_separator(self):
+        from claudish import __main__ as cli
+        argv = ["claudish", "service", "install", "--serve", "--dry-run", "--", "--backend", "rules"]
+        with patch.object(sys, "argv", argv), patch.object(service, "run", return_value=0) as run:
+            with self.assertRaises(SystemExit):
+                cli.main()
+        run.assert_called_once_with("install", True, ["--backend", "rules"], True)
+
+    def test_dry_run_runs_and_writes_nothing_on_every_os(self):
+        for system in ("Linux", "Windows", "Darwin"):
+            with tempfile.TemporaryDirectory() as directory, \
+                    patch("claudish.service.platform.system", return_value=system), \
+                    patch.object(Path, "home", return_value=Path(directory)), \
+                    patch.dict("os.environ", {"XDG_CONFIG_HOME": str(Path(directory, ".config"))}), \
+                    patch("claudish.service.os.getuid", create=True, return_value=501), \
+                    patch("claudish.service.subprocess.run", side_effect=AssertionError("ran a command")), \
+                    patch("builtins.print"):
+                for action in ("install", "uninstall"):
+                    self.assertEqual(service.run(action, serve=True, extra=["--backend", "rules"], dry_run=True), 0)
+                self.assertEqual(list(Path(directory).rglob("*")), [], system)
+
+    def test_plans_name_the_right_service_manager(self):
+        for system, tool in (("Linux", "systemctl"), ("Windows", "schtasks"), ("Darwin", "launchctl")):
+            with patch("claudish.service.platform.system", return_value=system), \
+                    patch("claudish.service.os.getuid", create=True, return_value=501):
+                steps = service.plan("install", serve=True, extra=["--backend", "rules"])
+            commands = [payload for _, kind, payload in steps if kind == "run"]
+            self.assertTrue(all(c[0] == tool for c in commands), system)
+
+
+if __name__ == "__main__":
+    unittest.main()

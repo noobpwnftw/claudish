@@ -47,11 +47,21 @@ def main():
     fixer.add_argument("words", nargs="*", metavar="-- COMMAND", help="Fix this command instead of the last failure")
     doctor = commands.add_parser("doctor", help="Check the setup end to end and say how to fix problems")
     doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
+    service = commands.add_parser("service", help="Start Claudish at login (systemd, logon task, launchd)")
+    service.add_argument("action", choices=["install", "uninstall", "status"])
+    service.add_argument("--serve", action="store_true",
+                         help="Run `claudish serve ARGS` instead of the local stack (scripts/start.py ARGS)")
+    service.add_argument("--dry-run", action="store_true", help="Show what would be written and run")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
     hook.add_argument("shell", choices=sorted(fix.HOOKS))
-    args = parser.parse_args()
+    # `service ... -- ARGS`: split before argparse, so no flag of ours can be swallowed into ARGS
+    # (argparse.REMAINDER once took --dry-run and really installed a unit).
+    argv, passthrough = sys.argv[1:], []
+    if argv[:1] == ["service"] and "--" in argv:
+        argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
+    args = parser.parse_args(argv)
     if args.command == "shell-hook":
         if shutil.which("claudish"):
             launcher = "claudish"
@@ -65,6 +75,9 @@ def main():
     if args.command == "doctor":
         from . import doctor as checkup
         sys.exit(checkup.main(args.json))
+    if args.command == "service":
+        from . import service as manager
+        sys.exit(manager.run(args.action, args.serve, passthrough, args.dry_run))
     if args.command == "init":
         try:
             path = config.write_starter(args.config)

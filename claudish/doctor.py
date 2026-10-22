@@ -89,6 +89,13 @@ def check_service(state):
     return "ok", detail, None
 
 
+def check_managed():
+    from . import service
+    status, detail = service.managed()
+    return status, detail, "claudish service install   (add --serve -- --profile NAME for a non-local profile)" \
+        if status == "warn" else None
+
+
 def check_ime_linux():
     if not shutil.which("ibus-daemon"):
         return [("Input method", "fail", "IBus is not installed", "sudo apt install ibus python3-gi gir1.2-ibus-1.0")]
@@ -198,7 +205,8 @@ def check_context(state):
 def run():
     state, results = {}, []
     for name, check in [("Python", check_python), ("Config", lambda: check_config(state)),
-                        ("Backend", lambda: check_backend(state)), ("Service", lambda: check_service(state))]:
+                        ("Backend", lambda: check_backend(state)), ("Service", lambda: check_service(state)),
+                        ("Starts at login", check_managed)]:
         results.append((name,) + check())
     system = platform.system()
     results += (check_ime_linux() if system == "Linux" else check_ime_windows() if system == "Windows"
