@@ -52,7 +52,7 @@ def host():
 
 
 def executable_name(system=None):
-    return "llama-server.exe" if (system or platform.system()) == "Windows" else "llama-server"
+    return "llama-server.exe" if (system or host()[0]) == "Windows" else "llama-server"
 
 
 def installed():

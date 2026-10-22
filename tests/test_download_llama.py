@@ -1,5 +1,6 @@
 import hashlib
 import io
+import os
 import shutil
 import sys
 import tarfile
@@ -81,7 +82,8 @@ class InstallTests(unittest.TestCase):
             self.assertTrue(fetched)
             self.assertEqual(server, self.tools / "llama-b11822-cpu" / "llama-server")
             self.assertTrue((server.parent / "libllama.so").is_file())
-            self.assertTrue(server.stat().st_mode & 0o100)
+            if os.name != "nt":
+                self.assertTrue(server.stat().st_mode & 0o100)
             self.assertEqual(download_llama.install(), (server, False))
             self.assertEqual(download.call_count, 1)
             self.assertEqual(download_llama.installed(), server)
