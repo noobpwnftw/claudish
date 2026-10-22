@@ -88,9 +88,12 @@ def main():
             for char in "story":
                 key(ord(char.upper()), ord(char))
             assert worker_class.return_value.schedule.call_count == calls
+            reply = key(0x77)  # F8: send a picture of the window too
+            assert service.state.look and "picture" in json.dumps(reply.get("showMessage")), reply
             reply = key(0x0D)
             assert service.state.working and "working" in json.dumps(reply.get("showMessage"))
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
+            assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
             assert key(0x0D)["commitString"] == "Once upon a time."
@@ -102,7 +105,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, F8 included (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":
