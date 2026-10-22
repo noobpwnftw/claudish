@@ -31,8 +31,11 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   are a placeholder (owner: no rush; CHANGELOG.md drafts 0.1.0).
 - G28: continue types into the app, the suggestion waits after the caret; F7 always
   switches modes. Linux 24/24, Windows Notepad 11/11 and Edge 10/10.
-- Next: a configurable accept key; G18 follow-ups ("Tell it…", follow-up turns);
-  macOS grey suggestion on a real Mac (needs hardware); G21 (browser model data).
+- G29: GNOME Shell on Wayland in the desktop gate (tests/desktop/linux-gnome, 10/10).
+- Owner focus (2026-10-23): make the en_US -> cd_AI switch feel natural, without regressions.
+  Done: sessions start in continue (keys straight in, literally); F7 is continue, instruct,
+  rewrite. Linux X11 25/25, GNOME 10/10, Windows Notepad 12/12, Edge 11/11.
+- Next: keep polishing the switch (watch for regressions); G30 auto-update needs releases.
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
