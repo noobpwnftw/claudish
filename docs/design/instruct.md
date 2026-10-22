@@ -16,35 +16,75 @@ The gap: when Claudish runs the loop itself, it cannot ask you anything, so
 side-effecting tools are simply excluded and you see nothing until the end. Only
 an external agent gets the interactive treatment.
 
-## One pipeline: every sent instruction is a session
+## One pipeline, one conversation per text box
+
+A fresh session for every instruction would throw away what makes multi-turn work
+useful: earlier instructions and what was offered, tool calls and their results,
+which draft you took, and standing approvals. And, as continue showed, a model
+without the text box is guessing. So a conversation belongs to a **text box**,
+and each instruction is a turn in it.
 
 ```
-instruction ─▶ assemble ─▶ driver ─▶ events ─▶ input method
-                 │            │                    │
-   template, examples,   model driver:        progress (each tool call)
-   profile context,      Claudish runs        partial draft
-   app bindings,         the loop             question (1–9, or your words)
-   text around caret,    ─ or ─               result: readings to pick
-   window picture (F8)   agent driver:        error
-                         an agent CLI runs
-                         it; Claudish hosts
+text box ─▶ conversation ─▶ turn: assemble ─▶ driver ─▶ events ─▶ input method
+              │  (kept)                │            │
+   instructions, drafts offered     the text box   model driver: Claudish runs
+   and taken, tool calls and        as it is now,  the loop
+   results, answers, approvals      caret marked   ─ or ─
+                                                   agent driver: a long-lived
+                                                   agent process per conversation
 ```
 
-1. **Assemble.** The mode's template and examples, the profile's context, the
-   bindings for the focused app, the text around the caret, the window picture
-   if you pressed F8, and the instruction itself.
-2. **Drive.** Two kinds of driver behind one interface:
+### Identity: the text box
+
+Each platform already gives an input method one context per text field: IBus
+creates an engine instance per input context, TSF has a context per document, and
+IMK has a client per field. That is the conversation's key. Switching to another
+field switches conversation; coming back resumes it.
+
+### What a conversation keeps, and what it sends fresh
+
+- **Kept:** every instruction; the drafts offered and the one you took; each tool
+  call with its result (large results trimmed); your answers; approvals given "for
+  this session". Long conversations are compacted (older turns summarized), never
+  silently dropped.
+- **Fresh every turn:** the text box itself, as the current document with the
+  caret marked, plus the profile's context, the app's bindings, and the window
+  picture if you pressed F8. If you edited the inserted draft, the model sees your
+  edits, not its own old text.
+
+### Agents keep their own state
+
+The agent driver keeps **one agent process per conversation** alive between
+instructions (stream-json accepts more user turns), so an agent such as Claude
+Code keeps its files read, its plan, and its tool results. If the process ends,
+the next turn resumes it by session id (`--resume`).
+
+### When a conversation ends
+
+- the text box goes away (its input context is destroyed);
+- it has been idle for a while (30 minutes by default);
+- you ask: in instruct, **Shift+Enter** sends as a new conversation; **Enter**
+  continues the current one.
+
+Conversations live only in the service's memory, never on disk, and are dropped
+when they end.
+
+### Each turn
+
+1. **Assemble:** the mode's template, the conversation so far, the fresh text box,
+   context and picture, then the instruction.
+2. **Drive:** one of two drivers behind one interface:
    - **Model driver:** Claudish runs the loop. It sends the conversation and the
      offered tools to the backend; for each tool call it applies the policy below,
-     runs the tool on its MCP server, appends the result, and asks again, until the
-     model answers without a tool call or the budget runs out.
-   - **Agent driver:** an agent CLI runs the loop with its own tools; Claudish is
-     its host and turns each permission request into a question, through the same
-     policy.
-3. **Events.** Both drivers emit the same events, so every adapter renders them
-   the same way: progress in the status line, questions as a numbered list, the
-   result as readings to pick. A plain instruction is a session with no tool
-   calls; it returns at once.
+     runs the tool on its MCP server, appends the result (to the conversation, so
+     later turns have it), and asks again, until the model answers without a tool
+     call or the budget runs out.
+   - **Agent driver:** the conversation's agent process runs the loop with its own
+     tools; Claudish is its host and turns each permission request into a question,
+     through the same policy.
+3. **Events:** both drivers emit the same events, so every adapter renders them the
+   same way: progress in the status line, questions as a numbered list, the result
+   as readings to pick.
 
 ## The tool policy (one policy, both drivers)
 
@@ -94,9 +134,11 @@ the cost of the last turn only.
 
 ## Order of work
 
-1. The model driver as a session: progress events for each tool call, and the
-   policy with write tools asking through the candidate list (questions already
-   render in all three adapters).
+1. Conversations per text box in the service (identity from the adapters, kept
+   turns, fresh text box each turn, idle timeout, Shift+Enter for a new one), with
+   the model driver as its first driver: progress for each tool call, and the
+   policy with write tools asking through the candidate list. The agent driver
+   moves to one process per conversation.
 2. Readings after tools.
 3. Claude's tool loop (needs credentials to verify).
 4. Streaming the final turn as a partial draft.
