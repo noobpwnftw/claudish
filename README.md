@@ -46,12 +46,12 @@ Status:
 
 ## Quick start
 
-1. **Try the three layers in your browser.** With Python 3.10+ and a
-   [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build:
+1. **Try the three layers in your browser.** With Python 3.10+:
 
    ```sh
+   python scripts/download_llama.py
    python scripts/download_model.py small
-   python scripts/start.py --server /path/to/llama-server
+   python scripts/start.py
    ```
 
    Open http://127.0.0.1:18765, then switch between Rewrite, Continue, and
@@ -100,21 +100,29 @@ A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 ## Start the model and service
 
 Python 3.10+ runs the service. It has no pip runtime dependencies. Run commands
-from this project directory. Obtain a [llama.cpp](https://github.com/ggml-org/llama.cpp/releases)
-build for your OS/GPU. Keep its DLLs/shared libraries beside its executable.
+from this project directory.
 
-The download script uses only the standard library. It fetches the pinned
-upstream revision of the model into `models/` and installs it only after its size
-and SHA-256 match the tested file; an interrupted download leaves nothing behind.
-A verified model is not downloaded again. Set `HF_ENDPOINT` to use a mirror.
+Both download scripts use only the standard library and verify before installing;
+an interrupted download leaves nothing behind, and a verified file is not
+downloaded again. `download_llama.py` fetches a pinned
+[llama.cpp](https://github.com/ggml-org/llama.cpp/releases) release build
+(`b11822`, 12–24 MB) for your OS and CPU into `.tools/`, checked against the
+SHA-256 GitHub publishes for it: the CPU build runs everywhere and uses Metal on
+Apple silicon; `--variant vulkan` uses most GPUs on Linux and Windows.
+`download_model.py` fetches the pinned upstream revision of the model into
+`models/`, checked against the tested file's size and SHA-256. Set `HF_ENDPOINT`
+to use a mirror.
 
 ```sh
+python scripts/download_llama.py
 python scripts/download_model.py small
-python scripts/start.py --server /path/to/llama-server
+python scripts/start.py
 ```
 
-On Windows, pass the path to `llama-server.exe` instead. On a CPU-only machine,
-add `--gpu-layers 0`. The service listens on `127.0.0.1:18765`; the model listens
+`start.py` uses `llama-server` from your `PATH` first, then the downloaded build;
+pass `--server /path/to/llama-server` (`llama-server.exe` on Windows) to use
+your own build, for example one with CUDA. On the Spark's CPU, the downloaded
+CPU build takes a median 82 ms per short rewrite (4 threads, warm). The service listens on `127.0.0.1:18765`; the model listens
 on `127.0.0.1:18766`. Ctrl+C stops both processes. Nothing is installed at startup.
 
 This checkout already contains both GGUF models and a CUDA-enabled llama.cpp

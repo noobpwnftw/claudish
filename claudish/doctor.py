@@ -72,9 +72,11 @@ def check_backend(state):
         fix = ("start it: `python scripts/start.py` (or `python scripts/run_model.py`)"
                if backend == "llama" else "start your model server, or fix the profile's model_url")
         if backend == "llama":
-            models = list((ROOT / "models").glob("*.gguf"))
-            if not models:
+            if not list((ROOT / "models").glob("*.gguf")):
                 fix = "download a model: `python scripts/download_model.py small`, then " + fix
+            servers = list((ROOT / ".tools").glob("llama-*/llama-server*")) + list((ROOT / ".tools").glob("build/bin/llama-server*"))
+            if not (servers or shutil.which("llama-server")):
+                fix = "get llama.cpp: `python scripts/download_llama.py`; " + fix
         return "fail", "no model server at %s (%s)" % (url, type(exc).__name__), fix
 
 

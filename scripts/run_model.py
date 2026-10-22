@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from download_llama import installed
+
 root = Path(__file__).resolve().parents[1]
 
 
@@ -21,7 +23,9 @@ def command(args):
         if candidate.is_file():
             server = str(candidate)
     if not server:
-        raise ValueError("install llama.cpp or supply --server /path/to/llama-server")
+        server = installed() and str(installed())
+    if not server:
+        raise ValueError("run python scripts/download_llama.py, or supply --server /path/to/llama-server")
     filename = ("SmolLM2-135M-Instruct-Q4_K_M.gguf" if args.preset == "tiny"
                 else "qwen2.5-0.5b-instruct-q4_k_m.gguf")
     model = root / "models" / filename
