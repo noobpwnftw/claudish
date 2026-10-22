@@ -131,6 +131,9 @@ def scenarios():
     wait_for(lambda: state()["view"], what="instruct result")
     check("Enter sends, the next Enter inserts", state()["view"], "As requested—write a story.")
 
+    check("binding for the focused app ran its context provider", (WORK / "bound-app.py").exists(), True)
+    check("binding for another app did not run", (WORK / "bound-firefox").exists(), False)
+
     focus("password")
     type_text("pass-word")
     time.sleep(0.3)
@@ -147,7 +150,18 @@ def main():
     os.environ.update(session, DISPLAY=":99", GTK_IM_MODULE="ibus", XMODIFIERS="@im=ibus", QT_IM_MODULE="ibus")
     background("Xvfb", ":99", "-screen", "0", "1024x768x24", "-nolisten", "tcp")
     wait_for(lambda: subprocess.run(["xdpyinfo"], capture_output=True).returncode == 0, what="Xvfb")
-    service = background(sys.executable, "-m", "claudish", "serve", "--backend", "rules", cwd=str(SRC))
+    # A "supported text box": a binding for the test app (IBus reports it as gtk3-im:app.py) runs a
+    # command provider that leaves a marker; a binding for another app must never run.
+    config_dir = Path.home() / ".config/claudish"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    marker = "import pathlib, sys; pathlib.Path(sys.argv[1]).touch(); print('context for ' + sys.argv[1])"
+    (config_dir / "config.json").write_text(json.dumps({"profiles": {"desk": {"backend": "rules", "bindings": [
+        {"app": "app.py", "context": [{"type": "command", "ttl": 0,
+                                        "command": [sys.executable, "-c", marker, str(WORK / "bound-app.py")]}]},
+        {"app": "firefox*", "context": [{"type": "command", "ttl": 0,
+                                          "command": [sys.executable, "-c", marker, str(WORK / "bound-firefox")]}]},
+    ]}}}))
+    service = background(sys.executable, "-m", "claudish", "serve", "--profile", "desk", cwd=str(SRC))
     background("ibus-daemon", "--replace", "--panel=disable", "--xim", "--verbose")
     wait_for(lambda: subprocess.run(["ibus", "address"], capture_output=True).returncode == 0
              and "claudish" in subprocess.run(["ibus", "list-engine"], capture_output=True, text=True).stdout,

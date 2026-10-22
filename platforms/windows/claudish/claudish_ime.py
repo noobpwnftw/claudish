@@ -4,6 +4,29 @@ from .composition import Composition
 from .client import Suggestions
 
 
+def focused_app():
+    """The foreground window's program name (for bindings), such as "notepad.exe"; None elsewhere."""
+    try:
+        import ctypes
+        import os
+        from ctypes import wintypes
+        user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), ctypes.byref(pid))
+        handle = kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return None
+        try:
+            size, path = wintypes.DWORD(1024), ctypes.create_unicode_buffer(1024)
+            if not kernel32.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
+                return None
+            return os.path.basename(path.value).lower()
+        finally:
+            kernel32.CloseHandle(handle)
+    except (AttributeError, OSError):  # Not on Windows.
+        return None
+
+
 class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
@@ -45,7 +68,7 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         if self.worker and (self.state.automatic or not self.state.text):
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app())
         self.publish()
 
     def onKeyDown(self, event):
@@ -66,7 +89,8 @@ class ClaudishTextService(TextService):
             if action == "submit":
                 self.state.submit()
                 if self.worker:
-                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True)
+                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                                         app=focused_app())
                 self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
                 self.publish()
                 return True

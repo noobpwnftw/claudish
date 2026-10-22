@@ -10,7 +10,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from claudish import config
-from claudish.context import Context
+from claudish.context import Binding, Context
 from claudish.model import Rewriter
 from claudish.server import make_server
 
@@ -100,6 +100,56 @@ class ContextTests(unittest.TestCase):
                     with self.assertRaises(HTTPError) as error:
                         urlopen(request)
                     self.assertEqual(error.exception.code, status)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+
+class BindingTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        (self.root / "pr.md").write_text("PR #42 adds retries.", encoding="utf-8")
+
+    def test_bindings_add_context_only_for_matching_apps(self):
+        binding = Binding({"app": "Firefox*", "context": [{"type": "file", "name": "pr", "path": "pr.md"}]}, self.root)
+        self.assertTrue(binding.matches("firefox") and binding.matches("firefox-esr"))
+        self.assertFalse(binding.matches("gedit") or binding.matches(None))
+        rewriter = Rewriter("rules", bindings=[binding])
+        self.assertEqual(rewriter.rewrite("very good", app="firefox")["consulted"], ["pr"])
+        self.assertEqual(rewriter.rewrite("very good", app="gedit")["consulted"], [])
+        with patch("claudish.model.build_opener") as opener:
+            reply = {"choices": [{"message": {"content": "Indeed."}, "finish_reason": "stop"}]}
+            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+            Rewriter(bindings=[binding]).rewrite("ok", app="firefox")
+            system = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][0]["content"]
+        self.assertIn("PR #42 adds retries.", system)
+
+    def test_binding_config_and_service(self):
+        path = self.root / "config.json"
+        for spec, message in [({"context": []}, "binding is"), ({"app": "x", "mode": "instruct"}, "binding is")]:
+            path.write_text(json.dumps({"profiles": {"p": {"bindings": [spec]}}}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, message):
+                config.resolve(path)
+        path.write_text(json.dumps({"profiles": {"p": {"bindings": [
+            {"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}]}}}), encoding="utf-8")
+        _, settings, _, _ = config.resolve(path)
+        server = make_server(Rewriter("rules", bindings=settings["bindings"]), 0)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            url = "http://127.0.0.1:%s/suggest" % server.server_port
+            request = Request(url, data=json.dumps({"text": "very good", "app": "gtk3-demo"}).encode(),
+                              headers={"Content-Type": "application/json"})
+            with urlopen(request) as reply:
+                self.assertEqual(json.load(reply)["consulted"], ["pr.md"])
+            request = Request(url, data=json.dumps({"text": "very good", "app": ["x"]}).encode(),
+                              headers={"Content-Type": "application/json"})
+            with self.assertRaises(HTTPError) as error:
+                urlopen(request)
+            self.assertEqual(error.exception.code, 400)
         finally:
             server.shutdown()
             server.server_close()

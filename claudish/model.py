@@ -83,7 +83,7 @@ class Rewriter:
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
-                 context=None, modes=None, command=None, hosted=None):
+                 context=None, modes=None, command=None, hosted=None, bindings=()):
         from . import modes as invocation
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
@@ -93,6 +93,7 @@ class Rewriter:
         self.timeout = timeout
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
+        self.bindings = list(bindings)
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         self.modes = invocation.defaults((self.system, self.examples))
         for name, override in (modes or {}).items():
@@ -108,12 +109,19 @@ class Rewriter:
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
-    def rewrite(self, text, before="", after="", mode="rewrite"):
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None):
         started = time.perf_counter()
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
         spec = self.modes[mode]
-        system = spec["system"] + (self.context.render(before, after) if self.context else "")
+        # A supported text box: bindings for the focused app add their context providers.
+        extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
+        if self.context or extra:
+            from .context import Context
+            block, consulted = (self.context or Context()).gather(before, after, extra)
+        else:
+            block, consulted = "", []
+        system = spec["system"] + block
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         if self.backend == "rules":
             # Deterministic stand-ins so the demo and tests work without a model.
@@ -179,6 +187,6 @@ class Rewriter:
         output = self.finish(mode, text, output)
         if not output:
             raise RuntimeError("the model offered nothing for this %s" % mode)
-        return {"text": output, "backend": self.backend, "mode": mode,
+        return {"text": output, "backend": self.backend, "mode": mode, "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}

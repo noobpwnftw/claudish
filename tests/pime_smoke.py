@@ -85,7 +85,7 @@ def main():
             assert worker_class.return_value.schedule.call_count == calls
             reply = key(0x0D)
             assert service.state.working and "working" in json.dumps(reply.get("showMessage"))
-            assert worker_class.return_value.schedule.call_args.kwargs == {"immediate": True}
+            assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert "commitString" not in key(0x0D)  # still working
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
             assert key(0x0D)["commitString"] == "Once upon a time."

@@ -177,6 +177,27 @@ Replace the rewrite template with `--prompt FILE` for any backend:
  "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]}
 ```
 
+### Supported text boxes
+
+The input method knows which app has focus. On Linux, IBus reports the program
+(`gtk3-im:firefox` arrives as `firefox`). On macOS it is the bundle identifier
+(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`).
+`bindings` attach context to apps:
+
+```json
+{"profiles": {"work": {"backend": "claude", "bindings": [
+  {"app": "firefox*", "context": [{"type": "mcp", "name": "PR diff", "command": ["github-mcp-server", "stdio"],
+                                   "tool": "get_pull_request_diff", "arguments": {"owner": "me", "repo": "app", "pullNumber": 42}}]},
+  {"app": "com.apple.Terminal", "context": [{"type": "command", "command": ["git", "status", "--short"]}]}
+]}}}
+```
+
+In a bound app, Claudish reads that context and the model or agent works with
+it. Everywhere else it is a plain input method. Patterns are case-insensitive
+globs. Every response lists what was `consulted`, so it is always visible what
+the AI read. Support grows by adding context providers per app, not by
+installing another app.
+
 ### An agent CLI as the backend
 
 An agent CLI is a text box and Enter, and an input method is a text box in every
