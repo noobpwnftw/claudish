@@ -102,7 +102,7 @@ class ServiceTests(unittest.TestCase):
     def test_demo_assets_and_same_origin_requests(self):
         for path, content_type, fragment in [
             ("/", "text/html", b"THE CLAUDISH TYPING ROOM"),
-            ("/demo.js", "text/javascript", b"requestSuggestion"),
+            ("/demo.js", "text/javascript", b"function ask(revision)"),
             ("/demo.css", "text/css", b"@media"),
         ]:
             with urlopen(self.url + path) as response:
