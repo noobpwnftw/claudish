@@ -2,6 +2,7 @@
 
 python scripts/check.py            # unit tests, compile, diff, IBus and PIME smokes
 python scripts/check.py --model    # also: real model, rewrite, fidelity eval, browser demo
+python scripts/check.py --desktop  # also: real IBus + GTK typing in a container (needs docker)
 
 Each check reports PASS, FAIL, or SKIP with a reason. Remote CI (push a ci/*
 branch) is still the only Windows and macOS coverage; use it for adapter or
@@ -108,6 +109,7 @@ def model_checks(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", action="store_true", help="Also run the real-model checks")
+    parser.add_argument("--desktop", action="store_true", help="Also run the real IBus/GTK desktop scenarios")
     parser.add_argument("--preset", choices=["tiny", "small"], default="small")
     parser.add_argument("--browser-python", help="Python with Playwright installed")
     parser.add_argument("--chromium", help="Chromium executable for Playwright")
@@ -139,6 +141,11 @@ def main():
         skip("PIME smoke", reason)
     if args.model:
         model_checks(args)
+    if args.desktop:
+        if shutil.which("docker"):
+            run("Linux desktop", ["sh", "tests/desktop/linux/run.sh"], timeout=900)
+        else:
+            skip("Linux desktop", "needs docker")
 
     print()
     for name, status, detail in results:
