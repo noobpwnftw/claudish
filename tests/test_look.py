@@ -21,7 +21,9 @@ class CompositionTests(unittest.TestCase):
         state = Composition()
         state.insert("x")
         self.assertFalse(state.toggle_look())  # rewrite mode
+        state.commit()
         state.next_mode(), state.next_mode()
+        state.insert("x")
         revision = state.revision
         self.assertTrue(state.toggle_look() and state.look)
         self.assertGreater(state.revision, revision)  # a pending result was for the other choice

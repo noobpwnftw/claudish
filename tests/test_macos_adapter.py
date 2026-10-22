@@ -190,20 +190,25 @@ class MacOSAdapterTests(unittest.TestCase):
         state = self.controller.state
         state.offer(state.revision, "A rewrite.")
         self.assertTrue(self.key(98))
-        self.assertEqual((state.mode, state.candidate), ("continue", ""))
+        # Continue types into the app: the held words go in, and stay as the model's context.
+        self.assertEqual((state.mode, state.candidate, state.text), ("continue", "", "thank the team"))
+        self.assertEqual(self.client.commits, ["thank the team"])
         self.assertEqual(self.controller.worker.modes[-1], "continue")
         self.key(98)
-        self.assertEqual(state.mode, "instruct")
+        self.assertEqual((state.mode, state.text), ("instruct", ""))  # the words are in the app already
+        self.type_text("say thanks")
+        self.key(36)
         self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
         self.controller.pollSuggestions_(None)
         self.key(48)
-        self.assertEqual(self.client.commits, ["Thank you, team—truly."])
-        self.assertFalse(self.key(98))  # Without a composition, F7 belongs to the app.
+        self.assertEqual(self.client.commits, ["thank the team", "Thank you, team—truly."])
+        self.assertTrue(self.key(98))  # F7 is the input method's while it is active
+        self.assertEqual(state.mode, "rewrite")
 
     def test_instruct_lists_several_readings_and_digits_pick(self):
-        self.key(0, "x")
         self.key(98)
         self.key(98)  # instruct
+        self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
@@ -214,9 +219,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(state.text, "")
 
     def test_an_agents_question_is_answered_with_a_digit(self):
-        self.key(0, "x")
         self.key(98)
         self.key(98)  # instruct
+        self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))  # send: the agent starts working
         question = {"id": "perm-1", "text": "Allow Bash?", "choices": [
@@ -230,9 +235,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, [])  # an answer is not text
 
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
-        self.key(0, "x")
         self.key(98)
         self.key(98)  # instruct
+        self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         sent = len(worker.modes)
         self.type_text("rite a story")

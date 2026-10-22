@@ -65,10 +65,38 @@ class ClaudishTextService(TextService):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
+            if self.state.live:  # nothing is held back in continue mode
+                self.drop_live()
+                return False
             # Mid-composition, take the key so onKeyDown commits the wording. Left to TSF, the
             # composition was discarded (Ctrl+A lost the typed text).
             return bool(self.state.text)
+        if event.keyCode == 0x76:  # F7 is the input method's while it is active
+            return True
+        if self.state.live:
+            self.poll_results()  # a waiting suggestion decides whether Tab is ours
+            if event.keyCode == 0x75:  # F6 shows it (PIME cannot redraw without a key)
+                return True
+            # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
+            # Backspace, Enter, and navigation are the app's (the context follows here).
+            if event.keyCode in (0x09, 0x1B):
+                return bool(self.state.ghost)
+            if event.isPrintableChar():
+                return True
+            if event.keyCode == 0x08:
+                if self.state.text:
+                    self.state.backspace()
+                self.publish()
+            elif event.keyCode not in (0x10, 0x14, 0x75, 0x77):
+                self.drop_live()
+            return False
         return event.isPrintableChar() or bool(self.state.text)
+
+    def drop_live(self):
+        self.state.change("")
+        if self.worker:
+            self.worker.schedule(self.state.revision, "")
+        self.publish()
 
     def shortcut(self, event):
         altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and event.isPrintableChar()
@@ -76,6 +104,14 @@ class ClaudishTextService(TextService):
         return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 
     def publish(self):
+        if self.state.live:
+            # Your words are in the app already; the suggestion shows in the candidate window
+            # (TSF compositions cannot be greyed), and Tab takes it.
+            self.setCompositionString("")
+            ghost = self.state.ghost
+            self.setCandidateList(["Tab: …" + ghost.lstrip()] if ghost else [])
+            self.setShowCandidates(bool(ghost))
+            return
         self.setCompositionString(self.state.text)
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(self.state.text.encode("utf-16-le")) // 2)
@@ -93,8 +129,7 @@ class ClaudishTextService(TextService):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app())
         self.publish()
 
-    def onKeyDown(self, event):
-        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
+    def poll_results(self):
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         result = self.worker.poll() if self.worker else None
         if result:
@@ -112,6 +147,10 @@ class ClaudishTextService(TextService):
                 self.state.fail(revision)
                 if self.state.failed:
                     self.showMessage("cd_AI: the request failed; Enter retries", 3)
+
+    def onKeyDown(self, event):
+        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
+        self.poll_results()
         key = event.keyCode
         if self.shortcut(event):
             # Commit the wording and consume the key; pressing the shortcut again runs it. Passing
@@ -146,6 +185,8 @@ class ClaudishTextService(TextService):
                 self.setCommitString(text)
                 self.changed()
             return True
+        if self.state.live and key not in (0x76, 0x77):  # F7 and F8 are handled below
+            return self.live_key(event)
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
             return True
@@ -156,6 +197,8 @@ class ClaudishTextService(TextService):
                 self.publish()
             return bool(self.state.text)
         if key == 0x76:  # F7 switches mode: rewrite, continue, instruct.
+            if self.state.mode == "rewrite" and self.state.text:
+                self.setCommitString(self.state.text)  # continue types into the app: the held words go in
             self.state.next_mode()
             self.showMessage("cd_AI: " + self.state.mode, 2)
             self.changed()
@@ -179,6 +222,23 @@ class ClaudishTextService(TextService):
         else:
             # First navigation key commits; a second performs navigation.
             self.setCommitString(self.state.commit())
+        self.changed()
+        return True
+
+    def live_key(self, event):
+        """Continue mode: what filterKeyDown took (printable keys, Tab and Esc with a suggestion)."""
+        key = event.keyCode
+        if key == 0x75:
+            self.publish()
+            return True
+        if key == 0x09:
+            ghost = self.state.take_ghost()
+            if ghost:
+                self.setCommitString(ghost)
+        elif key == 0x1B:
+            self.state.dismiss()
+        elif event.isPrintableChar():
+            self.setCommitString(self.state.type_live(chr(event.charCode)))
         self.changed()
         return True
 

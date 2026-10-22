@@ -44,6 +44,20 @@ class ClaudishEngine(IBus.Engine):
         return True
 
     def render(self):
+        if self.composition.live:
+            # Continue: your words are in the app already; the preedit is only the greyed suggestion,
+            # cleared (never committed) by a focus change.
+            ghost = self.composition.ghost
+            preedit = IBus.Text.new_from_string(ghost)
+            if ghost:
+                attributes = IBus.AttrList()
+                attributes.append(IBus.attr_foreground_new(0x8A8A8A, 0, len(ghost)))
+                preedit.set_attributes(attributes)
+            self.update_preedit_text_with_mode(preedit, 0, bool(ghost), IBus.PreeditFocusMode.CLEAR)
+            self.hide_lookup_table()
+            self.update_auxiliary_text(IBus.Text.new_from_string("continue · Tab: take the rest · Esc: dismiss · "
+                                                                 "F7: mode"), bool(ghost))
+            return
         text = self.composition.text
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
@@ -84,7 +98,42 @@ class ClaudishEngine(IBus.Engine):
                                       app=self.app)
         self.render()
 
+    def live_key(self, keyval):
+        """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
+        state = self.composition
+        if keyval == IBus.KEY_Tab:
+            ghost = state.take_ghost()
+            if not ghost:
+                return False  # no suggestion: Tab is the app's (next field, indent)
+            self.changed()
+            self.commit_text(IBus.Text.new_from_string(ghost))
+            return True
+        if keyval == IBus.KEY_Escape:
+            if not state.ghost:
+                return False
+            state.dismiss()
+            self.render()
+            return True
+        if keyval == IBus.KEY_BackSpace:
+            if state.text:
+                state.backspace()
+                self.changed()
+            return False  # the app deletes the character
+        char = IBus.keyval_to_unicode(keyval)
+        if char and char.isprintable():
+            typed = state.type_live(char)
+            self.changed()
+            self.commit_text(IBus.Text.new_from_string(typed))
+            return True
+        state.change("")  # Enter, arrows, anything else: the app's, and the context starts over
+        self.changed()
+        return False
+
     def finish(self, suggested=False):
+        if self.composition.live:  # nothing is held back in continue mode: just start over
+            self.composition.change("")
+            self.changed()
+            return
         text = self.composition.commit(suggested)
         self.changed()
         if text:
@@ -107,10 +156,17 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F8 and self.composition.toggle_look():
             self.render()
             return True
-        if keyval == IBus.KEY_F7 and self.composition.text:
+        if keyval == IBus.KEY_F7:  # the input method's key while it is active, composing or not
+            entering_live = self.composition.mode == "rewrite"  # rewrite -> continue
             self.composition.next_mode()
+            if entering_live:  # the composed words go into the app; they stay as context
+                self.commit_text(IBus.Text.new_from_string(self.composition.text))
             self.changed()
+            if not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
+                self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
             return True
+        if self.composition.live:
+            return self.live_key(keyval)
         if self.composition.question and IBus.KEY_1 <= keyval <= IBus.KEY_9:
             chosen = self.composition.answer_choice(keyval - IBus.KEY_0)
             if chosen:

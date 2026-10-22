@@ -42,11 +42,20 @@ try:
         engine.do_process_key_event(ord(char), 0, 0)
     engine.composition.offer(engine.composition.revision, "A rewrite.")
     assert engine.do_process_key_event(IBus.KEY_F7, 0, 0)
+    # Continue types into the app: the held words go in and stay as the model's context.
     assert engine.composition.mode == "continue" and not engine.composition.candidate
-    engine.do_process_key_event(IBus.KEY_F7, 0, 0)
-    engine.composition.offer(engine.composition.revision, "Hello—truly.")
-    engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
-    assert commits[-1] == "Hello—truly." and engine.composition.mode == "instruct"
+    assert commits[-1] == "say hi" and engine.composition.text == "say hi"
+    assert engine.do_process_key_event(ord("!"), 0, 0) and commits[-1] == "!"
+    assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # no suggestion: Tab is the app's
+    engine.composition.offer(engine.composition.revision, "say hi! Hello—truly.")
+    assert engine.composition.ghost == " Hello—truly."
+    assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and commits[-1] == " Hello—truly."
+    engine.composition.offer(engine.composition.revision, "say hi! Hello—truly. Bye.")
+    assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.ghost
+    assert not engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)  # the app deletes; the context follows
+    assert engine.composition.text == "say hi! Hello—truly"
+    assert engine.do_process_key_event(IBus.KEY_F7, 0, 0) and engine.composition.mode == "instruct"
+    assert engine.composition.text == ""  # the words are in the app already
     # Instruct holds the text; Enter sends it, and the next Enter inserts the result.
     for char in "story":
         engine.do_process_key_event(ord(char), 0, 0)
@@ -70,6 +79,6 @@ try:
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, F8, candidate list, password bypass")
+    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, live continue, F8, candidate list, password bypass")
 finally:
     engine.destroy()

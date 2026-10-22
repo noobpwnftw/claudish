@@ -84,9 +84,10 @@ class Composition:
 
     def next_mode(self):
         """Switch mode; the current candidate belonged to the old mode, so it is dropped."""
+        leaving_live = self.live  # its words are in the app already: the next mode starts empty
         self.mode = MODES[(MODES.index(self.mode) + 1) % len(MODES)]
         self.look = False
-        self.change(self.text)
+        self.change("" if leaving_live else self.text)
 
     def toggle_look(self):
         """F8: attach, or stop attaching, a picture of the focused window. Instruct only; a pending
@@ -105,6 +106,37 @@ class Composition:
         self.working = False
         self.question, self.status = None, ""
         return True
+
+    @property
+    def live(self):
+        """Continue mode types straight into the app; the text here is only the model's context,
+        and the one uncommitted thing is the suggestion (the ghost). A focus change can never
+        commit a suggestion or lose your words."""
+        return self.mode == "continue"
+
+    def type_live(self, char):
+        """Continue mode: what to commit for this key now (the dash substitution included)."""
+        typed = "—" if char == "-" else char
+        self.change((self.text + typed)[-MAX_COMPOSITION:])
+        return typed
+
+    def take_ghost(self):
+        """Tab in continue mode: the suggestion to commit, or "" (then Tab belongs to the app)."""
+        ghost = self.ghost
+        if ghost:
+            self.change((self.text + ghost)[-MAX_COMPOSITION:])
+        return ghost
+
+    def dismiss(self):
+        """Esc in continue mode: drop the suggestion, keep going."""
+        self.candidate, self.candidates = "", []
+
+    @property
+    def ghost(self):
+        """Continue mode: the rest of the sentence, shown greyed after the caret; Tab takes it."""
+        if self.mode == "continue" and len(self.candidate) > len(self.text) and self.candidate.startswith(self.text):
+            return self.candidate[len(self.text):]
+        return ""
 
     @property
     def choosing(self):

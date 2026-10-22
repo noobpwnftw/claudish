@@ -14,8 +14,8 @@ def reply(text):
 class CompositionTests(unittest.TestCase):
     def instruct(self):
         state = Composition()
-        state.insert("x")
         state.next_mode(), state.next_mode()
+        state.insert("x")
         return state
 
     def test_digits_pick_only_from_an_instructions_list(self):

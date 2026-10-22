@@ -78,11 +78,16 @@ def main():
             assert key(0x76, method="filterKeyDown")["return"]
             reply = key(0x76)
             assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
+            assert reply["commitString"] == "say hi"  # continue types into the app: the held words go in
             assert worker_class.return_value.schedule.call_args.args[2] == "continue"
-            key(0x76)
-            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Hello—truly."})
-            assert key(9)["commitString"] == "Hello—truly."
+            assert key(ord("!"), ord("!"))["commitString"] == "!"
+            assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
+            assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
+            assert key(9)["commitString"] == " Hello—truly."
+            key(0x76)  # instruct, starting empty: the words are in the app already
+            assert service.state.mode == "instruct" and service.state.text == ""
             # Instruct: no request while typing; Enter sends; the next Enter inserts.
             calls = worker_class.return_value.schedule.call_count
             for char in "story":
@@ -130,7 +135,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":

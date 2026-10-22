@@ -107,6 +107,32 @@ def scenarios():
     time.sleep(0.4)
     check("focus change keeps composed text", state()["entry"], "keep me")
 
+    # Continue: the rest of the sentence shows greyed after the caret (ghost text).
+    focus("entry")
+    key("ctrl+a", "BackSpace")
+    type_text("Thanks for the review")
+    key("F7")  # rewrite -> continue
+    settle()
+    key("Tab")  # takes the rest
+    wait_for(lambda: state()["entry"], what="continuation")
+    check("continue: Tab takes the ghost text", state()["entry"], "Thanks for the review and then some—naturally.")
+    key("ctrl+a", "BackSpace")
+    type_text("Only my words")
+    settle()  # the ghost is showing now
+    focus("other")  # a focus change must not commit a suggestion nobody accepted
+    time.sleep(0.4)
+    check("continue: focus change keeps only your words", state()["entry"], "Only my words")
+    focus("entry")
+    key("ctrl+a", "BackSpace")
+    type_text("Keep typing")
+    settle()
+    type_text(" on")  # typing ignores the ghost
+    key("Return")
+    wait_for(lambda: state()["entry"], what="commit")
+    check("continue: typing ignores the ghost", state()["entry"], "Keep typing on")
+    key("F7", "F7")  # continue -> instruct -> rewrite, for the scenarios below
+    key("ctrl+a", "BackSpace")
+
     focus("other")
     key("ctrl+a", "BackSpace")
     type_text("draft")
@@ -119,8 +145,8 @@ def scenarios():
 
     focus("view")
     key("ctrl+a", "BackSpace")
+    key("F7", "F7")  # rewrite -> continue -> instruct (F7 is the input method's while it is active)
     type_text("say hi")
-    key("F7", "F7")  # rewrite -> continue -> instruct
     key("Return")  # Instruct sends on Enter.
     settle()
     key("Tab")  # Tab accepts too.

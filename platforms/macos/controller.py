@@ -62,6 +62,12 @@ class ClaudishInputController(IMKInputController):
         if result:
             revision, data = result
             if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
+                if self.state.live:  # continue: the rest of the sentence, as marked text after the caret
+                    client = self.client()
+                    if client is not None:
+                        client.setMarkedText_selectionRange_replacementRange_(self.state.ghost, (0, 0),
+                                                                              (NSNotFound, 0))
+                    return
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
             elif "question" in data and self.state.ask(revision, data["question"], data["session"]):
@@ -121,13 +127,54 @@ class ClaudishInputController(IMKInputController):
         if self.worker is not None and (self.state.automatic or not self.state.text):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
         self.panel.hide()
+        if self.state.live:  # the only marked text is the suggestion, with the caret before it
+            client.setMarkedText_selectionRange_replacementRange_(self.state.ghost, (0, 0), (NSNotFound, 0))
+            return
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(self.state.text.encode("utf-16-le")) // 2
         client.setMarkedText_selectionRange_replacementRange_(
             self.state.text, (length, 0), (NSNotFound, 0))
 
     @objc.python_method
+    def live_key(self, client, key, chars):
+        """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
+        state = self.state
+        if key == 48:  # Tab
+            ghost = state.take_ghost()
+            if not ghost:
+                return False  # no suggestion: Tab is the app's
+            client.insertText_replacementRange_(ghost, (NSNotFound, 0))
+            self.changed(client)
+            return True
+        if key == 53:  # Escape
+            if not state.ghost:
+                return False
+            state.dismiss()
+            self.changed(client)
+            return True
+        navigation = key in (36, 76, 51, 115, 116, 117, 119, 121, 123, 124, 125, 126)
+        if navigation or not chars or not chars.isprintable():
+            if key == 51 and state.text:
+                state.backspace()
+            else:
+                state.change("")  # Enter, arrows, anything else: the context starts over
+            self.changed(client)  # clears the suggestion before the app handles the key
+            return False
+        for char in chars:
+            client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
+        self.changed(client)
+        return True
+
+    @objc.python_method
     def finish(self, client, suggested=False):
+        if self.state.live:  # nothing is held back in continue mode: drop the suggestion, start over
+            self.state.change("")
+            if self.worker is not None:
+                self.worker.schedule(self.state.revision, "")
+            self.panel.hide()
+            if client is not None:
+                client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+            return
         text = self.state.commit(suggested)
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")
@@ -162,10 +209,15 @@ class ClaudishInputController(IMKInputController):
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True
-        if key == 98 and self.state.text:  # F7 switches mode: rewrite, continue, instruct.
+        if key == 98:  # F7 switches mode: rewrite, continue, instruct (the input method's key while active).
+            entering_live = self.state.mode == "rewrite" and self.state.text
             self.state.next_mode()
+            if entering_live:  # continue types into the app: the held words go in, and stay as context
+                client.insertText_replacementRange_(self.state.text, (NSNotFound, 0))
             self.changed(client)
             return True
+        if self.state.live:
+            return self.live_key(client, key, chars)
         if key == 97 and self.state.text:  # F6
             if self.state.candidate:
                 self.panel.updateCandidates()

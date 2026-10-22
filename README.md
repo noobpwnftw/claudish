@@ -12,7 +12,9 @@ layers, one per mode; F7 switches between them while you type:
    comes out in another language; here, the language is Claudish: polished,
    slightly excessive English with a fondness for em dashes. (`rewrite`)
 2. **Autocomplete**, which is what Copilot promised and language models are, at
-   heart. Pause, and the next words are offered. (`continue`)
+   heart. Your typing goes straight into the app; pause, and the rest of the
+   sentence appears after the caret. Tab takes it; keep typing to ignore it.
+   (`continue`)
 3. **Instruction**, which is how you work a machine. Type "write a story about a
    cat"; the input method holds it, Enter sends it to the AI, and the result
    comes back at the caret, in a text editor, a browser, or a terminal.
@@ -99,7 +101,7 @@ Or step by step:
 | Key | Does |
 | --- | --- |
 | F7 | switch layer: rewrite → continue → instruct |
-| Tab | accept the candidate |
+| Tab | accept the candidate; in continue, take the rest of the sentence (with nothing offered, Tab is the app's) |
 | Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
 | Esc | keep what you typed |
 | F8 | in instruct, also send a picture of the window you are typing in |
@@ -609,7 +611,8 @@ refuses to overwrite an existing installed app.
 | `-` | Insert `—` immediately |
 | Pause for 180 ms | Request a local rewrite in the background |
 | F6 | Preview a completed candidate; useful on Windows |
-| F7 | Switch mode while composing: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice) |
+| F7 | Switch mode: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
+| Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as marked text on macOS, and in the candidate window on Windows (F6 shows it). Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
 | Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result; Esc keeps your text |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](#window-pictures)) |

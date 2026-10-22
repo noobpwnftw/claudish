@@ -47,6 +47,18 @@ The proof that matters is not that an IME can call an agent. Many interfaces
 can. It is that doing so feels as ordinary as switching input languages: no new
 window, no new habit, the same keys. G18 is accepted on that basis (below).
 
+### Principle: autocomplete is the habit
+
+Agents may be why someone installs Claudish; autocomplete is why they keep it. It
+has to cost nothing when it is wrong. So continue mode does not hold your words
+back at all: they go into the app as you type, and the only uncommitted thing is
+the suggestion after the caret. Tab takes it, typing ignores it, Esc dismisses
+it, and with nothing offered Tab, Enter, and the arrows are the app's, so forms
+and editors keep their keys. A focus change drops only the suggestion. (IBus
+discards a commit made during focus-out, so a suggestion inside the composition
+would either lose your words or commit text you never accepted; the container
+test caught it.)
+
 ### Principle: candidates, not one answer
 
 A CJK input method is not expected to guess right the first time. You type a
