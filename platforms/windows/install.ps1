@@ -11,8 +11,9 @@ if (Test-Path $Destination) {
 Copy-Item (Join-Path $PSScriptRoot 'claudish') $Destination -Recurse
 Copy-Item (Join-Path $ProjectRoot 'claudish\composition.py') $Destination
 Copy-Item (Join-Path $ProjectRoot 'claudish\client.py') $Destination
-# PIME enumerates input methods when its TSF DLL is registered.
-foreach ($Arch in @('x86', 'x64')) {
+# PIME enumerates input methods when its TSF DLL is registered. PIME 2.0 ships an
+# ARM64X DLL for Windows on ARM; native ARM64 apps load only that one.
+foreach ($Arch in @('x86', 'x64', 'arm64')) {
     $Dll = Join-Path $PimeRoot "$Arch\PIMETextService.dll"
     if (Test-Path $Dll) {
         $Regsvr = if ($Arch -eq 'x86' -and [Environment]::Is64BitOperatingSystem) {

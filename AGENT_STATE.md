@@ -14,12 +14,12 @@ Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
   - G05: CONTRIBUTING.md.
 
   The full gate `check.py --model --desktop` passes.
-- In flight: `agent/g01-windows` (`90b46ff`) holds the Windows-on-ARM VM harness
-  (`tests/desktop/windows`) and the install.ps1 arm64 registration fix. Neither is
-  verified yet. The VM container `claudish-windows` (dockur, Windows 11 Enterprise
-  evaluation, state in `~/vm/claudish-windows`) is still installing. Next:
-  `vm.sh sync`, `vm.sh run jobs/setup.ps1`, then `vm.sh run jobs/typing.ps1`.
-  Merge once it passes; fix what it finds.
+- Windows: `tests/desktop/windows` is merged. VM `claudish-windows` (dockur Windows 11
+  ARM64 Enterprise evaluation; `~/vm/claudish-windows`; account Docker/admin, a local
+  throwaway) is installed and set up with PIME 2.0.0-beta3 and Claudish. Typing is
+  blocked upstream: the TSF client never reaches PIME's backend (see ROADMAP G01
+  for the evidence and next steps). Use `vm.sh run jobs/*.ps1`; after a sign-out,
+  sign in with `vmkeys.py admin --enter`.
 - Owner direction: Claudish is a configurable entry point for AI at the caret
   (models, then context, then modes, then agentic instruct, G17). Model quality
   belongs to the model. The name and the em dashes stay. Use the Spark
@@ -31,6 +31,6 @@ Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
 - Environment: `gh` is authorized and backs git. The extras venv
   `.tools/claude-venv` has anthropic 2.1.0 and mcp 2.3.0. Models in `models/`
   (untracked): Qwen 0.5B, 1.5B, and 14B (the judge), and SmolLM2.
-- Owned background work: the `claudish-windows` VM container (stop with
-  `tests/desktop/windows/vm.sh stop`, which is on the g01-windows branch).
+- Owned background work: the `claudish-windows` VM container (8 GB RAM, 6 cores;
+  stop with `tests/desktop/windows/vm.sh stop`).
   Ports 18765/18766 are free.
