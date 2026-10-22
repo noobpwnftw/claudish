@@ -110,6 +110,12 @@ class Rewriter:
                        settings["command"], settings["hosted"], settings["bindings"])
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
+        if settings.get("tools"):
+            if settings["backend"] not in ("llama", "openai"):
+                raise ValueError("tools need an OpenAI-compatible backend with tool calls (llama.cpp, vLLM, Ollama) "
+                                 "for now; the %s backend cannot use them yet" % settings["backend"])
+            from .tools import Toolbox
+            rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {})
         return rewriter
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
@@ -125,6 +131,7 @@ class Rewriter:
         self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
         self.bindings = list(bindings)
+        self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         self.modes = invocation.defaults((self.system, self.examples))
@@ -144,6 +151,23 @@ class Rewriter:
 
     def complete(self, payload, headers, image=None):
         """One chat completion from an OpenAI-compatible server: (text, usage)."""
+        choice, usage = self.chat(payload, headers, image)
+        # Never offer a sentence chopped off by the token limit.
+        if choice.get("finish_reason") == "length":
+            raise RuntimeError("rewrite exceeded token budget; use a shorter phrase")
+        output = (choice["message"].get("content") or "").strip()
+        if not output:
+            raise RuntimeError("model returned no text")
+        return output, usage
+
+    def request_headers(self):
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = "Bearer " + self.api_key
+        return headers
+
+    def chat(self, payload, headers, image=None):
+        """(the first choice, usage) from /v1/chat/completions."""
         req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
         # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
         # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
@@ -157,14 +181,7 @@ class Rewriter:
                 raise RuntimeError("this model server did not accept the window picture; it needs a vision "
                                    "model (llama.cpp: --mmproj)") from exc
             raise
-        choice = data["choices"][0]
-        # Never offer a sentence chopped off by the token limit.
-        if choice.get("finish_reason") == "length":
-            raise RuntimeError("rewrite exceeded token budget; use a shorter phrase")
-        output = choice["message"]["content"].strip()
-        if not output:
-            raise RuntimeError("model returned no text")
-        return output, data.get("usage", {})
+        return data["choices"][0], data.get("usage", {})
 
     def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False):
         """look: attach a picture of the focused window (instruct only; the user asked for it with F8)."""
@@ -228,6 +245,26 @@ class Rewriter:
                 outputs = [output]  # one request: alternatives would multiply the cost
             finally:
                 self.lock.release()
+        elif self.toolbox and mode == "instruct":
+            # Agentic instruct: the model may call the profile's read-only MCP tools, then draft.
+            if not self.lock.acquire(blocking=False):
+                raise RuntimeError("model busy; keep typing or retry")
+            try:
+                def ask(messages, tools):
+                    payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False}
+                    if tools:
+                        payload["tools"] = tools
+                    if self.model:
+                        payload["model"] = self.model
+                    choice, _ = self.chat(payload, self.request_headers(), image)
+                    return choice["message"]
+                guide = ("\n\nYou have tools. When the instruction needs facts you do not have (status, numbers, "
+                         "names, contents), call a tool first and write from its result; never invent such facts.")
+                output, called = self.toolbox.run(ask, [{"role": "system", "content": system + guide}] + examples +
+                                                  [{"role": "user", "content": user_content(text, image, "openai")}])
+                outputs, usage, consulted = [output], {}, consulted + called
+            finally:
+                self.lock.release()
         else:
             # Avoid building a backlog in the model server while typing rapidly.
             if not self.lock.acquire(blocking=False):
@@ -239,9 +276,7 @@ class Rewriter:
                            "stream": False, "cache_prompt": True}
                 if self.model:
                     payload["model"] = self.model
-                headers = {"Content-Type": "application/json"}
-                if self.api_key:
-                    headers["Authorization"] = "Bearer " + self.api_key
+                headers = self.request_headers()
                 outputs, usage = [], {}
                 for index in range(count):
                     # The first reading is deterministic (what the evaluation measures); the others

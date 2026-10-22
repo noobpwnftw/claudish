@@ -141,27 +141,30 @@ class Provider:
             return self.cached
 
 
+def connector(provider):
+    """The MCP client transport for a provider: stdio for a started server, else SSE or streamable HTTP."""
+    from mcp import StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    if provider.command is None and provider.transport == "sse":
+        from mcp.client.sse import sse_client
+        return sse_client(provider.url, headers=provider.headers, timeout=provider.timeout)
+    if provider.command is None:
+        import httpx2
+        from mcp.client.streamable_http import streamable_http_client
+        client = httpx2.AsyncClient(headers=provider.headers, timeout=provider.timeout)
+        return streamable_http_client(provider.url, http_client=client)
+    return stdio_client(StdioServerParameters(command=provider.command[0], args=provider.command[1:],
+                                              env={**os.environ, **provider.env}, cwd=provider.cwd))
+
+
 def read_mcp(provider):
     """Start the configured stdio MCP server, call one tool or read one resource, and return its text."""
     import anyio
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
-
-    def connect():
-        if provider.command is None and provider.transport == "sse":
-            from mcp.client.sse import sse_client
-            return sse_client(provider.url, headers=provider.headers, timeout=provider.timeout)
-        if provider.command is None:
-            import httpx2
-            from mcp.client.streamable_http import streamable_http_client
-            client = httpx2.AsyncClient(headers=provider.headers, timeout=provider.timeout)
-            return streamable_http_client(provider.url, http_client=client)
-        return stdio_client(StdioServerParameters(command=provider.command[0], args=provider.command[1:],
-                                                  env={**os.environ, **provider.env}, cwd=provider.cwd))
+    from mcp import ClientSession
 
     async def fetch():
         with anyio.fail_after(provider.timeout):
-            async with connect() as streams:
+            async with connector(provider) as streams:
                 read_stream, write_stream = streams[0], streams[1]
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()

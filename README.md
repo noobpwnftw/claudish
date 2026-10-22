@@ -391,6 +391,31 @@ For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
 
+### Tools: instructions that look things up
+
+Context is read before the model starts. Tools go further: an instruction may
+*call* MCP tools while it works, then draft from what they returned, for example
+"tell the team how CI looks on main". Name servers from `mcp_servers` in a
+profile:
+
+```json
+{"profiles": {"agent": {"backend": "llama", "timeout": 60,
+  "tools": ["github", {"server": "notes", "trust": ["pull_request_diff"]}]}}}
+```
+
+- Only tools the server marks read-only (`readOnlyHint`) are offered, plus the
+  ones you vouch for with `"trust"`. Tools with side effects are never offered;
+  they will need a per-call approval in the candidate list (G18).
+- Every call appears in "consulted", such as `notes.ci_status(branch="main")`.
+- The loop is bounded: at most 4 rounds of calls, and 60 s in all. The result is
+  still only a candidate.
+- It needs an OpenAI-compatible server whose model calls tools (llama.cpp, whose
+  chat templates handle tool calls by default, vLLM, Ollama). On the Spark, Qwen2.5-14B called the right tool and
+  drafted from its result ("41 tests have passed… test_upload_retry timed out
+  after 30 seconds", 3.1 s), and called none for a haiku. Qwen2.5-1.5B never
+  called a tool and wrote around the gap. Claude and agent CLIs come later; an
+  agent CLI behind the `command` backend already uses its own tools.
+
 ## Modes
 
 Every request names a mode, and every mode only offers a candidate, which you

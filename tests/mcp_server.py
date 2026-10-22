@@ -12,6 +12,18 @@ def pull_request_diff(number: int) -> str:
     return "PR #%d: + retry the flaky upload (token %s)" % (number, os.environ.get("TEST_TOKEN", "unset"))
 
 
+@server.tool(annotations={"readOnlyHint": True})
+def ci_status(branch: str) -> str:
+    """CI status of a branch (read-only)."""
+    return "CI for %s: 41 passed, 1 failed (test_upload_retry, timeout after 30 s)" % branch
+
+
+@server.tool(annotations={"readOnlyHint": False, "destructiveHint": True})
+def delete_branch(branch: str) -> str:
+    """Delete a branch (side effect: never offered without approval)."""
+    raise AssertionError("delete_branch must never be called by the read-only tool loop")
+
+
 @server.tool()
 def broken() -> str:
     """Always fails."""
