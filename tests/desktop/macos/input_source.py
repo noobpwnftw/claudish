@@ -3,6 +3,7 @@ PyObjC), so the rig needs no compiler.
 
 python input_source.py /path/to/Claudish.app org.claudish.inputmethod.Claudish
 python input_source.py --current
+python input_source.py --select com.apple.keylayout.US
 """
 import ctypes
 import sys
@@ -48,6 +49,12 @@ def main():
     if sys.argv[1] == "--current":
         print(current())
         return 0
+    if sys.argv[1] == "--select":
+        query = NSDictionary.dictionaryWithDictionary_({wrap(constant("kTISPropertyInputSourceID")): sys.argv[2]})
+        found = wrap(carbon.TISCreateInputSourceList(query.__c_void_p__(), False)) or []
+        status = carbon.TISSelectInputSource(found[0].__c_void_p__()) if len(found) else -1
+        print("select", sys.argv[2], status, "current:", current())
+        return 0 if status == 0 else 1
     path, bundle_id = sys.argv[1], sys.argv[2]
     print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
     for attempt in range(1, 21):  # a newly registered input method can take a moment

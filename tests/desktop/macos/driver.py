@@ -102,6 +102,7 @@ def main():
 
 def scenarios():
     # 1. Without the input method: can this session post keys to the app?
+    print(sh(sys.executable, str(HERE / "input_source.py"), "--select", "com.apple.keylayout.US", check=False))
     fresh_document()
     type_text("probe")
     time.sleep(0.5)
@@ -111,10 +112,14 @@ def scenarios():
         return 1
 
     # 2. Install and select cd_AI.
-    if TARGET.exists():
-        shutil.rmtree(TARGET)
-    TARGET.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(ROOT / "dist/macos/Claudish.app", TARGET, symlinks=True)
+    # Replacing a registered bundle leaves macOS without a server to launch until it notices, so an
+    # installed cd_AI is kept unless --reinstall asks for the fresh build.
+    if "--reinstall" in sys.argv or not TARGET.exists():
+        if TARGET.exists():
+            subprocess.run(["pkill", "-f", str(TARGET)], check=False)
+            shutil.rmtree(TARGET)
+        TARGET.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ROOT / "dist/macos/Claudish.app", TARGET, symlinks=True)
     print(sh(sys.executable, str(HERE / "input_source.py"), str(TARGET), BUNDLE_ID, check=False))
     fresh_document()
     current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
