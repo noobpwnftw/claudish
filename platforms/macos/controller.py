@@ -2,12 +2,15 @@
 import objc
 from AppKit import NSEventMaskKeyDown, NSEventTypeKeyDown
 from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl
+from AppKit import NSAttributedString, NSColor, NSForegroundColorAttributeName
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController, IMKCandidates
 from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCandidatesBelowHint
 
-from claudish.composition import Composition
+from claudish.composition import MAX_COMPOSITION, Composition
 from claudish.client import Suggestions
+
+SURROUNDING = 8000  # characters each side of the caret an instruction takes along (as on Linux)
 
 
 class ClaudishInputController(IMKInputController):
@@ -65,8 +68,8 @@ class ClaudishInputController(IMKInputController):
                 if self.state.live:  # continue: the rest of the sentence, as marked text after the caret
                     client = self.client()
                     if client is not None:
-                        client.setMarkedText_selectionRange_replacementRange_(self.state.ghost, (0, 0),
-                                                                              (NSNotFound, 0))
+                        client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost),
+                                                                              (0, 0), (NSNotFound, 0))
                     return
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
@@ -123,12 +126,50 @@ class ClaudishInputController(IMKInputController):
             return None
 
     @objc.python_method
+    def grey(self, text):
+        """Continue's suggestion as marked text in the secondary label color, so it reads as an
+        offer rather than typed text (apps that draw marked text their own way may ignore it)."""
+        if not text:
+            return text
+        return NSAttributedString.alloc().initWithString_attributes_(
+            text, {NSForegroundColorAttributeName: NSColor.secondaryLabelColor()})
+
+    @objc.python_method
+    def around_caret(self, client):
+        """(before, after): the client's text around the caret (IMKTextInput), or empty when it does
+        not share it. Chromium-based apps (VS Code, browsers) answer only about 100 characters
+        around the selection; native text views answer the whole text."""
+        def text(location, length):
+            if length <= 0:
+                return ""
+            found = client.stringFromRange_actualRange_((location, length), None)
+            if isinstance(found, tuple):  # PyObjC returns the out parameter alongside
+                found = found[0]
+            return str(found or "")
+        def pair(found):
+            return (found.location, found.length) if hasattr(found, "location") else tuple(found)
+        try:
+            location, length = pair(client.selectedRange())
+            marked = pair(client.markedRange())  # our own composition or suggestion is not the app's text
+            if marked[0] != NSNotFound and marked[1]:
+                location, length = marked
+            total = client.length()
+            if location == NSNotFound or location > total:
+                return "", ""
+            start = max(0, location - SURROUNDING)
+            end = min(total, location + length)
+            return text(start, location - start), text(end, min(SURROUNDING, total - end))
+        except Exception:  # not every client implements these
+            return "", ""
+
+    @objc.python_method
     def changed(self, client):
         if self.worker is not None and (self.state.automatic or not self.state.text):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
         self.panel.hide()
         if self.state.live:  # the only marked text is the suggestion, with the caret before it
-            client.setMarkedText_selectionRange_replacementRange_(self.state.ghost, (0, 0), (NSNotFound, 0))
+            client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost), (0, 0),
+                                                                  (NSNotFound, 0))
             return
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(self.state.text.encode("utf-16-le")) // 2
@@ -160,6 +201,8 @@ class ClaudishInputController(IMKInputController):
                 state.change("")  # Enter, arrows, anything else: the context starts over
             self.changed(client)  # clears the suggestion before the app handles the key
             return False
+        if not state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
+            state.change(self.around_caret(client)[0][-MAX_COMPOSITION:])
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
         self.changed(client)
@@ -229,8 +272,9 @@ class ClaudishInputController(IMKInputController):
             if action == "submit":
                 self.state.submit()
                 if self.worker is not None:
+                    before, after = self.around_caret(client)  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
-                                         app=self.app(client), look=self.state.look)
+                                         app=self.app(client), look=self.state.look, before=before, after=after)
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"

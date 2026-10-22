@@ -28,6 +28,48 @@ class Client:
         return "com.apple.TextEdit"
 
 
+class TextClient(Client):
+    """A client that shares its text, like NSTextView: the committed text plus the marked text."""
+
+    def __init__(self, text):
+        super().__init__()
+        self.text = text
+
+    def insertText_replacementRange_(self, text, replacement):
+        super().insertText_replacementRange_(text, replacement)
+        self.text += text
+
+    def whole(self):
+        marked = getattr(self.marked, "text", self.marked)
+        return self.text + marked
+
+    def length(self):
+        return len(self.whole())
+
+    def selectedRange(self):
+        marked = getattr(self.marked, "text", self.marked)
+        return (len(self.text) + (self.selection or (len(marked), 0))[0], 0)
+
+    def markedRange(self):
+        marked = getattr(self.marked, "text", self.marked)
+        return (len(self.text), len(marked)) if marked else (2**63 - 1, 0)
+
+    def stringFromRange_actualRange_(self, span, actual):
+        return self.whole()[span[0]:span[0] + span[1]], span
+
+
+class Grey:
+    """NSAttributedString, as far as the adapter uses it."""
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithString_attributes_(self, text, attributes):
+        self.text, self.attributes = text, attributes
+        return self
+
+
 class BaseController:
     def initWithServer_delegate_client_(self, server, delegate, client):
         self._client = client
@@ -74,9 +116,10 @@ class Worker:
     def answer(self, session, question, choice=None, text=None):
         self.answered = (session, question, choice)
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after=""):
         self.result = None
         self.modes.append(mode)
+        self.sent = (text, before, after)
         self.app = app
         self.immediate = immediate
         self.look = look
@@ -95,6 +138,9 @@ def load_adapter():
     objc.python_method = lambda method: method
     objc.signature = lambda signature: lambda method: method
     appkit = types.ModuleType("AppKit")
+    appkit.NSAttributedString = Grey
+    appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor")
+    appkit.NSForegroundColorAttributeName = "NSColor"
     for name, value in {"NSEventMaskKeyDown": 1024, "NSEventTypeKeyDown": 10,
                         "NSEventModifierFlagCommand": 1 << 20,
                         "NSEventModifierFlagControl": 1 << 18,
@@ -299,6 +345,42 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(len(self.client.commits), 1)
         self.controller.candidateSelected_("More, thoughtfully.")
         self.assertEqual(self.client.commits[-1], "More, thoughtfully.")
+
+    def test_continue_starts_from_the_text_box_and_the_suggestion_is_grey(self):
+        client = TextClient("Thanks for the review ")
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                          characters=lambda: "o")
+            fresh.handleEvent_client_(event, client)
+            self.assertEqual(fresh.state.text, "Thanks for the review o")  # the app's text, then the key
+            fresh.state.change("Thanks for the review ")
+            fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
+            fresh.changed(client)
+            self.assertEqual((client.marked.text, client.marked.attributes),
+                             ("on the parser.", {"NSColor": "secondaryLabelColor"}))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_an_instruction_takes_the_text_box_but_not_itself(self):
+        client = TextClient("Dear Ana,\n\n")
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "instruct"
+            for char in "say hi":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
+                                          modifierFlags=lambda: 0, characters=lambda c=char: c), client)
+            self.assertEqual(client.whole(), "Dear Ana,\n\nsay hi")  # the instruction is marked text
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 36,
+                                      modifierFlags=lambda: 0, characters=lambda: "\r"), client)
+            self.assertEqual(fresh.worker.sent, ("say hi", "Dear Ana,\n\n", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_a_client_without_text_access_gives_no_context(self):
+        self.assertEqual(self.controller.around_caret(self.client), ("", ""))  # Client lacks selectedRange
 
     def test_bundle_registration_names_match_controller(self):
         with (ROOT / "platforms/macos/Info.plist").open("rb") as source:

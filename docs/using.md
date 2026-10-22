@@ -11,7 +11,7 @@ Typing in detail, the browser demos, and `claudish fix`.
 | Pause for 180 ms | Request a local rewrite in the background |
 | F6 | Preview a completed candidate; useful on Windows |
 | F7 | Switch mode: continue → instruct → rewrite (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
-| Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as marked text on macOS, and in the candidate window on Windows (F6 shows it). Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
+| Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as grey marked text on macOS (apps that draw marked text themselves may show it underlined), and in the candidate window on Windows (F6 shows it). Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
 | Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result; Esc keeps your text |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
@@ -119,3 +119,24 @@ for environmental reasons, which must be left alone.
 
 Reproduce with `python benchmarks/evaluate_fix.py --label NAME` against a model
 server. The bash hook is tested; the zsh hook has not been run yet.
+
+## Talking to a coding agent in its own chat box
+
+A worked example of the scope (one turn at the caret, nothing more): typing to
+Claude Code in VS Code.
+
+- **Continue** completes your message as you type, from the text already in the
+  chat box. On macOS, VS Code and other Chromium apps share only about 100
+  characters around the caret with an input method, which is plenty for a
+  message.
+- **Instruct** turns a one-line task into the message: "tell it to add a test for
+  the retry" becomes a full request, drafted at the caret for you to send.
+- **The code you are looking at** comes from F8 (a picture of the window, for a
+  vision model) or from MCP servers you configure for Claudish; Claudish does not
+  read Claude Code's own configuration or connection.
+- **Permissions**: if a tool you configured needs one (fetching a site, say), it
+  asks in the candidate list: 1 allow, 2 deny.
+
+It is not a replacement for the extension: the conversation with the agent stays
+in the agent's own window.
+
