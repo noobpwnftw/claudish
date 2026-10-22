@@ -148,6 +148,7 @@ def main():
     if args.desktop:
         if shutil.which("docker"):
             run("Linux desktop", ["sh", "tests/desktop/linux/run.sh"], timeout=900)
+            run("Linux service", ["sh", "tests/desktop/linux-systemd/run.sh"], timeout=600)
         else:
             skip("Linux desktop", "needs docker")
 

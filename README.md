@@ -64,12 +64,18 @@ Status:
 3. **Install the input method** for [Linux](#linux-input-method),
    [Windows](#windows-input-method), or [macOS](#macos-input-method), and add
    **cd_AI — Claudish** in your input sources.
-4. **Check the setup.** `python -m claudish doctor` walks the whole chain (model,
+4. **Start it at login.** `python -m claudish service install` runs the local
+   stack (model and service) at every login: a systemd user unit on Linux, a logon
+   task on Windows (no console window), a launch agent on macOS. Use
+   `service install --serve -- --profile claude` for another profile, `service
+   status` and `service uninstall` to inspect or remove it, and `--dry-run` to see
+   what it would do.
+5. **Check the setup.** `python -m claudish doctor` walks the whole chain (model,
    service, config, the input method's registration on your OS, and context
    sources) and prints a fix for anything wrong. On Linux, for example, it
    catches a session that started before the installer's search-path change
    ("log out and back in"); on Windows on ARM, PIME's missing x86 runtime.
-5. **Learn four keys.** Everything else is typing.
+6. **Learn four keys.** Everything else is typing.
 
 | Key | Does |
 | --- | --- |
