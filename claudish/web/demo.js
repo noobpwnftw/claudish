@@ -10,6 +10,12 @@ let queued = false;
 let composing = false;
 let hosted = false;  // true when the service sends text to a hosted model
 let backend = "";
+let mode = "rewrite";
+const MODES = {
+  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", placeholder: "We should use a smaller model."},
+  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", placeholder: "Thanks for the quick review on"},
+  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", placeholder: "decline the meeting politely, propose Thursday"},
+};
 
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
@@ -51,7 +57,7 @@ async function requestSuggestion() {
   try {
     const response = await fetch("/suggest", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }), signal: controller.signal,
+      body: JSON.stringify({ text, mode }), signal: controller.signal,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "The rewrite could not be completed.");
@@ -109,6 +115,15 @@ draft.addEventListener("keydown", (event) => {
   else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) { event.preventDefault(); commit(false); }
   else if (event.key === "Escape" && draft.value.trim()) { event.preventDefault(); commit(false); }
 });
+document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", () => {
+  mode = input.value;
+  $("candidate-title").textContent = MODES[mode].title;
+  $("accept-label").textContent = MODES[mode].accept;
+  $("rewrite-label").textContent = MODES[mode].ask;
+  draft.placeholder = MODES[mode].placeholder;
+  edited();  // The old candidate belonged to another mode; ask again.
+  draft.focus();
+}));
 $("accept").addEventListener("click", () => commit(true));
 $("keep").addEventListener("click", () => commit(false));
 $("rewrite").addEventListener("click", requestSuggestion);

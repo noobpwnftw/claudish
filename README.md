@@ -194,6 +194,26 @@ For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
 
+## Modes
+
+Every request names a mode, and every mode only offers a candidate, which you
+accept with Tab or ignore:
+
+| Mode | You type | The candidate |
+| --- | --- | --- |
+| `rewrite` (default) | a phrase | the phrase, rewritten in house style |
+| `continue` | the start of a sentence | your text plus the next few words |
+| `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
+
+The browser demo has a mode switch. Adapters send `"mode"` in `/suggest`, and
+`/health` lists the modes. A profile can replace any mode's template or token
+budget, or add a mode of its own:
+
+```json
+{"profiles": {"p": {"modes": {"instruct": {"max_tokens": 900},
+                               "haiku": {"prompt": "haiku.json", "max_tokens": 60}}}}}
+```
+
 ## Fix the last failed command
 
 A better [thefuck](https://github.com/nvbn/thefuck): `claudish fix` asks your

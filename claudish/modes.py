@@ -12,7 +12,8 @@ CONTINUE_EXAMPLES = [
 INSTRUCT_SYSTEM = (
     "The user typed an instruction for text they want to write. Write that text, ready to send, "
     "in polished and slightly verbose English with a fondness for em dashes. Use the reference "
-    "context for names, terms, and facts. Output only the text itself, with no preamble or notes."
+    "context for names, terms, and facts. Refer to people by name, or as they/them unless their "
+    "pronouns are given. Output only the text itself, with no preamble or notes."
 )
 INSTRUCT_EXAMPLES = [
     {"role": "user", "content": "decline the meeting politely, propose thursday"},

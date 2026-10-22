@@ -72,7 +72,7 @@ def main():
         try:
             rewriter = Rewriter(settings["backend"], settings["model_url"], settings["max_tokens"],
                                 settings["claude_model"], settings["model"], api_key, settings["timeout"], prompt,
-                                context)
+                                context, settings["modes"])
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         rewriter.profile = profile
