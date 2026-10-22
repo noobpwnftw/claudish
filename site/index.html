@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="cd_AI: an input method that puts a language model at the caret, in every app. If you can type there, you can use AI there.">
+  <title>cd_AI — Claudish</title>
+  <link rel="icon" href="data:,">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="site.css">
+  <script src="site.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="wordmark" href="./" aria-label="Claudish home">cd<span class="dash">—</span><span class="ai">AI</span></a>
+      <nav class="nav" aria-label="Main">
+        <a href="demo/">Demo</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a>
+        <a href="https://github.com/noobpwnftw/claudish">GitHub</a>
+        <label class="theme-picker"><span aria-hidden="true">◐</span><select id="theme-picker" aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="title">
+        <div class="hero-text">
+          <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
+          <h1 id="title">If you can type there,<br>you can use AI <em>there.</em></h1>
+          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: a small local one by default, or your own API key. The answer arrives as a candidate at the caret. Nothing is inserted until you accept it.</p>
+          <p class="lede joke">English goes in. Em dashes come out.</p>
+          <div class="actions">
+            <a class="button primary" href="demo/">Try it in your browser</a>
+            <a class="button" href="#install">Install with your agent</a>
+            <a class="button ghost" href="https://github.com/noobpwnftw/claudish/releases">Releases · first one soon ↗</a>
+          </div>
+        </div>
+        <figure class="ime" aria-label="Example: an instruction typed into any app, with three readings to choose from">
+          <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret">tell the team the deploy slips to Friday<span class="cursor"></span></span></div>
+          <div class="ime-panel">
+            <div class="ime-status">instruct · 1–3: insert that one · Esc: keep your words</div>
+            <ol>
+              <li><kbd>1</kbd> Heads-up: the deploy moves to Friday—thanks for bearing with us.</li>
+              <li><kbd>2</kbd> Quick update—we're shipping Friday instead. I'll share the details shortly.</li>
+              <li><kbd>3</kbd> Deploy slips to Friday. Details to follow.</li>
+            </ol>
+          </div>
+          <figcaption>Any text box: chat, mail, an editor, a terminal. Pick with a number, as with any CJK input method.</figcaption>
+        </figure>
+      </section>
+
+      <section class="section" aria-labelledby="layers">
+        <div class="eyebrow">01 / THREE LAYERS, ONE KEYBOARD</div>
+        <h2 id="layers">Rewrite, continue, instruct<span class="dash">—</span>F7 switches.</h2>
+        <div class="cards">
+          <article class="card"><h3>Rewrite</h3><p>Ordinary English becomes unnecessarily polished prose.</p><p class="example"><span>this is important</span> → <span>This is of utmost significance.</span></p></article>
+          <article class="card"><h3>Continue</h3><p>Start a sentence; the model offers the rest, like autocomplete for everything.</p><p class="example"><span>Thanks for the review on</span> → <span>…the parser change.</span></p></article>
+          <article class="card"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p><p class="example"><span>decline the meeting politely</span> → <span>three readings to pick from</span></p></article>
+        </div>
+      </section>
+
+      <section class="section split" aria-labelledby="keys">
+        <div>
+          <div class="eyebrow">02 / THE KEYS</div>
+          <h2 id="keys">Everything else is typing.</h2>
+          <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. Claudish extends it from what you meant to say to what you meant to do.</p>
+        </div>
+        <table class="keys">
+          <tr><td><kbd>F7</kbd></td><td>switch layer: rewrite → continue → instruct</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>accept the candidate</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>keep your wording; in instruct, send, then insert</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>pick a reading, or answer an agent's question</td></tr>
+          <tr><td><kbd>F8</kbd></td><td>in instruct, also send a picture of this window</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>keep what you typed</td></tr>
+        </table>
+      </section>
+
+      <section class="section" aria-labelledby="byoi">
+        <div class="eyebrow">03 / BRING YOUR OWN INTELLIGENCE</div>
+        <h2 id="byoi">The caret is model-agnostic.</h2>
+        <ul class="features">
+          <li><b>Local by default.</b> llama.cpp and a 491 MB model, downloaded and checksum-verified by setup. Nothing leaves your machine.</li>
+          <li><b>Or yours.</b> Claude with your API key, any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
+          <li><b>Context.</b> Files, commands, and MCP servers, per app: the PR diff in your editor, the ticket in your browser. Import the MCP servers you already use with Claude.</li>
+          <li><b>Tools and agents.</b> An instruction may call read-only tools, or run an agent whose permission questions arrive as choices. You approve every side effect.</li>
+          <li><b>Restraint.</b> It runs only on what you type, never watches the screen, and never inserts anything you did not accept. Password fields bypass it.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="install" aria-labelledby="install-title">
+        <div class="eyebrow">04 / INSTALL</div>
+        <h2 id="install-title">Let your agent do it.</h2>
+        <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want Claudish. It shows you the plan before it changes anything, and leaves sudo and administrator steps to you.</p>
+        <div class="prompt">
+          <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
+          <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
+
+1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop.
+2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
+3. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
+4. Run `python -m claudish setup --yes`. It downloads a verified llama.cpp build and a 491 MB model, writes a config, registers the input method, and starts Claudish at login.
+5. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
+6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
+7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: F7 switches mode, Tab accepts, Enter keeps my words, Esc cancels.
+
+Make no mistakes.</pre>
+        </div>
+        <h3 class="by-hand">Or by hand</h3>
+        <pre class="commands">git clone https://github.com/noobpwnftw/claudish
+cd claudish
+python3 -m claudish setup</pre>
+        <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Details in the <a href="https://github.com/noobpwnftw/claudish#quick-start">README</a>.</p>
+      </section>
+
+      <section class="section" aria-labelledby="status">
+        <div class="eyebrow">05 / WHERE IT STANDS</div>
+        <h2 id="status">An experiment, tested honestly.</h2>
+        <table class="status">
+          <tr><td>Linux (IBus)</td><td>Verified with real IBus and GTK typing in a container, 21 scenarios. Wayland/GNOME and Qt are not yet tested.</td></tr>
+          <tr><td>Windows (PIME/TSF)</td><td>Verified on Windows 11 ARM64: Notepad and Edge, setup end to end. x64 hardware untested.</td></tr>
+          <tr><td>macOS (IMK)</td><td>Builds in CI and passes event tests; not yet run on a Mac.</td></tr>
+          <tr><td>Browser demo</td><td>The model runs in the page through WebAssembly; nothing you type leaves it.</td></tr>
+        </table>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <span>cd_AI is an independent, MIT-licensed project. Not affiliated with or endorsed by Anthropic.</span>
+      <span><a href="demo/">Demo</a> · <a href="https://github.com/noobpwnftw/claudish">GitHub</a> · <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a></span>
+    </footer>
+  </div>
+</body>
+</html>

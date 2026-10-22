@@ -160,8 +160,9 @@ pushing branches, merging to `main`, and revising this file and the roadmap.
 Merge to `main` after `python scripts/check.py --model` passes on the merged
 result (plus a `ci/*` run when the change needs Windows or macOS coverage); push
 `main` as a fast-forward. The presence of
-credentials alone grants no further authority. Do not force-push, delete remote
-branches, publish releases/packages, deploy public services, or change
+credentials alone grants no further authority. Force-pushing your own `agent/*`
+and `ci/*` branches is fine (owner, 2026-10-23); `main` stays fast-forward. Do
+not delete remote branches, publish releases/packages, deploy public services, or change
 repository/account settings without applicable owner authorization. Prepare the concrete result
 first if a remaining external action needs approval. Do not ask the same question
 again when the owner has already authorized it.

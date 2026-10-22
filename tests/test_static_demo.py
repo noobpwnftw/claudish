@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from build_static_demo import MODEL_URL, build  # noqa: E402
+from build_static_demo import MODEL_URL, build, build_site  # noqa: E402
 from claudish import modes  # noqa: E402
 
 
@@ -27,6 +27,32 @@ class StaticDemoBuildTests(unittest.TestCase):
             for name, spec in modes.defaults().items():
                 self.assertEqual(templates["modes"][name]["system"], spec["system"])
                 self.assertEqual(templates["modes"][name]["examples"], spec["examples"])
+
+
+class SiteBuildTests(unittest.TestCase):
+    def test_home_page_links_the_demo_and_its_install_prompt_is_real(self):
+        import re
+        import subprocess
+        with tempfile.TemporaryDirectory() as directory:
+            out = build_site(Path(directory) / "site")
+            page = (out / "index.html").read_text(encoding="utf-8")
+            demo = (out / "demo" / "index.html").read_text(encoding="utf-8")
+            css = (out / "site.css").read_text(encoding="utf-8")
+        self.assertIn('href="demo/"', page)
+        self.assertNotIn('href="/', page)
+        self.assertIn('class="wordmark" href="../"', demo)  # the demo links back home
+        self.assertIn(':root[data-theme="dark"]{', css)  # the demo's tokens, both themes
+        self.assertIn("Content-Security-Policy", page)
+        prompt = re.search(r'<pre id="prompt-text">(.*?)</pre>', page, re.S).group(1)
+        self.assertTrue(prompt.rstrip().endswith("Make no mistakes."))
+        # Every command the prompt tells an agent to run must exist.
+        for command in re.findall(r"`python -m claudish ([^`]+)`", prompt):
+            words = command.split()
+            usage = subprocess.run([sys.executable, "-m", "claudish", words[0], "--help"], cwd=str(ROOT),
+                                   capture_output=True, text=True)
+            self.assertEqual(usage.returncode, 0, command)
+            for flag in (w for w in words[1:] if w.startswith("--")):
+                self.assertIn(flag, usage.stdout, command)
 
 
 if __name__ == "__main__":

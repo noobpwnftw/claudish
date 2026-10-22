@@ -1,4 +1,5 @@
-# The project home page: the static demo (model runs in the visitor's browser), rebuilt on every push to main.
+# The project home page (site/) with the static demo in demo/ (the model runs in the visitor's browser),
+# rebuilt on every push to main.
 name: Pages
 on:
   push:
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python scripts/build_static_demo.py --out _site
+      - run: python scripts/build_static_demo.py --site --out _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

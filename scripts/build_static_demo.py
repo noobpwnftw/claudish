@@ -1,6 +1,7 @@
 """Build the static demo: the browser demo, with the model running in the page (no inference server).
 
 python scripts/build_static_demo.py [--out dist/demo]
+python scripts/build_static_demo.py --site [--out dist/site]   # the home page, with the demo in demo/
 
 The output is plain files for any static host (for example GitHub Pages). The templates come from
 claudish/modes.py, so the page and the service never drift apart.
@@ -52,10 +53,40 @@ def build(out):
     return out
 
 
+SITE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            "connect-src 'none'; base-uri 'none'; form-action 'none'")
+
+
+def build_site(out):
+    """The home page (site/) at the root and the demo in demo/. The page shares the demo's color tokens."""
+    out = Path(out)
+    build(out / "demo")
+    site, web = ROOT / "site", ROOT / "claudish" / "web"
+    css = (web / "demo.css").read_text(encoding="utf-8")
+    tokens = [re.search(r":root\{[^}]*\}", css).group(0), re.search(r':root\[data-theme="dark"\]\{[^}]*\}', css).group(0)]
+    (out / "site.css").write_text("\n".join(tokens) + "\n" + (site / "site.css").read_text(encoding="utf-8"),
+                                  encoding="utf-8")
+    shutil.copy(site / "site.js", out / "site.js")
+    shutil.copy(web / "theme.js", out / "theme.js")
+    page = (site / "index.html").read_text(encoding="utf-8")
+    page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n'
+                        '  <meta http-equiv="Content-Security-Policy" content="%s">\n' % SITE_CSP, 1)
+    (out / "index.html").write_text(page, encoding="utf-8")
+    demo = (out / "demo" / "index.html").read_text(encoding="utf-8")
+    demo = demo.replace('<a class="wordmark" href=""', '<a class="wordmark" href="../"', 1)  # back to the home page
+    (out / "demo" / "index.html").write_text(demo, encoding="utf-8")
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", default=str(ROOT / "dist" / "demo"))
-    print("Built", build(parser.parse_args().out))
+    parser.add_argument("--site", action="store_true", help="Build the home page, with the demo in demo/")
+    parser.add_argument("--out")
+    args = parser.parse_args()
+    if args.site:
+        print("Built", build_site(args.out or ROOT / "dist" / "site"))
+    else:
+        print("Built", build(args.out or ROOT / "dist" / "demo"))
 
 
 if __name__ == "__main__":
