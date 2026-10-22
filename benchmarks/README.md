@@ -114,3 +114,19 @@ clause either adds a claim or restates a fact wrongly. A 41/41 score on the
 checks hid the worst variant, terse-system. The shipped prompt is unchanged.
 Framing the input as quoted text stopped one question from being answered
 instead of rewritten. No variant stopped "Thanks!" becoming "You're welcome!".
+
+The same experiments with Qwen2.5 1.5B Instruct Q4_K_M (1,117,320,736 bytes, SHA-256
+`6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`, upstream
+revision `91cad511`), on the same hardware and settings:
+
+| Variant | Pass checks | Added em dash | Median | p95 |
+| --- | ---: | ---: | ---: | ---: |
+| baseline | 32 / 41 | 3 | 100 ms | 147 ms |
+| terse-system | 39 / 41 | 15 | 93 ms | 140 ms |
+| restate-framed | 38 / 41 | 10 | 91 ms | 120 ms |
+
+With terse-system, 1.5B adds milder clauses than 0.5B does. They still invent
+some claims ("14 minutes—quite a short time, isn't it?", "No one reviewed the
+change—this needs addressing"), and "back in 20" became "meet back at 20".
+"Thanks!" still becomes "You're welcome!". Paired with the shipped prompt, it
+scores below 0.5B. It is not proposed as a preset.
