@@ -115,9 +115,9 @@ def scenarios():
         shutil.rmtree(TARGET)
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "dist/macos/Claudish.app", TARGET, symlinks=True)
-    print(sh("swift", str(HERE / "input_source.swift"), str(TARGET), BUNDLE_ID, check=False))
+    print(sh(sys.executable, str(HERE / "input_source.py"), str(TARGET), BUNDLE_ID, check=False))
     fresh_document()
-    current = sh("swift", str(HERE / "input_source.swift"), "--current")
+    current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
     check("cd_AI is the selected input source", current.startswith(BUNDLE_ID), True)
 
     # 3. Continue: keys go straight in; the rest waits as grey marked text; Tab takes it.
