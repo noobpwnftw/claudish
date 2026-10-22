@@ -57,10 +57,13 @@ def main():
         return 0 if status == 0 else 1
     path, bundle_id = sys.argv[1], sys.argv[2]
     print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
-    for attempt in range(1, 21):  # a newly registered input method can take a moment
+    # Enabling a third-party input method asks the user (macOS: "Allow … to enable …?"): ask once,
+    # then wait for the answer; asking again on every retry raises the dialog again.
+    for source in sources(bundle_id):
+        if not prop(source, "kTISPropertyInputSourceIsEnabled"):
+            print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
+    for attempt in range(1, 61):
         for source in sources(bundle_id):
-            if not prop(source, "kTISPropertyInputSourceIsEnabled"):
-                print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
             if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
                 status = carbon.TISSelectInputSource(source)
                 print("attempt", attempt, "select", prop(source, "kTISPropertyInputSourceID"), status)
