@@ -19,7 +19,7 @@
         <a href="#install">Install</a>
         <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a>
         <a href="https://github.com/noobpwnftw/claudish">GitHub</a>
-        <label class="theme-picker"><span aria-hidden="true">◐</span><select id="theme-picker" aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme">☾</button>
       </nav>
     </header>
 
@@ -33,20 +33,20 @@
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
             <a class="button" href="#install">Install with your agent</a>
-            <a class="button ghost" href="https://github.com/noobpwnftw/claudish/releases">Releases · first one soon ↗</a>
           </div>
+          <p class="note">The first release is coming; until then, install from source. <a href="https://github.com/noobpwnftw/claudish/releases">Releases ↗</a></p>
         </div>
         <figure class="ime" aria-label="Example: an instruction typed into any app, with three readings to choose from">
           <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret">tell the team the deploy slips to Friday<span class="cursor"></span></span></div>
           <div class="ime-panel">
             <div class="ime-status">instruct · 1–3: insert that one · Esc: keep your words</div>
             <ol>
-              <li><kbd>1</kbd> Heads-up: the deploy moves to Friday—thanks for bearing with us.</li>
-              <li><kbd>2</kbd> Quick update—we're shipping Friday instead. I'll share the details shortly.</li>
+              <li><kbd>1</kbd> Heads-up: the deploy moves to Friday—more soon.</li>
+              <li><kbd>2</kbd> Quick update—we're shipping Friday instead.</li>
               <li><kbd>3</kbd> Deploy slips to Friday. Details to follow.</li>
             </ol>
           </div>
-          <figcaption>Any text box: chat, mail, an editor, a terminal. Pick with a number, as with any CJK input method.</figcaption>
+          <figcaption>Any text box: chat, mail, an editor, a terminal. Pick with a number.</figcaption>
         </figure>
       </section>
 
@@ -56,7 +56,7 @@
         <div class="cards">
           <article class="card"><h3>Rewrite</h3><p>Ordinary English becomes unnecessarily polished prose.</p><p class="example"><span>this is important</span> → <span>This is of utmost significance.</span></p></article>
           <article class="card"><h3>Continue</h3><p>Start a sentence; the model offers the rest, like autocomplete for everything.</p><p class="example"><span>Thanks for the review on</span> → <span>…the parser change.</span></p></article>
-          <article class="card"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p><p class="example"><span>decline the meeting politely</span> → <span>three readings to pick from</span></p></article>
+          <article class="card"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p><p class="example"><span>decline the meeting politely</span> → <span>three drafts, 1–3</span></p></article>
         </div>
       </section>
 

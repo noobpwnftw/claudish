@@ -1,6 +1,8 @@
 /* The landing page. Color tokens (light and dark) are copied from claudish/web/demo.css at build time. */
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+p,li,td,figcaption{text-wrap:pretty}
+h2,h3,.example,.ime-panel li{text-wrap:balance}
 a{color:inherit}
 a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .shell{max-width:1200px;margin:0 auto;padding:0 40px}
@@ -12,8 +14,7 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(
 .nav{display:flex;align-items:center;gap:22px;font-family:var(--mono);font-size:13px}
 .nav a{text-decoration:none;color:var(--label)}
 .nav a:hover{color:var(--accent)}
-.theme-picker{display:flex;align-items:center;gap:7px;color:var(--label);border-left:1px solid var(--line);padding-left:18px}
-.theme-picker select{font-family:var(--mono);font-size:12px;color:var(--label);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:5px 4px}
+.theme-toggle{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--label);font-size:19px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}.theme-toggle:hover{background:var(--chip-hover);color:var(--ink)}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.3px;color:var(--muted)}
 .tag{background:var(--tag-bg);color:var(--label);padding:6px 8px;margin-right:10px}
 .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:56px;align-items:center;padding:64px 0 56px}
@@ -26,11 +27,11 @@ h1 em{color:var(--accent)}
 .button:hover{background:var(--chip-hover)}
 .button.primary{background:var(--button-bg);border-color:var(--button-bg);color:var(--button-text)}
 .button.primary:hover{background:var(--button-hover)}
-.button.ghost{border-color:transparent;color:var(--label)}
+.note{font-size:13px;color:var(--muted);margin:16px 0 0;text-wrap:pretty}.note a{color:var(--label)}
 .ime{margin:0;border:1px solid var(--workspace-border);border-radius:8px;background:var(--editor-bg);box-shadow:0 5px 0 var(--workspace-shadow);overflow:hidden}
 .ime-app{padding:18px 22px 20px;border-bottom:1px solid var(--line)}
 .ime-title{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;letter-spacing:.6px}
-.ime-caret{font-family:var(--serif);font-size:21px;text-decoration:underline dotted var(--accent);text-underline-offset:6px}
+.ime-caret{display:block;text-wrap:balance;font-family:var(--serif);font-size:21px;text-decoration:underline dotted var(--accent);text-underline-offset:6px}
 .cursor{display:inline-block;width:2px;height:22px;background:var(--ink);vertical-align:-4px;margin-left:2px}
 .ime-panel{background:var(--candidate-bg);padding:14px 22px 18px}
 .ime-status{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px}
@@ -70,5 +71,5 @@ pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono)
 code{font-family:var(--mono);font-size:12px}
 .page-footer{border-top:1px solid var(--line);padding:22px 0 30px;display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.4px;line-height:1.6}
 @media(max-width:900px){.hero,.split{grid-template-columns:1fr;gap:36px}.cards,.features{grid-template-columns:1fr}}
-@media(max-width:650px){.shell{padding:0 16px}.topbar{height:auto;padding:16px 0;flex-wrap:wrap;gap:12px}.nav{gap:14px;flex-wrap:wrap}.theme-picker{padding-left:12px}.hero{padding:36px 0 40px}h1{font-size:38px;letter-spacing:-1.4px}.keys td:first-child,.status td:first-child{width:auto}.status td{display:block;padding:4px 0}.status tr td:first-child{padding-top:14px}.page-footer{flex-direction:column}}
+@media(max-width:650px){.shell{padding:0 16px}.topbar{height:auto;padding:16px 0;flex-wrap:wrap;gap:12px}.nav{gap:14px;flex-wrap:wrap}.hero{padding:36px 0 40px}h1{font-size:38px;letter-spacing:-1.4px}.keys td:first-child,.status td:first-child{width:auto}.status td{display:block;padding:4px 0}.status tr td:first-child{padding-top:14px}.page-footer{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}

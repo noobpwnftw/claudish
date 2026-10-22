@@ -23,6 +23,12 @@ async def check(args):
         try:
             await page.goto(args.url)
             await expect(page.locator("#connection")).to_contain_text("connected")
+            # One button flips the theme (system first; nothing stored).
+            first = await page.evaluate("() => document.documentElement.dataset.theme")
+            await page.locator("#theme-toggle").click()
+            flipped = await page.evaluate("() => document.documentElement.dataset.theme")
+            assert {first, flipped} == {"light", "dark"}, (first, flipped)
+            await page.locator("#theme-toggle").click()
             await page.get_by_role("button", name="This is very important.").click()
             await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
             suggestion = await page.locator("#candidate").inner_text()
@@ -130,7 +136,7 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
             print("Browser acceptance passed: inference, Tab/Enter/Escape, dashes, clipboard, "
-                  "clear, stale responses, service failure, instruct mode, and mobile layout")
+                  "clear, stale responses, service failure, instruct mode, theme toggle, and mobile layout")
         finally:
             await browser.close()
 
