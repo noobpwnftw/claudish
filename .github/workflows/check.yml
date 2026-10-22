@@ -1,0 +1,27 @@
+name: Check
+on: [push, pull_request]
+jobs:
+  core:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q claudish platforms scripts
+  macos-bundle:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python platforms/macos/build.py
+      - name: Load native controller and check Objective-C selectors
+        run: .tools/macos-build-venv/bin/python -c "import sys; sys.path.insert(0, 'platforms/macos'); import controller"
+      - name: Verify bundle signature
+        run: codesign --verify --deep --strict dist/macos/Claudish.app

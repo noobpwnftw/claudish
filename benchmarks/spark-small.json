@@ -1,0 +1,188 @@
+{
+  "runs": 12,
+  "successes": 12,
+  "median_ms": 64.805,
+  "p95_ms": 85.31,
+  "results": [
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 67.31,
+      "text": "We should opt for a more compact model.",
+      "backend": "llama",
+      "elapsed_ms": 54.03,
+      "usage": {
+        "completion_tokens": 10,
+        "prompt_tokens": 87,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 86
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 63.55,
+      "text": "This is of utmost significance.",
+      "backend": "llama",
+      "elapsed_ms": 50.53,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 85,
+        "total_tokens": 92,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 73.34,
+      "text": "Let's investigate the possibilities.",
+      "backend": "llama",
+      "elapsed_ms": 59.09,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 86,
+        "total_tokens": 93,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 82.81,
+      "text": "The test encountered an issue due to the absence of the file.",
+      "backend": "llama",
+      "elapsed_ms": 69.93,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 89,
+        "total_tokens": 103,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 63.22,
+      "text": "We should opt for a more compact model.",
+      "backend": "llama",
+      "elapsed_ms": 49.91,
+      "usage": {
+        "completion_tokens": 10,
+        "prompt_tokens": 87,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 56.95,
+      "text": "This is of utmost significance.",
+      "backend": "llama",
+      "elapsed_ms": 43.44,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 85,
+        "total_tokens": 92,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 54.14,
+      "text": "Let's investigate the possibilities.",
+      "backend": "llama",
+      "elapsed_ms": 40.92,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 86,
+        "total_tokens": 93,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 85.31,
+      "text": "The test encountered an issue due to the absence of the file.",
+      "backend": "llama",
+      "elapsed_ms": 72.0,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 89,
+        "total_tokens": 103,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 62.05,
+      "text": "We should opt for a more compact model.",
+      "backend": "llama",
+      "elapsed_ms": 48.36,
+      "usage": {
+        "completion_tokens": 10,
+        "prompt_tokens": 87,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 62.79,
+      "text": "This is of utmost significance.",
+      "backend": "llama",
+      "elapsed_ms": 48.96,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 85,
+        "total_tokens": 92,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 66.06,
+      "text": "Let's investigate the possibilities.",
+      "backend": "llama",
+      "elapsed_ms": 43.96,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 86,
+        "total_tokens": 93,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 80.36,
+      "text": "The test encountered an issue due to the absence of the file.",
+      "backend": "llama",
+      "elapsed_ms": 66.77,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 89,
+        "total_tokens": 103,
+        "prompt_tokens_details": {
+          "cached_tokens": 75
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cd_AI — Claudish",
+  "version": "0.1.0",
+  "guid": "{EF97D106-1721-4466-A6B1-764987694B3C}",
+  "locale": "en-US",
+  "fallbackLocale": "en-US",
+  "icon": "icon.ico",
+  "win8_icon": "",
+  "moduleName": "claudish_ime",
+  "serviceName": "ClaudishTextService"
+}

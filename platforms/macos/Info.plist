@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleName</key><string>Claudish</string>
+  <key>CFBundleDisplayName</key><string>cd_AI — Claudish</string>
+  <key>CFBundleIdentifier</key><string>org.claudish.inputmethod.Claudish</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>LSUIElement</key><true/>
+  <key>InputMethodConnectionName</key><string>Claudish_Connection</string>
+  <key>InputMethodServerControllerClass</key><string>ClaudishInputController</string>
+  <key>TISIntendedLanguage</key><string>en</string>
+  <key>tsInputMethodCharacterRepertoireKey</key><array><string>Latn</string></array>
+  <key>ComponentInputModeDict</key><dict>
+    <key>tsInputModeListKey</key><dict>
+      <key>org.claudish.inputmethod.Claudish.English</key><dict>
+        <key>TISInputSourceID</key><string>org.claudish.inputmethod.Claudish.English</string>
+        <key>TISIntendedLanguage</key><string>en</string>
+        <key>tsInputModeDefaultStateKey</key><true/>
+        <key>tsInputModeIsVisibleKey</key><true/>
+        <key>tsInputModePrimaryInScriptKey</key><true/>
+        <key>tsInputModeScriptKey</key><string>smRoman</string>
+      </dict>
+    </dict>
+    <key>tsVisibleInputModeOrderedArrayKey</key>
+    <array><string>org.claudish.inputmethod.Claudish.English</string></array>
+  </dict>
+</dict></plist>

@@ -1,0 +1,135 @@
+"""InputMethodKit controller; all Cocoa client operations stay on the main thread."""
+import objc
+from AppKit import NSEventMaskKeyDown, NSEventTypeKeyDown
+from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagOption
+from Foundation import NSNotFound, NSTimer
+from InputMethodKit import IMKInputController, IMKCandidates
+from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCandidatesBelowHint
+
+from claudish.composition import Composition
+from claudish.client import Suggestions
+
+
+class ClaudishInputController(IMKInputController):
+    def initWithServer_delegate_client_(self, server, delegate, client):
+        self = objc.super(ClaudishInputController, self).initWithServer_delegate_client_(
+            server, delegate, client)
+        if self is None:
+            return None
+        self.state = Composition()
+        self.worker = None
+        self.timer = None
+        self.active = False
+        self.panel = IMKCandidates.alloc().initWithServer_panelType_(
+            server, kIMKSingleColumnScrollingCandidatePanel)
+        return self
+
+    def activateServer_(self, sender):
+        self.active = True
+        if self.worker is None:
+            self.worker = Suggestions()
+        if self.timer is None:
+            self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                0.04, self, "pollSuggestions:", None, True)
+
+    def deactivateServer_(self, sender):
+        self.finish(self.client())
+        self.stop()
+
+    def inputControllerWillClose(self):
+        self.stop()
+
+    @objc.python_method
+    def stop(self):
+        self.active = False
+        if self.timer is not None:
+            self.timer.invalidate()
+            self.timer = None
+        if self.worker is not None:
+            self.worker.close()
+            self.worker = None
+        self.state.change("")
+        self.panel.hide()
+
+    def recognizedEvents_(self, sender):
+        return NSEventMaskKeyDown
+
+    @objc.signature(b"v@:@")
+    def pollSuggestions_(self, timer):
+        if not self.active or self.worker is None:
+            return
+        result = self.worker.poll()
+        if result:
+            revision, data = result
+            if "text" in data and self.state.offer(revision, data["text"]):
+                self.panel.updateCandidates()
+                self.panel.show(kIMKLocateCandidatesBelowHint)
+
+    def candidates_(self, sender):
+        return [self.state.candidate] if self.state.candidate else []
+
+    def candidateSelected_(self, candidate):
+        if self.active and self.state.candidate and str(candidate) == self.state.candidate:
+            self.finish(self.client(), suggested=True)
+
+    @objc.python_method
+    def changed(self, client):
+        if self.worker is not None:
+            self.worker.schedule(self.state.revision, self.state.text)
+        self.panel.hide()
+        # Cocoa ranges count UTF-16 code units, rather than Python code points.
+        length = len(self.state.text.encode("utf-16-le")) // 2
+        client.setMarkedText_selectionRange_replacementRange_(
+            self.state.text, (length, 0), (NSNotFound, 0))
+
+    @objc.python_method
+    def finish(self, client, suggested=False):
+        text = self.state.commit(suggested)
+        if self.worker is not None:
+            self.worker.schedule(self.state.revision, "")
+        self.panel.hide()
+        if text and client is not None:
+            # Inserting replaces the client's existing marked text.
+            client.insertText_replacementRange_(text, (NSNotFound, 0))
+
+    def commitComposition_(self, sender):
+        self.finish(self.client())
+
+    def handleEvent_client_(self, event, client):
+        if not self.active or event.type() != NSEventTypeKeyDown:
+            return False
+        flags = event.modifierFlags()
+        if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption):
+            self.finish(client)
+            return False
+        self.pollSuggestions_(None)
+        key = event.keyCode()
+        if key == 97 and self.state.text:  # F6
+            if self.state.candidate:
+                self.panel.updateCandidates()
+                self.panel.show(kIMKLocateCandidatesBelowHint)
+            return True
+        if key in (36, 76, 48, 53):  # Return, keypad Enter, Tab, Escape
+            if not self.state.text:
+                return False
+            if key == 48 and not self.state.candidate:
+                return True
+            self.finish(client, suggested=key == 48)
+            return True
+        if key == 51:  # Backspace
+            if not self.state.text:
+                return False
+            self.state.backspace()
+            self.changed(client)
+            return True
+        text = event.characters() or ""
+        # Navigation keys use private-use characters, which must not enter the draft.
+        if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not text or not text.isprintable():
+            self.finish(client)
+            return False
+        for char in text:
+            if not self.state.insert(char):
+                self.finish(client)
+                self.state.insert(char)
+        self.changed(client)
+        return True

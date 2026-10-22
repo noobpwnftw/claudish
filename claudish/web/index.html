@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Try cd_AI: a local language model that turns your typing into Claudish.">
+  <title>cd_AI — The Claudish typing room</title>
+  <link rel="icon" href="/favicon.ico">
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/demo.css">
+  <script src="/demo.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="wordmark" href="/" aria-label="Claudish home">cd<span class="dash">—</span><span class="ai">AI</span></a>
+      <span class="edition">THE CLAUDISH TYPING ROOM <span> / </span> EXPERIMENT 001</span>
+      <div class="header-controls">
+        <span class="connection" id="connection" role="status"><i></i> Connecting</span>
+        <label class="theme-picker"><span aria-hidden="true">◐</span><select id="theme-picker" aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="title">
+        <div>
+          <div class="eyebrow"><span class="tag">en_US → cd_AI</span> A NEW DIALECT OF YOUR KEYBOARD</div>
+          <h1 id="title">A little more thought.<br>A lot more <em>dash.</em></h1>
+          <p class="lede">Your words, with a certain… verbosity. Type something ordinary.<br class="desktop-break"> Let a tiny local model make it unmistakably Claudish.</p>
+        </div>
+        <div class="locale-card" aria-hidden="true"><span>INPUT LANGUAGE</span><strong>cd_AI</strong><div>English, thoughtfully reconsidered.</div><b>—</b></div>
+      </section>
+
+      <section class="workspace" aria-label="Try the input method">
+        <div class="workspace-bar">
+          <div class="room-title"><span class="live-dot"></span> THE COMPOSITION DESK</div>
+          <label class="toggle"><input id="dash-toggle" type="checkbox" checked><span>Em dashes by default</span></label>
+        </div>
+        <div class="editors">
+          <div class="draft-pane">
+            <div class="pane-heading"><label for="draft"><span class="step">01</span> YOUR WORDS</label><span id="count">0 / 512</span></div>
+            <textarea id="draft" maxlength="512" spellcheck="false" placeholder="We should use a smaller model." aria-describedby="draft-help"></textarea>
+            <div class="draft-bottom"><span id="draft-help">A thought, a sentence, a perfectly normal email.</span><button id="rewrite" class="text-button" type="button">Rewrite <span>↗</span></button></div>
+          </div>
+          <div class="candidate-pane">
+            <div class="pane-heading"><span><span class="step">02</span> THE CLAUDISH EDIT</span><span class="candidate-state" id="candidate-state" role="status">AWAITING A THOUGHT</span></div>
+            <div class="candidate-body"><p class="candidate placeholder" id="candidate">A nuanced perspective is<br>just a keystroke away.</p></div>
+            <div class="candidate-bottom"><span id="timing">LOCAL MODEL · NO CLOUD REQUIRED</span><button id="accept" class="accept-button" type="button" disabled>Accept rewrite <kbd>Tab</kbd></button></div>
+          </div>
+        </div>
+        <div class="desk-footer"><span><kbd>Tab</kbd> accept <span class="separator">/</span> <kbd>Enter</kbd> keep your wording <span class="separator">/</span> <kbd>Shift ↵</kbd> new line</span><button id="keep" class="text-button" type="button" disabled>Keep my wording →</button></div>
+      </section>
+
+      <div class="samples" aria-label="Example phrases"><span>NEED A FIRST THOUGHT?</span><button type="button" data-sample="This is very important.">This is very important. ↗</button><button type="button" data-sample="Let's explore the options.">Let's explore the options. ↗</button><button type="button" data-sample="We should use a smaller model.">We should use a smaller model. ↗</button></div>
+
+      <section class="output-section" aria-labelledby="output-title">
+        <div class="output-header"><div><div class="eyebrow">03 / COMMITTED TEXT</div><h2 id="output-title">The final word<span class="dash">—</span>yours.</h2></div><div class="output-actions"><button id="clear" class="text-button" type="button" disabled>Clear</button><button id="copy" class="copy-button" type="button" disabled>Copy text <span>⧉</span></button></div></div>
+        <textarea id="output" readonly aria-label="Committed text" placeholder="Accepted rewrites and original thoughts land here. Nothing is saved after you leave."></textarea>
+        <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <footer class="page-footer"><span>A deeply unserious input method. Actual local inference.</span><span id="backend">cd_AI · LOCAL EXPERIMENT</span></footer>
+  </div>
+</body>
+</html>
