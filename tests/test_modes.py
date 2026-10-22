@@ -28,11 +28,11 @@ class ModeTests(unittest.TestCase):
 
     def test_continue_never_offers_its_examples_or_what_is_already_there(self):
         examples = modes.defaults()["continue"]["examples"]
-        done = "Thanks for the quick review on the parser change—much appreciated. "
-        self.assertTrue(modes.parroted("continue", done, done + "the parser change—much appreciated.", examples))
+        done = "Sorry for the slow reply on the budget—this week got away from me. "
+        self.assertTrue(modes.parroted("continue", done, done + "the budget—this week got away from me.", examples))
         self.assertTrue(modes.parroted("continue", done, done + "I hope this finds you well—a quick update on the release.", examples))
         self.assertFalse(modes.parroted("continue", done, done + "Let's merge it today.", examples))
-        self.assertFalse(modes.parroted("rewrite", "x", "x the parser change—much appreciated.", examples))
+        self.assertFalse(modes.parroted("rewrite", "x", "x the budget—this week got away from me.", examples))
 
     def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
         rewriter = Rewriter(max_tokens=64)

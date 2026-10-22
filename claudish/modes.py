@@ -9,8 +9,10 @@ CONTINUE_SYSTEM = (
 # ("hello" -> "Hello! How can I assist you today?") instead of continuing it as the writer.
 CONTINUE_FRAME = 'Text so far: "{text}"\nThe next few words:'
 CONTINUE_EXAMPLES = [
-    {"role": "user", "content": CONTINUE_FRAME.replace("{text}", "Thanks for the quick review on")},
-    {"role": "assistant", "content": "the parser change—much appreciated."},
+    # Not the demo's continue sample: a sample equal to an example gets the example's answer back,
+    # which parroted() rightly drops, so the demo would show nothing.
+    {"role": "user", "content": CONTINUE_FRAME.replace("{text}", "Sorry for the slow reply on")},
+    {"role": "assistant", "content": "the budget—this week got away from me."},
     {"role": "user", "content": CONTINUE_FRAME.replace("{text}", "Hello everyone, ")},
     {"role": "assistant", "content": "I hope this finds you well—a quick update on the release."},
 ]

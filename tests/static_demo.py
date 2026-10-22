@@ -43,12 +43,13 @@ async def check(url, executable, screenshots=None):
         committed, window, keys = page.locator("#page"), page.locator("#candidates"), page.keyboard
         await page.locator("#editor").click()
         await keys.press("F7")  # the demo opens in rewrite; continue: keys straight in, the rest waits in grey
-        await keys.type("Thanks for the review ", delay=20)
+        sample = "Thanks for the quick review on "  # the demo's own continue sample (demo.js SAMPLES)
+        await keys.type(sample, delay=20)
         await expect(page.locator("#ghost")).not_to_be_empty(timeout=60000)
         assert "in this browser" in await page.locator("#timing").text_content()
         ghost = await page.locator("#ghost").text_content()
         await keys.press("Tab")
-        await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost)
+        await expect(committed).to_have_attribute("data-text", sample + ghost)
         # The owner's sequence: take, space, take, space. The template's example answers are never offered.
         from claudish import modes
         examples = {m["content"] for m in modes.defaults()["continue"]["examples"] if m["role"] == "assistant"}
