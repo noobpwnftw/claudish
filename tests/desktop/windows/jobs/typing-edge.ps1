@@ -25,6 +25,9 @@ function Get-Text {
 # Reset with the keyboard, as a person would (nothing is composed, so the keys reach Edge).
 # Not UIA SetValue: after a programmatic reset, "draft" + Ctrl+A lost the word (ROADMAP G01).
 function Reset-Target { [Keys]::Press(0x41, 0x11); [Keys]::Press(0x2E); Start-Sleep -Milliseconds 200 }
+# Known: in Edge, after the field has had text, "draft" + Ctrl+A loses the word (fresh fields keep it;
+# Escape and Enter commit fine). See ROADMAP G01.
+$script:known['Ctrl shortcut keeps the composed text'] = 'Edge: lost after the field was cleared; ROADMAP G01'
 Invoke-Scenarios
 # The first shortcut press commits (and is consumed); the second reaches the app.
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300

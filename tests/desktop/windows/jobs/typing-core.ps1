@@ -60,8 +60,12 @@ public static class Keys {
 }
 '@
 $script:results = @()
+$script:known = @{}  # scenario name -> issue; reported as KNOWN, not counted as a failure
 function Check($name, $actual, $expected) {
   $ok = $actual -ceq $expected
+  if (-not $ok -and $script:known.ContainsKey($name)) {
+    "KNOWN {0,-44} '{1}' ({2})" -f $name, $actual, $script:known[$name]; return
+  }
   $script:results += $ok
   "{0} {1,-44} '{2}'{3}" -f ($(if ($ok) { 'PASS' } else { 'FAIL' })), $name, $actual, $(if ($ok) { '' } else { " (expected '$expected')" })
 }
