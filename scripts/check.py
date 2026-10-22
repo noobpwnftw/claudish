@@ -111,9 +111,16 @@ def main():
     parser.add_argument("--preset", choices=["tiny", "small"], default="small")
     parser.add_argument("--browser-python", help="Python with Playwright installed")
     parser.add_argument("--chromium", help="Chromium executable for Playwright")
+    parser.add_argument("--extras-python", help='Python with "claudish-ime[claude,mcp]" installed')
     args = parser.parse_args()
 
     run("unit tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests"])
+    # Optional extras (Anthropic and MCP SDKs) are tested only where they are installed.
+    extras = Path(args.extras_python) if args.extras_python else ROOT / ".tools/claude-venv/bin/python"
+    if extras.is_file():
+        run("extras tests", [str(extras), "-m", "unittest", "tests.test_context", "tests.test_backends"])
+    else:
+        skip("extras tests", "no Python with the [claude,mcp] extras (pass --extras-python)")
     run("compileall", [sys.executable, "-m", "compileall", "-q", "claudish", "platforms", "scripts", "tests",
                        "benchmarks"])
     run("git diff --check", ["git", "diff", "--check", "HEAD"])
