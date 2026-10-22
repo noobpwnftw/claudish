@@ -18,12 +18,12 @@ from pathlib import Path
 from .context import Context
 from .model import load_prompt
 
-BACKENDS = ("llama", "openai", "claude", "rules")
+BACKENDS = ("llama", "openai", "claude", "command", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
-            "context": None, "max_context_chars": 6000, "modes": None}
+            "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict}
+         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool}
 
 
 def default_path():
@@ -58,7 +58,7 @@ def resolve(path=None, profile=None, overrides=None):
         if unknown:
             raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
         for key, value in entry.items():
-            if value is not None and (not isinstance(value, TYPES[key]) or isinstance(value, bool)):
+            if value is not None and (not isinstance(value, TYPES[key]) or (isinstance(value, bool) and TYPES[key] is not bool)):
                 raise ValueError("profile %r: %s has the wrong type" % (name, key))
         settings.update(entry)
         base = path.parent
@@ -67,6 +67,11 @@ def resolve(path=None, profile=None, overrides=None):
     settings.update({key: value for key, value in (overrides or {}).items() if value is not None})
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
+    if settings["backend"] == "command":
+        command = settings["command"]
+        if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
+            raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')
+        settings["command"] = [os.path.expanduser(part) for part in command]
     prompt = None
     if settings["prompt"]:
         prompt_path = Path(settings["prompt"]).expanduser()

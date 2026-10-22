@@ -59,7 +59,10 @@ def main():
     if args.command == "fix":
         return fix_command(parser, args)
     if args.command == "serve":
-        overrides = {key: getattr(args, key, None) for key in config.DEFAULTS}  # file-only keys have no flag
+        # Only real flags override the profile; other profile keys (and args.command, the
+        # subcommand's name) must not.
+        flags = ("backend", "claude_model", "model_url", "model", "api_key_env", "timeout", "prompt", "max_tokens")
+        overrides = {key: getattr(args, key) for key in flags}
         try:
             profile, settings, prompt, context = config.resolve(args.config, args.profile, overrides)
         except (OSError, ValueError) as exc:
@@ -72,13 +75,14 @@ def main():
         try:
             rewriter = Rewriter(settings["backend"], settings["model_url"], settings["max_tokens"],
                                 settings["claude_model"], settings["model"], api_key, settings["timeout"], prompt,
-                                context, settings["modes"])
+                                context, settings["modes"], settings["command"], settings["hosted"])
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         rewriter.profile = profile
         server = make_server(rewriter, args.port)
         if rewriter.hosted:
             target = ("the Anthropic API (%s)" % settings["claude_model"] if rewriter.claude
+                      else " ".join(settings["command"]) if settings["backend"] == "command"
                       else settings["model_url"])
             print("Typed text will be sent to %s." % target, flush=True)
         print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (

@@ -46,7 +46,10 @@ class ConfigTests(unittest.TestCase):
                                  ({"modle": "typo"}, "unknown keys modle"),
                                  ({"timeout": "3"}, "timeout has the wrong type"),
                                  ({"timeout": True}, "timeout has the wrong type"),
-                                 ({"backend": "gpt"}, "backend must be one of")]:
+                                 ({"backend": "gpt"}, "backend must be one of"),
+                                 ({"backend": "command"}, "needs \"command\""),
+                                 ({"backend": "command", "command": "claude -p"}, "command has the wrong type"),
+                                 ({"hosted": "no"}, "hosted has the wrong type")]:
             path = self.write({"profiles": {"p": profile}}, "other.json")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)

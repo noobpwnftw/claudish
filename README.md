@@ -130,6 +130,30 @@ Replace the rewrite template with `--prompt FILE` for any backend:
  "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]}
 ```
 
+### An agent CLI as the backend
+
+An agent CLI is a text box and Enter, and an input method is a text box in every
+app. With `"backend": "command"`, the input method becomes that CLI's text box.
+Claudish sends the mode's instructions, the profile's context, and your text on
+stdin; the command's output becomes the candidate, which you accept with Tab:
+
+```json
+{"profiles": {"agent": {"backend": "command", "timeout": 120,
+                        "command": ["claude", "-p", "--output-format", "text"]}}}
+```
+
+Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
+`llm`, or your own script. The command comes only from your config, runs without a
+shell, and never sees your text as arguments. Tool permissions are the CLI's
+own; for example, Claude Code's `--allowedTools` in the command list. Agents are
+slow, so the profile's `timeout` applies (`/health` reports it), and typing is
+never blocked while one works. These profiles are reported as hosted unless
+the profile sets `"hosted": false`.
+
+Measured on the Spark with Claude Code 2.1.306: an instruct request ("thank
+Priya for fixing the flaky CI job, it saved the release") returned a finished,
+em-dashed thank-you note in 4.5 s.
+
 ### Profiles
 
 Instead of passing flags, declare your backends once in

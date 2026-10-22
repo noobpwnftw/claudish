@@ -51,7 +51,8 @@ def make_server(rewriter, port=18765):
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
                                         "hosted": rewriter.hosted,
                                         "profile": getattr(rewriter, "profile", None),
-                                        "modes": list(rewriter.modes)})
+                                        "modes": list(rewriter.modes),
+                                        "timeout": rewriter.timeout})
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):

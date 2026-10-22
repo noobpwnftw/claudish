@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import threading
 import time
 from urllib.parse import urlsplit
@@ -82,7 +83,7 @@ class Rewriter:
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
-                 context=None, modes=None):
+                 context=None, modes=None, command=None, hosted=None):
         from . import modes as invocation
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
@@ -100,6 +101,11 @@ class Rewriter:
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
+        if backend == "command":
+            if not command:
+                raise ValueError('the command backend needs a "command" list in the profile')
+            self.command = command
+            self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
     def rewrite(self, text, before="", after="", mode="rewrite"):
@@ -114,6 +120,22 @@ class Rewriter:
             output = {"rewrite": rules(text), "continue": "and then some—naturally.",
                       "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
             usage = {}
+        elif self.backend == "command":
+            # An agent CLI (claude -p, ollama run, ...): the prompt goes in on stdin, never through a shell.
+            if not self.lock.acquire(blocking=False):
+                raise RuntimeError("the agent is still working; keep typing or retry")
+            try:
+                prompt = system + "\n\nText:\n" + text
+                try:
+                    done = subprocess.run(self.command, input=prompt, capture_output=True, text=True,
+                                          errors="replace", timeout=self.timeout)
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("the agent took longer than %g s" % self.timeout)
+                if done.returncode != 0:
+                    raise RuntimeError("the agent failed (exit %d): %s" % (done.returncode, done.stderr.strip()[-300:]))
+                output, usage = done.stdout.strip(), {}
+            finally:
+                self.lock.release()
         elif self.claude:
             # One request at a time: no backlog of paid requests while typing.
             if not self.lock.acquire(blocking=False):
