@@ -1,6 +1,8 @@
 """Optional browser acceptance test; run against a running Claudish service.
 
-Requires Playwright and Chromium. Does not install or start the model.
+Requires Playwright and Chromium. Does not install or start the model. The demo is an input method,
+drawn: keys go to the editor, and the test reads what was committed, the composition, the grey
+suggestion, and the candidate window, as a person would see them.
 """
 import argparse
 import asyncio
@@ -20,6 +22,13 @@ async def check(args):
         page = await context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
+        committed = page.locator("#committed")
+        window = page.locator("#candidates")
+        keys = page.keyboard
+
+        async def committed_text():
+            return await committed.text_content()
+
         try:
             await page.goto(args.url)
             await expect(page.locator("#connection")).to_contain_text("connected")
@@ -29,31 +38,49 @@ async def check(args):
             flipped = await page.evaluate("() => document.documentElement.dataset.theme")
             assert {first, flipped} == {"light", "dark"}, (first, flipped)
             await page.locator("#theme-toggle").click()
-            await page.get_by_role("button", name="This is very important.").click()
-            await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
-            suggestion = await page.locator("#candidate").inner_text()
-            assert suggestion.strip()
-            print("Real backend:", suggestion, "|", await page.locator("#timing").inner_text())
+
+            # Continue (where cd_AI starts): keys go straight in; a pause after a word offers the rest.
+            await page.locator("#editor").click()
+            await expect(page.locator("#source-mode")).to_have_text("continue")
+            await keys.type("Thanks for the review ", delay=20)
+            await expect(committed).to_have_text("Thanks for the review ")
+            await expect(page.locator("#ghost")).not_to_be_empty(timeout=10000)
+            ghost = await page.locator("#ghost").text_content()
+            print("Real backend, continue:", repr(ghost), "|", await page.locator("#timing").text_content())
             if args.screenshots:
                 args.screenshots.mkdir(parents=True, exist_ok=True)
-                await page.screenshot(path=str(args.screenshots / "desktop.png"), full_page=True)
-            await page.locator("#draft").press("Tab")
-            await expect(page.locator("#output")).to_have_value(suggestion)
-            await expect(page.locator("#draft")).to_have_value("")
-            await page.locator("#draft").press_sequentially("hello-world")
-            await expect(page.locator("#draft")).to_have_value("hello—world")
-            await page.locator("#draft").press("Enter")
-            await expect(page.locator("#output")).to_have_value(suggestion + "\n\nhello—world")
-            await page.locator("#dash-toggle").uncheck()
-            await page.locator("#draft").press_sequentially("a-b")
-            await expect(page.locator("#draft")).to_have_value("a-b")
-            await page.locator("#draft").press("Escape")
-            await page.locator("#copy").click()
-            assert await page.evaluate("() => navigator.clipboard.readText()") == await page.locator("#output").input_value()
-            await page.locator("#clear").click()
-            await expect(page.locator("#output")).to_have_value("")
+                await page.screenshot(path=str(args.screenshots / "continue.png"))
+            await keys.press("Tab")
+            await expect(committed).to_have_text("Thanks for the review " + ghost)
+            await keys.press("Enter")
+            await keys.type("ls -la", delay=20)  # literal: the hyphen stays a hyphen
+            await expect(committed).to_have_text("Thanks for the review " + ghost + "\nls -la")
+            await keys.press("Enter")
 
-            # Deliver an old result after the draft changes; it must never appear.
+            # Rewrite (F7 twice): your words are a composition; the candidate window is under it.
+            await keys.press("F7")
+            await keys.press("F7")
+            await expect(page.locator("#source-mode")).to_have_text("rewrite")
+            before = await committed_text()
+            await keys.type("This is very important.", delay=20)
+            await expect(page.locator("#preedit")).to_have_text("This is very important.")
+            await expect(window).to_be_visible(timeout=10000)
+            rewrite = (await window.locator(".candidate-row").first.text_content()).removeprefix("Tab")
+            print("Real backend, rewrite:", repr(rewrite))
+            if args.screenshots:
+                await page.screenshot(path=str(args.screenshots / "rewrite.png"))
+            await keys.press("Tab")
+            await expect(committed).to_have_text(before + rewrite)
+            await keys.type("hello-world", delay=20)  # in rewrite, the dash is Claudish
+            await expect(page.locator("#preedit")).to_have_text("hello—world")
+            await keys.press("Enter")  # keeps your words
+            await expect(committed).to_have_text(before + rewrite + "hello—world")
+            await page.locator("#copy").click()
+            assert await page.evaluate("() => navigator.clipboard.readText()") == await committed_text()
+            await page.locator("#clear").click()
+            await expect(committed).to_have_text("")
+
+            # A stale answer must never appear: hold the first request, type on, then release it.
             first_started, release = asyncio.Event(), asyncio.Event()
 
             async def controlled(route):
@@ -68,75 +95,77 @@ async def check(args):
             await page.evaluate("""() => {
                 window.candidateUpdates = [];
                 new MutationObserver(() => window.candidateUpdates.push(
-                  document.getElementById('candidate').textContent)).observe(
-                  document.getElementById('candidate'), {childList: true, subtree: true});
+                  document.getElementById('candidates').textContent)).observe(
+                  document.getElementById('candidates'), {childList: true, subtree: true});
             }""")
-            await page.locator("#draft").fill("an earlier thought")
+            await page.locator("#editor").click()
+            await keys.type("an earlier thought", delay=10)
             await asyncio.wait_for(first_started.wait(), timeout=3)
-            await page.locator("#draft").fill("a newer thought")
+            await keys.type(" now", delay=10)
             release.set()
-            await expect(page.locator("#candidate")).to_have_text("Rewrite: a newer thought")
-            updates = await page.evaluate("() => window.candidateUpdates")
-            assert "Rewrite: an earlier thought" not in updates
+            await expect(window).to_contain_text("Rewrite: an earlier thought now")
+            assert not any("Rewrite: an earlier thought" in u and "now" not in u
+                           for u in await page.evaluate("() => window.candidateUpdates"))
             await page.unroute("**/suggest", controlled)
+            await keys.press("Escape")
+            await page.locator("#clear").click()
 
             async def unavailable(route):
                 await route.fulfill(status=503, content_type="application/json",
                                     body=json.dumps({"error": "model unavailable"}))
 
             await page.route("**/suggest", unavailable)
-            await page.locator("#draft").fill("Keep this thought intact.")
-            await expect(page.locator("#feedback")).to_contain_text("model unavailable")
-            await expect(page.locator("#draft")).to_have_value("Keep this thought intact.")
-            await expect(page.locator("#accept")).to_be_disabled()
-            await page.locator("#keep").click()
-            await expect(page.locator("#output")).to_have_value("Keep this thought intact.")
+            await page.locator("#editor").click()
+            await keys.type("Keep this thought intact.", delay=10)
+            await expect(page.locator("#status")).to_contain_text("model unavailable")
+            await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
+            await keys.press("Escape")  # keeps your words
+            await expect(committed).to_have_text("Keep this thought intact.")
             await page.unroute("**/suggest", unavailable)
+            await page.locator("#clear").click()
 
-            # Instruct mode: the typed text is an instruction; the candidate is the draft.
+            # Instruct (rewrite -> continue -> instruct): held until Enter; a digit picks.
             sent = []
             page.on("request", lambda request: sent.append(request.post_data_json)
                     if request.url.endswith("/suggest") else None)
-            await page.locator("#clear").click()
-            await page.get_by_role("radio", name="INSTRUCT").check()
-            await expect(page.locator("#candidate-title")).to_have_text("THE DRAFT")
-            await expect(page.locator("#accept-label")).to_have_text("Accept draft")
-            await expect(page.locator("#samples-label")).to_have_text("TRY AN INSTRUCTION")
-            await expect(page.get_by_role("button", name="write a two-line story about a cat ↗")).to_be_visible()
-            await page.locator("#draft").fill("thank the team for shipping the release")
+            await keys.press("F7")
+            await keys.press("F7")
+            await expect(page.locator("#source-mode")).to_have_text("instruct")
+            await keys.type("thank the team for shipping the release", delay=10)
             await page.wait_for_timeout(600)
             assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
-            await page.locator("#draft").press("Enter")  # Enter sends the instruction.
-            await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
+            await keys.press("Enter")
+            await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             assert any(body and body.get("mode") == "instruct" for body in sent), sent
-            choices = page.locator("#candidate .choice")
-            if await choices.count() > 1:  # several readings: a numbered list; 2 inserts the second
+            choices = window.locator("button.candidate-row")
+            if await choices.count() > 1:
                 if args.screenshots:
-                    await page.screenshot(path=str(args.screenshots / "choices.png"))
+                    await page.screenshot(path=str(args.screenshots / "instruct.png"))
                 count = await choices.count()
-                await expect(page.locator("#candidate-state")).to_have_text("PICK ONE · 1–%d" % count)
-                second = (await choices.nth(1).inner_text()).split(" ", 1)[1]
-                await page.locator("#draft").press("2")
-                await expect(page.locator("#output")).to_have_value(second)
+                second = (await choices.nth(1).text_content())[1:]
+                await keys.press("2")
+                await expect(committed).to_have_text(second)
                 print("instruct offered %d readings; 2 inserted the second" % count)
             else:
-                draft_text = await page.locator("#candidate").inner_text()
-                assert draft_text.strip()
-                await page.locator("#draft").press("Enter")  # The second Enter inserts it.
-                await expect(page.locator("#output")).to_have_value(draft_text)
-            await page.get_by_role("radio", name="REWRITE").check()
-            await expect(page.locator("#candidate-title")).to_have_text("THE CLAUDISH EDIT")
+                draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
+                await keys.press("Enter")
+                await expect(committed).to_have_text(draft)
             await page.locator("#clear").click()
 
+            # A sample types itself, key by key, in its own mode.
+            await page.locator("[data-mode=rewrite]").click()
+            await expect(page.locator("#source-mode")).to_have_text("rewrite")
+            await expect(page.locator("#preedit")).to_have_text("This is very important.", timeout=5000)
+            await expect(window).to_be_visible(timeout=10000)
+
             await page.set_viewport_size({"width": 390, "height": 844})
-            await page.get_by_role("button", name="Let's explore the options.").click()
-            await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
             assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
-            print("Browser acceptance passed: inference, Tab/Enter/Escape, dashes, clipboard, "
-                  "clear, stale responses, service failure, instruct mode, theme toggle, and mobile layout")
+            print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (candidate window, "
+                  "dash, Tab, Enter), clipboard, clear, stale responses, service failure, instruct, samples, "
+                  "theme toggle, and mobile layout")
         finally:
             await browser.close()
 

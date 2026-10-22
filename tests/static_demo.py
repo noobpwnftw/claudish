@@ -40,24 +40,36 @@ async def check(url, executable, screenshots=None):
         await expect(page.locator("#model-strip.ready")).to_be_visible(timeout=120000)
         if screenshots:
             await page.screenshot(path=str(screenshots / "static-ready.png"))
-        await page.locator("#draft").fill("This is very important.")
-        await expect(page.locator("#accept")).to_be_enabled(timeout=60000)
-        rewrite = await page.locator("#candidate").inner_text()
+        committed, window, keys = page.locator("#committed"), page.locator("#candidates"), page.keyboard
+        await page.locator("#editor").click()  # continue: keys straight in, the rest waits in grey
+        await keys.type("Thanks for the review ", delay=20)
+        await expect(page.locator("#ghost")).not_to_be_empty(timeout=60000)
+        assert "in this browser" in await page.locator("#timing").text_content()
+        ghost = await page.locator("#ghost").text_content()
+        await keys.press("Tab")
+        await expect(committed).to_have_text("Thanks for the review " + ghost)
+        await keys.press("Enter")
+        await keys.press("F7")
+        await keys.press("F7")  # rewrite
+        before = await committed.text_content()
+        await keys.type("This is very important.", delay=20)
+        await expect(window).to_be_visible(timeout=60000)
+        rewrite = (await window.locator(".candidate-row").first.text_content()).removeprefix("Tab")
         assert rewrite.strip(), "empty rewrite"
-        assert "IN THIS BROWSER" in await page.locator("#timing").inner_text()
-        await page.locator("#draft").press("Tab")
-        await expect(page.locator("#output")).to_have_value(rewrite)
-        await page.get_by_role("radio", name="INSTRUCT").check()
-        await page.locator("#draft").fill("thank the team for shipping the release")
-        await page.locator("#draft").press("Enter")
-        await expect(page.locator("#accept")).to_be_enabled(timeout=60000)
-        draft = await page.locator("#candidate").inner_text()
-        await page.locator("#draft").press("Enter")
-        await expect(page.locator("#output")).to_have_value(rewrite + "\n\n" + draft)
+        await keys.press("Tab")
+        await expect(committed).to_have_text(before + rewrite)
+        await keys.press("F7")
+        await keys.press("F7")  # instruct
+        await keys.type("thank the team for shipping the release", delay=10)
+        await keys.press("Enter")  # sends
+        await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=60000)
+        draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
+        await keys.press("Enter")  # inserts
+        await expect(committed).to_have_text(before + rewrite + draft)
         assert not any("/suggest" in u or "/health" in u for u in requests), "the static page called a server"
         assert not errors, errors
         await browser.close()
-    print("Static demo passed: isolation, in-browser model, rewrite %r, instruct, no server calls" % rewrite)
+    print("Static demo passed: isolation, in-browser model, continue %r, rewrite %r, instruct, no server calls" % (ghost, rewrite))
 
 
 def main():

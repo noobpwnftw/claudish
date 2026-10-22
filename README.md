@@ -163,14 +163,16 @@ python3 scripts/start.py
 
 ## Browser demo
 
-With the launcher running, open **http://127.0.0.1:18765**. The service includes
-a buildless browser demo: type a phrase, pause for a rewrite, then press **Tab**
-to accept it or **Enter** to keep your wording. Committed text appears below,
-where you can copy or clear it. **Shift+Enter** inserts a line break. Sample
-phrases, an em-dash toggle, and measured response times are included. No input
-method installation is needed to try the demo; it is an in-page simulation.
-The theme picker offers System, Light, and Dark. It follows the system by
-default; manual choices last only for the current page, with no cookies or storage.
+With the launcher running, open **http://127.0.0.1:18765**. The demo is the
+input method, drawn in the page: one editor with an input-source badge, the
+composition at the caret, and a candidate window, following the same rules as the
+desktop adapters. It starts in continue (keys go straight in; pause after a word
+and the rest waits in grey; Tab takes it). F7 or the badge switches to instruct
+(Enter sends; pick a draft with 1–3) and rewrite (Tab takes the rewrite, Enter
+keeps your words). A key strip lights the keys as you use them, and each sample
+types itself in its own mode. No input method installation is needed. The theme
+toggle follows the system by default; a choice lasts only for the current page,
+with no cookies or storage.
 
 The page calls the same local model as the desktop adapters. Nothing is saved
 in browser storage. If your browser runs on a different machine from the Spark,

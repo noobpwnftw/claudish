@@ -33,36 +33,22 @@
 
       <section class="workspace" aria-label="Try the input method">
         <div class="workspace-bar">
-          <div class="room-title"><span class="live-dot"></span> THE COMPOSITION DESK</div>
-          <div class="modes" role="radiogroup" aria-label="What the model does">
-            <label><input type="radio" name="mode" value="rewrite" checked><span>REWRITE</span></label>
-            <label><input type="radio" name="mode" value="continue"><span>CONTINUE</span></label>
-            <label><input type="radio" name="mode" value="instruct"><span>INSTRUCT</span></label>
-          </div>
-          <label class="toggle"><input id="dash-toggle" type="checkbox" checked><span>Em dashes by default</span></label>
+          <div class="room-title"><span class="live-dot"></span> NOTES <span class="room-sub">a text box in any app</span></div>
+          <button id="source" class="source-badge" type="button"><b>cd</b><span id="source-mode">continue</span><span class="source-key">F7</span></button>
         </div>
-        <div class="editors">
-          <div class="draft-pane">
-            <div class="pane-heading"><label for="draft"><span class="step">01</span> YOUR WORDS</label><span id="count">0 / 512</span></div>
-            <textarea id="draft" maxlength="512" spellcheck="false" placeholder="Type something ordinary…" aria-describedby="draft-help" autofocus></textarea>
-            <div class="draft-bottom"><span id="draft-help">A thought, a sentence, a perfectly normal email.</span><button id="rewrite" class="text-button" type="button"><span id="rewrite-label">Rewrite</span> <span>↗</span></button></div>
-          </div>
-          <div class="candidate-pane">
-            <div class="pane-heading"><span><span class="step">02</span> <span id="candidate-title">THE CLAUDISH EDIT</span></span><span class="candidate-state" id="candidate-state" role="status">AWAITING A THOUGHT</span></div>
-            <div class="candidate-body"><p class="candidate placeholder" id="candidate">A nuanced perspective is just a keystroke away.</p></div>
-            <div class="candidate-bottom"><span id="timing">LOCAL&nbsp;MODEL&nbsp;· NO&nbsp;CLOUD&nbsp;REQUIRED</span><button id="accept" class="accept-button" type="button" disabled><span id="accept-label">Accept rewrite</span> <kbd>Tab</kbd></button></div>
-          </div>
+        <div class="editor" id="editor">
+          <div class="page" aria-hidden="true"><span id="committed"></span><span id="preedit" class="preedit"></span><span id="caret" class="caret"></span><span id="ghost" class="ghost"></span><span id="placeholder" class="editor-placeholder">Click here and type. You are typing in cd_AI.</span></div>
+          <textarea id="input" class="sink" aria-label="Type here, in cd_AI" aria-describedby="hint" autocapitalize="off" autocomplete="off" spellcheck="false" autofocus></textarea>
+          <div id="candidates" class="candidate-window" hidden></div>
         </div>
-        <div class="desk-footer"><span><span class="hint"><kbd>Tab</kbd> accept</span> <span class="separator">/</span> <span class="hint"><kbd>Enter</kbd> <span id="enter-hint">keep your wording</span></span> <span class="separator">/</span> <span class="hint"><kbd>Shift ↵</kbd> new line</span></span><button id="keep" class="text-button" type="button" disabled>Keep my wording →</button></div>
+        <div class="desk-footer">
+          <span class="keystrip"><span data-key="F7"><kbd>F7</kbd> mode</span><span data-key="Tab"><kbd>Tab</kbd> take</span><span data-key="Enter"><kbd>Enter</kbd> send / keep</span><span data-key="1"><kbd>1–3</kbd> pick</span><span data-key="Escape"><kbd>Esc</kbd> your words</span></span>
+          <span class="desk-actions"><span id="timing" class="timing"></span><button id="clear" class="text-button" type="button" disabled>Clear</button><button id="copy" class="text-button" type="button" disabled>Copy</button></span>
+        </div>
       </section>
-
-      <div class="samples" id="samples" aria-label="Example phrases"><span id="samples-label">NEED A FIRST THOUGHT?</span><button type="button" data-sample="This is very important.">This is very important. ↗</button><button type="button" data-sample="Let's explore the options.">Let's explore the options. ↗</button><button type="button" data-sample="We should use a smaller model.">We should use a smaller model. ↗</button></div>
-
-      <section class="output-section" aria-labelledby="output-title">
-        <div class="output-header"><div><div class="eyebrow">03 / COMMITTED TEXT</div><h2 id="output-title">The final word<span class="dash">—</span>yours.</h2></div><div class="output-actions"><button id="clear" class="text-button" type="button" disabled>Clear</button><button id="copy" class="copy-button" type="button" disabled>Copy text <span>⧉</span></button></div></div>
-        <textarea id="output" readonly aria-label="Committed text" placeholder="Accepted rewrites and original thoughts land here. Nothing is saved after you leave."></textarea>
-        <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
-      </section>
+      <p class="mode-hint" id="hint"></p>
+      <p class="feedback" id="status" role="status" aria-live="polite"></p>
+      <div class="samples" id="samples" aria-label="Examples that type themselves"><span id="samples-label">TYPE IT FOR ME</span></div>
     </main>
     <footer class="page-footer"><span>A deeply unserious input method. <span id="inference-note">Actual local inference.</span></span><span id="backend">cd_AI · LOCAL EXPERIMENT</span></footer>
   </div>

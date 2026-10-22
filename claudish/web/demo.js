@@ -1,216 +1,343 @@
 "use strict";
+// The demo is an input method, drawn: one editor, a composition at the caret, a candidate window,
+// and the same rules as claudish/composition.py (continue types straight in; rewrite and instruct
+// hold your words until you take something). Typed keys arrive through a hidden textarea, so phone
+// keyboards and the browser's own input methods still work.
 const $ = (id) => document.getElementById(id);
-const draft = $("draft");
-const output = $("output");
-let revision = 0;
-let candidate = "";
-let choices = [];  // several readings of an instruction: 1-3 pick, as in a CJK input method
-let timer;
-let inflight = false;
-let queued = false;
-let composing = false;
-let hosted = false;  // true when the service sends text to a hosted model
-let backend = "";
-let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
-let mode = "rewrite";
-// The static build (scripts/build_static_demo.py) runs the model in this page instead of calling a service.
+const sink = $("input");
+const MAX = 512;
+const MODES = ["continue", "instruct", "rewrite"];  // F7 order, as in every adapter
+const HINTS = {
+  continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey. Tab takes it.",
+  instruct: "Type what you want, then Enter. Pick a draft with 1–3.",
+  rewrite: "Type something ordinary. Tab takes the rewrite; Enter keeps your words.",
+};
+const SAMPLES = [
+  ["continue", "Thanks for the quick review on "],
+  ["instruct", "decline the meeting politely, propose Thursday"],
+  ["rewrite", "This is very important."],
+];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
-const MODES = {
-  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", prompt: "NEED A FIRST THOUGHT?",
-    samples: ["This is very important.", "Let's explore the options.", "We should use a smaller model."], placeholder: "Type something ordinary…"},
-  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", prompt: "START A SENTENCE",
-    samples: ["Thanks for the quick review on", "We should postpone the launch until", "The best part of this release is"], placeholder: "Start a sentence…"},
-  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", prompt: "TRY AN INSTRUCTION",
-    samples: ["decline the meeting politely, propose Thursday", "thank the team for shipping the release", "write a two-line story about a cat"], placeholder: "Type an instruction, then press Enter…"},
+let hosted = false;
+let backend = "";
+let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
+
+const state = {
+  committed: "",     // the app's text: what the input method has committed
+  text: "",          // continue: the model's context (already in the app); else the composition
+  mode: "continue",
+  candidate: "",
+  candidates: [],
+  working: false,
+  failed: false,
+  revision: 0,
 };
+let timer = null;
+let typing = null;  // a sample typing itself
 
-function status(label) { $("candidate-state").textContent = label; }
-function resetCandidate() {
-  candidate = "";
-  choices = [];
-  $("accept").disabled = true;
-  $("candidate").textContent = IN_BROWSER && !browserBackend ? "Run the model above, then type something ordinary."
-    : mode === "instruct"
-    ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction, then press Enter.")
-    : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is just a keystroke away.";
-  $("candidate").classList.add("placeholder");
-  $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL\u00a0MODEL\u00a0· NO\u00a0CLOUD\u00a0REQUIRED";
-  status(!draft.value.trim() ? "AWAITING A THOUGHT" : mode === "instruct" ? "ENTER SENDS" : "COMPOSING");
+function change(text) {
+  state.text = text;
+  state.candidate = "";
+  state.candidates = [];
+  state.working = state.failed = false;
+  state.revision++;
+}
+const live = () => state.mode === "continue";
+const ghost = () => live() && state.candidate.length > state.text.length && state.candidate.startsWith(state.text)
+  ? state.candidate.slice(state.text.length) : "";
+const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
+function automatic() {
+  if (state.mode === "instruct") return false;
+  if (live()) return Boolean(state.text) && !/[\p{L}\p{N}]$/u.test(state.text);  // a word boundary
+  return true;
+}
+function commit(text) {
+  state.committed = (state.committed + text).slice(-20000);
 }
 
-function edited() {
-  revision++;
-  queued = false;
+// What happens after every change: ask the model after a pause, then draw.
+function changed() {
   clearTimeout(timer);
-  $("count").textContent = `${draft.value.length} / 512`;
-  $("keep").disabled = !draft.value.trim();
-  $("feedback").textContent = "";
-  resetCandidate();
-  // Rewrite and continue ask on every pause; an instruction waits for Enter.
-  if (!composing && mode !== "instruct" && draft.value.trim().length >= 3 && (!IN_BROWSER || browserBackend)) {
-    timer = setTimeout(requestSuggestion, 180);
+  if (automatic() && state.text.trim().length >= 3 && (!IN_BROWSER || browserBackend)) {
+    const revision = state.revision;
+    timer = setTimeout(() => ask(revision), 180);
   }
+  render();
 }
 
-async function requestSuggestion() {
-  clearTimeout(timer);
-  if (composing || draft.value.trim().length < 3) return;
-  if (inflight) { queued = true; return; }
-  queued = false;
-  inflight = true;
-  const current = revision;
-  const text = draft.value;
-  const started = performance.now();
+async function ask(revision) {
+  if (revision !== state.revision) return;
+  const text = state.text, mode = state.mode, started = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
-  document.querySelector(".workspace").classList.add("busy");
-  status(hosted ? "THINKING REMOTELY" : "THINKING LOCALLY");
-  $("rewrite").disabled = true;
+  const limit = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
+  setStatus(mode === "instruct" ? (hosted ? "working remotely…" : "working…") : "");
   try {
     let data;
     if (IN_BROWSER) {
-      if (!browserBackend) throw new Error("Load the model first.");
+      if (!browserBackend) throw new Error("Run the model above first.");
       data = await browserBackend.suggest(text, mode);
     } else {
-      const response = await fetch("/suggest", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, mode }), signal: controller.signal,
-      });
+      const response = await fetch("/suggest", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                body: JSON.stringify({text, mode}), signal: controller.signal});
       data = await response.json();
-      if (!response.ok) throw new Error(data.error || "The rewrite could not be completed.");
+      if (!response.ok) throw new Error(data.error || "The model could not answer.");
     }
-    if (current !== revision) return;
-    candidate = data.text;
-    choices = mode === "instruct" && (data.candidates || []).length > 1 ? data.candidates.slice(0, 9) : [];
-    showCandidates();
-    $("candidate").classList.remove("placeholder");
-    $("accept").disabled = false;
+    if (revision !== state.revision) return;  // you typed since: a stale answer never lands
+    state.candidate = data.text;
+    state.candidates = (data.candidates || [data.text]).slice(0, 9);
+    state.working = false;
     const elapsed = Math.round(performance.now() - started);
-    $("timing").textContent = data.backend === "browser" ? `${elapsed} ms IN THIS BROWSER`
-      : `${elapsed} ms ROUND TRIP · ${Math.round(data.elapsed_ms)} ms ${data.backend === "rules" ? "RULES" : "INFERENCE"}`;
-    status(choices.length ? `PICK ONE · 1–${choices.length}` : data.backend === "rules" ? "RULES DEMO · READY" : "A THOUGHTFUL REVISION");
+    $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
+      : `${elapsed} ms · ${data.backend === "rules" ? "rules, no model" : hosted ? "hosted model" : "local model"}`;
+    setStatus("");
   } catch (error) {
-    if (current === revision) {
-      status("YOUR WORDS ARE STILL HERE");
-      $("candidate").textContent = "The rewrite will have to wait.";
-      $("feedback").textContent = error.name === "AbortError"
-        ? "The model took too long. Try a shorter phrase, or keep your wording."
-        : `${error.message} You can still keep your wording.`;
-    }
+    if (revision !== state.revision) return;
+    state.working = false;
+    state.failed = true;
+    setStatus(error.name === "AbortError" ? "The model took too long; your words are still here."
+      : `${error.message} Your words are still here.`);
   } finally {
-    clearTimeout(timeout);
-    inflight = false;
-    $("rewrite").disabled = false;
-    document.querySelector(".workspace").classList.remove("busy");
-    if (queued) { queued = false; requestSuggestion(); }
+    clearTimeout(limit);
+    render();
   }
 }
 
-function showCandidates() {
-  const box = $("candidate");
-  box.replaceChildren();
-  if (!choices.length) { box.textContent = candidate; return; }
-  choices.forEach((choice, index) => {  // nodes, not HTML: the text comes from a model
-    const line = document.createElement("button");
-    line.type = "button";
-    line.className = "choice";
-    const number = document.createElement("kbd");
-    number.textContent = String(index + 1);
-    line.append(number, " ", choice);
-    line.addEventListener("click", () => commit(true, choice));
-    box.append(line);
-  });
+// Keys, as an input method sees them. Returns true when the key was taken.
+function key(name) {
+  flash(name);
+  if (name === "F7") {
+    const enteringLive = state.mode === "rewrite" && state.text;
+    if (enteringLive) commit(state.text);  // continue types into the app: the held words go in
+    const leavingLive = live();
+    state.mode = MODES[(MODES.indexOf(state.mode) + 1) % MODES.length];
+    change(leavingLive ? "" : state.text);
+    showMode();
+    changed();
+    return true;
+  }
+  if (live()) return liveKey(name);
+  if (choosing() && /^[1-9]$/.test(name)) {
+    const picked = state.candidates[Number(name) - 1];
+    if (picked !== undefined) { commit(picked); change(""); changed(); }
+    return true;
+  }
+  if (name === "Enter") {
+    if (!state.text) { commit("\n"); render(); return true; }
+    if (state.mode === "instruct" && !state.candidate) {
+      if (!state.working) { state.working = true; state.failed = false; render(); ask(state.revision); }
+      return true;  // the first Enter sends; the next inserts the result
+    }
+    commit(state.mode === "instruct" ? state.candidate : state.text);
+    change(""); changed();
+    return true;
+  }
+  if (name === "Tab") {
+    if (!state.text) return false;
+    if (state.candidate) { commit(state.candidate); change(""); changed(); }
+    return true;  // rewrite: a pending candidate is not stale text, so Tab waits for it
+  }
+  if (name === "Escape") {
+    if (!state.text) return false;
+    commit(state.text); change(""); changed();
+    return true;
+  }
+  if (name === "Backspace") {
+    if (state.text) { change(state.text.slice(0, -1)); changed(); }
+    else { state.committed = state.committed.slice(0, -1); render(); }
+    return true;
+  }
+  if (name.length === 1) {
+    if (state.text.length >= MAX) { commit(state.text); change(""); }
+    change(state.text + (name === "-" && state.mode === "rewrite" ? "—" : name));
+    changed();
+    return true;
+  }
+  return false;
 }
 
-function commit(useCandidate, chosen) {
-  const text = chosen || (useCandidate ? candidate : draft.value);
-  if (!text.trim()) return;
-  output.value += (output.value ? "\n\n" : "") + text;
-  $("copy").disabled = false;
-  $("clear").disabled = false;
-  draft.value = "";
-  edited();
-  $("feedback").textContent = useCandidate ? "Rewrite committed. Your next thought?" : "Your wording, committed.";
-  draft.focus();
+function liveKey(name) {
+  if (name === "Tab") {
+    const rest = ghost();
+    if (!rest) return false;  // nothing offered: Tab is the app's
+    commit(rest); change((state.text + rest).slice(-MAX)); changed();
+    return true;
+  }
+  if (name === "Escape") {
+    if (!ghost()) return false;
+    state.candidate = ""; state.candidates = []; render();
+    return true;
+  }
+  if (name === "Backspace") {
+    state.committed = state.committed.slice(0, -1);
+    if (state.text) change(state.text.slice(0, -1));
+    changed();
+    return true;
+  }
+  if (name === "Enter") { commit("\n"); change(""); changed(); return true; }
+  if (name.length === 1) {  // exactly the key: continue types like en_US
+    commit(name); change((state.text + name).slice(-MAX)); changed();
+    return true;
+  }
+  return false;
 }
 
-draft.addEventListener("beforeinput", (event) => {
-  if (!composing && !event.isComposing && $("dash-toggle").checked && event.inputType === "insertText" && event.data === "-") {
-    event.preventDefault();
-    if (draft.value.length - (draft.selectionEnd - draft.selectionStart) >= 512) return;
-    draft.setRangeText("—", draft.selectionStart, draft.selectionEnd, "end");
-    edited();
+// Drawing: committed text, the composition (underlined), the suggestion (grey), the caret, and the
+// candidate window under the caret.
+function render() {
+  const composing = !live() && state.text;
+  $("committed").textContent = state.committed;
+  $("preedit").textContent = composing ? state.text : "";
+  $("ghost").textContent = ghost();
+  $("placeholder").hidden = Boolean(state.committed || state.text);
+  const window = $("candidates");
+  window.replaceChildren();
+  const lines = [];
+  if (composing && state.mode === "instruct") {
+    if (state.working) lines.push(["", "working…"]);
+    else if (state.failed) lines.push(["", "the request failed · Enter retries · Esc keeps your words"]);
+    else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
+    else if (state.candidate) lines.push(["Enter", state.candidate]);
+    else lines.push(["", "Enter sends"]);
+  } else if (composing && state.candidate) {
+    lines.push(["Tab", state.candidate]);
+  }
+  window.hidden = !lines.length;
+  for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
+    const row = document.createElement(label && label !== "Enter" && label !== "Tab" ? "button" : "div");
+    row.className = "candidate-row";
+    if (row.tagName === "BUTTON") {
+      row.type = "button";
+      row.addEventListener("mousedown", (event) => { event.preventDefault(); key(label); });
+    }
+    if (label) { const k = document.createElement("kbd"); k.textContent = label; row.append(k); }
+    const span = document.createElement("span");
+    span.textContent = text;
+    row.append(span);
+    window.append(row);
+  }
+  if (lines.length) {
+    const foot = document.createElement("div");
+    foot.className = "candidate-foot";
+    foot.textContent = choosing() ? "1–3 picks · Enter takes the first · Esc keeps your words"
+      : state.mode === "instruct" ? "Esc keeps your words" : "Tab takes it · Enter keeps your words";
+    window.append(foot);
+  }
+  placeCandidateWindow();
+  $("copy").disabled = $("clear").disabled = !state.committed;
+}
+
+function placeCandidateWindow() {
+  const window = $("candidates");
+  const editor = $("editor").getBoundingClientRect();
+  const caret = $("caret").getBoundingClientRect();
+  // As input methods do, the window sits under the start of the composition (or the caret).
+  const start = $("preedit").getClientRects()[0] || caret;
+  const left = Math.max(12, Math.min(start.left - editor.left - 8, editor.width - window.offsetWidth - 12));
+  window.style.left = `${left}px`;
+  window.style.top = `${caret.bottom - editor.top + 8}px`;
+  sink.style.left = `${caret.left - editor.left}px`;  // the browser's own IME window follows the caret too
+  sink.style.top = `${caret.top - editor.top}px`;
+}
+
+function showMode() {
+  $("source-mode").textContent = state.mode;
+  $("source").setAttribute("aria-label", `Input source: cd_AI, ${state.mode}. Press F7 or click to switch.`);
+  $("hint").textContent = HINTS[state.mode];
+}
+function setStatus(text) { $("status").textContent = text; }
+function flash(name) {
+  const strip = document.querySelector(`[data-key="${/^[1-9]$/.test(name) ? "1" : name}"]`);
+  if (!strip) return;
+  strip.classList.add("pressed");
+  setTimeout(() => strip.classList.remove("pressed"), 220);
+}
+
+// Input from the hidden textarea.
+sink.addEventListener("keydown", (event) => {
+  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  const named = ["F7", "Tab", "Enter", "Escape", "Backspace"].includes(event.key)
+    || (choosing() && /^[1-9]$/.test(event.key));
+  if (named) {
+    if (event.key === "Enter" && event.shiftKey) return;
+    stopTyping();
+    if (key(event.key)) event.preventDefault();
   }
 });
-draft.addEventListener("input", edited);
-draft.addEventListener("compositionstart", () => { composing = true; revision++; queued = false; clearTimeout(timer); resetCandidate(); });
-draft.addEventListener("compositionend", () => { composing = false; edited(); });
-draft.addEventListener("keydown", (event) => {
-  if (event.isComposing || composing || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (choices.length && /^[1-9]$/.test(event.key)) {
-    // A list is showing: a digit picks, as in a CJK input method (while typing, digits are text).
+sink.addEventListener("beforeinput", (event) => {
+  if (event.isComposing) return;  // the browser's own IME composes; we take the result
+  if (event.inputType === "insertText" && event.data) {
     event.preventDefault();
-    if (Number(event.key) <= choices.length) commit(true, choices[Number(event.key) - 1]);
+    stopTyping();
+    for (const char of event.data) key(char);
+  } else if (event.inputType === "insertLineBreak" || event.inputType === "insertParagraph") {
+    event.preventDefault(); key("Enter");
+  } else if (event.inputType === "deleteContentBackward") {
+    event.preventDefault(); key("Backspace");
   }
-  else if (event.key === "Tab" && !event.shiftKey && candidate) { event.preventDefault(); commit(true); }
-  else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) {
-    event.preventDefault();
-    if (mode !== "instruct") commit(false);
-    else if (candidate) commit(true);  // The second Enter inserts the result.
-    else if (!inflight) requestSuggestion();  // The first sends the instruction.
-  }
-  else if (event.key === "Escape" && draft.value.trim()) { event.preventDefault(); commit(false); }
 });
-document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", () => {
-  mode = input.value;
-  $("candidate-title").textContent = MODES[mode].title;
-  $("accept-label").textContent = MODES[mode].accept;
-  $("rewrite-label").textContent = MODES[mode].ask;
-  $("enter-hint").textContent = MODES[mode].enter;
-  renderSamples();
-  draft.placeholder = MODES[mode].placeholder;
-  edited();  // The old candidate belonged to another mode; ask again.
-  draft.focus();
-}));
-$("accept").addEventListener("click", () => commit(true));
-$("keep").addEventListener("click", () => commit(false));
-$("rewrite").addEventListener("click", requestSuggestion);
+sink.addEventListener("compositionend", (event) => {
+  for (const char of event.data || "") key(char);
+  sink.value = "";
+});
+$("editor").addEventListener("mousedown", (event) => {
+  if (event.target.closest(".candidate-window")) return;
+  event.preventDefault();
+  sink.focus();
+});
+sink.addEventListener("focus", () => $("editor").classList.add("focused"));
+sink.addEventListener("blur", () => $("editor").classList.remove("focused"));
+$("source").addEventListener("click", () => { key("F7"); sink.focus(); });
+
+// Samples type themselves, key by key, through the same path as your keys.
+function stopTyping() { if (typing) { clearInterval(typing); typing = null; } }
+$("samples").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sample]");
+  if (!button) return;
+  stopTyping();
+  sink.focus();
+  while (state.mode !== button.dataset.mode) key("F7");
+  if (state.text && !live()) { commit(state.text); change(""); }
+  const chars = [...button.dataset.sample];
+  typing = setInterval(() => {
+    if (!chars.length) {
+      stopTyping();
+      if (button.dataset.mode === "instruct") key("Enter");
+      return;
+    }
+    key(chars.shift());
+  }, 45);
+});
 function renderSamples() {
-  $("samples-label").textContent = MODES[mode].prompt;
-  const buttons = MODES[mode].samples.map((sample) => {
+  const buttons = SAMPLES.map(([mode, sample]) => {
     const button = document.createElement("button");
     button.type = "button";
+    button.dataset.mode = mode;
     button.dataset.sample = sample;
-    button.textContent = sample + " ↗";
+    const tag = document.createElement("span");
+    tag.className = "sample-mode";
+    tag.textContent = mode;
+    button.append(tag, " " + sample.trim() + " ↗");
     return button;
   });
   $("samples").replaceChildren($("samples-label"), ...buttons);
 }
-// One listener for every chip: samples change with the mode. Instruct samples wait for Enter.
-$("samples").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-sample]");
-  if (!button) return;
-  draft.value = button.dataset.sample;
-  edited();
-  draft.focus();
-});
 $("copy").addEventListener("click", async () => {
   try {
-    await navigator.clipboard.writeText(output.value);
-    $("feedback").textContent = "Copied to clipboard.";
+    await navigator.clipboard.writeText(state.committed);
+    setStatus("Copied to the clipboard.");
   } catch {
-    output.focus();
-    output.select();
-    $("feedback").textContent = "Text selected. Press Ctrl+C (or Command+C) to copy.";
+    setStatus("The clipboard is not available here.");
   }
 });
 $("clear").addEventListener("click", () => {
-  output.value = "";
-  $("copy").disabled = true;
-  $("clear").disabled = true;
-  $("feedback").textContent = "Committed text cleared.";
+  state.committed = "";
+  change("");
+  changed();
+  setStatus("Cleared.");
+  sink.focus();
 });
+window.addEventListener("resize", placeCandidateWindow);
 
 async function checkConnection() {
   try {
@@ -218,12 +345,9 @@ async function checkConnection() {
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
     serviceTimeout = Number(data.timeout) || 3;
-    if (hosted !== Boolean(data.hosted) || backend !== data.backend) {
-      hosted = Boolean(data.hosted);
-      backend = data.backend;
-      $("inference-note").textContent = hosted ? "Hosted inference, as configured." : "Actual local inference.";
-      if (!candidate) resetCandidate();
-    }
+    hosted = Boolean(data.hosted);
+    backend = data.backend;
+    $("inference-note").textContent = hosted ? "Hosted inference, as configured." : "Actual local inference.";
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"
@@ -253,11 +377,12 @@ async function loadInBrowser() {
     $("model-copy").textContent = "The model is running in this browser. Type below; nothing leaves this page.";
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Model ready in browser"));
     $("connection").className = "connection online";
-    edited();
+    changed();
+    sink.focus();
   } catch (error) {
     strip.classList.remove("loading");
     $("load-model").textContent = "Try loading the model again";
-    $("feedback").textContent = `The model could not start here: ${error.message}`;
+    setStatus(`The model could not start here: ${error.message}`);
   }
 }
 
@@ -273,6 +398,9 @@ if (IN_BROWSER && !self.crossOriginIsolated && "serviceWorker" in navigator) {
   }).catch(() => {});
 }
 
+renderSamples();
+showMode();
+render();
 if (IN_BROWSER) {
   // Nothing is downloaded until the visitor asks; the model is then cached by the browser.
   const model = document.querySelector('meta[name="claudish-model"]')?.content || "A small model";
@@ -290,6 +418,7 @@ if (IN_BROWSER) {
   $("connection").className = "connection";
   $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
   $("backend").textContent = "cd_AI · IN-BROWSER LLM";
+  $("inference-note").textContent = "The model runs in this page.";
 } else {
   checkConnection();
   setInterval(checkConnection, 15000);
