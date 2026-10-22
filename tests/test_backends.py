@@ -97,7 +97,8 @@ class ClaudeBackendTests(unittest.TestCase):
             try:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
                     self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "hosted": hosted,
-                                                       "profile": None, "modes": ["rewrite", "continue", "instruct"]})
+                                                       "profile": None, "modes": ["rewrite", "continue", "instruct"],
+                                                       "timeout": 3})
             finally:
                 server.shutdown()
                 server.server_close()
@@ -154,6 +155,55 @@ class PromptTemplateTests(unittest.TestCase):
         for data in [{"examples": []}, {"system": " "}, {"system": "x", "examples": [["only one"]]}]:
             with self.assertRaises(ValueError):
                 load_prompt(self.write(data))
+
+
+class CommandBackendTests(unittest.TestCase):
+    """An agent CLI as the backend; a small Python script stands in for `claude -p`."""
+
+    def agent(self, script, **options):
+        import sys
+        return Rewriter("command", command=[sys.executable, "-c", script], **options)
+
+    def test_prompt_on_stdin_and_output_as_candidate(self):
+        echo = "import sys; prompt = sys.stdin.read(); print('Drafted—' + prompt.split('Text:\\n')[-1].strip())"
+        rewriter = self.agent(echo)
+        self.assertTrue(rewriter.hosted)
+        result = rewriter.rewrite("say hi; rm -rf ~ $(whoami)", mode="instruct")
+        self.assertEqual(result["text"], "Drafted—say hi; rm -rf ~ $(whoami)")  # data, never a shell or argv
+        dump = self.agent("import sys; print(sys.stdin.read())").rewrite("thanks", mode="instruct")["text"]
+        self.assertTrue(dump.startswith("The user typed an instruction"))  # the mode's template comes first
+        self.assertFalse(self.agent("print('x')", hosted=False).hosted)
+
+    def test_failures_and_timeouts_keep_your_wording(self):
+        with self.assertRaisesRegex(RuntimeError, "exit 3"):
+            self.agent("import sys; sys.stderr.write('no auth'); sys.exit(3)").rewrite("hi")
+        with self.assertRaisesRegex(RuntimeError, "longer than"):
+            self.agent("import time; time.sleep(5)", timeout=0.3).rewrite("hi")
+        with self.assertRaisesRegex(ValueError, "needs a"):
+            Rewriter("command")
+
+
+    def test_serve_cli_keeps_the_profile_command(self):
+        import os
+        import sys
+        import tempfile
+        from claudish import __main__ as cli
+        with tempfile.TemporaryDirectory() as directory:
+            os.makedirs(os.path.join(directory, "claudish"))
+            with open(os.path.join(directory, "claudish", "config.json"), "w") as out:
+                json.dump({"profiles": {"agent": {"backend": "command", "command": [sys.executable, "-c", "print(1)"]}}}, out)
+            built = {}
+
+            def make_server(rewriter, port):
+                built["rewriter"] = rewriter
+                raise SystemExit(0)
+
+            with patch.dict("os.environ", {"XDG_CONFIG_HOME": directory}), \
+                    patch.object(cli, "make_server", make_server), \
+                    patch.object(sys, "argv", ["claudish", "serve"]):
+                with self.assertRaises(SystemExit):
+                    cli.main()
+            self.assertEqual(built["rewriter"].command, [sys.executable, "-c", "print(1)"])
 
 
 if __name__ == "__main__":

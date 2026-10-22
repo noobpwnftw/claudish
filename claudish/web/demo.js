@@ -10,6 +10,7 @@ let queued = false;
 let composing = false;
 let hosted = false;  // true when the service sends text to a hosted model
 let backend = "";
+let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 let mode = "rewrite";
 const MODES = {
   rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", placeholder: "We should use a smaller model."},
@@ -50,7 +51,7 @@ async function requestSuggestion() {
   const text = draft.value;
   const started = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), hosted ? 15000 : 5000);
+  const timeout = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
   document.querySelector(".workspace").classList.add("busy");
   status(hosted ? "THINKING REMOTELY" : "THINKING LOCALLY");
   $("rewrite").disabled = true;
@@ -154,6 +155,7 @@ async function checkConnection() {
     const response = await fetch("/health", { signal: AbortSignal.timeout(3000) });
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
+    serviceTimeout = Number(data.timeout) || 3;
     if (hosted !== Boolean(data.hosted) || backend !== data.backend) {
       hosted = Boolean(data.hosted);
       backend = data.backend;
@@ -163,7 +165,8 @@ async function checkConnection() {
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"
-        : data.backend === "claude" ? "Claude API connected" : hosted ? "Remote model connected" : "Local service connected"));
+        : data.backend === "claude" ? "Claude API connected" : data.backend === "command" ? "Agent command connected"
+        : hosted ? "Remote model connected" : "Local service connected"));
     $("backend").textContent = data.backend === "rules" ? "RULES MODE · NO MODEL"
       : data.backend === "claude" ? "cd_AI · CLAUDE API" : hosted ? "cd_AI · REMOTE MODEL" : "cd_AI · LOCAL LLM";
   } catch {

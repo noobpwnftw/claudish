@@ -5,8 +5,9 @@ import time
 from urllib.request import Request, build_opener, ProxyHandler
 
 
-# Runs on the background worker, never on an input event, so a hosted backend may take longer.
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=12, mode="rewrite"):
+# Runs on the background worker, never on an input event. The service enforces each backend's
+# own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
+def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite"):
     request = Request(endpoint + "/suggest", data=json.dumps({"text": text, "mode": mode}).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
     # Local typing must not be routed through HTTP_PROXY.
