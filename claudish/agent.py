@@ -4,7 +4,9 @@ The profile's "session_command" starts it, for example:
   ["claude", "--print", "--input-format", "stream-json", "--output-format", "stream-json",
    "--verbose", "--include-partial-messages", "--permission-prompts", "host"]
 Claudish is the host: each permission request becomes a question in the candidate list, and the
-answer goes back on stdin. Message shapes follow the Agent SDK's control protocol
+answer goes back on stdin. One agent process lives per conversation (docs/design/instruct.md), so
+follow-up instructions continue the same agent session; a process that ended is resumed by its
+session id. Message shapes follow the Agent SDK's control protocol
 (claude_agent_sdk/_internal/query.py): control_request can_use_tool -> control_response.
 """
 import json
@@ -12,6 +14,7 @@ import os
 import subprocess
 import threading
 import time
+import uuid
 
 PARTIAL_EVERY = 0.15  # seconds between partial-draft events
 
@@ -25,18 +28,42 @@ def summarize(tool, arguments):
     return tool
 
 
-class ClaudeCodeDriver:
-    def __init__(self, command, timeout=300):
+class AgentProcess:
+    """One agent process for a conversation: started once, given each turn as a user message."""
+
+    def __init__(self, command):
         self.command = list(command)
-        self.timeout = timeout
+        self.session_id = str(uuid.uuid4())
+        self.started = False  # once started, a restart resumes the same agent session
         self.process = None
         self.write_lock = threading.Lock()
-        self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
+        self.turn_lock = threading.Lock()
+        self.turns = 0  # turns started; with running, tells an interrupted turn from the next one
+        self.running = False
         self.counter = 0
+        self.stderr = []
+
+    def alive(self):
+        return self.process is not None and self.process.poll() is None
+
+    def ensure(self):
+        if self.alive():
+            return
+        self.close()  # an agent that exited: its pipes go before it is resumed
+        session = []
+        if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):
+            session = ["--resume", self.session_id] if self.started else ["--session-id", self.session_id]
+        self.process = subprocess.Popen(self.command + session, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                                        bufsize=1)
+        self.started = True
+        self.stderr = []
+        threading.Thread(target=lambda process=self.process: self.stderr.extend(process.stderr), daemon=True).start()
+        self.request({"subtype": "initialize", "hooks": None})
 
     def send(self, message):
         with self.write_lock:
-            if self.process and self.process.poll() is None:
+            if self.alive():
                 try:
                     self.process.stdin.write(json.dumps(message) + "\n")
                     self.process.stdin.flush()
@@ -48,20 +75,81 @@ class ClaudeCodeDriver:
         self.send({"type": "control_request", "request_id": "req_%d_%s" % (self.counter, os.urandom(4).hex()),
                    "request": body})
 
+    def interrupt(self):
+        """Stop the current turn but keep the agent (and its session); kill it if it does not stop."""
+        if not self.alive():
+            return
+        self.request({"subtype": "interrupt"})
+        process, turn = self.process, self.turns
+
+        def kill_if_stuck():
+            if self.running and self.turns == turn and process.poll() is None:
+                process.kill()
+        timer = threading.Timer(5, kill_if_stuck)
+        timer.daemon = True
+        timer.start()
+
+    def close(self):
+        process, self.process = self.process, None
+        if process is None:
+            return
+        try:
+            process.stdin.close()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
+
+
+class ClaudeCodeDriver:
+    """One turn: the conversation's agent process, its events, and its permission questions."""
+
+    def __init__(self, command, timeout=300, agent=None):
+        self.agent = agent or AgentProcess(command)
+        self.own = agent is None  # a process of its own (no conversation): closed after the turn
+        self.timeout = timeout
+        self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
+        self.cancelled = False
+        self.ran = None  # the process this turn ran in
+
+    @property
+    def process(self):
+        return self.agent.process or self.ran
+
+    def send(self, message):
+        self.agent.send(message)
+
     def run(self, session, prompt):
-        self.process = subprocess.Popen(self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                        bufsize=1)
+        with self.agent.turn_lock:
+            if self.cancelled:  # Esc while an earlier turn of this conversation still ran
+                return
+            self.agent.ensure()
+            self.agent.turns += 1
+            self.agent.running = True
+            try:
+                self.turn(session, prompt)
+            finally:
+                self.agent.running = False
+        if self.own:
+            self.agent.close()
+
+    def turn(self, session, prompt):
         timer = threading.Timer(self.timeout, self.cancel)
         timer.daemon = True
         timer.start()
-        stderr = []
-        threading.Thread(target=lambda: stderr.extend(self.process.stderr), daemon=True).start()
-        self.request({"subtype": "initialize", "hooks": None})
         self.send({"type": "user", "message": {"role": "user", "content": prompt}, "parent_tool_use_id": None})
         draft, last = "", 0.0
+        process = self.ran = self.agent.process
         try:
-            for line in self.process.stdout:
+            for line in process.stdout:
                 try:
                     message = json.loads(line)
                 except ValueError:
@@ -87,16 +175,17 @@ class ClaudeCodeDriver:
                             session.emit("progress", text=summarize(block.get("name", "tool"), block.get("input")))
                 elif kind == "result":
                     text = (message.get("result") or "").strip()
-                    if message.get("subtype") == "success" and text and not message.get("is_error"):
+                    if self.cancelled:
+                        pass  # Esc already ended the session; the agent stopped its turn
+                    elif message.get("subtype") == "success" and text and not message.get("is_error"):
                         session.emit("result", text=text)
                     else:
                         session.emit("error", text=text or "the agent stopped: %s" % message.get("subtype"))
-                    break
+                    return
         finally:
             timer.cancel()
-            self.close()
-        if not session.done:
-            tail = "".join(stderr).strip()[-300:]
+        if not session.done and not self.cancelled:  # the process ended mid-turn; the next turn resumes it
+            tail = "".join(self.agent.stderr).strip()[-300:]
             session.emit("error", text="the agent exited without a result" + (": " + tail if tail else ""))
 
     def question(self, session, message):
@@ -125,21 +214,13 @@ class ClaudeCodeDriver:
         self.send({"type": "control_response", "response": {
             "subtype": "success", "request_id": question, "response": decision}})
 
-    def close(self):
-        process = self.process
-        if process is None:
-            return
-        try:
-            process.stdin.close()
-        except OSError:
-            pass
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-
     def cancel(self):
-        process = self.process
-        if process is not None and process.poll() is None:
-            process.kill()
+        self.cancelled = True
+        for question in list(self.pending):  # a waiting permission request is denied
+            self.answer(question, 1)
+        if self.own:
+            process = self.agent.process
+            if process is not None and process.poll() is None:
+                process.kill()
+        else:
+            self.agent.interrupt()  # the conversation keeps its agent

@@ -24,6 +24,7 @@ class Session:
         self.events = []
         self.questions = {}  # open question id -> number of choices
         self.done = False
+        self.cancelled = False
         self.finished_at = None
 
     def emit(self, kind, **fields):
@@ -59,6 +60,7 @@ class Session:
         self.driver.answer(question, choice, text)
 
     def cancel(self):
+        self.cancelled = True  # before the driver stops, so its end reads as cancelled
         self.driver.cancel()
         self.emit("error", text="cancelled")
 
@@ -88,7 +90,7 @@ class Sessions:
         except Exception as exc:  # a driver failure ends the session with an error event
             session.emit("error", text=str(exc) or type(exc).__name__)
         if not session.done:
-            session.emit("error", text="the agent stopped without a result")
+            session.emit("error", text="cancelled" if session.cancelled else "the agent stopped without a result")
 
     def get(self, key):
         with self.lock:

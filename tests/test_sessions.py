@@ -24,6 +24,7 @@ class ServiceTests(unittest.TestCase):
         thread = threading.Thread(target=self.server.serve_forever)
         thread.start()
         self.addCleanup(thread.join)
+        self.addCleanup(self.rewriter.conversations.close)
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
         self.opener = build_opener(ProxyHandler({}))
@@ -84,6 +85,43 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.call("/sessions/%s/cancel" % data["id"], {})[0], 200)
         self.assertEqual(self.until(data["id"], "error")["text"], "cancelled")
         session.driver.process.wait(timeout=5)  # killed, not left running
+
+    def turn(self, text, conversation="box"):
+        _, data = self.call("/sessions", {"text": text, "conversation": conversation})
+        return data["id"]
+
+    def test_a_conversation_keeps_its_agent_between_turns(self):
+        first = self.until(self.turn("count"), "result")["text"]
+        self.assertRegex(first, r"^turn 1 of this process \(--session-id [0-9a-f-]{36}\)$")
+        self.assertEqual(self.until(self.turn("count"), "result")["text"], first.replace("turn 1", "turn 2"))
+        self.assertTrue(self.until(self.turn("count", "other"), "result")["text"].startswith("turn 1 "))
+        agent = self.rewriter.conversations.get("box").agent
+        process = agent.process
+        self.assertEqual(self.call("/conversations/box/end", {})[0], 200)
+        process.wait(timeout=5)  # the conversation ended: its agent exits
+        self.assertIsNone(self.rewriter.conversations.get("box").agent)
+
+    def test_esc_interrupts_the_turn_and_keeps_the_agent(self):
+        session = self.turn("slow task")
+        agent = None
+        for _ in range(50):
+            agent = self.rewriter.conversations.get("box").agent
+            if agent is not None and agent.running:
+                break
+            time.sleep(0.05)
+        process = agent.process
+        self.assertEqual(self.call("/sessions/%s/cancel" % session, {})[0], 200)
+        self.assertEqual(self.until(session, "error")["text"], "cancelled")
+        self.assertRegex(self.until(self.turn("count"), "result")["text"], r"^turn 2 ")
+        self.assertIs(agent.process, process)
+
+    def test_an_agent_that_exited_is_resumed_by_session_id(self):
+        self.until(self.turn("count"), "result")
+        agent = self.rewriter.conversations.get("box").agent
+        agent.process.kill()
+        agent.process.wait()
+        text = self.until(self.turn("count"), "result")["text"]
+        self.assertEqual(text, "turn 1 of this process (--resume %s)" % agent.session_id)
 
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)

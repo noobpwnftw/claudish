@@ -147,6 +147,7 @@ def main():
             pass
         finally:
             server.server_close()
+            rewriter.conversations.close()
     elif args.command == "rewrite":
         print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
     else:

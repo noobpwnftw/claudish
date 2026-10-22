@@ -162,7 +162,9 @@ the cost of the last turn only.
    kept turns, the window around the caret each turn, idle timeout), with
    the model driver as its first driver: progress for each tool call, and the
    policy with write tools asking through the candidate list. The agent driver
-   moves to one process per conversation.
+   keeps one process per conversation: Esc interrupts a turn rather than killing
+   the agent, an exited agent is resumed by session id, and the agent exits with
+   its conversation.
 2. Readings after tools.
 3. Claude's tool loop (needs credentials to verify).
 4. Streaming the final turn as a partial draft.

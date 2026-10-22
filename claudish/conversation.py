@@ -19,7 +19,13 @@ class Conversation:
         self.key = key
         self.messages = []  # earlier turns: user, assistant (with tool calls), tool results
         self.approved = set()  # (server, tool) allowed for this conversation
+        self.agent = None  # the agent process, when the profile uses one (session_command)
         self.used = time.monotonic()
+
+    def close(self):
+        if self.agent is not None:
+            self.agent.close()
+            self.agent = None
 
     def remember(self, messages):
         self.messages = (self.messages + messages)[-KEPT_MESSAGES:]
@@ -37,7 +43,7 @@ class Conversations:
         with self.lock:
             now = time.monotonic()
             for old in [k for k, c in self.items.items() if now - c.used > IDLE_SECONDS]:
-                del self.items[old]
+                self.items.pop(old).close()
             if not key:
                 return Conversation(None)
             conversation = self.items.get(key) or Conversation(key)
@@ -47,7 +53,16 @@ class Conversations:
 
     def end(self, key):
         with self.lock:
-            self.items.pop(key, None)
+            conversation = self.items.pop(key, None)
+        if conversation is not None:
+            conversation.close()
+
+    def close(self):
+        """The service stops: every conversation's agent exits."""
+        with self.lock:
+            items, self.items = list(self.items.values()), {}
+        for conversation in items:
+            conversation.close()
 
 
 def window(before, after):

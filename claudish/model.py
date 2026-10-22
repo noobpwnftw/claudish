@@ -170,8 +170,12 @@ class Rewriter:
         """The driver for an instruction: the profile's agent (session_command), else the model
         driver, which runs it as a turn in the text box's conversation."""
         if self.session_command:
-            from .agent import ClaudeCodeDriver
-            return ClaudeCodeDriver(self.session_command)
+            from .agent import AgentProcess, ClaudeCodeDriver
+            if not conversation:
+                return ClaudeCodeDriver(self.session_command)  # a process for this turn only
+            kept = self.conversations.get(conversation)
+            kept.agent = kept.agent or AgentProcess(self.session_command)
+            return ClaudeCodeDriver(self.session_command, agent=kept.agent)
         from .conversation import ModelDriver
         return ModelDriver(self, self.conversations.get(conversation), app, before, after, look)
 

@@ -253,6 +253,13 @@ candidate like any other. For Claude Code:
   your choice unless your own Claude Code settings already allow it.
 - **Esc** at any point stops the agent and keeps your words. Editing the
   instruction stops it too.
+- **Follow-ups continue the same agent.** Each text box has its own agent
+  process, started at the first instruction and kept between them, so "now
+  shorten it" or "and the other branch?" builds on the files it read, its plan,
+  and its tool results. Esc interrupts the turn but keeps the agent. If the
+  process exits, the next instruction resumes its session (`--resume`). The agent
+  exits when the text box goes away, after 30 idle minutes, or when the service
+  stops. Claudish adds `--session-id` itself; leave it out of `session_command`.
 - The agent runs with your Claude Code login, settings, and working directory
   (the service's), and its usage counts as yours. A session is limited to five
   minutes and four at a time.
