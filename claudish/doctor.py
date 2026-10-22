@@ -198,13 +198,25 @@ def run():
 MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "-"}
 
 
+def marks():
+    """Symbols where the console can show them; ASCII on, for example, a cp1252 Windows console."""
+    try:
+        "".join(MARKS.values()).encode(sys.stdout.encoding or "ascii")
+        return MARKS
+    except (UnicodeEncodeError, LookupError):
+        return {"ok": "[ok]", "warn": "[!]", "fail": "[x]", "skip": "[-]"}
+
+
 def main(as_json=False):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")  # a diagnostic tool must never die on its own output
+    symbols = marks()
     results = run()
     if as_json:
         print(json.dumps([{"check": n, "status": s, "detail": d, "fix": f} for n, s, d, f in results], indent=1))
     else:
         for name, status, detail, fix in results:
-            print("%s %-18s %s" % (MARKS[status], name, detail))
+            print("%s %-18s %s" % (symbols[status], name, detail))
             if fix and status in ("fail", "warn"):
                 print("  %-18s fix: %s" % ("", fix))
     return 1 if any(status == "fail" for _, status, _, _ in results) else 0
