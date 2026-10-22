@@ -23,9 +23,8 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   verified with Qwen2.5-VL-3B (models/, with its mmproj) on the Spark.
 - G27 first slice done: instruct offers up to 3 readings, 1-9 pick (all adapters, demo).
 - G17 second step done: profile "tools" (read-only MCP tools in a bounded loop, OpenAI-compatible).
-- claudish.io: bought by the owner; DNS not resolving yet (no NS on 2026-10-23). When it does:
-  set the Pages custom domain, wait for HTTPS, switch README and repo homepage. Not before:
-  a custom domain redirects the github.io home page.
+- claudish.io (owner's domain, name.com DNS): the Pages custom domain since 2026-10-23,
+  HTTPS enforced, www and the old github.io URL redirect; verified isolated in Chromium.
 - Next: G18 (agent sessions at the caret; approval of side-effecting tools as
   candidate choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
@@ -33,7 +32,7 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
   jobs/deploy.ps1 40`, `vm.sh run jobs/typing.ps1 90`. `vmscreen.sh OUT.png
   ['sendkey …']` gives a screenshot in about 1 s; `vmkeys.py` types exact text.
-- Home page: https://noobpwnftw.github.io/claudish/ is the static demo (the model runs in the
+- Home page: https://claudish.io is the static demo (the model runs in the
   visitor's browser via wllama; coi-sw.js supplies isolation; about 1.4 s per rewrite live). It
   is deployed by .github/workflows/pages.yml on every push to main, and it is the repository
   homepage (owner-approved). Next: G21, a purpose-trained ~150 MB browser model, starting with

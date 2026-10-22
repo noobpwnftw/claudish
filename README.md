@@ -2,7 +2,7 @@
 
 English goes in. Em dashes come out.
 
-**[Try it in your browser](https://noobpwnftw.github.io/claudish/)**: the model runs in the page; nothing you type leaves it.
+**[Try it in your browser](https://claudish.io)**: the model runs in the page; nothing you type leaves it.
 
 An input method for Linux (IBus), Windows (PIME/TSF), and macOS
 (InputMethodKit) that puts AI at the caret of every app. It works in three
@@ -107,7 +107,7 @@ Or step by step:
 
 ## Static demo: the model in your browser
 
-This is the [project home page](https://noobpwnftw.github.io/claudish/), deployed by `.github/workflows/pages.yml` on every push to `main`. `python scripts/build_static_demo.py` writes `dist/demo/`, the same browser demo
+This is the [project home page](https://claudish.io), deployed by `.github/workflows/pages.yml` on every push to `main`. `python scripts/build_static_demo.py` writes `dist/demo/`, the same browser demo
 with the model running in the page through [wllama](https://github.com/ngxson/wllama)
 (llama.cpp compiled to WebAssembly). It needs no inference server, so any static
 host can serve it. Nothing is downloaded until the visitor clicks **Run the model
