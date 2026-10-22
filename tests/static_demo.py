@@ -49,6 +49,17 @@ async def check(url, executable, screenshots=None):
         ghost = await page.locator("#ghost").text_content()
         await keys.press("Tab")
         await expect(committed).to_have_attribute("data-text", "Thanks for the review " + ghost)
+        # The owner's sequence: take, space, take, space. The template's example answers are never offered.
+        from claudish import modes
+        examples = {m["content"] for m in modes.defaults()["continue"]["examples"] if m["role"] == "assistant"}
+        for _ in range(2):
+            await keys.type(" ")
+            await page.wait_for_timeout(2500)
+            offered = await page.locator("#ghost").text_content()
+            assert offered.strip() not in examples, offered
+            assert not (await page.locator("#status").text_content()).strip(), "continue showed an error"
+            if offered:
+                await keys.press("Tab")
         await keys.press("Enter")
         await keys.press("F7")
         await keys.press("F7")  # rewrite

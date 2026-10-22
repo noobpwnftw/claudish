@@ -314,8 +314,11 @@ class Rewriter:
             finally:
                 self.lock.release()
         candidates = []
+        from .modes import parroted
         for output in outputs:
             output = self.finish(mode, text, output)
+            if parroted(mode, text, output, examples):
+                continue
             if output and output not in candidates:
                 candidates.append(output)
         if not candidates:

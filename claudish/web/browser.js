@@ -45,6 +45,16 @@ async function inMemory(modelUrl, onProgress) {
   return new Blob(chunks);
 }
 
+// Port of claudish.modes.parroted: the template's own example answers, or words already before the
+// caret, are not suggestions.
+function parroted(mode, text, candidate, examples) {
+  if (mode !== "continue" || !candidate.startsWith(text)) return false;
+  const rest = candidate.slice(text.length).trim().toLowerCase();
+  if (!rest) return true;
+  const answers = new Set(examples.filter((m) => m.role === "assistant").map((m) => m.content.trim().toLowerCase()));
+  return answers.has(rest) || (rest.length >= 12 && text.toLowerCase().includes(rest));
+}
+
 export async function createBrowserBackend(templates, modelUrl, onProgress, onNote = () => {}) {
   const wllama = new Wllama(WASM);
   const options = { n_ctx: 2048, progressCallback: ({ loaded, total }) => onProgress(loaded, total) };
@@ -79,7 +89,7 @@ export async function createBrowserBackend(templates, modelUrl, onProgress, onNo
       const choice = response.choices[0];
       if (choice.finish_reason === "length") throw new Error("The rewrite ran past its length budget; try a shorter phrase.");
       const output = finish(mode, text, (choice.message.content || "").trim());
-      if (!output) throw new Error("The model offered nothing for this.");
+      if (!output || parroted(mode, text, output, spec.examples)) throw new Error("The model offered nothing for this.");
       return { text: output, backend: "browser", mode, elapsed_ms: performance.now() - started };
     },
   };

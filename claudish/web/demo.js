@@ -123,6 +123,7 @@ async function ask(revision) {
   } catch (error) {
     if (revision !== state.revision) return;
     state.working = false;
+    if (mode === "continue") return;  // continue stays quiet: no suggestion is a fine answer
     state.failed = true;
     setStatus(error.name === "AbortError" ? "The model took too long; your words are still here."
       : `${error.message} Your words are still here.`);
