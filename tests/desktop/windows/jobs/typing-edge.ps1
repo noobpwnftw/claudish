@@ -16,7 +16,12 @@ for ($i = 0; $i -lt 25 -and -not $area; $i++) {  # Chromium builds its accessibi
 $value = $area.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Edge could not take the foreground' }
 $area.SetFocus(); Start-Sleep 1
-function Get-Text { $value.Current.Value.TrimEnd("`r", "`n") }
+# Re-find the textarea on every read: a cached element's value went stale after a consumed shortcut
+# (the screen showed "draft" while the old element reported "").
+function Get-Text {
+  $fresh = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $byId)
+  $fresh.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value.TrimEnd("`r", "`n")
+}
 function Reset-Target { $value.SetValue(''); Start-Sleep -Milliseconds 200 }
 Invoke-Scenarios
 # The first shortcut press commits (and is consumed); the second reaches the app.
