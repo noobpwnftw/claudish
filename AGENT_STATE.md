@@ -27,6 +27,14 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   HTTPS enforced, www and the old github.io URL redirect; verified isolated in Chromium.
 - G18 first slice: agent sessions (Claude Code stream-json host; questions as choices).
   Scripted-agent tested; a live Claude Code run waits for the owner's OK (their quota).
+- G17/G18 conversations (a481e05): one conversation per text box; the model driver
+  keeps turns and asks for write tools; the agent driver keeps one agent process per
+  conversation (--session-id, Esc interrupts, --resume after exit, exits with the
+  conversation). Gate --model --desktop and CI 39865449511 (5 jobs) pass.
+  Next: textbox retrieval tools (textbox.read/search/selection) and Claudish as an
+  MCP server for the conversation's agent.
+- The demo's continue sample must differ from the continue example's input (f5f7ac3):
+  otherwise parroted() drops the answer and the demo shows nothing.
 - Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
   are a placeholder (owner: no rush; CHANGELOG.md drafts 0.1.0).
 - G28: continue types into the app, the suggestion waits after the caret; F7 always
