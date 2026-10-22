@@ -22,7 +22,11 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - G26 done: F8 window pictures (Windows PrintWindow, X11 ImageMagick, look_command);
   verified with Qwen2.5-VL-3B (models/, with its mmproj) on the Spark.
 - G27 first slice done: instruct offers up to 3 readings, 1-9 pick (all adapters, demo).
-- Next: G17/G18 (agentic instruct; legends and action candidates) (agentic instruct,
+- G17 second step done: profile "tools" (read-only MCP tools in a bounded loop, OpenAI-compatible).
+- claudish.io: bought by the owner; DNS not resolving yet (no NS on 2026-10-23). When it does:
+  set the Pages custom domain, wait for HTTPS, switch README and repo homepage. Not before:
+  a custom domain redirects the github.io home page.
+- Next: G18 (sessions; approval of side-effecting tools as candidate choices) (agentic instruct,
   candidate-list choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
