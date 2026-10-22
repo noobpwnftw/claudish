@@ -61,8 +61,11 @@ class AgentProcess:
             descriptor, self.config_file = tempfile.mkstemp(prefix="claudish-mcp-", suffix=".json")
             with os.fdopen(descriptor, "w", encoding="utf-8") as config:
                 json.dump(self.mcp_config, config)
+        if "--permission-prompt-tool" not in self.command:
+            # Without it Claude Code denies by itself instead of asking the host (checked live, 2.1.308).
+            session += ["--permission-prompt-tool", "stdio"]
         if self.config_file:
-            session += ["--mcp-config", self.config_file]
+            session += ["--mcp-config", self.config_file]  # last: it takes several values
         self.process = subprocess.Popen(self.command + session, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                                         bufsize=1)
@@ -175,6 +178,10 @@ class ClaudeCodeDriver:
                 kind = message.get("type")
                 if kind == "control_request":
                     self.question(session, message)
+                elif kind == "system" and message.get("subtype") == "permission_denied":
+                    # The agent's own settings said no, without asking: say so in the status line.
+                    session.emit("progress", text="%s: not allowed by the agent's settings"
+                                 % message.get("tool_name", "a tool"))
                 elif kind == "control_cancel_request":
                     self.pending.pop(message.get("request_id"), None)
                 elif kind == "stream_event":

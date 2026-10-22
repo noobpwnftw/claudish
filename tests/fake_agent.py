@@ -89,6 +89,10 @@ while True:
         out({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash",
                                                            "input": {"command": "git status"}}]},
              "parent_tool_use_id": None})
+        if "--permission-prompt-tool" not in sys.argv:  # like Claude Code: no host to ask, so it denies itself
+            out({"type": "system", "subtype": "permission_denied", "tool_name": "Bash"})
+            out({"type": "result", "subtype": "success", "is_error": False, "result": "I was not allowed to run it."})
+            continue
         out({"type": "control_request", "request_id": "perm-%d" % turns, "request": {
             "subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": "git status"},
             "description": "Show the working tree status"}})

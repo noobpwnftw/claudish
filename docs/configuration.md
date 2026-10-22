@@ -259,7 +259,8 @@ candidate like any other. For Claude Code:
   and its tool results. Esc interrupts the turn but keeps the agent. If the
   process exits, the next instruction resumes its session (`--resume`). The agent
   exits when the text box goes away, after 30 idle minutes, or when the service
-  stops. Claudish adds `--session-id` itself; leave it out of `session_command`.
+  stops. Claudish adds `--session-id` and `--permission-prompt-tool stdio` itself
+  (without the latter, Claude Code denies by itself instead of asking you).
 - **The agent sees your text box.** The text around the caret goes with each
   instruction, and with the `[mcp]` extra installed, Claudish gives the agent a
   `textbox` MCP server (read, search) for the rest, so "fix the second paragraph"
