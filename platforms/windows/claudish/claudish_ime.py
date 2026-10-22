@@ -4,6 +4,29 @@ from .composition import Composition
 from .client import Suggestions
 
 
+def focused_app():
+    """The foreground window's program name (for bindings), such as "notepad.exe"; None elsewhere."""
+    try:
+        import ctypes
+        import os
+        from ctypes import wintypes
+        user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), ctypes.byref(pid))
+        handle = kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return None
+        try:
+            size, path = wintypes.DWORD(1024), ctypes.create_unicode_buffer(1024)
+            if not kernel32.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
+                return None
+            return os.path.basename(path.value).lower()
+        finally:
+            kernel32.CloseHandle(handle)
+    except (AttributeError, OSError):  # Not on Windows.
+        return None
+
+
 class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
@@ -44,8 +67,8 @@ class ClaudishTextService(TextService):
         self.setShowCandidates(bool(candidate))
 
     def changed(self):
-        if self.worker:
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
+        if self.worker and (self.state.automatic or not self.state.text):
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app())
         self.publish()
 
     def onKeyDown(self, event):
@@ -55,7 +78,25 @@ class ClaudishTextService(TextService):
             revision, data = result
             if "text" in data:
                 self.state.offer(revision, data["text"])
+            elif "error" in data:
+                self.state.fail(revision)
+                if self.state.failed:
+                    self.showMessage("cd_AI: the request failed; Enter retries", 3)
         key = event.keyCode
+        if key == 0x0D:
+            # Instruct holds the text until Enter sends it; the next Enter inserts the result.
+            action = self.state.enter()
+            if action == "submit":
+                self.state.submit()
+                if self.worker:
+                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                                         app=focused_app())
+                self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
+                self.publish()
+                return True
+            if action == "wait":
+                self.showMessage("cd_AI: still working…", 2)
+                return True
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
             return True
@@ -68,7 +109,8 @@ class ClaudishTextService(TextService):
             self.publish()
             return True
         if key in (0x09, 0x0D, 0x1B):
-            self.setCommitString(self.state.commit(key == 0x09))
+            # Enter reaches here in instruct mode only with a result ready (see above).
+            self.setCommitString(self.state.commit(key == 0x09 or (key == 0x0D and self.state.mode == "instruct")))
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar():

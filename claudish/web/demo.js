@@ -10,21 +10,27 @@ let queued = false;
 let composing = false;
 let hosted = false;  // true when the service sends text to a hosted model
 let backend = "";
+let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 let mode = "rewrite";
 const MODES = {
-  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", placeholder: "We should use a smaller model."},
-  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", placeholder: "Thanks for the quick review on"},
-  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", placeholder: "decline the meeting politely, propose Thursday"},
+  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", prompt: "NEED A FIRST THOUGHT?",
+    samples: ["This is very important.", "Let's explore the options.", "We should use a smaller model."], placeholder: "We should use a smaller model."},
+  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", prompt: "START A SENTENCE",
+    samples: ["Thanks for the quick review on", "We should postpone the launch until", "The best part of this release is"], placeholder: "Thanks for the quick review on"},
+  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", prompt: "TRY AN INSTRUCTION",
+    samples: ["decline the meeting politely, propose Thursday", "thank the team for shipping the release", "write a two-line story about a cat"], placeholder: "decline the meeting politely, propose Thursday"},
 };
 
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
   candidate = "";
   $("accept").disabled = true;
-  $("candidate").textContent = draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
+  $("candidate").textContent = mode === "instruct"
+    ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction,\nthen press Enter.")
+    : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
   $("candidate").classList.add("placeholder");
   $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL MODEL · NO CLOUD REQUIRED";
-  status(draft.value.trim() ? "COMPOSING" : "AWAITING A THOUGHT");
+  status(!draft.value.trim() ? "AWAITING A THOUGHT" : mode === "instruct" ? "ENTER SENDS" : "COMPOSING");
 }
 
 function edited() {
@@ -35,7 +41,8 @@ function edited() {
   $("keep").disabled = !draft.value.trim();
   $("feedback").textContent = "";
   resetCandidate();
-  if (!composing && draft.value.trim().length >= 3) {
+  // Rewrite and continue ask on every pause; an instruction waits for Enter.
+  if (!composing && mode !== "instruct" && draft.value.trim().length >= 3) {
     timer = setTimeout(requestSuggestion, 180);
   }
 }
@@ -50,7 +57,7 @@ async function requestSuggestion() {
   const text = draft.value;
   const started = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), hosted ? 15000 : 5000);
+  const timeout = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
   document.querySelector(".workspace").classList.add("busy");
   status(hosted ? "THINKING REMOTELY" : "THINKING LOCALLY");
   $("rewrite").disabled = true;
@@ -112,7 +119,12 @@ draft.addEventListener("compositionend", () => { composing = false; edited(); })
 draft.addEventListener("keydown", (event) => {
   if (event.isComposing || composing || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.key === "Tab" && !event.shiftKey && candidate) { event.preventDefault(); commit(true); }
-  else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) { event.preventDefault(); commit(false); }
+  else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) {
+    event.preventDefault();
+    if (mode !== "instruct") commit(false);
+    else if (candidate) commit(true);  // The second Enter inserts the result.
+    else if (!inflight) requestSuggestion();  // The first sends the instruction.
+  }
   else if (event.key === "Escape" && draft.value.trim()) { event.preventDefault(); commit(false); }
 });
 document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", () => {
@@ -120,6 +132,8 @@ document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEven
   $("candidate-title").textContent = MODES[mode].title;
   $("accept-label").textContent = MODES[mode].accept;
   $("rewrite-label").textContent = MODES[mode].ask;
+  $("enter-hint").textContent = MODES[mode].enter;
+  renderSamples();
   draft.placeholder = MODES[mode].placeholder;
   edited();  // The old candidate belonged to another mode; ask again.
   draft.focus();
@@ -127,11 +141,25 @@ document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEven
 $("accept").addEventListener("click", () => commit(true));
 $("keep").addEventListener("click", () => commit(false));
 $("rewrite").addEventListener("click", requestSuggestion);
-document.querySelectorAll("[data-sample]").forEach((button) => button.addEventListener("click", () => {
+function renderSamples() {
+  $("samples-label").textContent = MODES[mode].prompt;
+  const buttons = MODES[mode].samples.map((sample) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.sample = sample;
+    button.textContent = sample + " ↗";
+    return button;
+  });
+  $("samples").replaceChildren($("samples-label"), ...buttons);
+}
+// One listener for every chip: samples change with the mode. Instruct samples wait for Enter.
+$("samples").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sample]");
+  if (!button) return;
   draft.value = button.dataset.sample;
   edited();
   draft.focus();
-}));
+});
 $("copy").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(output.value);
@@ -154,6 +182,7 @@ async function checkConnection() {
     const response = await fetch("/health", { signal: AbortSignal.timeout(3000) });
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
+    serviceTimeout = Number(data.timeout) || 3;
     if (hosted !== Boolean(data.hosted) || backend !== data.backend) {
       hosted = Boolean(data.hosted);
       backend = data.backend;
@@ -163,7 +192,8 @@ async function checkConnection() {
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"
-        : data.backend === "claude" ? "Claude API connected" : hosted ? "Remote model connected" : "Local service connected"));
+        : data.backend === "claude" ? "Claude API connected" : data.backend === "command" ? "Agent command connected"
+        : hosted ? "Remote model connected" : "Local service connected"));
     $("backend").textContent = data.backend === "rules" ? "RULES MODE · NO MODEL"
       : data.backend === "claude" ? "cd_AI · CLAUDE API" : hosted ? "cd_AI · REMOTE MODEL" : "cd_AI · LOCAL LLM";
   } catch {

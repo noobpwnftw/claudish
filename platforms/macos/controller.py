@@ -64,6 +64,8 @@ class ClaudishInputController(IMKInputController):
             if "text" in data and self.state.offer(revision, data["text"]):
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
+            elif "error" in data:
+                self.state.fail(revision)
 
     def candidates_(self, sender):
         return [self.state.candidate] if self.state.candidate else []
@@ -73,9 +75,17 @@ class ClaudishInputController(IMKInputController):
             self.finish(self.client(), suggested=True)
 
     @objc.python_method
+    def app(self, client):
+        """The focused app's bundle identifier (for bindings), such as "com.apple.Terminal"."""
+        try:
+            return str(client.bundleIdentifier()) if client is not None else None
+        except Exception:  # Not every client implements it.
+            return None
+
+    @objc.python_method
     def changed(self, client):
-        if self.worker is not None:
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode)
+        if self.worker is not None and (self.state.automatic or not self.state.text):
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
         self.panel.hide()
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(self.state.text.encode("utf-16-le")) // 2
@@ -114,7 +124,18 @@ class ClaudishInputController(IMKInputController):
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
             return True
-        if key in (36, 76, 48, 53):  # Return, keypad Enter, Tab, Escape
+        if key in (36, 76):  # Return, keypad Enter
+            # Instruct holds the text until Enter sends it; the next Enter inserts the result.
+            action = self.state.enter()
+            if action == "submit":
+                self.state.submit()
+                if self.worker is not None:
+                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                                         app=self.app(client))
+            elif action in ("accept", "keep"):
+                self.finish(client, suggested=action == "accept")
+            return action != "pass"
+        if key in (48, 53):  # Tab, Escape
             if not self.state.text:
                 return False
             if key == 48 and not self.state.candidate:

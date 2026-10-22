@@ -5,9 +5,13 @@ import time
 from urllib.request import Request, build_opener, ProxyHandler
 
 
-# Runs on the background worker, never on an input event, so a hosted backend may take longer.
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=12, mode="rewrite"):
-    request = Request(endpoint + "/suggest", data=json.dumps({"text": text, "mode": mode}).encode("utf-8"),
+# Runs on the background worker, never on an input event. The service enforces each backend's
+# own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
+def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None):
+    body = {"text": text, "mode": mode}
+    if app:
+        body["app"] = app
+    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
     # Local typing must not be routed through HTTP_PROXY.
     with build_opener(ProxyHandler({})).open(request, timeout=timeout) as response:
@@ -25,9 +29,9 @@ class Suggestions:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
-    def schedule(self, revision, text, mode="rewrite"):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None):
         with self.condition:
-            self.pending = (revision, text, mode, time.monotonic() + self.debounce)
+            self.pending = (revision, text, mode, app, time.monotonic() + (0 if immediate else self.debounce))
             self.result = None
             self.condition.notify()
 
@@ -50,7 +54,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, due = self.pending
+                revision, text, mode, app, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -59,7 +63,7 @@ class Suggestions:
             if len(text.strip()) < 3:
                 continue
             try:
-                result = suggest(text, self.endpoint, mode=mode)
+                result = suggest(text, self.endpoint, mode=mode, app=app)
             except Exception as exc:
                 result = {"error": str(exc)}
             with self.condition:

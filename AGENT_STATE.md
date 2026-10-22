@@ -2,22 +2,35 @@
 
 Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
 
-- `main` (`1fe465e`) adds since the last checkpoint: G10 context providers
-  (file, command, MCP, caret text), extras tests in the gate, and G16 `claudish
-  fix`. The gate `python scripts/check.py --model` passes. `agent/g16-bash3`
-  (bash 3.2 support for macOS) is waiting on its `ci/g16-bash3` run before merge.
+- `main` (`a1f567a`) adds since the last checkpoint:
+  - G01 Linux: real IBus/GTK desktop tests (`check.py --desktop`) and the fixed
+    installer (environment.d search path, `--system`, `--uninstall`, layout
+    `default`).
+  - G15: rewrite/continue/instruct modes in the service, the browser demo, and
+    F7 in all three adapters.
+  - G12: a local 14B meaning judge, with 91.5% same-vs-not agreement on hand
+    labels.
+  - G16: `claudish fix` (bash 3 and Windows fixes included).
+  - G05: CONTRIBUTING.md.
+
+  The full gate `check.py --model --desktop` passes.
+- In flight: `agent/g01-windows` (`90b46ff`) holds the Windows-on-ARM VM harness
+  (`tests/desktop/windows`) and the install.ps1 arm64 registration fix. Neither is
+  verified yet. The VM container `claudish-windows` (dockur, Windows 11 Enterprise
+  evaluation, state in `~/vm/claudish-windows`) is still installing. Next:
+  `vm.sh sync`, `vm.sh run jobs/setup.ps1`, then `vm.sh run jobs/typing.ps1`.
+  Merge once it passes; fix what it finds.
 - Owner direction: Claudish is a configurable entry point for AI at the caret
-  (models, then MCP and context, then invocation modes). Model quality belongs to
-  the model. The name and the em dashes stay. See the ROADMAP preamble.
-- Evidence limits: native desktop typing is unverified (G01). The Claude backend
-  is tested with the real SDK against a loopback stub, never against the live
-  API, because there are no credentials on the Spark.
-- Environment: `gh` is authorized (account noobpwnftw) and set up for git. CI is
-  opt-in via `ci/*` branches; check it with `gh run watch`. Local extras venv:
-  `.tools/claude-venv` (anthropic 2.1.0, mcp 2.3.0). zsh is not installed, so
-  the zsh hook is unrun.
-- Next action: G15 invocation modes (rewrite, continue, instruct, fix) chosen
-  per profile and switched by key, starting with the service API and the browser
-  demo, then the adapters. G12 (a local judge model) in parallel.
-- Owned background work: none. Ports 18765/18766 are free. The untracked
-  `models/qwen2.5-1.5b-instruct-q4_k_m.gguf` (1.1 GB, verified) is left from G11.
+  (models, then context, then modes, then agentic instruct, G17). Model quality
+  belongs to the model. The name and the em dashes stay. Use the Spark
+  (containers, KVM VMs, local models) instead of GitHub CI; run `ci/*` branches
+  for Windows and macOS coverage.
+- Evidence limits: macOS is covered only by the Cocoa doubles and the CI bundle
+  build. The Claude backend has never been called live (no credentials). The zsh
+  hook is unrun. Wayland/GNOME and Qt are untested.
+- Environment: `gh` is authorized and backs git. The extras venv
+  `.tools/claude-venv` has anthropic 2.1.0 and mcp 2.3.0. Models in `models/`
+  (untracked): Qwen 0.5B, 1.5B, and 14B (the judge), and SmolLM2.
+- Owned background work: the `claudish-windows` VM container (stop with
+  `tests/desktop/windows/vm.sh stop`, which is on the g01-windows branch).
+  Ports 18765/18766 are free.

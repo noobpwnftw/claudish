@@ -46,7 +46,10 @@ class ConfigTests(unittest.TestCase):
                                  ({"modle": "typo"}, "unknown keys modle"),
                                  ({"timeout": "3"}, "timeout has the wrong type"),
                                  ({"timeout": True}, "timeout has the wrong type"),
-                                 ({"backend": "gpt"}, "backend must be one of")]:
+                                 ({"backend": "gpt"}, "backend must be one of"),
+                                 ({"backend": "command"}, "needs \"command\""),
+                                 ({"backend": "command", "command": "claude -p"}, "command has the wrong type"),
+                                 ({"hosted": "no"}, "hosted has the wrong type")]:
             path = self.write({"profiles": {"p": profile}}, "other.json")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
@@ -63,6 +66,19 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError) as error:
             config.resolve(path)
         self.assertNotIn("sk-ant-very-secret", str(error.exception))
+
+
+    def test_starter_config_is_valid_and_never_overwrites(self):
+        path = config.write_starter()
+        self.assertEqual(path, self.root / "claudish/config.json")
+        for name in config.STARTER["profiles"]:
+            _, settings, _, _ = config.resolve(path, name)
+            self.assertEqual(settings["backend"], config.STARTER["profiles"][name]["backend"])
+        self.assertEqual(config.resolve()[0], "local")
+        path.write_text('{"profiles": {"mine": {}}}', encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            config.write_starter()
+        self.assertIn("mine", path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -15,15 +15,16 @@ import json
 import os
 from pathlib import Path
 
-from .context import Context
+from .context import Binding, Context
 from .model import load_prompt
 
-BACKENDS = ("llama", "openai", "claude", "rules")
+BACKENDS = ("llama", "openai", "claude", "command", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
-            "context": None, "max_context_chars": 6000, "modes": None}
+            "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
+            "bindings": None}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict}
+         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list}
 
 
 def default_path():
@@ -58,7 +59,7 @@ def resolve(path=None, profile=None, overrides=None):
         if unknown:
             raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
         for key, value in entry.items():
-            if value is not None and (not isinstance(value, TYPES[key]) or isinstance(value, bool)):
+            if value is not None and (not isinstance(value, TYPES[key]) or (isinstance(value, bool) and TYPES[key] is not bool)):
                 raise ValueError("profile %r: %s has the wrong type" % (name, key))
         settings.update(entry)
         base = path.parent
@@ -67,6 +68,11 @@ def resolve(path=None, profile=None, overrides=None):
     settings.update({key: value for key, value in (overrides or {}).items() if value is not None})
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
+    if settings["backend"] == "command":
+        command = settings["command"]
+        if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
+            raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')
+        settings["command"] = [os.path.expanduser(part) for part in command]
     prompt = None
     if settings["prompt"]:
         prompt_path = Path(settings["prompt"]).expanduser()
@@ -94,4 +100,32 @@ def resolve(path=None, profile=None, overrides=None):
         if not all(isinstance(spec, dict) for spec in settings["context"]):
             raise ValueError("profile %r: context must be a list of objects" % name)
         context = Context(settings["context"], base, settings["max_context_chars"])
+    settings["bindings"] = [Binding(spec, base) for spec in settings["bindings"] or []]
     return name, settings, prompt, context
+
+
+STARTER = {
+    "about": [
+        "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
+        "Keys never go in this file: name an environment variable with api_key_env.",
+        "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
+        "prompt, context, max_context_chars, modes, command, hosted. See README.md.",
+    ],
+    "profile": "local",
+    "profiles": {
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766"},
+        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
+        "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+        "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
+    },
+}
+
+
+def write_starter(path=None):
+    """Write the starter config; never overwrite an existing one. Returns the path."""
+    path = Path(path or default_path())
+    if path.exists():
+        raise FileExistsError("%s already exists; edit it, or move it aside to start over" % path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(STARTER, indent=2) + "\n", encoding="utf-8")
+    return path

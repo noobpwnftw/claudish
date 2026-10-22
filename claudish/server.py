@@ -51,7 +51,8 @@ def make_server(rewriter, port=18765):
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
                                         "hosted": rewriter.hosted,
                                         "profile": getattr(rewriter, "profile", None),
-                                        "modes": list(rewriter.modes)})
+                                        "modes": list(rewriter.modes),
+                                        "timeout": rewriter.timeout})
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):
@@ -82,12 +83,15 @@ def make_server(rewriter, port=18765):
                 if not all(isinstance(s, str) and len(s) <= 4000 for s in (before, after)):
                     raise ValueError("before/after must be strings of at most 4000 characters")
                 mode = data.get("mode", "rewrite")
+                app = data.get("app")  # The focused app, reported by the adapter; selects bindings.
+                if app is not None and not (isinstance(app, str) and len(app) <= 200):
+                    raise ValueError("app must be a short string")
                 if mode not in rewriter.modes:
                     raise ValueError("unknown mode")
             except (ValueError, UnicodeError):
                 return self.reply(400, {"error": "invalid text request"})
             try:
-                result = rewriter.rewrite(text, before, after, mode)
+                result = rewriter.rewrite(text, before, after, mode, app)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
             self.reply(200, result)

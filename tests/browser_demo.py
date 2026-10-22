@@ -95,11 +95,16 @@ async def check(args):
             await page.get_by_role("radio", name="INSTRUCT").check()
             await expect(page.locator("#candidate-title")).to_have_text("THE DRAFT")
             await expect(page.locator("#accept-label")).to_have_text("Accept draft")
+            await expect(page.locator("#samples-label")).to_have_text("TRY AN INSTRUCTION")
+            await expect(page.get_by_role("button", name="write a two-line story about a cat ↗")).to_be_visible()
             await page.locator("#draft").fill("thank the team for shipping the release")
+            await page.wait_for_timeout(600)
+            assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
+            await page.locator("#draft").press("Enter")  # Enter sends the instruction.
             await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
             draft_text = await page.locator("#candidate").inner_text()
             assert draft_text.strip() and any(body and body.get("mode") == "instruct" for body in sent), sent
-            await page.locator("#draft").press("Tab")
+            await page.locator("#draft").press("Enter")  # The second Enter inserts it.
             await expect(page.locator("#output")).to_have_value(draft_text)
             await page.get_by_role("radio", name="REWRITE").check()
             await expect(page.locator("#candidate-title")).to_have_text("THE CLAUDISH EDIT")

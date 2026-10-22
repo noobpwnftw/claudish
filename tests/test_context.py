@@ -10,7 +10,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from claudish import config
-from claudish.context import Context
+from claudish.context import Binding, Context
 from claudish.model import Rewriter
 from claudish.server import make_server
 
@@ -106,6 +106,56 @@ class ContextTests(unittest.TestCase):
             thread.join()
 
 
+class BindingTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        (self.root / "pr.md").write_text("PR #42 adds retries.", encoding="utf-8")
+
+    def test_bindings_add_context_only_for_matching_apps(self):
+        binding = Binding({"app": "Firefox*", "context": [{"type": "file", "name": "pr", "path": "pr.md"}]}, self.root)
+        self.assertTrue(binding.matches("firefox") and binding.matches("firefox-esr"))
+        self.assertFalse(binding.matches("gedit") or binding.matches(None))
+        rewriter = Rewriter("rules", bindings=[binding])
+        self.assertEqual(rewriter.rewrite("very good", app="firefox")["consulted"], ["pr"])
+        self.assertEqual(rewriter.rewrite("very good", app="gedit")["consulted"], [])
+        with patch("claudish.model.build_opener") as opener:
+            reply = {"choices": [{"message": {"content": "Indeed."}, "finish_reason": "stop"}]}
+            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+            Rewriter(bindings=[binding]).rewrite("ok", app="firefox")
+            system = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][0]["content"]
+        self.assertIn("PR #42 adds retries.", system)
+
+    def test_binding_config_and_service(self):
+        path = self.root / "config.json"
+        for spec, message in [({"context": []}, "binding is"), ({"app": "x", "mode": "instruct"}, "binding is")]:
+            path.write_text(json.dumps({"profiles": {"p": {"bindings": [spec]}}}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, message):
+                config.resolve(path)
+        path.write_text(json.dumps({"profiles": {"p": {"bindings": [
+            {"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}]}}}), encoding="utf-8")
+        _, settings, _, _ = config.resolve(path)
+        server = make_server(Rewriter("rules", bindings=settings["bindings"]), 0)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            url = "http://127.0.0.1:%s/suggest" % server.server_port
+            request = Request(url, data=json.dumps({"text": "very good", "app": "gtk3-demo"}).encode(),
+                              headers={"Content-Type": "application/json"})
+            with urlopen(request) as reply:
+                self.assertEqual(json.load(reply)["consulted"], ["pr.md"])
+            request = Request(url, data=json.dumps({"text": "very good", "app": ["x"]}).encode(),
+                              headers={"Content-Type": "application/json"})
+            with self.assertRaises(HTTPError) as error:
+                urlopen(request)
+            self.assertEqual(error.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+
 class MCPContextTests(unittest.TestCase):
     """Real stdio MCP round trips; skipped unless the optional MCP SDK is installed."""
 
@@ -129,10 +179,41 @@ class MCPContextTests(unittest.TestCase):
         self.assertNotIn('name="broken"', block)
         self.assertIn("broken", context.providers[2].error)
 
+    def test_url_transport_to_an_app_exposing_mcp(self):
+        import socket
+        import subprocess
+        import time
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        server = subprocess.Popen(self.server + ["http", str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(server.wait)
+        self.addCleanup(server.terminate)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            with socket.socket() as probe:
+                if probe.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.1)
+        url = "http://127.0.0.1:%d/mcp" % port
+        with patch.dict("os.environ", {"APP_TOKEN": "t-7"}):
+            context = Context([
+                {"type": "mcp", "name": "app", "url": url, "headers": {"Authorization": "Bearer $APP_TOKEN"},
+                 "tool": "pull_request_diff", "arguments": {"number": 9}, "timeout": 20},
+                {"type": "mcp", "url": url, "resource": "notes://style", "timeout": 20}])
+        self.assertEqual(context.providers[0].headers, {"Authorization": "Bearer t-7"})
+        block = context.render()
+        self.assertIn("PR #9: + retry the flaky upload", block)
+        self.assertIn("Prefer em dashes.", block)
+
     def test_spec_validation(self):
         for spec, message in [({"type": "mcp", "command": self.server}, "exactly one"),
                               ({"type": "mcp", "command": self.server, "tool": "a", "resource": "b"}, "exactly one"),
-                              ({"type": "mcp", "command": self.server, "tool": "a", "env": {"A": 1}}, "env")]:
+                              ({"type": "mcp", "command": self.server, "tool": "a", "env": {"A": 1}}, "env"),
+                              ({"type": "mcp", "url": "http://x", "command": self.server, "tool": "a"}, "not both"),
+                              ({"type": "mcp", "url": "file:///etc/passwd", "tool": "a"}, "http"),
+                              ({"type": "mcp", "url": "http://x", "transport": "ws", "tool": "a"}, "transport"),
+                              ({"type": "mcp", "url": "http://x", "tool": "a", "env": {"A": "b"}}, "started server")]:
             with self.assertRaisesRegex(ValueError, message):
                 Context([spec])
 
