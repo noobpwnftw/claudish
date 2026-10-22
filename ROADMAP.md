@@ -1,14 +1,17 @@
 # Claudish roadmap
 
-Direction (from the owner, 2026-10-22): Claudish is a configurable entry point
-for AI at the caret, in every app, replacing the chat window on the side and the
-copy-paste round trip. You configure it once: model APIs or local servers (G13),
-context sources such as MCP servers and the surrounding text (G10), and
-templates and invocation modes (G15). Then you invoke it by typing where you
-already are. The name is a metaphor, em dashes included. Each step must earn
-trust: typed text is never lost, acceptance is explicit and reversible, local
-is the default and nothing goes where the user did not configure, and latency
-feels like typing.
+Direction (from the owner, 2026-10-22): we operate computers with a keyboard,
+and every app that takes text has an input method between your keys and its text
+field. Claudish makes that input method the way you talk to machines, in three
+layers: translation (rewrite), autocomplete (continue), and instruction
+(instruct). An agent CLI is a text box and Enter, and even its interactive parts
+are choices that fit an input method's candidate list. So the input method can
+host the whole agent loop in any app, and in a terminal. Configure the brain
+once (local models, APIs, agent CLIs, context, MCP), then just type. Each step
+must earn trust: typed text is never lost, nothing lands without a key you
+pressed, local is the default and nothing goes where the user did not
+configure, and latency feels like typing. See
+[docs/design/interaction.md](docs/design/interaction.md).
 
 All work through G13 was merged to `main` on 2026-10-22 (`4cdebf8`), and CI passed on every branch.
 
@@ -34,6 +37,8 @@ evidence according to `AGENT.md`; these are goals, not completed capabilities.
 | G15 | active | Invocation modes beyond rewrite: continue (G09), fill-in-the-middle (G10), and instruct, where you type an instruction and get a written draft. Bound to keys and chosen per profile or app. Acceptance: every mode keeps the stale-result, explicit-accept, and keep-my-wording guarantees; mode switching is tested in all three adapters' harnesses. | G09, G10, G14. |
 | G16 | active | A better thefuck (owner's suggestion, for fun): fix the last failed shell command with any configured model. A bash/zsh hook records the last command, its exit code, and the end of its output to a file. Unlike thefuck, the command is never re-run to capture output. A `file` context provider and a fix-command template feed the backend. Invoke it with a `claudish fix` CLI first, then from the IME in terminals (type `fix`, Tab, and the corrected command appears as a candidate). Acceptance: never auto-executes, keeps the original command available, works with the local model offline, and gets an evaluation set of real failure cases (typos, wrong flags, missing sudo, git mistakes) measured against thefuck's rules where comparable. | `claudish fix` CLI and bash/zsh hooks are done (`agent/g16-fix`). On the 30-case fix eval, Qwen 1.5B fixed 22/23 with 0 harmful and 0.5B fixed 15/23 with 1 harmful. Remaining: IME invocation in terminals (with G15), a zsh run, and a thefuck comparison on cases with captured output. |
 | G17 | queued | Agentic instruct, raised by the owner as "an even better Claude CLI": instruct mode may call the profile's MCP tools (not just read context) to research and then draft, for example looking up the PR's CI status before writing the update. This is an agent loop at the caret in any app. Acceptance: tool calls are visible (the candidate shows what was consulted); write or side-effecting tools need an explicit per-call confirmation; the result is still only a candidate; latency and cost are bounded per invocation; it works with Claude (the API's MCP connector or client-side tools) and local models that support tool calls. | G15 instruct mode, G10 MCP context. First step done: the `command` backend makes any agent CLI (for example `claude -p`) the driver behind the input method (owner: "the IME is the CLI's text box"); its tool permissions are the CLI's own. Remaining: streaming partial output to the candidate, an approval channel for tool calls, showing which tools were consulted. |
+| G18 | queued | Interactive agent sessions at the caret ([design](docs/design/interaction.md)): a session API in the service (`/sessions`, events, answers); a Claude Code bridge over stream-json with `--permission-prompts host` and `--session-id`; adapters render progress in the auxiliary text and questions as candidate lists (1–9 to choose, "Tell it…" for free text); multi-turn follow-ups in one session. Acceptance: in the real GTK desktop, a scripted agent asks a permission question, the test answers with a number key, and the result commits as one undo step; Esc at any point keeps the prompt; secure fields never start sessions; PIME and IMK show the same events. | G15, G17, the command backend. |
+| G19 | active | Onboarding in three minutes ([design](docs/design/interaction.md#onboarding-g19)): per-mode sample phrases and key hints in the browser demo; `claudish init` writes a starter config with commented profiles (local, OpenAI-compatible, Claude, agent CLI); the README Quick start follows try, then pick a brain, then install, then four keys. Acceptance: a fresh clone reaches all three modes in the browser with two commands; `claudish init` never overwrites an existing config; all three are covered by tests. | — |
 
 At the first maintenance session, select one task and state its concrete
 acceptance criteria in `AGENT_STATE.md`. Review open CI and issues before
