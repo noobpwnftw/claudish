@@ -175,21 +175,28 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=()):
     shown = {"done": symbols["ok"], "todo": "→" if symbols is doctor.MARKS else "->",
              "manual": symbols["warn"], "skip": symbols["skip"]}
     print("Setting up Claudish for profile %r.\n" % (name or "local"))
-    manual, started = [], False
+    manual, started, missing = [], False, []
     for label, state, detail, action in steps:
         print("%s %-16s %s" % (shown[state], label, detail))
         if state == "manual":
             manual.append((label, action))
+            missing.append(label)
         if state != "todo" or dry_run:
+            continue
+        if label == "Starts at login" and set(missing) & {"llama.cpp", "Model"}:
+            # A login service without its model would only fail at every login.
+            print("  not yet: the local model needs %s first" % " and ".join(m for m in missing if m in ("llama.cpp", "Model")))
             continue
         if not (yes or ask("  %s?" % detail[0].upper() + detail[1:])):
             print("  skipped")
+            missing.append(label)
             continue
         try:
             action()
         except (OSError, ValueError, subprocess.CalledProcessError, SystemExit) as exc:
             print("\n  failed: %s" % exc)
             manual.append((label, "fix the error above, then run `claudish setup` again"))
+            missing.append(label)
             continue
         print("  done")
         started = started or label == "Starts at login"

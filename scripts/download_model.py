@@ -2,8 +2,13 @@
 import argparse
 import hashlib
 import os
+import platform
+import shutil
+import ssl
+import subprocess
 import sys
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import urlopen
 
 # Pinned to the upstream revisions measured in benchmarks/; the hashes are their LFS SHA-256.
@@ -25,6 +30,21 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def open_url(url):
+    """urlopen, plus a fix for fresh Windows installs: Windows fetches missing root certificates
+    on demand, but only for its own TLS stack, so Python fails until something else has
+    connected. curl.exe (Windows 10+) uses that stack; one request installs the root. Downloads
+    stay safe either way: every file is checked against its pinned SHA-256."""
+    try:
+        return urlopen(url, timeout=30)
+    except URLError as exc:
+        curl = shutil.which("curl.exe")
+        if not (platform.system() == "Windows" and curl and isinstance(exc.reason, ssl.SSLCertVerificationError)):
+            raise
+        subprocess.run([curl, "-sIL", "-o", "NUL", url], capture_output=True, timeout=60)
+        return urlopen(url, timeout=30)
+
+
 def download(url, target, size, digest, progress=None):
     """Write to a .part file and rename only after the size and hash match."""
     target = Path(target)
@@ -36,7 +56,7 @@ def download(url, target, size, digest, progress=None):
     partial = target.with_name(target.name + ".part")
     try:
         hasher, received = hashlib.sha256(), 0
-        with urlopen(url, timeout=30) as response, open(partial, "wb") as output:
+        with open_url(url) as response, open(partial, "wb") as output:
             for block in iter(lambda: response.read(1 << 20), b""):
                 output.write(block)
                 hasher.update(block)

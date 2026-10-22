@@ -117,11 +117,13 @@ class SetupTests(unittest.TestCase):
         self.quiet(yes=True)
         self.assertEqual(self.states()["MCP servers"], "done")
 
-    def test_a_failing_step_does_not_stop_the_rest(self):
-        self.llama.install.side_effect = OSError("network down")
+    def test_a_failing_step_does_not_stop_the_rest_but_no_service_without_a_model(self):
+        self.models.fetch.side_effect = OSError("network down")
         _, out = self.quiet(yes=True)
         self.assertIn("failed: network down", out)
-        self.service_run.assert_called_once()
+        self.ime.assert_called_once()  # later steps still run
+        self.service_run.assert_not_called()
+        self.assertIn("the local model needs Model first", out)
 
 
 if __name__ == "__main__":

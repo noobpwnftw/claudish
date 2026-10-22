@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -42,6 +43,32 @@ class DownloadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "move it aside"):
             download_model.download(self.url, self.target, len(self.data), self.digest)
         self.assertEqual(self.target.read_bytes(), b"someone else's model")
+
+    def test_fresh_windows_root_certificate_is_fetched_once_then_retried(self):
+        import ssl
+        from urllib.error import URLError
+        from urllib.request import urlopen
+        failure = URLError(ssl.SSLCertVerificationError("unable to get local issuer certificate"))
+        calls = []
+
+        def flaky(url, timeout):
+            calls.append(url)
+            if len(calls) == 1:
+                raise failure
+            return urlopen(url, timeout=timeout)
+
+        with patch.object(download_model, "urlopen", side_effect=flaky), \
+                patch.object(download_model.platform, "system", return_value="Windows"), \
+                patch.object(download_model.shutil, "which", return_value="C:/Windows/System32/curl.exe"), \
+                patch.object(download_model.subprocess, "run") as curl:
+            self.assertTrue(download_model.download(self.url, self.target, len(self.data), self.digest))
+        self.assertEqual(curl.call_args.args[0][0], "C:/Windows/System32/curl.exe")
+        self.assertEqual(len(calls), 2)
+        self.target.unlink()
+        with patch.object(download_model, "urlopen", side_effect=failure), \
+                patch.object(download_model.platform, "system", return_value="Linux"):
+            with self.assertRaises(URLError):  # elsewhere a certificate failure is a real failure
+                download_model.download(self.url, self.target, len(self.data), self.digest)
 
     def test_presets_are_pinned(self):
         for repo, revision, filename, size, digest in download_model.PRESETS.values():
