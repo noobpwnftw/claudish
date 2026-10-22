@@ -90,7 +90,12 @@ def main():
             assert key(ord("!"), ord("!"))["commitString"] == "!"
             assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
             assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
+            # The suggestion shows when the key is released: continue takes printable key-ups too.
+            assert key(ord("!"), ord("!"), "filterKeyUp")["return"] is True
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
+            reply = key(ord("!"), ord("!"), "onKeyUp")
+            assert reply.get("candidateList") == ["Tab: …Hello—truly."] and reply.get("showCandidates"), reply
+            assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
             assert key(9)["commitString"] == " Hello—truly."

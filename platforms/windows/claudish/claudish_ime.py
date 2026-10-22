@@ -126,8 +126,22 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         if self.worker and (self.state.automatic or not self.state.text):
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app())
+            # Continue asks at once at a word boundary (itself the pause), so the answer is often
+            # ready by the time the key is released, and onKeyUp can show it.
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
+                                 immediate=self.state.live)
         self.publish()
+
+    def filterKeyUp(self, event):
+        # PIME can only change what is shown in reply to a request. In continue Claudish takes the
+        # key-downs of printable keys (it commits them itself), so it takes their key-ups too: the
+        # onKeyUp reply carries an edit session, and with it the suggestion.
+        return bool(self.keyboardOpen and self.state.live and event.isPrintableChar())
+
+    def onKeyUp(self, event):
+        self.poll_results()
+        self.publish()
+        return True
 
     def poll_results(self):
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
