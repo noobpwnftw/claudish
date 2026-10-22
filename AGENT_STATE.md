@@ -19,6 +19,11 @@ Checkpoint 2026-10-22 (an interactive session on the Spark; no 24/7 runner).
   master build 656 plus the x86 VC++ runtime. Loop: `vm.sh sync`, `vm.sh run
   jobs/deploy.ps1 40`, `vm.sh run jobs/typing.ps1 90`. `vmscreen.sh OUT.png
   ['sendkey …']` gives a screenshot in about 1 s; `vmkeys.py` types exact text.
+- Home page: https://noobpwnftw.github.io/claudish/ is the static demo (the model runs in the
+  visitor's browser via wllama; coi-sw.js supplies isolation; about 1.4 s per rewrite live). It
+  is deployed by .github/workflows/pages.yml on every push to main, and it is the repository
+  homepage (owner-approved). Next: G21, a purpose-trained ~150 MB browser model, starting with
+  training data. The Edge shortcut issue (G01) is tabled by the owner.
 - Owner direction: Claudish is a configurable entry point for AI at the caret
   (models, then context, then modes, then agentic instruct, G17). Model quality
   belongs to the model. The name and the em dashes stay. Use the Spark
