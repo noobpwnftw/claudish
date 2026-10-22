@@ -13,19 +13,21 @@ let backend = "";
 let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 let mode = "rewrite";
 const MODES = {
-  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", placeholder: "We should use a smaller model."},
-  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", placeholder: "Thanks for the quick review on"},
-  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", placeholder: "decline the meeting politely, propose Thursday"},
+  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", placeholder: "We should use a smaller model."},
+  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", placeholder: "Thanks for the quick review on"},
+  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", placeholder: "decline the meeting politely, propose Thursday"},
 };
 
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
   candidate = "";
   $("accept").disabled = true;
-  $("candidate").textContent = draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
+  $("candidate").textContent = mode === "instruct"
+    ? (draft.value.trim() ? "Press Enter to send the instruction." : "Type an instruction,\nthen press Enter.")
+    : draft.value.trim() ? "Considering your wording…" : "A nuanced perspective is\njust a keystroke away.";
   $("candidate").classList.add("placeholder");
   $("timing").textContent = hosted ? `${backend.toUpperCase()} · HOSTED MODEL` : "LOCAL MODEL · NO CLOUD REQUIRED";
-  status(draft.value.trim() ? "COMPOSING" : "AWAITING A THOUGHT");
+  status(!draft.value.trim() ? "AWAITING A THOUGHT" : mode === "instruct" ? "ENTER SENDS" : "COMPOSING");
 }
 
 function edited() {
@@ -36,7 +38,8 @@ function edited() {
   $("keep").disabled = !draft.value.trim();
   $("feedback").textContent = "";
   resetCandidate();
-  if (!composing && draft.value.trim().length >= 3) {
+  // Rewrite and continue ask on every pause; an instruction waits for Enter.
+  if (!composing && mode !== "instruct" && draft.value.trim().length >= 3) {
     timer = setTimeout(requestSuggestion, 180);
   }
 }
@@ -113,7 +116,12 @@ draft.addEventListener("compositionend", () => { composing = false; edited(); })
 draft.addEventListener("keydown", (event) => {
   if (event.isComposing || composing || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.key === "Tab" && !event.shiftKey && candidate) { event.preventDefault(); commit(true); }
-  else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) { event.preventDefault(); commit(false); }
+  else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) {
+    event.preventDefault();
+    if (mode !== "instruct") commit(false);
+    else if (candidate) commit(true);  // The second Enter inserts the result.
+    else if (!inflight) requestSuggestion();  // The first sends the instruction.
+  }
   else if (event.key === "Escape" && draft.value.trim()) { event.preventDefault(); commit(false); }
 });
 document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", () => {
@@ -121,6 +129,7 @@ document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEven
   $("candidate-title").textContent = MODES[mode].title;
   $("accept-label").textContent = MODES[mode].accept;
   $("rewrite-label").textContent = MODES[mode].ask;
+  $("enter-hint").textContent = MODES[mode].enter;
   draft.placeholder = MODES[mode].placeholder;
   edited();  // The old candidate belonged to another mode; ask again.
   draft.focus();

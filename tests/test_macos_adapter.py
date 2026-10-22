@@ -68,9 +68,10 @@ class Worker:
         self.closed = False
         self.modes = []
 
-    def schedule(self, revision, text, mode="rewrite"):
+    def schedule(self, revision, text, mode="rewrite", immediate=False):
         self.result = None
         self.modes.append(mode)
+        self.immediate = immediate
 
     def poll(self):
         result, self.result = self.result, None
@@ -190,6 +191,27 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(48)
         self.assertEqual(self.client.commits, ["Thank you, team—truly."])
         self.assertFalse(self.key(98))  # Without a composition, F7 belongs to the app.
+
+    def test_instruct_waits_for_enter_then_inserts_the_result(self):
+        self.key(0, "x")
+        self.key(98)
+        self.key(98)  # instruct
+        state, worker = self.controller.state, self.controller.worker
+        sent = len(worker.modes)
+        self.type_text("rite a story")
+        self.assertEqual(len(worker.modes), sent)  # no requests while typing an instruction
+        self.assertTrue(self.key(36))  # Enter sends
+        self.assertTrue(state.working and worker.immediate)
+        self.assertTrue(self.key(36))  # still working: Enter waits
+        self.assertEqual(self.client.commits, [])
+        worker.result = (state.revision, {"error": "agent failed"})
+        self.controller.pollSuggestions_(None)
+        self.assertTrue(state.failed and not state.working)
+        self.key(36)  # retry
+        worker.result = (state.revision, {"text": "Once upon a time—a cat."})
+        self.controller.pollSuggestions_(None)
+        self.key(36)  # the second Enter inserts the result
+        self.assertEqual(self.client.commits, ["Once upon a time—a cat."])
 
     def test_deactivation_commits_and_closes_worker_timer(self):
         self.type_text("keep me")

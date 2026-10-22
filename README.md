@@ -2,27 +2,45 @@
 
 English goes in. Em dashes come out.
 
-A local LLM input method for Linux (IBus), Windows (PIME/TSF), and macOS
-(InputMethodKit). Type a phrase
-in composition, preview its polished, mildly excessive rewrite, then commit it
-to the focused application. `cd_AI` is the input method's label; the underlying
-language remains English. No custom OS locale is necessary.
+An input method for Linux (IBus), Windows (PIME/TSF), and macOS
+(InputMethodKit) that puts AI at the caret of every app. It works in three
+layers, one per mode; F7 switches between them while you type:
+
+1. **Translation**, which is what an input method does. Keystrokes go in and text
+   comes out in another language; here, the language is Claudish: polished,
+   slightly excessive English with a fondness for em dashes. (`rewrite`)
+2. **Autocomplete**, which is what Copilot promised and language models are, at
+   heart. Pause, and the next words are offered. (`continue`)
+3. **Instruction**, which is how you work a machine. Type "write a story about a
+   cat"; the input method holds it, Enter sends it to the AI, and the result
+   comes back at the caret, in a text editor, a browser, or a terminal.
+   (`instruct`)
+
+Every result is only a candidate: Tab, or Enter in instruct mode, puts it in
+your app, and your own wording is always one key away. The AI behind it is your
+choice: a small local model (the default), any OpenAI-compatible server, Claude,
+or an agent CLI such as `claude -p`, which makes the input method that agent's
+text box in every app. Context such as files, command output, or MCP servers
+can go along. `cd_AI` is the input method's label; no custom OS locale is
+needed.
 
 The default model is Qwen2.5-0.5B-Instruct Q4_K_M, a 491 MB download. On the
 DGX Spark/GB10 used for development, 12 warm short-phrase requests took **64.8 ms
 median, 85.3 ms p95**, including both local HTTP hops. These are completed
 rewrite timings, not time to first token. See [measurements](benchmarks/README.md)
-for inputs, outputs, limitations, and the smaller-model comparison.
+for inputs, outputs, fidelity, and model comparisons.
 
-This is an initial implementation. The shared service and real model inference
-have been tested on Linux. The IBus adapter passes an isolated binding smoke
-test. The Windows adapter passes the upstream PIME Python request/reply
-contract on Linux; native Windows installation, TSF, and application behavior
-still require testing on a Windows machine. The macOS adapter has event-routing
-tests using Cocoa test doubles and a native app-bundle CI job; its bundle and
-desktop behavior have not been verified on a Mac here. None of the desktop
-adapters has been tested end to end in a graphical application in this headless
-session. The browser demo has been tested with actual inference in Chromium.
+Status:
+
+- **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
+  key events in a container (12 scenarios, `scripts/check.py --desktop`).
+  Wayland/GNOME sessions and Qt apps are not yet tested.
+- **Windows:** passes PIME's Python contract on every OS, and CI runs on Windows.
+  Typing through TSF into real apps is being set up in a Windows-on-ARM VM and
+  is not yet verified.
+- **macOS:** covered by event-routing tests with Cocoa test doubles and a native
+  bundle build in CI; not yet run on a Mac.
+- **Browser demo:** tested with real inference in Chromium.
 
 ## Start the model and service
 
@@ -374,6 +392,7 @@ refuses to overwrite an existing installed app.
 | Pause for 180 ms | Request a local rewrite in the background |
 | F6 | Preview a completed candidate; useful on Windows |
 | F7 | Switch mode while composing: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice) |
+| Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result; Esc keeps your text |
 | Tab | Commit an available rewrite; if none is ready, keep composing |
 | Enter / Escape | Commit your wording, including the em-dash substitution |
 | Backspace | Edit the composition and invalidate its candidate |
