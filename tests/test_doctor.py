@@ -17,6 +17,7 @@ def by_name(results):
     return {name: (status, fix) for name, status, _, fix in results}
 
 
+@unittest.skipIf(os.name == "nt", "the IBus checks run on Linux; IBUS_COMPONENT_PATH is colon-separated")
 class LinuxChecks(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
