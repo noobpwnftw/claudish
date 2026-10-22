@@ -42,3 +42,52 @@ Reproduce with `python scripts/start.py --preset small`, then
 Original model sources: [SmolLM2](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct),
 [Qwen GGUF](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF), and
 [SmolLM2 GGUF](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF).
+
+## Rewrite fidelity evaluation
+
+[`eval/cases.json`](eval/cases.json) holds 41 varied inputs: names, numbers,
+dates, negation, code identifiers and URLs, questions, very short and casual
+messages, multi-sentence text, already-formal text, tone, emoji, and French and
+Spanish. [`evaluate.py`](evaluate.py) sends each case to a running service and
+applies mechanical checks:
+
+- required names, numbers, and identifiers are kept;
+- negation is preserved;
+- the language is kept;
+- no chat preamble or added quotes;
+- the length stays sane.
+
+Style is reported separately as "changed" and "added an em dash".
+
+```sh
+python scripts/start.py --preset small
+python benchmarks/evaluate.py --label small --output benchmarks/eval/spark-small.json
+```
+
+Results on the Spark, with the hardware and llama.cpp commit above, after one
+excluded warmup request and with one request per case. Wall time includes both
+HTTP hops:
+
+| Model / Q4_K_M | Pass checks | Pass and changed | Added em dash | Median | p95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SmolLM2 135M Instruct | 18 / 41 | 16 | 3 | 57.6 ms | 71.9 ms |
+| Qwen2.5 0.5B Instruct | 38 / 41 | 34 | 0 | 70.0 ms | 89.8 ms |
+
+Full outputs: [eval/spark-small.json](eval/spark-small.json) and
+[eval/spark-tiny.json](eval/spark-tiny.json).
+
+These checks set an upper bound on fidelity, not a quality score. They do not
+catch meaning changes that keep the guarded tokens. Reading the 38 passing
+Qwen outputs by hand found at least four such changes:
+
+- "Thanks!" became "You're welcome!";
+- "Set MAX_RETRIES to 5" became "Increase…";
+- "Tell Priya…" became a message addressed to Priya;
+- "Do not merge this yet" lost its object.
+
+Qwen also translated both non-English inputs into English and spelled out "3 of
+the 40" as words. It never added an em dash, so the house style is not landing
+yet. SmolLM2 usually drops names and numbers or copies the prompt's example
+sentence, and its three em dashes come from that copied example. Greedy
+decoding makes the outputs repeatable for a given model, prompt, and llama.cpp
+build.
