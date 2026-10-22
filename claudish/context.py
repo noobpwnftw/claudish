@@ -40,19 +40,24 @@ class Provider:
             self.name = spec.get("name") or self.path.name
         else:
             command = spec.get("command")
-            if isinstance(command, str):
-                command = shlex.split(command)
-            if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
+            if isinstance(command, str) and command.strip():
+                # Windows parses a command line itself (CreateProcess); POSIX shlex would eat backslashes.
+                command = command if os.name == "nt" else [os.path.expanduser(part) for part in shlex.split(command)]
+            elif isinstance(command, list) and command and all(isinstance(part, str) for part in command):
+                command = [os.path.expanduser(part) for part in command]
+            else:
                 raise ValueError('context command needs a "command" list or string')
-            self.command = [os.path.expanduser(part) for part in command]
+            self.command = command
             self.timeout = float(spec.get("timeout", 5))
             self.cwd = os.path.expanduser(spec["cwd"]) if spec.get("cwd") else None
-            self.name = spec.get("name") or " ".join(command)
+            self.name = spec.get("name") or (command if isinstance(command, str) else " ".join(command))
         if kind == "mcp":
             try:
                 import mcp  # noqa: F401  Optional dependency: pip install "claudish-ime[mcp]"
             except ImportError:
                 raise ValueError('mcp context needs the MCP SDK: pip install "claudish-ime[mcp]"')
+            if isinstance(self.command, str):
+                raise ValueError('mcp "command" must be a list on Windows: ["program", "arg", ...]')
             self.tool, self.resource = spec.get("tool"), spec.get("resource")
             if bool(self.tool) == bool(self.resource):
                 raise ValueError('mcp context needs exactly one of "tool" or "resource"')
