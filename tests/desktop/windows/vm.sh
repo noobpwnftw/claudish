@@ -23,8 +23,12 @@ case "$1" in
   run)  # Run a job script in the VM's desktop session and print its output.
     name=$(basename "$2" .ps1); rm -f "$vm/shared/results/$name.txt"
     cp "$2" "$vm/shared/jobs/$name.ps1"
-    while [ ! -f "$vm/shared/results/$name.txt" ]; do sleep 2; done
+    limit=${3:-120}; waited=0  # seconds; a stuck job should fail fast, not hang the caller
+    while [ ! -f "$vm/shared/results/$name.txt" ]; do
+      sleep 2; waited=$((waited + 2))
+      [ "$waited" -ge "$limit" ] && { echo "job $name: no result after ${limit}s" >&2; exit 1; }
+    done
     # Windows PowerShell 5 may write UTF-16; print either as UTF-8.
     python3 -c 'import sys; d = open(sys.argv[1], "rb").read(); print(d.decode("utf-16" if d[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"))' "$vm/shared/results/$name.txt" ;;
-  *) echo "usage: $0 start|stop|logs|sync|bootstrap|run JOB.ps1" >&2; exit 2 ;;
+  *) echo "usage: $0 start|stop|logs|sync|bootstrap|run JOB.ps1 [SECONDS]" >&2; exit 2 ;;
 esac
