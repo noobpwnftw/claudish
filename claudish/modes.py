@@ -23,12 +23,15 @@ INSTRUCT_EXAMPLES = [
 
 
 def defaults(rewrite_prompt=None):
-    """name -> {"system", "examples", "max_tokens"}; max_tokens None means the backend's default."""
+    """name -> {"system", "examples", "max_tokens", "candidates"}; max_tokens None means the backend's default.
+
+    candidates: how many readings to offer. An instruction is sent on purpose and its result
+    is awaited, so it offers a short list to pick from (1-3); while you type, one at a time."""
     system, examples = rewrite_prompt or (model.SYSTEM, model.EXAMPLES)
     return {
-        "rewrite": {"system": system, "examples": examples, "max_tokens": None},
-        "continue": {"system": CONTINUE_SYSTEM, "examples": CONTINUE_EXAMPLES, "max_tokens": 24},
-        "instruct": {"system": INSTRUCT_SYSTEM, "examples": INSTRUCT_EXAMPLES, "max_tokens": 400},
+        "rewrite": {"system": system, "examples": examples, "max_tokens": None, "candidates": 1},
+        "continue": {"system": CONTINUE_SYSTEM, "examples": CONTINUE_EXAMPLES, "max_tokens": 24, "candidates": 1},
+        "instruct": {"system": INSTRUCT_SYSTEM, "examples": INSTRUCT_EXAMPLES, "max_tokens": 400, "candidates": 3},
     }
 
 

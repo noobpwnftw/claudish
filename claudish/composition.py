@@ -9,6 +9,7 @@ class Composition:
     def __init__(self):
         self.text = ""
         self.candidate = ""
+        self.candidates = []  # every reading offered; candidate is the first
         self.revision = 0
         self.mode = MODES[0]
         self.working = False  # An instruction was submitted and its result is pending.
@@ -18,6 +19,7 @@ class Composition:
     def change(self, text):
         self.text = text
         self.candidate = ""
+        self.candidates = []
         self.working = self.failed = False
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
@@ -69,12 +71,27 @@ class Composition:
         self.change(self.text)
         return True
 
-    def offer(self, revision, text):
+    def offer(self, revision, text, alternatives=()):
         if revision != self.revision or not self.text:
             return False
         self.candidate = text
+        self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.working = False
         return True
+
+    @property
+    def choosing(self):
+        """A numbered list is shown: number keys pick. Only for an instruction, whose result you
+        asked for and are waiting on; while you type, digits are text."""
+        return self.mode == "instruct" and len(self.candidates) > 1
+
+    def pick(self, number):
+        """Commit the numbered candidate (1-based); None if there is no such candidate."""
+        if not (self.choosing and 1 <= number <= len(self.candidates)):
+            return None
+        text = self.candidates[number - 1]
+        self.change("")
+        return text
 
     def commit(self, suggested=False):
         text = (self.candidate if suggested else "") or self.text

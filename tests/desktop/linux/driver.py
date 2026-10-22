@@ -146,6 +146,14 @@ def scenarios():
     wait_for(lambda: state()["view"], what="instruct result with a window picture")
     check("F8 sends a real picture of the window", state()["view"], "As requested—describe this, having looked at the window.")
 
+    key("ctrl+a", "BackSpace")
+    type_text("greet")
+    key("Return")  # three readings come back as a numbered list
+    settle()
+    key("2")
+    wait_for(lambda: state()["view"], what="the second reading")
+    check("2 inserts the second of several readings", state()["view"], "Certainly—as requested—greet.")
+
     check("binding for the focused app ran its context provider", (WORK / "bound-app.py").exists(), True)
     check("binding for another app did not run", (WORK / "bound-firefox").exists(), False)
 

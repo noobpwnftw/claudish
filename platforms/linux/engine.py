@@ -31,7 +31,7 @@ class ClaudishEngine(IBus.Engine):
         result = self.suggestions.poll()
         if result:
             revision, data = result
-            if "text" in data and self.composition.offer(revision, data["text"]):
+            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
                 self.render()
             elif "error" in data:
                 self.composition.fail(revision)
@@ -43,7 +43,17 @@ class ClaudishEngine(IBus.Engine):
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
         state = self.composition
-        if state.candidate:
+        # Several readings of an instruction: a numbered list, like any CJK input method's.
+        if state.choosing:
+            table = IBus.LookupTable.new(9, 0, True, False)
+            for candidate in state.candidates:
+                table.append_candidate(IBus.Text.new_from_string(candidate))
+            self.update_lookup_table(table, True)
+        else:
+            self.hide_lookup_table()
+        if state.choosing:
+            hint = "instruct · 1–%d: insert that one · Enter: the first · Esc: keep your words" % len(state.candidates)
+        elif state.candidate:
             hint = LABELS[state.mode] + state.candidate
         elif state.working:
             hint = "instruct · %s… · Esc: keep your words" % ("looking and working" if state.look else "working")
@@ -88,6 +98,13 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F7 and self.composition.text:
             self.composition.next_mode()
             self.changed()
+            return True
+        if self.composition.choosing and IBus.KEY_1 <= keyval <= IBus.KEY_9:
+            text = self.composition.pick(keyval - IBus.KEY_0)
+            if text is None:
+                return True  # no such candidate: ignore the key rather than type it
+            self.changed()
+            self.commit_text(IBus.Text.new_from_string(text))
             return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()

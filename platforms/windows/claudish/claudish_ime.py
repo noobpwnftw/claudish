@@ -79,9 +79,9 @@ class ClaudishTextService(TextService):
         self.setCompositionString(self.state.text)
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(self.state.text.encode("utf-16-le")) // 2)
-        candidate = self.state.candidate
-        self.setCandidateList([candidate] if candidate else [])
-        self.setShowCandidates(bool(candidate))
+        candidates = self.state.candidates if self.state.choosing else [self.state.candidate] if self.state.candidate else []
+        self.setCandidateList(candidates)
+        self.setShowCandidates(bool(candidates))
 
     def changed(self):
         if self.worker and (self.state.automatic or not self.state.text):
@@ -95,7 +95,7 @@ class ClaudishTextService(TextService):
         if result:
             revision, data = result
             if "text" in data:
-                self.state.offer(revision, data["text"])
+                self.state.offer(revision, data["text"], data.get("candidates", ()))
             elif "error" in data:
                 self.state.fail(revision)
                 if self.state.failed:
@@ -121,6 +121,12 @@ class ClaudishTextService(TextService):
             if action == "wait":
                 self.showMessage("cd_AI: still working…", 2)
                 return True
+        if self.state.choosing and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
+            text = self.state.pick(key - 0x30)
+            if text is not None:
+                self.setCommitString(text)
+                self.changed()
+            return True
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
             return True

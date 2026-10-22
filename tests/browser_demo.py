@@ -102,10 +102,22 @@ async def check(args):
             assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
             await page.locator("#draft").press("Enter")  # Enter sends the instruction.
             await expect(page.locator("#accept")).to_be_enabled(timeout=10000)
-            draft_text = await page.locator("#candidate").inner_text()
-            assert draft_text.strip() and any(body and body.get("mode") == "instruct" for body in sent), sent
-            await page.locator("#draft").press("Enter")  # The second Enter inserts it.
-            await expect(page.locator("#output")).to_have_value(draft_text)
+            assert any(body and body.get("mode") == "instruct" for body in sent), sent
+            choices = page.locator("#candidate .choice")
+            if await choices.count() > 1:  # several readings: a numbered list; 2 inserts the second
+                if args.screenshots:
+                    await page.screenshot(path=str(args.screenshots / "choices.png"))
+                count = await choices.count()
+                await expect(page.locator("#candidate-state")).to_have_text("PICK ONE · 1–%d" % count)
+                second = (await choices.nth(1).inner_text()).split(" ", 1)[1]
+                await page.locator("#draft").press("2")
+                await expect(page.locator("#output")).to_have_value(second)
+                print("instruct offered %d readings; 2 inserted the second" % count)
+            else:
+                draft_text = await page.locator("#candidate").inner_text()
+                assert draft_text.strip()
+                await page.locator("#draft").press("Enter")  # The second Enter inserts it.
+                await expect(page.locator("#output")).to_have_value(draft_text)
             await page.get_by_role("radio", name="REWRITE").check()
             await expect(page.locator("#candidate-title")).to_have_text("THE CLAUDISH EDIT")
             await page.locator("#clear").click()

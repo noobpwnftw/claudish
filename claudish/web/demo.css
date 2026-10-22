@@ -12,3 +12,4 @@
 .samples>span{font-size:12px}.samples button{font-size:14px;padding:9px 15px}.copy-button,.text-button{white-space:nowrap}@media(max-width:650px){.samples button{font-size:13px}.output-header{flex-wrap:wrap;align-items:flex-end}.output-actions{margin-left:auto}}
 .hint{white-space:nowrap}.draft-bottom>span,.candidate-bottom>span,.model-strip p{text-wrap:balance}
 h1,h2,.lede,.candidate,.feedback,.samples>span{text-wrap:balance}
+.candidate .choice{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;font:inherit;font-size:19px;line-height:1.45;padding:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}.candidate .choice+.choice{border-top:1px solid var(--line)}.candidate .choice kbd{margin-right:8px;vertical-align:2px}.candidate .choice:hover{color:var(--accent)}.candidate:has(.choice){width:100%}

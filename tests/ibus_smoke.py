@@ -58,9 +58,18 @@ try:
     engine.composition.offer(engine.composition.revision, "Once upon a time—a cat.")
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     assert commits[-1] == "Once upon a time—a cat."
+    # Several readings of an instruction: a numbered list; 2 inserts the second.
+    for char in "greet":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    engine.composition.offer(engine.composition.revision, "Hello.", ["Hi there.", "Greetings."])
+    assert engine.composition.choosing
+    engine.render()
+    assert engine.do_process_key_event(IBus.KEY_2, 0, 0)
+    assert commits[-1] == "Hi there." and not engine.composition.text
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, F8, password bypass")
+    print("IBus binding smoke passed: composition, modifiers, commit, candidate, modes, F8, candidate list, password bypass")
 finally:
     engine.destroy()

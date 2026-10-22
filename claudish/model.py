@@ -142,6 +142,30 @@ class Rewriter:
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
+    def complete(self, payload, headers, image=None):
+        """One chat completion from an OpenAI-compatible server: (text, usage)."""
+        req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
+        # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
+        # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
+        if self.opener is None:
+            self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
+        try:
+            with self.opener.open(req, timeout=self.timeout) as response:
+                data = json.load(response)
+        except HTTPError as exc:
+            if image is not None and exc.code in (400, 500, 501):
+                raise RuntimeError("this model server did not accept the window picture; it needs a vision "
+                                   "model (llama.cpp: --mmproj)") from exc
+            raise
+        choice = data["choices"][0]
+        # Never offer a sentence chopped off by the token limit.
+        if choice.get("finish_reason") == "length":
+            raise RuntimeError("rewrite exceeded token budget; use a shorter phrase")
+        output = choice["message"]["content"].strip()
+        if not output:
+            raise RuntimeError("model returned no text")
+        return output, data.get("usage", {})
+
     def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False):
         """look: attach a picture of the focused window (instruct only; the user asked for it with F8)."""
         started = time.perf_counter()
@@ -167,12 +191,15 @@ class Rewriter:
             consulted = consulted + ["window picture (%d×%d)" % (width, height)]
         system = spec["system"] + block
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
+        count = spec.get("candidates") or 1
         if self.backend == "rules":
             # Deterministic stand-ins so the demo and tests work without a model.
             output = {"rewrite": rules(text), "continue": "and then some—naturally.",
                       "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
             if image is not None:
                 output = output[:-1] + ", having looked at the window."
+            outputs = [output] + ["%s—%s" % (lead, output[0].lower() + output[1:])
+                                  for lead in ("Certainly", "Of course")][:count - 1]
             usage = {}
         elif self.backend == "command":
             # An agent CLI (claude -p, ollama run, ...): the prompt goes in on stdin, never through a shell.
@@ -187,7 +214,7 @@ class Rewriter:
                     raise RuntimeError("the agent took longer than %g s" % self.timeout)
                 if done.returncode != 0:
                     raise RuntimeError("the agent failed (exit %d): %s" % (done.returncode, done.stderr.strip()[-300:]))
-                output, usage = done.stdout.strip(), {}
+                outputs, usage = [done.stdout.strip()], {}
             finally:
                 self.lock.release()
         elif self.claude:
@@ -198,6 +225,7 @@ class Rewriter:
                 output, usage = self.claude.rewrite(text, system, examples, image)
                 if not output:
                     raise RuntimeError("Claude returned no text")
+                outputs = [output]  # one request: alternatives would multiply the cost
             finally:
                 self.lock.release()
         else:
@@ -214,33 +242,30 @@ class Rewriter:
                 headers = {"Content-Type": "application/json"}
                 if self.api_key:
                     headers["Authorization"] = "Bearer " + self.api_key
-                req = Request(self.endpoint + "/v1/chat/completions",
-                              data=json.dumps(payload).encode(), headers=headers)
-                # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
-                # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
-                if self.opener is None:
-                    self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
-                try:
-                    with self.opener.open(req, timeout=self.timeout) as response:
-                        data = json.load(response)
-                except HTTPError as exc:
-                    if image is not None and exc.code in (400, 500, 501):
-                        raise RuntimeError("this model server did not accept the window picture; it needs a vision "
-                                           "model (llama.cpp: --mmproj)") from exc
-                    raise
-                choice = data["choices"][0]
-                # Never offer a sentence chopped off by the token limit.
-                if choice.get("finish_reason") == "length":
-                    raise RuntimeError("rewrite exceeded token budget; use a shorter phrase")
-                output = choice["message"]["content"].strip()
-                usage = data.get("usage", {})
-                if not output:
-                    raise RuntimeError("model returned no text")
+                outputs, usage = [], {}
+                for index in range(count):
+                    # The first reading is deterministic (what the evaluation measures); the others
+                    # are sampled, so they differ. A failed extra sample only shortens the list.
+                    if index:
+                        payload.update(temperature=0.9, seed=index)
+                    try:
+                        output, used = self.complete(payload, headers, image)
+                    except Exception:
+                        if index:
+                            continue
+                        raise
+                    outputs.append(output)
+                    usage = usage or used
             finally:
                 self.lock.release()
-        output = self.finish(mode, text, output)
-        if not output:
+        candidates = []
+        for output in outputs:
+            output = self.finish(mode, text, output)
+            if output and output not in candidates:
+                candidates.append(output)
+        if not candidates:
             raise RuntimeError("the model offered nothing for this %s" % mode)
-        return {"text": output, "backend": self.backend, "mode": mode, "consulted": consulted,
+        return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
+                "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}

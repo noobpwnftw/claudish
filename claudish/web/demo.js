@@ -4,6 +4,7 @@ const draft = $("draft");
 const output = $("output");
 let revision = 0;
 let candidate = "";
+let choices = [];  // several readings of an instruction: 1-3 pick, as in a CJK input method
 let timer;
 let inflight = false;
 let queued = false;
@@ -27,6 +28,7 @@ const MODES = {
 function status(label) { $("candidate-state").textContent = label; }
 function resetCandidate() {
   candidate = "";
+  choices = [];
   $("accept").disabled = true;
   $("candidate").textContent = IN_BROWSER && !browserBackend ? "Run the model above, then type something ordinary."
     : mode === "instruct"
@@ -80,13 +82,14 @@ async function requestSuggestion() {
     }
     if (current !== revision) return;
     candidate = data.text;
-    $("candidate").textContent = candidate;
+    choices = mode === "instruct" && (data.candidates || []).length > 1 ? data.candidates.slice(0, 9) : [];
+    showCandidates();
     $("candidate").classList.remove("placeholder");
     $("accept").disabled = false;
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms IN THIS BROWSER`
       : `${elapsed} ms ROUND TRIP · ${Math.round(data.elapsed_ms)} ms ${data.backend === "rules" ? "RULES" : "INFERENCE"}`;
-    status(data.backend === "rules" ? "RULES DEMO · READY" : "A THOUGHTFUL REVISION");
+    status(choices.length ? `PICK ONE · 1–${choices.length}` : data.backend === "rules" ? "RULES DEMO · READY" : "A THOUGHTFUL REVISION");
   } catch (error) {
     if (current === revision) {
       status("YOUR WORDS ARE STILL HERE");
@@ -104,8 +107,24 @@ async function requestSuggestion() {
   }
 }
 
-function commit(useCandidate) {
-  const text = useCandidate ? candidate : draft.value;
+function showCandidates() {
+  const box = $("candidate");
+  box.replaceChildren();
+  if (!choices.length) { box.textContent = candidate; return; }
+  choices.forEach((choice, index) => {  // nodes, not HTML: the text comes from a model
+    const line = document.createElement("button");
+    line.type = "button";
+    line.className = "choice";
+    const number = document.createElement("kbd");
+    number.textContent = String(index + 1);
+    line.append(number, " ", choice);
+    line.addEventListener("click", () => commit(true, choice));
+    box.append(line);
+  });
+}
+
+function commit(useCandidate, chosen) {
+  const text = chosen || (useCandidate ? candidate : draft.value);
   if (!text.trim()) return;
   output.value += (output.value ? "\n\n" : "") + text;
   $("copy").disabled = false;
@@ -129,7 +148,12 @@ draft.addEventListener("compositionstart", () => { composing = true; revision++;
 draft.addEventListener("compositionend", () => { composing = false; edited(); });
 draft.addEventListener("keydown", (event) => {
   if (event.isComposing || composing || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.key === "Tab" && !event.shiftKey && candidate) { event.preventDefault(); commit(true); }
+  if (choices.length && /^[1-9]$/.test(event.key)) {
+    // A list is showing: a digit picks, as in a CJK input method (while typing, digits are text).
+    event.preventDefault();
+    if (Number(event.key) <= choices.length) commit(true, choices[Number(event.key) - 1]);
+  }
+  else if (event.key === "Tab" && !event.shiftKey && candidate) { event.preventDefault(); commit(true); }
   else if (event.key === "Enter" && !event.shiftKey && draft.value.trim()) {
     event.preventDefault();
     if (mode !== "instruct") commit(false);

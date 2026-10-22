@@ -61,18 +61,36 @@ class ClaudishInputController(IMKInputController):
         result = self.worker.poll()
         if result:
             revision, data = result
-            if "text" in data and self.state.offer(revision, data["text"]):
+            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
                 self.panel.updateCandidates()
                 self.panel.show(kIMKLocateCandidatesBelowHint)
             elif "error" in data:
                 self.state.fail(revision)
 
     def candidates_(self, sender):
+        if self.state.choosing:
+            return list(self.state.candidates)
         return [self.state.candidate] if self.state.candidate else []
 
     def candidateSelected_(self, candidate):
-        if self.active and self.state.candidate and str(candidate) == self.state.candidate:
+        if not (self.active and self.state.candidate):
+            return
+        if self.state.choosing and str(candidate) in self.state.candidates:
+            self.commit_pick(self.client(), self.state.candidates.index(str(candidate)) + 1)
+        elif str(candidate) == self.state.candidate:
             self.finish(self.client(), suggested=True)
+
+    @objc.python_method
+    def commit_pick(self, client, number):
+        """Insert the numbered candidate of an instruction's list (1-9 or a click in the panel)."""
+        text = self.state.pick(number)
+        if text is None:
+            return
+        if self.worker is not None:
+            self.worker.schedule(self.state.revision, "")
+        self.panel.hide()
+        if client is not None:
+            client.insertText_replacementRange_(text, (NSNotFound, 0))
 
     @objc.python_method
     def app(self, client):
@@ -115,6 +133,10 @@ class ClaudishInputController(IMKInputController):
             return False
         self.pollSuggestions_(None)
         key = event.keyCode()
+        chars = event.characters() or ""
+        if self.state.choosing and len(chars) == 1 and "1" <= chars <= "9":
+            self.commit_pick(client, int(chars))
+            return True
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True

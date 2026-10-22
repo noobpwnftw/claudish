@@ -103,6 +103,7 @@ Or step by step:
 | Enter | keep your wording (rewrite, continue); send, then insert (instruct) |
 | Esc | keep what you typed |
 | F8 | in instruct, also send a picture of the window you are typing in |
+| 1–3 | when an instruction comes back as a numbered list, insert that reading |
 
 ## Static demo: the model in your browser
 
@@ -556,6 +557,7 @@ refuses to overwrite an existing installed app.
 | F6 | Preview a completed candidate; useful on Windows |
 | F7 | Switch mode while composing: rewrite → continue → instruct (Linux shows it in the auxiliary text, Windows in a notice) |
 | Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result; Esc keeps your text |
+| 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](#window-pictures)) |
 | Tab | Commit an available rewrite; if none is ready, keep composing |
 | Enter / Escape | Commit your wording, including the em-dash substitution |

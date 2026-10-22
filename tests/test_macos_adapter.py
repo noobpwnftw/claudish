@@ -197,6 +197,19 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, ["Thank you, team—truly."])
         self.assertFalse(self.key(98))  # Without a composition, F7 belongs to the app.
 
+    def test_instruct_lists_several_readings_and_digits_pick(self):
+        self.key(0, "x")
+        self.key(98)
+        self.key(98)  # instruct
+        state, worker = self.controller.state, self.controller.worker
+        self.assertTrue(self.key(36))
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.assertEqual(self.controller.candidates_(None), ["Hello.", "Hi there."])
+        self.assertTrue(self.key(19, "2"))
+        self.assertEqual(self.client.commits, ["Hi there."])
+        self.assertEqual(state.text, "")
+
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
         self.key(0, "x")
         self.key(98)
