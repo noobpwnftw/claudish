@@ -165,6 +165,14 @@ the cost of the last turn only.
    keeps one process per conversation: Esc interrupts a turn rather than killing
    the agent, an exited agent is resumed by session id, and the agent exits with
    its conversation.
+   **Done:** the text box as retrieval. The window around the caret is sent each
+   turn; when the text box is longer, the model driver offers `textbox.read` and
+   `textbox.search` (Claudish's own read-only tools, no MCP SDK needed), and an
+   agent gets the same two tools from `claudish textbox-mcp`, an MCP server
+   Claudish configures for it with `--mcp-config`. The server reads through the
+   service with the conversation's token, so no other local process can read the
+   text box; the agent's reads are allowed by policy, without a question.
+   Selection is not sent by the adapters yet.
 2. Readings after tools.
 3. Claude's tool loop (needs credentials to verify).
 4. Streaming the final turn as a partial draft.

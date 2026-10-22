@@ -123,6 +123,26 @@ class ServiceTests(unittest.TestCase):
         text = self.until(self.turn("count"), "result")["text"]
         self.assertEqual(text, "turn 1 of this process (--resume %s)" % agent.session_id)
 
+    def test_the_agent_reads_the_text_box_over_mcp(self):
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        before = "Minutes. The budget for Q3 is 40k.\n" + "Filler.\n" * 400
+        _, data = self.call("/sessions", {"text": "use the textbox", "conversation": "box", "before": before})
+        result = self.until(data["id"], "result", timeout=30)["text"]
+        names, found, caret = result.split(" | ")
+        self.assertEqual(names, "read,search")
+        self.assertIn("The budget for Q3 is 40k", found)
+        self.assertEqual(caret, "caret seen: True")
+        self.assertEqual([e for e in self.call("/sessions/%s?after=0" % data["id"])[1]["events"]
+                          if e["type"] == "question"], [])  # the read ran by policy, unasked
+        # Without the conversation's token, the text box is not readable.
+        self.assertEqual(self.call("/conversations/box/textbox", {"op": "read"})[0], 404)
+        config = self.rewriter.conversations.get("box").agent.config_file
+        self.call("/conversations/box/end", {})
+        self.assertFalse(Path(config).exists())  # the token's file goes with the conversation
+
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)
         self.assertEqual(self.call("/sessions/nope?after=0")[0], 404)

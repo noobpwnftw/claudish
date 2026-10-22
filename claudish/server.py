@@ -1,7 +1,12 @@
+import hmac
 import json
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .composition import MAX_COMPOSITION
+
+
+TEXTBOX_LIMIT = 200_000  # an instruction's text box, each side of the caret (the model sees a window)
+BODY_LIMIT = 8 * TEXTBOX_LIMIT + 65536  # both sides, in UTF-8 and JSON escapes
 
 
 def make_server(rewriter, port=18765):
@@ -34,7 +39,7 @@ def make_server(rewriter, port=18765):
                 "localhost:%s" % self.server.server_port,
             )
 
-        def json_request(self):
+        def json_request(self, limit=32768):
             """The checked JSON body of a request from this machine's own pages, or None after replying."""
             origin = self.headers.get("Origin")  # the local demo may call its own API; websites may not
             if origin is not None and origin != "http://" + self.headers["Host"]:
@@ -44,7 +49,7 @@ def make_server(rewriter, port=18765):
             if self.headers.get_content_type() != "application/json":
                 return self.reply(415, {"error": "application/json required"})
             size = int(self.headers.get("Content-Length", "0") or 0)
-            if not 0 < size <= 32768:
+            if not 0 < size <= limit:
                 return self.reply(413, {"error": "invalid body size"})
             try:
                 data = json.loads(self.rfile.read(size))
@@ -56,10 +61,10 @@ def make_server(rewriter, port=18765):
 
         def post_session(self):
             """POST /sessions {text, app?}; /sessions/ID/answer {question, choice | text}; /sessions/ID/cancel."""
-            data = self.json_request()
+            parts = self.path.strip("/").split("/")
+            data = self.json_request(BODY_LIMIT if parts == ["sessions"] else 32768)
             if data is None:
                 return
-            parts = self.path.strip("/").split("/")
             if parts == ["sessions"]:
                 text, app = data.get("text"), data.get("app")
                 conversation, look = data.get("conversation"), data.get("look", False)
@@ -70,8 +75,9 @@ def make_server(rewriter, port=18765):
                     return self.reply(400, {"error": "app must be a short string"})
                 if conversation is not None and not (isinstance(conversation, str) and 0 < len(conversation) <= 64):
                     return self.reply(400, {"error": "conversation must be a short id"})
-                if not (isinstance(before, str) and isinstance(after, str) and len(before) <= 8000 and len(after) <= 8000):
-                    return self.reply(400, {"error": "before/after must be strings of at most 8000 characters"})
+                if not (isinstance(before, str) and isinstance(after, str) and len(before) <= TEXTBOX_LIMIT and len(after) <= TEXTBOX_LIMIT):
+                    return self.reply(400, {"error": "before/after must be strings of at most %d characters"
+                                                     % TEXTBOX_LIMIT})
                 if not isinstance(look, bool):
                     return self.reply(400, {"error": "look is a boolean"})
                 try:
@@ -81,6 +87,8 @@ def make_server(rewriter, port=18765):
                 except RuntimeError as exc:
                     return self.reply(503, {"error": str(exc)})
                 return self.reply(200, {"id": session.id})
+            if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "textbox":
+                return self.textbox(parts[1], data)
             if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "end":
                 rewriter.conversations.end(parts[1])  # its text box went away
                 return self.reply(200, {"ok": True})
@@ -100,6 +108,25 @@ def make_server(rewriter, port=18765):
             except ValueError as exc:
                 return self.reply(400, {"error": str(exc)})
             return self.reply(200, {"ok": True})
+
+        def textbox(self, key, data):
+            """POST /conversations/ID/textbox {op: read|search, ...}: the conversation's text box, for
+            its agent (claudish textbox-mcp). Only with the conversation's token: the text box is
+            typed text, so other local processes may not read it."""
+            conversation = rewriter.conversations.find(key)
+            token = self.headers.get("X-Claudish-Token") or ""
+            if conversation is None or not hmac.compare_digest(token, conversation.token):
+                return self.reply(404, {"error": "no such conversation"})
+            try:
+                if data.get("op") == "read":
+                    text = conversation.textbox.read(data.get("start", 0), data.get("length", 2000))
+                elif data.get("op") == "search":
+                    text = conversation.textbox.search(data.get("query", ""))
+                else:
+                    return self.reply(400, {"error": "op is read or search"})
+            except (TypeError, ValueError) as exc:
+                return self.reply(400, {"error": str(exc)})
+            return self.reply(200, {"text": text})
 
         def get_session(self):
             """GET /sessions/ID?after=N: new events, waiting up to a second for the first."""
@@ -188,4 +215,6 @@ def make_server(rewriter, port=18765):
             sock.settimeout(5)
             return sock, address
 
-    return Server(("127.0.0.1", port), Handler)
+    server = Server(("127.0.0.1", port), Handler)
+    rewriter.url = "http://127.0.0.1:%d" % server.server_port  # for the agents' textbox MCP server
+    return server

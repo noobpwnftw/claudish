@@ -12,6 +12,7 @@ session id. Message shapes follow the Agent SDK's control protocol
 import json
 import os
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -31,8 +32,10 @@ def summarize(tool, arguments):
 class AgentProcess:
     """One agent process for a conversation: started once, given each turn as a user message."""
 
-    def __init__(self, command):
+    def __init__(self, command, mcp_config=None):
         self.command = list(command)
+        self.mcp_config = mcp_config  # Claudish's own MCP servers for this agent (the text box)
+        self.config_file = None
         self.session_id = str(uuid.uuid4())
         self.started = False  # once started, a restart resumes the same agent session
         self.process = None
@@ -53,6 +56,13 @@ class AgentProcess:
         session = []
         if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):
             session = ["--resume", self.session_id] if self.started else ["--session-id", self.session_id]
+        if self.mcp_config and self.config_file is None:
+            # A private file, not an argument: the config carries the conversation's token.
+            descriptor, self.config_file = tempfile.mkstemp(prefix="claudish-mcp-", suffix=".json")
+            with os.fdopen(descriptor, "w", encoding="utf-8") as config:
+                json.dump(self.mcp_config, config)
+        if self.config_file:
+            session += ["--mcp-config", self.config_file]
         self.process = subprocess.Popen(self.command + session, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                                         bufsize=1)
@@ -89,7 +99,14 @@ class AgentProcess:
         timer.daemon = True
         timer.start()
 
-    def close(self):
+    def close(self, ended=False):
+        """Stop the process; ended: the conversation is over (its MCP config goes too)."""
+        if ended and self.config_file:
+            try:
+                os.unlink(self.config_file)
+            except OSError:
+                pass
+            self.config_file = None
         process, self.process = self.process, None
         if process is None:
             return
@@ -112,10 +129,11 @@ class AgentProcess:
 class ClaudeCodeDriver:
     """One turn: the conversation's agent process, its events, and its permission questions."""
 
-    def __init__(self, command, timeout=300, agent=None):
+    def __init__(self, command, timeout=300, agent=None, context=""):
         self.agent = agent or AgentProcess(command)
         self.own = agent is None  # a process of its own (no conversation): closed after the turn
         self.timeout = timeout
+        self.context = context  # the text box around the caret, sent with the instruction
         self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
         self.cancelled = False
         self.ran = None  # the process this turn ran in
@@ -145,7 +163,7 @@ class ClaudeCodeDriver:
         timer = threading.Timer(self.timeout, self.cancel)
         timer.daemon = True
         timer.start()
-        self.send({"type": "user", "message": {"role": "user", "content": prompt}, "parent_tool_use_id": None})
+        self.send({"type": "user", "message": {"role": "user", "content": prompt + self.context}, "parent_tool_use_id": None})
         draft, last = "", 0.0
         process = self.ran = self.agent.process
         try:
@@ -195,6 +213,11 @@ class ClaudeCodeDriver:
             # Claudish registers no hooks or SDK MCP servers; anything else is declined.
             self.send({"type": "control_response", "response": {
                 "subtype": "error", "request_id": request_id, "error": "not supported by this host"}})
+            return
+        if (body.get("tool_name") or "").startswith("mcp__textbox__"):
+            # Claudish's own read-only tools: the policy runs reads without asking.
+            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
+                       "response": {"behavior": "allow", "updatedInput": body.get("input") or {}}}})
             return
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}

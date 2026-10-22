@@ -4,7 +4,7 @@ Profile: "tools": ["notes", {"server": "github", "trust": ["get_pull_request"]}]
 mcp_servers. Only tools the server marks read-only (readOnlyHint) are offered, plus the ones the
 user vouches for with "trust"; tools with side effects wait for an approval channel (G18). Every
 call is listed in "consulted", the loop is bounded in steps and time, and the result is still
-only a candidate.
+only a candidate. Claudish's own read-only tools (the text box) join them, with or without MCP.
 """
 import json
 import time
@@ -57,52 +57,55 @@ class Toolbox:
             Provider.__init__(provider, {"type": "mcp", "server": name, "timeout": timeout}, None, servers)
             self.servers.append((name, trust, deny, provider))
 
-    def run(self, ask, messages, approve=None, progress=None):
+    def run(self, ask, messages, approve=None, progress=None, local=None):
         """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).
         approve(server, tool, arguments, kind) -> (allowed, reason) is asked before each write or
         destructive call; without it those tools are not offered. progress(text) hears each call.
+        local: {"server__tool": (description, parameters, function(arguments) -> text)}, read-only
+        tools served by Claudish itself (the text box). MCP servers need the SDK; local tools do not.
         Returns (final text, consulted, messages with the tool calls and results appended)."""
-        import anyio
-        return anyio.run(self._run, ask, messages, approve, progress)
-
-    async def _run(self, ask, messages, approve, progress):
-        from contextlib import AsyncExitStack
-
-        import anyio
-        from mcp import ClientSession
-        from .context import connector
-        consulted, kinds = [], {}
+        from contextlib import ExitStack
+        consulted, kinds, callers, offered = [], {}, {}, []
         spent = 0.0  # model and tool time; waiting for your answer does not count
 
-        async def timed(call, *args):
+        def timed(call, *args):
             nonlocal spent
             started = time.monotonic()
-            with anyio.fail_after(max(1.0, self.timeout - spent)):
-                try:
-                    return await call(*args)
-                finally:
-                    spent += time.monotonic() - started
+            try:
+                return call(*args)
+            finally:
+                spent += time.monotonic() - started
 
-        async with AsyncExitStack() as stack:
-            sessions, offered = {}, []
-            for name, trust, deny, provider in self.servers:
-                streams = await stack.enter_async_context(connector(provider))
-                session = await stack.enter_async_context(ClientSession(streams[0], streams[1]))
-                await timed(session.initialize)
-                sessions[name] = session
-                for tool in (await timed(session.list_tools)).tools:
-                    kind = classify(tool, trust, deny)
-                    if kind == "denied" or (kind != "read" and approve is None):
-                        continue  # side effects are only offered when someone can approve them
-                    kinds[name + SEPARATOR + tool.name] = kind
-                    offered.append({"type": "function", "function": {
-                        "name": name + SEPARATOR + tool.name,
-                        "description": (tool.description or "").strip()[:500],
-                        "parameters": field(tool, "input_schema") or {"type": "object", "properties": {}}}})
+        def offer(name, description, parameters):
+            offered.append({"type": "function", "function": {
+                "name": name, "description": (description or "").strip()[:500],
+                "parameters": parameters or {"type": "object", "properties": {}}}})
+
+        for name, (description, parameters, function) in (local or {}).items():
+            kinds[name], callers[name] = "read", function
+            offer(name, description, parameters)
+        with ExitStack() as stack:
+            if self.servers:
+                from anyio.from_thread import start_blocking_portal
+                portal = stack.enter_context(start_blocking_portal())
+                for name, trust, deny, provider in self.servers:
+                    limit = max(1.0, self.timeout - spent)
+                    session = stack.enter_context(portal.wrap_async_context_manager(opened(provider, limit)))
+                    for tool in timed(portal.call, listed, session, max(1.0, self.timeout - spent)):
+                        kind = classify(tool, trust, deny)
+                        if kind == "denied" or (kind != "read" and approve is None):
+                            continue  # side effects are only offered when someone can approve them
+                        full = name + SEPARATOR + tool.name
+                        if full in kinds:
+                            continue  # Claudish's own tools come first
+                        kinds[full] = kind
+                        callers[full] = (lambda arguments, session=session, tool=tool.name: timed(
+                            portal.call, called, session, tool, arguments, max(1.0, self.timeout - spent)))
+                        offer(full, tool.description, field(tool, "input_schema"))
             messages = list(messages)
             for step in range(MAX_STEPS + 1):
                 final = step == MAX_STEPS or not offered or spent >= self.timeout
-                reply = await timed(anyio.to_thread.run_sync, ask, messages, None if final else offered)
+                reply = timed(ask, messages, None if final else offered)
                 calls = reply.get("tool_calls") or []
                 if not calls:
                     return (reply.get("content") or "").strip(), consulted, messages
@@ -122,7 +125,7 @@ class Toolbox:
                             "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items()))
                         allowed, reason = True, None
                         if kind != "read":
-                            allowed, reason = await anyio.to_thread.run_sync(approve, server, tool, arguments, kind)
+                            allowed, reason = approve(server, tool, arguments, kind)
                         if not allowed:
                             result = "denied by the user" + (": " + reason if reason else "")
                         else:
@@ -130,12 +133,39 @@ class Toolbox:
                             if progress:
                                 progress(summary)
                             try:
-                                outcome = await timed(sessions[server].call_tool, tool, arguments)
-                                result = "\n".join(block.text for block in outcome.content
-                                                   if getattr(block, "type", "") == "text")[:8000]
-                                if field(outcome, "is_error"):
-                                    result = "error: " + result
+                                result = str(callers[function["name"]](arguments))[:8000]
                             except Exception as exc:  # a failed tool is information for the model
                                 result = "error: %s" % (exc,)
                     messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
         raise RuntimeError("the tool loop did not finish")
+
+
+def opened(provider, limit):
+    """An initialized MCP client session for a configured server (an async context manager)."""
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def session():
+        import anyio
+        from mcp import ClientSession
+        from .context import connector
+        async with connector(provider) as streams:
+            async with ClientSession(streams[0], streams[1]) as client:
+                with anyio.fail_after(limit):
+                    await client.initialize()
+                yield client
+    return session()
+
+
+async def listed(session, limit):
+    import anyio
+    with anyio.fail_after(limit):
+        return (await session.list_tools()).tools
+
+
+async def called(session, tool, arguments, limit):
+    import anyio
+    with anyio.fail_after(limit):
+        outcome = await session.call_tool(tool, arguments)
+    text = "\n".join(block.text for block in outcome.content if getattr(block, "type", "") == "text")
+    return "error: " + text if field(outcome, "is_error") else text

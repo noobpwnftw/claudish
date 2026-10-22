@@ -28,7 +28,7 @@ class Scripted:
     def __init__(self, *replies):
         self.replies, self.sent = list(replies), []
 
-    def __call__(self, payload, headers, image=None):
+    def __call__(self, payload, headers, image=None, timeout=None):
         self.sent.append(payload)
         return self.replies.pop(0) if self.replies else answer("Another reading.")
 
@@ -67,6 +67,28 @@ class ConversationTests(unittest.TestCase):
         result = session.events[-1]
         self.assertEqual((result["type"], result["candidates"]), ("result", ["One.", "Two."]))
         self.assertEqual([p["temperature"] for p in model.sent], [0, 0.9, 0.9])
+
+    def test_a_long_text_box_is_searched_not_sent(self):
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        before = "Minutes. The budget for Q3 is 40k, agreed by Ana.\n" + "Filler line.\n" * 400
+        model = Scripted(answer(calls=[("textbox__search", {"query": "budget"})]), answer("Q3 has 40k—per Ana."))
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), before=before),
+                                  "remind them of the budget")
+            thread.join(5)
+        first = model.sent[0]
+        self.assertNotIn("Minutes.", first["messages"][0]["content"])  # only the window is sent
+        self.assertIn("textbox__read", [t["function"]["name"] for t in first["tools"]])
+        found = [m["content"] for m in model.sent[1]["messages"] if m["role"] == "tool"][-1]
+        self.assertIn("The budget for Q3 is 40k", found)
+        self.assertEqual(session.events[-1]["consulted"], ['textbox.search(query="budget")'])
+        self.assertEqual(session.events[-1]["text"], "Q3 has 40k—per Ana.")
+        short = Scripted(answer("Hi."))
+        with patch.object(rewriter, "chat", short):
+            _, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), before="Dear Sam,"), "say hi")
+            thread.join(5)
+        self.assertNotIn("tools", short.sent[0])  # a short text box is sent whole: no tools
 
     def test_idle_conversations_end(self):
         conversations = Conversations()

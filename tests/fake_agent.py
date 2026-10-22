@@ -43,7 +43,8 @@ threading.Thread(target=reader, daemon=True).start()
 init = read()
 assert init["type"] == "control_request" and init["request"]["subtype"] == "initialize", init
 out({"type": "control_response", "response": {"subtype": "success", "request_id": init["request_id"], "response": {}}})
-session = " ".join(sys.argv[1:])
+session = " ".join(arg for i, arg in enumerate(sys.argv[1:]) if arg in ("--session-id", "--resume")
+                   or sys.argv[i] in ("--session-id", "--resume"))
 turns = 0
 while True:
     prompt = read()
@@ -55,6 +56,27 @@ while True:
         if "count" in text:
             out({"type": "result", "subtype": "success", "is_error": False,
                  "result": "turn %d of this process (%s)" % (turns, session)})
+            continue
+        if "textbox" in text:  # call Claudish's textbox MCP server, as Claude Code would
+            import asyncio
+            config = json.load(open(sys.argv[sys.argv.index("--mcp-config") + 1]))["mcpServers"]["textbox"]
+
+            async def search():
+                from mcp import ClientSession, StdioServerParameters
+                from mcp.client.stdio import stdio_client
+                server = StdioServerParameters(command=config["command"], args=config["args"], env=config["env"])
+                async with stdio_client(server) as streams, ClientSession(*streams) as client:
+                    await client.initialize()
+                    names = sorted(tool.name for tool in (await client.list_tools()).tools)
+                    found = await client.call_tool("search", {"query": "budget"})
+                    return names, found.content[0].text
+            names, found = asyncio.run(search())
+            out({"type": "control_request", "request_id": "perm-tb-%d" % turns, "request": {
+                "subtype": "can_use_tool", "tool_name": "mcp__textbox__search", "input": {"query": "budget"}}})
+            reply = read()
+            assert reply["response"]["response"]["behavior"] == "allow", reply  # allowed by policy, no question
+            out({"type": "result", "subtype": "success", "is_error": False,
+                 "result": "%s | %s | caret seen: %s" % (",".join(names), found, "▮" in text)})
             continue
         if "slow" in text:
             deadline = time.monotonic() + 60

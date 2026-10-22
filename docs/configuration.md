@@ -260,6 +260,12 @@ candidate like any other. For Claude Code:
   process exits, the next instruction resumes its session (`--resume`). The agent
   exits when the text box goes away, after 30 idle minutes, or when the service
   stops. Claudish adds `--session-id` itself; leave it out of `session_command`.
+- **The agent sees your text box.** The text around the caret goes with each
+  instruction, and with the `[mcp]` extra installed, Claudish gives the agent a
+  `textbox` MCP server (read, search) for the rest, so "fix the second paragraph"
+  works in a long document. Its reads run without asking; nothing else can read
+  the text box. Without an agent, the model driver has the same two tools
+  whenever the text box is longer than what it is sent.
 - The agent runs with your Claude Code login, settings, and working directory
   (the service's), and its usage counts as yours. A session is limited to five
   minutes and four at a time.

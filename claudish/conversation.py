@@ -6,12 +6,21 @@ their results; the text around the caret is sent fresh each turn. Conversations 
 and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
 (once per conversation if you allow it for the conversation), destructive tools ask every time.
 """
+import secrets
 import threading
 import time
 
+from .textbox import Textbox
+
 IDLE_SECONDS = 1800
+# Told with the text box (to the model or an agent): the answer is a draft for the caret, not a reply.
+AGENT_NOTE = ("\n\nYour answer is inserted at the caret (▮) of the text box above, as the user's own text: "
+              "reply with that text only.")
 KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs: compaction)
 WINDOW_BEFORE, WINDOW_AFTER = 1500, 500
+# A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
+# it may take far longer than a suggestion while typing (the profile's timeout, if longer).
+TURN_TIMEOUT = 60
 
 
 class Conversation:
@@ -20,11 +29,13 @@ class Conversation:
         self.messages = []  # earlier turns: user, assistant (with tool calls), tool results
         self.approved = set()  # (server, tool) allowed for this conversation
         self.agent = None  # the agent process, when the profile uses one (session_command)
+        self.textbox = Textbox()  # the text box as of the latest instruction (retrieval reads it)
+        self.token = secrets.token_hex(16)  # lets this conversation's agent read its text box
         self.used = time.monotonic()
 
     def close(self):
         if self.agent is not None:
-            self.agent.close()
+            self.agent.close(ended=True)
             self.agent = None
 
     def remember(self, messages):
@@ -51,6 +62,11 @@ class Conversations:
             self.items[key] = conversation
             return conversation
 
+    def find(self, key):
+        """The live conversation for this key, or None (never creates one)."""
+        with self.lock:
+            return self.items.get(key)
+
     def end(self, key):
         with self.lock:
             conversation = self.items.pop(key, None)
@@ -65,14 +81,23 @@ class Conversations:
             conversation.close()
 
 
-def window(before, after):
-    """The text box around the caret, as reference text for the model."""
+def clipped(before, after):
+    """Whether the text box is longer than the window around the caret."""
+    return len(before) > WINDOW_BEFORE or len(after) > WINDOW_AFTER
+
+
+def window(before, after, tools=True):
+    """The text box around the caret, as reference text for the model; tools: it can read the rest."""
     if not (before or after):
         return ""
-    before, after = before[-WINDOW_BEFORE:], after[:WINDOW_AFTER]
-    return ("\n\n<context name=\"the text box around the caret (▮)\">\n%s%s▮%s%s\n</context>"
-            % ("…" if len(before) == WINDOW_BEFORE else "", before, after,
-               "…" if len(after) == WINDOW_AFTER else ""))
+    more = ""
+    if clipped(before, after) and tools:
+        more = ("\nThe text box has %d characters; this is the part around the caret, at %d. "
+                "Read or search the rest with the textbox tools." % (len(before) + len(after), len(before)))
+    head = "…" if len(before) > WINDOW_BEFORE else ""
+    tail = "…" if len(after) > WINDOW_AFTER else ""
+    return ("\n\n<context name=\"the text box around the caret (▮)\">\n%s%s▮%s%s\n</context>%s"
+            % (head, before[-WINDOW_BEFORE:], after[:WINDOW_AFTER], tail, more))
 
 
 class ModelDriver:
@@ -105,7 +130,8 @@ class ModelDriver:
             from .capture import capture
             image, width, height = capture(rewriter.look_command)
             consulted.append("window picture (%d×%d)" % (width, height))
-        system = spec["system"] + block + window(self.before, self.after)
+        context = window(self.before, self.after)
+        system = spec["system"] + block + context + (AGENT_NOTE if context else "")
         turn = [{"role": "user", "content": user_content(prompt, image, "openai")}]
         messages = ([{"role": "system", "content": system}] + spec["examples"] + self.conversation.messages + turn)
         max_tokens = spec["max_tokens"] or rewriter.max_tokens
@@ -117,19 +143,23 @@ class ModelDriver:
                 payload["tools"] = tools
             if rewriter.model:
                 payload["model"] = rewriter.model
-            choice, _ = rewriter.chat(payload, rewriter.request_headers(), image)
+            choice, _ = rewriter.chat(payload, rewriter.request_headers(), image,
+                                      timeout=max(rewriter.timeout, TURN_TIMEOUT))
             if choice.get("finish_reason") == "length":
                 raise RuntimeError("the draft ran past its length budget")
             return choice["message"]
 
         with_tools = messages
-        if rewriter.toolbox:
+        self.conversation.textbox = Textbox(self.before, self.after)
+        local = self.conversation.textbox.tools() if clipped(self.before, self.after) else {}
+        if rewriter.toolbox or local:
             guide = ("\n\nYou have tools. When the instruction needs facts you do not have (status, numbers, "
                      "names, contents), call a tool first and write from its result; never invent such facts.")
             messages[0] = {"role": "system", "content": system + guide}
-            text, called, with_tools = rewriter.toolbox.run(
+            from .tools import Toolbox
+            text, called, with_tools = (rewriter.toolbox or Toolbox([], {})).run(
                 ask, messages, approve=lambda *call: self.approve(session, *call),
-                progress=lambda summary: session.emit("progress", text=summary))
+                progress=lambda summary: session.emit("progress", text=summary), local=local)
             consulted += called
         else:
             text = (ask(messages, None).get("content") or "").strip()

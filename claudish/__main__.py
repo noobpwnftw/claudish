@@ -70,6 +70,7 @@ def main():
     context_cmd.add_argument("--app", required=True, help='App name as the input method reports it, e.g. "firefox"')
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
+    commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
@@ -80,6 +81,9 @@ def main():
     if argv[:1] == ["service"] and "--" in argv:
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
+    if args.command == "textbox-mcp":
+        from .textbox_mcp import main as textbox_mcp
+        return textbox_mcp()
     if args.command == "shell-hook":
         if shutil.which("claudish"):
             launcher = "claudish"

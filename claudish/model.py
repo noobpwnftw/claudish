@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 from urllib.parse import urlsplit
@@ -173,11 +174,30 @@ class Rewriter:
             from .agent import AgentProcess, ClaudeCodeDriver
             if not conversation:
                 return ClaudeCodeDriver(self.session_command)  # a process for this turn only
+            from .conversation import AGENT_NOTE, window
+            from .textbox import Textbox
             kept = self.conversations.get(conversation)
-            kept.agent = kept.agent or AgentProcess(self.session_command)
-            return ClaudeCodeDriver(self.session_command, agent=kept.agent)
+            kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
+            kept.agent = kept.agent or AgentProcess(self.session_command, self.textbox_config(kept))
+            context = window(before, after, tools=bool(kept.agent.mcp_config))
+            if context:
+                context += AGENT_NOTE + (" The textbox tools (read, search) see all of it."
+                                         if kept.agent.mcp_config else "")
+            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context)
         from .conversation import ModelDriver
         return ModelDriver(self, self.conversations.get(conversation), app, before, after, look)
+
+    def textbox_config(self, conversation):
+        """--mcp-config for an agent: Claudish's textbox server, when the MCP SDK is here to run it."""
+        import importlib.util
+        url = getattr(self, "url", None)
+        if not url or importlib.util.find_spec("mcp") is None:
+            return None
+        package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return {"mcpServers": {"textbox": {
+            "command": sys.executable, "args": ["-m", "claudish", "textbox-mcp"],
+            "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
+                    "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}}}
 
     def start_session(self, text, app=None, conversation=None, before="", after="", look=False):
         return self.sessions.start(self.make_driver(app, conversation, before, after, look), text)
@@ -188,15 +208,15 @@ class Rewriter:
             headers["Authorization"] = "Bearer " + self.api_key
         return headers
 
-    def chat(self, payload, headers, image=None):
-        """(the first choice, usage) from /v1/chat/completions."""
+    def chat(self, payload, headers, image=None, timeout=None):
+        """(the first choice, usage) from /v1/chat/completions; timeout: seconds, else the profile's."""
         req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
         # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
         # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
         if self.opener is None:
             self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
         try:
-            with self.opener.open(req, timeout=self.timeout) as response:
+            with self.opener.open(req, timeout=timeout or self.timeout) as response:
                 data = json.load(response)
         except HTTPError as exc:
             if image is not None and exc.code in (400, 500, 501):
