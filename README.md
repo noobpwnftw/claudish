@@ -130,6 +130,30 @@ Replace the rewrite template with `--prompt FILE` for any backend:
  "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]}
 ```
 
+### Profiles
+
+Instead of passing flags, declare your backends once in
+`~/.config/claudish/config.json` (or `$XDG_CONFIG_HOME/claudish/config.json`, or
+pass `--config FILE`):
+
+```json
+{"profile": "local",
+ "profiles": {
+   "local":  {"backend": "llama"},
+   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+              "prompt": "grand.json"},
+   "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
+              "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},
+   "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"}
+ }}
+```
+
+`python -m claudish serve` uses the file's `"profile"`. `--profile claude`
+picks another, and any flag overrides the profile's value. A template path in a
+profile is relative to the config file. Keys are never stored in the file: name
+an environment variable with `api_key_env`. Unknown keys, a literal `api_key`,
+and wrong types are rejected at startup. `/health` reports the active profile.
+
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
