@@ -39,8 +39,11 @@ async def check(args):
             assert {first, flipped} == {"light", "dark"}, (first, flipped)
             await page.locator("#theme-toggle").click()
 
-            # Continue (where cd_AI starts): keys go straight in; a pause after a word offers the rest.
+            # The demo opens in rewrite (the pitch); F7 reaches continue, where the installed input
+            # method starts: keys go straight in, and a pause after a word offers the rest.
             await page.locator("#editor").click()
+            await expect(page.locator("#source-mode")).to_have_text("rewrite")
+            await keys.press("F7")
             await expect(page.locator("#source-mode")).to_have_text("continue")
             await keys.type("Thanks for the review ", delay=20)
             await expect(committed).to_have_attribute("data-text", "Thanks for the review ")

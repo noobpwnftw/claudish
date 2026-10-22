@@ -15,9 +15,9 @@ const HINTS = {
   rewrite: "Type something ordinary. Tab takes the rewrite; Enter keeps your words.",
 };
 const SAMPLES = [
+  ["rewrite", "This is very important."],
   ["continue", "Thanks for the quick review on "],
   ["instruct", "decline the meeting politely, propose Thursday"],
-  ["rewrite", "This is very important."],
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
@@ -41,7 +41,7 @@ function moveTo(index, extend) {
 
 const state = {
   text: "",          // continue: the model's context (already in the text box); else the composition
-  mode: "continue",
+  mode: "rewrite",   // the demo opens with the pitch; the installed input method starts in continue
   candidate: "",
   candidates: [],
   working: false,

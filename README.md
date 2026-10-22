@@ -166,10 +166,10 @@ python3 scripts/start.py
 With the launcher running, open **http://127.0.0.1:18765**. The demo is the
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and a candidate window, following the same rules as the
-desktop adapters. It starts in continue (keys go straight in; pause after a word
-and the rest waits in grey; Tab takes it). F7 or the badge switches to instruct
-(Enter sends; pick a draft with 1–3) and rewrite (Tab takes the rewrite, Enter
-keeps your words). A key strip lights the keys as you use them, and each sample
+desktop adapters. It opens in rewrite, the pitch (Tab takes the rewrite, Enter
+keeps your words); F7 or the badge switches to continue (keys go straight in;
+pause after a word and the rest waits in grey; Tab takes it) and instruct (Enter
+sends; pick a draft with 1–3). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default; a choice lasts only for the current page,
 with no cookies or storage.

@@ -41,7 +41,8 @@ async def check(url, executable, screenshots=None):
         if screenshots:
             await page.screenshot(path=str(screenshots / "static-ready.png"))
         committed, window, keys = page.locator("#page"), page.locator("#candidates"), page.keyboard
-        await page.locator("#editor").click()  # continue: keys straight in, the rest waits in grey
+        await page.locator("#editor").click()
+        await keys.press("F7")  # the demo opens in rewrite; continue: keys straight in, the rest waits in grey
         await keys.type("Thanks for the review ", delay=20)
         await expect(page.locator("#ghost")).not_to_be_empty(timeout=60000)
         assert "in this browser" in await page.locator("#timing").text_content()
