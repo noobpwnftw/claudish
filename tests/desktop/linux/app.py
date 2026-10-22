@@ -19,6 +19,11 @@ widgets = {"entry": entry, "other": other, "password": password, "view": view}
 for widget in widgets.values():
     box.pack_start(widget, False, False, 0)
 window.add(box)
+# The input method's preedit (the composition, or continue's grey suggestion), as the app sees it.
+preedits = {}
+for name in ("entry", "other", "password"):
+    widgets[name].connect("preedit-changed", lambda widget, text, name=name: preedits.__setitem__(name, text))
+view.connect("preedit-changed", lambda widget, text: preedits.__setitem__("view", text))
 window.connect("destroy", Gtk.main_quit)
 window.show_all()
 
@@ -43,7 +48,7 @@ def tick():
         pass
     focused = next((name for name, widget in widgets.items() if widget.has_focus()), None)
     with open(STATE + ".tmp", "w") as out:
-        json.dump({"focus": focused, "active": window.is_active(),
+        json.dump({"focus": focused, "active": window.is_active(), "preedit": preedits.get(focused, ""),
                    **{name: text(widget) for name, widget in widgets.items()}}, out)
     os.replace(STATE + ".tmp", STATE)
     return True

@@ -117,7 +117,14 @@ def scenarios():
     key("ctrl+a", "BackSpace")
     type_text("Thanks for the review ")  # a pause after a word: continue asks
     key("F7")  # rewrite -> continue
-    settle(1.5)  # the suggestion is not visible to the app, so wait rather than watch
+    # The grey suggestion is the preedit, which the app sees; before F7 lands it still holds the
+    # rewrite composition, so wait for the suggestion itself.
+    expected = "and then some—naturally."
+    try:
+        wait_for(lambda: state().get("preedit") == expected, what="the grey suggestion")
+    except TimeoutError:
+        pass
+    check("continue: the suggestion waits after the caret", state().get("preedit"), expected)
     key("Tab")  # takes the rest
     wait_for(lambda: state()["entry"], what="continuation")
     check("continue: Tab takes the ghost text", state()["entry"], "Thanks for the review and then some—naturally.")
