@@ -86,8 +86,8 @@ the next turn resumes it by session id (`--resume`).
 
 - the text box goes away (its input context is destroyed);
 - it has been idle for a while (30 minutes by default);
-- you ask: in instruct, **Shift+Enter** sends as a new conversation; **Enter**
-  continues the current one.
+- you ask: a slash command such as `/new`, if it ever comes to that (owner); the
+  idle timeout and the text box's lifetime cover the common cases.
 
 Conversations live only in the service's memory, never on disk, and are dropped
 when they end.
@@ -158,8 +158,8 @@ the cost of the last turn only.
 
 ## Order of work
 
-1. Conversations per text box in the service (identity from the adapters, kept
-   turns, fresh text box each turn, idle timeout, Shift+Enter for a new one), with
+1. **Done:** conversations per text box in the service (identity from the adapters,
+   kept turns, the window around the caret each turn, idle timeout), with
    the model driver as its first driver: progress for each tool call, and the
    policy with write tools asking through the candidate list. The agent driver
    moves to one process per conversation.

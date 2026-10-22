@@ -124,7 +124,7 @@ def main():
     # Optional extras (Anthropic and MCP SDKs) are tested only where they are installed.
     extras = Path(args.extras_python) if args.extras_python else ROOT / ".tools/claude-venv/bin/python"
     if extras.is_file():
-        run("extras tests", [str(extras), "-m", "unittest", "tests.test_context", "tests.test_backends", "tests.test_mcp_setup", "tests.test_tools"])
+        run("extras tests", [str(extras), "-m", "unittest", "tests.test_context", "tests.test_backends", "tests.test_mcp_setup", "tests.test_tools", "tests.test_conversation"])
     else:
         skip("extras tests", "no Python with the [claude,mcp] extras (pass --extras-python)")
     run("compileall", [sys.executable, "-m", "compileall", "-q", "claudish", "platforms", "scripts", "tests",

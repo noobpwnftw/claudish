@@ -62,17 +62,28 @@ def make_server(rewriter, port=18765):
             parts = self.path.strip("/").split("/")
             if parts == ["sessions"]:
                 text, app = data.get("text"), data.get("app")
+                conversation, look = data.get("conversation"), data.get("look", False)
+                before, after = data.get("before", ""), data.get("after", "")
                 if not (isinstance(text, str) and text.strip() and len(text) <= MAX_COMPOSITION):
                     return self.reply(400, {"error": "text must be 1–512 characters"})
                 if app is not None and not (isinstance(app, str) and len(app) <= 200):
                     return self.reply(400, {"error": "app must be a short string"})
+                if conversation is not None and not (isinstance(conversation, str) and 0 < len(conversation) <= 64):
+                    return self.reply(400, {"error": "conversation must be a short id"})
+                if not (isinstance(before, str) and isinstance(after, str) and len(before) <= 8000 and len(after) <= 8000):
+                    return self.reply(400, {"error": "before/after must be strings of at most 8000 characters"})
+                if not isinstance(look, bool):
+                    return self.reply(400, {"error": "look is a boolean"})
                 try:
-                    session = rewriter.start_session(text, app)
+                    session = rewriter.start_session(text, app, conversation, before, after, look)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
                 except RuntimeError as exc:
                     return self.reply(503, {"error": str(exc)})
                 return self.reply(200, {"id": session.id})
+            if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "end":
+                rewriter.conversations.end(parts[1])  # its text box went away
+                return self.reply(200, {"ok": True})
             session = rewriter.sessions.get(parts[1]) if len(parts) == 3 else None
             if session is None:
                 return self.reply(404, {"error": "no such session"})
@@ -126,7 +137,7 @@ def make_server(rewriter, port=18765):
         def do_POST(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
-            if self.path.startswith("/sessions"):
+            if self.path.startswith(("/sessions", "/conversations/")):
                 return self.post_session()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})

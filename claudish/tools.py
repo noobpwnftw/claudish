@@ -22,14 +22,24 @@ def field(item, name):
 
 
 def parse(spec):
-    """A "tools" entry -> (server name, set of trusted tool names)."""
+    """A "tools" entry -> (server name, trusted tool names, denied tool names)."""
     if isinstance(spec, str):
-        return spec, set()
-    if isinstance(spec, dict) and isinstance(spec.get("server"), str) and set(spec) <= {"server", "trust"}:
-        trust = spec.get("trust") or []
-        if isinstance(trust, list) and all(isinstance(name, str) for name in trust):
-            return spec["server"], set(trust)
-    raise ValueError('tools entries are server names or {"server": NAME, "trust": [TOOL, ...]}')
+        return spec, set(), set()
+    if isinstance(spec, dict) and isinstance(spec.get("server"), str) and set(spec) <= {"server", "trust", "deny"}:
+        lists = [spec.get(key) or [] for key in ("trust", "deny")]
+        if all(isinstance(names, list) and all(isinstance(n, str) for n in names) for names in lists):
+            return spec["server"], set(lists[0]), set(lists[1])
+    raise ValueError('tools entries are server names or {"server": NAME, "trust": [TOOL, ...], "deny": [TOOL, ...]}')
+
+
+def classify(tool, trust, deny):
+    """read (runs), write (asks), destructive (asks every time), or denied (never offered)."""
+    annotations = getattr(tool, "annotations", None)
+    if tool.name in deny:
+        return "denied"
+    if field(annotations, "read_only_hint") or tool.name in trust:
+        return "read"
+    return "destructive" if field(annotations, "destructive_hint") else "write"
 
 
 class Toolbox:
@@ -37,7 +47,7 @@ class Toolbox:
         self.timeout = timeout
         self.servers = []
         for spec in specs:
-            name, trust = parse(spec)
+            name, trust, deny = parse(spec)
             if name not in (servers or {}):
                 raise ValueError('tools: server %r is not in "mcp_servers"' % name)
             if SEPARATOR in name:
@@ -45,65 +55,87 @@ class Toolbox:
             provider = Provider.__new__(Provider)
             provider.listing = True  # connection settings only; tools are chosen per call
             Provider.__init__(provider, {"type": "mcp", "server": name, "timeout": timeout}, None, servers)
-            self.servers.append((name, trust, provider))
+            self.servers.append((name, trust, deny, provider))
 
-    def run(self, ask, messages):
+    def run(self, ask, messages, approve=None, progress=None):
         """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).
-        Returns (final text, consulted)."""
+        approve(server, tool, arguments, kind) -> (allowed, reason) is asked before each write or
+        destructive call; without it those tools are not offered. progress(text) hears each call.
+        Returns (final text, consulted, messages with the tool calls and results appended)."""
         import anyio
-        return anyio.run(self._run, ask, messages)
+        return anyio.run(self._run, ask, messages, approve, progress)
 
-    async def _run(self, ask, messages):
+    async def _run(self, ask, messages, approve, progress):
         from contextlib import AsyncExitStack
 
         import anyio
         from mcp import ClientSession
         from .context import connector
-        consulted, deadline = [], time.monotonic() + self.timeout
-        with anyio.fail_after(self.timeout):
-            async with AsyncExitStack() as stack:
-                sessions, offered = {}, []
-                for name, trust, provider in self.servers:
-                    streams = await stack.enter_async_context(connector(provider))
-                    session = await stack.enter_async_context(ClientSession(streams[0], streams[1]))
-                    await session.initialize()
-                    sessions[name] = session
-                    for tool in (await session.list_tools()).tools:
-                        if not (field(getattr(tool, "annotations", None), "read_only_hint") or tool.name in trust):
-                            continue  # side effects need a per-call approval (G18)
-                        offered.append({"type": "function", "function": {
-                            "name": name + SEPARATOR + tool.name,
-                            "description": (tool.description or "").strip()[:500],
-                            "parameters": field(tool, "input_schema") or {"type": "object", "properties": {}}}})
-                messages = list(messages)
-                for step in range(MAX_STEPS + 1):
-                    final = step == MAX_STEPS or not offered
-                    reply = await anyio.to_thread.run_sync(ask, messages, None if final else offered)
-                    calls = reply.get("tool_calls") or []
-                    if not calls:
-                        return (reply.get("content") or "").strip(), consulted
-                    messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
-                    for call in calls:
-                        function = call.get("function") or {}
-                        server, _, tool = (function.get("name") or "").partition(SEPARATOR)
-                        allowed = any(o["function"]["name"] == function.get("name") for o in offered)
-                        try:
-                            arguments = json.loads(function.get("arguments") or "{}")
-                        except ValueError:
-                            arguments = None
-                        if not allowed or not isinstance(arguments, dict):
-                            result = "error: unknown tool or invalid arguments"
+        consulted, kinds = [], {}
+        spent = 0.0  # model and tool time; waiting for your answer does not count
+
+        async def timed(call, *args):
+            nonlocal spent
+            started = time.monotonic()
+            with anyio.fail_after(max(1.0, self.timeout - spent)):
+                try:
+                    return await call(*args)
+                finally:
+                    spent += time.monotonic() - started
+
+        async with AsyncExitStack() as stack:
+            sessions, offered = {}, []
+            for name, trust, deny, provider in self.servers:
+                streams = await stack.enter_async_context(connector(provider))
+                session = await stack.enter_async_context(ClientSession(streams[0], streams[1]))
+                await timed(session.initialize)
+                sessions[name] = session
+                for tool in (await timed(session.list_tools)).tools:
+                    kind = classify(tool, trust, deny)
+                    if kind == "denied" or (kind != "read" and approve is None):
+                        continue  # side effects are only offered when someone can approve them
+                    kinds[name + SEPARATOR + tool.name] = kind
+                    offered.append({"type": "function", "function": {
+                        "name": name + SEPARATOR + tool.name,
+                        "description": (tool.description or "").strip()[:500],
+                        "parameters": field(tool, "input_schema") or {"type": "object", "properties": {}}}})
+            messages = list(messages)
+            for step in range(MAX_STEPS + 1):
+                final = step == MAX_STEPS or not offered or spent >= self.timeout
+                reply = await timed(anyio.to_thread.run_sync, ask, messages, None if final else offered)
+                calls = reply.get("tool_calls") or []
+                if not calls:
+                    return (reply.get("content") or "").strip(), consulted, messages
+                messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
+                for call in calls:
+                    function = call.get("function") or {}
+                    server, _, tool = (function.get("name") or "").partition(SEPARATOR)
+                    kind = kinds.get(function.get("name"))
+                    try:
+                        arguments = json.loads(function.get("arguments") or "{}")
+                    except ValueError:
+                        arguments = None
+                    if kind is None or not isinstance(arguments, dict):
+                        result = "error: unknown tool or invalid arguments"
+                    else:
+                        summary = "%s.%s(%s)" % (server, tool, ", ".join(
+                            "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items()))
+                        allowed, reason = True, None
+                        if kind != "read":
+                            allowed, reason = await anyio.to_thread.run_sync(approve, server, tool, arguments, kind)
+                        if not allowed:
+                            result = "denied by the user" + (": " + reason if reason else "")
                         else:
-                            consulted.append("%s.%s(%s)" % (server, tool, ", ".join(
-                                "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items())))
+                            consulted.append(summary)
+                            if progress:
+                                progress(summary)
                             try:
-                                with anyio.fail_after(max(1.0, deadline - time.monotonic())):
-                                    outcome = await sessions[server].call_tool(tool, arguments)
+                                outcome = await timed(sessions[server].call_tool, tool, arguments)
                                 result = "\n".join(block.text for block in outcome.content
                                                    if getattr(block, "type", "") == "text")[:8000]
                                 if field(outcome, "is_error"):
                                     result = "error: " + result
                             except Exception as exc:  # a failed tool is information for the model
                                 result = "error: %s" % (exc,)
-                        messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
+                    messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
         raise RuntimeError("the tool loop did not finish")

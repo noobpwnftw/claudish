@@ -133,7 +133,9 @@ class Rewriter:
         self.context = context
         self.bindings = list(bindings)
         from .sessions import Sessions
-        self.sessions = Sessions()  # agent sessions at the caret (G18)
+        self.sessions = Sessions()  # instructions as sessions: events, questions, a result (G18)
+        from .conversation import Conversations
+        self.conversations = Conversations()  # one per text box (docs/design/instruct.md)
         self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
@@ -164,15 +166,17 @@ class Rewriter:
             raise RuntimeError("model returned no text")
         return output, usage
 
-    def make_driver(self, app=None):
-        """The driver for a new agent session; the profile's session_command runs the agent."""
-        if not self.session_command:
-            raise ValueError('this profile has no agent sessions: set "session_command" (see docs/configuration.md, Agent sessions)')
-        from .agent import ClaudeCodeDriver
-        return ClaudeCodeDriver(self.session_command)
+    def make_driver(self, app=None, conversation=None, before="", after="", look=False):
+        """The driver for an instruction: the profile's agent (session_command), else the model
+        driver, which runs it as a turn in the text box's conversation."""
+        if self.session_command:
+            from .agent import ClaudeCodeDriver
+            return ClaudeCodeDriver(self.session_command)
+        from .conversation import ModelDriver
+        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look)
 
-    def start_session(self, text, app=None):
-        return self.sessions.start(self.make_driver(app), text)
+    def start_session(self, text, app=None, conversation=None, before="", after="", look=False):
+        return self.sessions.start(self.make_driver(app, conversation, before, after, look), text)
 
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -276,7 +280,7 @@ class Rewriter:
                     return choice["message"]
                 guide = ("\n\nYou have tools. When the instruction needs facts you do not have (status, numbers, "
                          "names, contents), call a tool first and write from its result; never invent such facts.")
-                output, called = self.toolbox.run(ask, [{"role": "system", "content": system + guide}] + examples +
+                output, called, _ = self.toolbox.run(ask, [{"role": "system", "content": system + guide}] + examples +
                                                   [{"role": "user", "content": user_content(sent, image, "openai")}])
                 outputs, usage, consulted = [output], {}, consulted + called
             finally:

@@ -213,9 +213,16 @@ profile:
   "tools": ["github", {"server": "notes", "trust": ["pull_request_diff"]}]}}}
 ```
 
-- Only tools the server marks read-only (`readOnlyHint`) are offered, plus the
-  ones you vouch for with `"trust"`. Tools with side effects are never offered;
-  they will need a per-call approval in the candidate list (G18).
+- Tools the server marks read-only (`readOnlyHint`), and the ones you vouch for
+  with `"trust"`, run without asking. Any other tool asks first, in the candidate
+  list: **1** Allow, **2** Deny, **3** Allow for this conversation; a tool marked
+  destructive (`destructiveHint`) asks every time. Typing words instead of a number
+  denies the call with your words as the reason. `"deny": [TOOL, ...]` keeps a tool
+  from ever being offered.
+- Instructions in the same text box are one **conversation**: later instructions
+  see earlier ones, the drafts, and the tool results ("now make it shorter" works).
+  The text around the caret goes along fresh each time. A conversation ends when
+  its text box goes away or after 30 idle minutes, and lives only in memory.
 - Every call appears in "consulted", such as `notes.ci_status(branch="main")`.
 - The loop is bounded: at most 4 rounds of calls, and 60 s in all. The result is
   still only a candidate.

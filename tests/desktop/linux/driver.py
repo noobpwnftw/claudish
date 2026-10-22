@@ -117,7 +117,7 @@ def scenarios():
     key("ctrl+a", "BackSpace")
     type_text("Thanks for the review ")  # a pause after a word: continue asks
     key("F7")  # rewrite -> continue
-    settle()
+    settle(1.5)  # the suggestion is not visible to the app, so wait rather than watch
     key("Tab")  # takes the rest
     wait_for(lambda: state()["entry"], what="continuation")
     check("continue: Tab takes the ghost text", state()["entry"], "Thanks for the review and then some—naturally.")

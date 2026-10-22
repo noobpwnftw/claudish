@@ -27,7 +27,7 @@ class ToolLoopTests(unittest.TestCase):
             seen.append((list(messages), tools))
             return replies[len(seen) - 1]
         toolbox = Toolbox([{"server": "notes", "trust": list(trust)}], SERVER, timeout=30)
-        text, consulted = toolbox.run(ask, [{"role": "user", "content": "summarize CI for main"}])
+        text, consulted, _ = toolbox.run(ask, [{"role": "user", "content": "summarize CI for main"}])
         return text, consulted, seen
 
     def test_read_only_tools_are_offered_and_called(self):
@@ -67,7 +67,7 @@ class ToolLoopTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not in"):
             Toolbox(["missing"], SERVER)
         with self.assertRaisesRegex(ValueError, "server names"):
-            Toolbox([{"server": "notes", "allow": []}], SERVER)
+            Toolbox([{"server": "notes", "allow": []}], SERVER)  # an unknown key
 
 
 class RewriterTests(unittest.TestCase):
@@ -91,7 +91,7 @@ class RewriterTests(unittest.TestCase):
         from claudish.model import Rewriter
         _, settings, prompt, context = self.settings()
         rewriter = Rewriter.from_settings(settings, prompt, context)
-        with patch.object(rewriter.toolbox, "run", return_value=("CI is green.", ['notes.ci_status(branch="main")'])) as run:
+        with patch.object(rewriter.toolbox, "run", return_value=("CI is green.", ['notes.ci_status(branch="main")'], [])) as run:
             result = rewriter.rewrite("how is CI", mode="instruct")
         self.assertEqual((result["text"], result["candidates"]), ("CI is green.", ["CI is green."]))
         self.assertIn('notes.ci_status(branch="main")', result["consulted"])

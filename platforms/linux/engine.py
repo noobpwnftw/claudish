@@ -98,16 +98,20 @@ class ClaudishEngine(IBus.Engine):
                                       app=self.app)
         self.render()
 
-    def before_caret(self):
-        """The app's text before the caret, when the client shares it (IBus surrounding text; GTK
-        refreshes it before each key event). "" when it does not."""
+    def around_caret(self):
+        """(before, after): the app's text around the caret, when the client shares it (IBus
+        surrounding text; GTK refreshes it before each key event). Empty when it does not."""
         if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
-            return ""
+            return "", ""
         try:
             text, cursor, _anchor = self.get_surrounding_text()
         except Exception:  # not every client implements it
-            return ""
-        return (text.get_text() if text else "")[:cursor][-MAX_COMPOSITION:]
+            return "", ""
+        value = text.get_text() if text else ""
+        return value[:cursor], value[cursor:]
+
+    def before_caret(self):
+        return self.around_caret()[0][-MAX_COMPOSITION:]
 
     def live_key(self, keyval):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
@@ -198,9 +202,10 @@ class ClaudishEngine(IBus.Engine):
             action = self.composition.enter()
             if action == "submit":  # Instruct: Enter sends the held text now.
                 self.composition.submit()
+                before, after = self.around_caret()  # the text box, for this turn of its conversation
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
                                           self.composition.mode, immediate=True, app=self.app,
-                                          look=self.composition.look)
+                                          look=self.composition.look, before=before[-8000:], after=after[:8000])
                 self.render()
             elif action in ("accept", "keep"):
                 self.finish(action == "accept")

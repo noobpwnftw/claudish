@@ -1,5 +1,6 @@
 """A single coalescing worker: UI callbacks never wait for inference."""
 import collections
+import random
 import json
 import threading
 import time
@@ -44,12 +45,14 @@ class Suggestions:
         self.pending = None
         self.results = collections.deque()  # (revision, data); a session yields several
         self.closed = False
+        # This text box's conversation: instructions are turns in it (docs/design/instruct.md).
+        self.conversation = "%032x" % random.getrandbits(128)
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after=""):
         with self.condition:
-            self.pending = (revision, text, mode, app, look, immediate,
+            self.pending = (revision, text, mode, app, look, immediate, before, after,
                             time.monotonic() + (0 if immediate else self.debounce))
             self.results.clear()
             self.condition.notify()
@@ -72,11 +75,19 @@ class Suggestions:
         threading.Thread(target=send, daemon=True).start()
 
     def close(self):
+        """The text box went away: stop, and end its conversation (off the input thread)."""
         with self.condition:
             self.closed = True
             self.pending = None
             self.results.clear()
             self.condition.notify()
+
+        def end():
+            try:
+                call(self.endpoint, "/conversations/%s/end" % self.conversation, {}, timeout=2)
+            except Exception:
+                pass
+        threading.Thread(target=end, daemon=True).start()
 
     def deliver(self, revision, data):
         with self.condition:
@@ -85,10 +96,14 @@ class Suggestions:
                 return True
             return False
 
-    def session(self, revision, text, app):
-        """Run an instruction as an agent session; False if the profile has none."""
+    def session(self, revision, text, app, look=False, before="", after=""):
+        """Run an instruction as a turn in this text box's conversation; False if the service has
+        no sessions (an older service)."""
+        body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
+        if app:
+            body["app"] = app
         try:
-            started = call(self.endpoint, "/sessions", dict({"text": text}, **({"app": app} if app else {})))
+            started = call(self.endpoint, "/sessions", body)
         except HTTPError as exc:
             if exc.code == 400:  # this profile has no agent: a plain instruction (about 1 ms to find out)
                 return False
@@ -103,7 +118,8 @@ class Suggestions:
                 after = event["seq"] + 1
                 kind = event["type"]
                 if kind == "result":
-                    self.deliver(revision, {"text": event["text"], "candidates": [event["text"]], "session": key})
+                    self.deliver(revision, {"text": event["text"], "candidates": event.get("candidates") or [event["text"]],
+                                            "consulted": event.get("consulted") or [], "session": key})
                 elif kind == "error":
                     self.deliver(revision, {"error": event["text"], "session": key})
                 elif kind in EVENTS:
@@ -124,7 +140,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, app, look, immediate, due = self.pending
+                revision, text, mode, app, look, immediate, before, after, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -134,7 +150,7 @@ class Suggestions:
                 continue
             try:
                 # A sent instruction runs as an agent session when the profile has an agent.
-                if mode == "instruct" and immediate and not look and self.session(revision, text, app):
+                if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after):
                     continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look)
             except Exception as exc:

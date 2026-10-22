@@ -88,9 +88,12 @@ class ServiceTests(unittest.TestCase):
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)
         self.assertEqual(self.call("/sessions/nope?after=0")[0], 404)
-        rewriter = Rewriter("rules")
-        with self.assertRaisesRegex(ValueError, "session_command"):
-            rewriter.start_session("hi")
+        rewriter = Rewriter("rules")  # no agent: the model driver runs the instruction
+        session = rewriter.start_session("hi")
+        events, done = session.wait(0, timeout=5)
+        self.assertTrue(done)
+        self.assertEqual(events[-1]["type"], "result")
+        self.assertEqual(events[-1]["candidates"][0], "As requested—hi.")
 
 
 class SessionTests(unittest.TestCase):
