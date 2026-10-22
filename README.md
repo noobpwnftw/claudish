@@ -308,6 +308,19 @@ caches the text:
 `"$NAME"` values in `env` are read from your environment, so tokens stay out of
 the config file. Use `"resource": "uri"` instead of `"tool"` to read a resource.
 
+Already using MCP servers with Claude? Bring them along:
+
+```sh
+python -m claudish mcp import            # from Claude Desktop, Claude Code (~/.claude.json), and ./.mcp.json
+python -m claudish mcp list              # connect to each server; show its tools and resources
+python -m claudish context test --app firefox --show   # what a binding would read in that app
+```
+
+Imported servers land under `"mcp_servers"` in your config and are used by name:
+`{"type": "mcp", "server": "github", "tool": "...", "arguments": {...}}`. Secrets
+are never copied: every `env` and header value becomes a `$NAME` reference, and
+`import` lists the variables to set.
+
 Apps that publish MCP on a local socket are read with `url` instead of
 `command`: streamable HTTP by default, or `"transport": "sse"`. Headers may use
 `"$NAME"` values from your environment:

@@ -52,6 +52,15 @@ def main():
     service.add_argument("--serve", action="store_true",
                          help="Run `claudish serve ARGS` instead of the local stack (scripts/start.py ARGS)")
     service.add_argument("--dry-run", action="store_true", help="Show what would be written and run")
+    mcp = commands.add_parser("mcp", help="Import MCP servers from Claude and list their tools")
+    mcp.add_argument("action", choices=["import", "list"])
+    mcp.add_argument("--dry-run", action="store_true")
+    mcp.add_argument("--replace", action="store_true", help="Overwrite servers already in the config")
+    context_cmd = commands.add_parser("context", help="Show what context an app would get")
+    context_cmd.add_argument("action", choices=["test"])
+    context_cmd.add_argument("--app", required=True, help='App name as the input method reports it, e.g. "firefox"')
+    context_cmd.add_argument("--profile")
+    context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
@@ -78,6 +87,16 @@ def main():
     if args.command == "service":
         from . import service as manager
         sys.exit(manager.run(args.action, args.serve, passthrough, args.dry_run))
+    if args.command == "mcp":
+        from . import mcp_setup
+        sys.exit(mcp_setup.import_servers(dry_run=args.dry_run, replace=args.replace) if args.action == "import"
+                 else mcp_setup.list_servers())
+    if args.command == "context":
+        from . import mcp_setup
+        try:
+            sys.exit(mcp_setup.context_test(args.app, args.profile, args.show))
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     if args.command == "init":
         try:
             path = config.write_starter(args.config)

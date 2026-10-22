@@ -16,13 +16,35 @@ from pathlib import Path
 
 PROVIDER_KEYS = {"file": {"type", "name", "path", "ttl"},
                  "command": {"type", "name", "command", "ttl", "timeout", "cwd"},
-                 "mcp": {"type", "name", "command", "env", "cwd", "url", "transport", "headers",
+                 "mcp": {"type", "name", "server", "command", "env", "cwd", "url", "transport", "headers",
                          "tool", "arguments", "resource", "ttl", "timeout"}}
 
 
+def from_server(spec, servers):
+    """Expand {"server": NAME} with the config's mcp_servers entry (Claude-style command/args/env or url)."""
+    if "server" not in spec:
+        return spec
+    server = (servers or {}).get(spec["server"])
+    if server is None:
+        raise ValueError('mcp server %r is not in "mcp_servers" (see `claudish mcp import`)' % spec["server"])
+    spec = dict(spec)
+    spec.pop("server")
+    if server.get("url"):
+        spec.setdefault("url", server["url"])
+        spec.setdefault("transport", "sse" if server.get("type") == "sse" else "http")
+        spec.setdefault("headers", server.get("headers") or {})
+    else:
+        spec.setdefault("command", [server["command"]] + list(server.get("args") or []))
+        spec.setdefault("env", server.get("env") or {})
+    spec.setdefault("name", spec.get("tool") or spec.get("resource"))
+    return spec
+
+
 class Provider:
-    def __init__(self, spec, base):
+    def __init__(self, spec, base, servers=None):
         kind = spec.get("type")
+        if kind == "mcp":
+            spec = from_server(spec, servers)
         if kind not in PROVIDER_KEYS:
             raise ValueError("context type must be one of: " + ", ".join(PROVIDER_KEYS))
         unknown = sorted(set(spec) - PROVIDER_KEYS[kind])
@@ -79,14 +101,17 @@ class Provider:
             if self.command is None and (spec.get("env") or spec.get("cwd")):
                 raise ValueError("mcp env/cwd apply to a started server, not a url")
             self.tool, self.resource = spec.get("tool"), spec.get("resource")
-            if bool(self.tool) == bool(self.resource):
-                raise ValueError('mcp context needs exactly one of "tool" or "resource"')
             self.arguments = spec.get("arguments") or {}
             env = spec.get("env") or {}
             if not (isinstance(env, dict) and all(isinstance(v, str) for v in env.values())):
                 raise ValueError("mcp env must map names to strings")
             # "$NAME" values come from the environment, so tokens stay out of the config file.
             self.env = {key: os.path.expandvars(value) for key, value in env.items()}
+            if getattr(self, "listing", False):
+                self.name = spec.get("name") or "listing"
+                return
+            if bool(self.tool) == bool(self.resource):
+                raise ValueError('mcp context needs exactly one of "tool" or "resource"')
             self.name = spec.get("name") or self.tool or self.resource
             if self.command is None:
                 self.name = spec.get("name") or self.url
@@ -140,6 +165,14 @@ def read_mcp(provider):
                 read_stream, write_stream = streams[0], streams[1]
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
+                    if getattr(provider, "listing", False):
+                        tools = (await session.list_tools()).tools
+                        try:
+                            resources = (await session.list_resources()).resources
+                        except Exception:  # Not every server offers resources.
+                            resources = []
+                        return {"tools": [(tool.name, (tool.description or "").strip().split("\n")[0]) for tool in tools],
+                                "resources": [str(resource.uri) for resource in resources]}
                     if provider.tool:
                         result = await session.call_tool(provider.tool, provider.arguments)
                         if getattr(result, "is_error", False) or not hasattr(result, "content"):
@@ -156,9 +189,17 @@ def read_mcp(provider):
         raise RuntimeError("MCP %s: %s" % (provider.name, exc))
 
 
+def list_server(server, timeout=15):
+    """{"tools": [(name, summary)], "resources": [uri]} for one mcp_servers entry."""
+    provider = Provider.__new__(Provider)
+    provider.listing = True
+    Provider.__init__(provider, {"type": "mcp", "server": "_", "timeout": timeout}, Path.cwd(), {"_": server})
+    return read_mcp(provider)
+
+
 class Context:
-    def __init__(self, specs=(), base=Path.cwd(), max_chars=6000):
-        self.providers = [Provider(spec, base) for spec in specs]
+    def __init__(self, specs=(), base=Path.cwd(), max_chars=6000, servers=None):
+        self.providers = [Provider(spec, base, servers) for spec in specs]
         self.max_chars = max_chars
 
     def render(self, before="", after="", extra=()):
@@ -191,11 +232,11 @@ class Context:
 class Binding:
     """Context for one kind of text box: an app pattern, such as "firefox*" or "com.apple.Terminal"."""
 
-    def __init__(self, spec, base=Path.cwd()):
+    def __init__(self, spec, base=Path.cwd(), servers=None):
         if not isinstance(spec, dict) or not isinstance(spec.get("app"), str) or set(spec) - {"app", "context"}:
             raise ValueError('a binding is {"app": "pattern", "context": [providers]}')
         self.pattern = spec["app"]
-        self.providers = [Provider(item, base) for item in spec.get("context") or []]
+        self.providers = [Provider(item, base, servers) for item in spec.get("context") or []]
 
     def matches(self, app):
         import fnmatch
