@@ -180,6 +180,20 @@ SSE for apps that publish on a local socket (headers from environment
 variables, never stored). App-specific internal channels, such as an IDE
 extension's private socket, are not targets; published MCP endpoints are.
 
+### Scenario: the address bar
+
+The address bar is a text box too. With a browser MCP server configured
+(imported from an existing Claude setup by G24 and bound to the browser), switch
+to instruct and type into the omnibox: *"find the cheapest flight to Oslo next
+Friday and open it"*. Enter sends it; the agent drives the browser through MCP
+tools; questions such as *"Allow navigating to example.com?"* appear as a
+candidate list; the result is the page you asked for, not a chat transcript. No
+side panel, no extension UI, no separate assistant app: integration follows from
+what is configured, and the text box you were already using is the interface. This
+needs G17 (instruct may call tools), G18 (sessions and choices), and G24 (MCP
+import and bindings); each must keep tool calls visible and side effects
+confirmed.
+
 ## Onboarding (G19)
 
 People already know how to use this: you type. Onboarding should take three
