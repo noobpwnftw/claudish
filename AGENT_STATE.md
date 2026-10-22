@@ -40,10 +40,14 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   framework checks; llama-server --jinja -ngl 99): retrieval, follow-ups, MCP read/write OK.
   Script: the session scratchpad's live_instruct.py (rewrite it if lost: long text box,
   three follow-ups, a short box, two MCP turns).
-- Known flake: X11 desktop "continue: Tab takes the ghost text" fails about 1 in 2 on
-  main too (the ghost is empty when Tab lands). Next to investigate.
-- Integration path still open: a live Claude Code agent run (owner's quota: ask), Claude
-  API tool loop (needs credentials), selection from the adapters.
+- Fixed flake (20761c1): the desktop test now waits for the grey suggestion (preedit).
+- Live Claude Code checked (7fbdd4f; owner allows live runs on their quota, use haiku):
+  per-conversation process, textbox MCP reads, Allow/Deny questions, worded denial, Esc.
+  Fixed: --permission-prompt-tool stdio is required for host prompts.
+- macOS (d29b27f): surrounding text via IMK, grey suggestion, instructions carry the text
+  box; doubles and CI only. The owner's desktop is a Mac (VS Code remote to the Spark):
+  the first real-Mac run is theirs (python3 platforms/macos/build.py --install).
+- Still open: Claude API tool loop (needs credentials), selection from the adapters.
 - The demo's continue sample must differ from the continue example's input (f5f7ac3):
   otherwise parroted() drops the answer and the demo shows nothing.
 - Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
