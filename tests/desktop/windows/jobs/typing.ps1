@@ -21,8 +21,9 @@ public static class Keys {
   [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
   // Classic Notepad: read its Edit control (WM_GETTEXTLENGTH, WM_GETTEXT).
   // Harness-only reset between scenarios: WM_SETTEXT on the Edit control, so no keys are involved.
+  [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")] static extern IntPtr SendText(IntPtr hwnd, uint msg, IntPtr w, string l);
   public static void ClearEdit(IntPtr window) {
-    SendMessage(FindWindowEx(window, IntPtr.Zero, "Edit", null), 0x000C, IntPtr.Zero, new System.Text.StringBuilder(""));
+    SendText(FindWindowEx(window, IntPtr.Zero, "Edit", null), 0x000C, IntPtr.Zero, "");
   }
   public static string EditText(IntPtr window) {
     IntPtr edit = FindWindowEx(window, IntPtr.Zero, "Edit", null);
