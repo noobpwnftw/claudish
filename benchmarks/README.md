@@ -42,3 +42,91 @@ Reproduce with `python scripts/start.py --preset small`, then
 Original model sources: [SmolLM2](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct),
 [Qwen GGUF](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF), and
 [SmolLM2 GGUF](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF).
+
+## Rewrite fidelity evaluation
+
+[`eval/cases.json`](eval/cases.json) holds 41 varied inputs: names, numbers,
+dates, negation, code identifiers and URLs, questions, very short and casual
+messages, multi-sentence text, already-formal text, tone, emoji, and French and
+Spanish. [`evaluate.py`](evaluate.py) sends each case to a running service and
+applies mechanical checks:
+
+- required names, numbers, and identifiers are kept;
+- no number is invented, whether written as digits or as words;
+- negation is preserved;
+- the language is kept;
+- no chat preamble or added quotes;
+- the length stays sane.
+
+Style is reported separately as "changed" and "added an em dash".
+
+```sh
+python scripts/start.py --preset small
+python benchmarks/evaluate.py --label small --output benchmarks/eval/spark-small.json
+```
+
+Results on the Spark, with the hardware and llama.cpp commit above, after one
+excluded warmup request and with one request per case. Wall time includes both
+HTTP hops:
+
+| Model / Q4_K_M | Pass checks | Pass and changed | Added em dash | Median | p95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SmolLM2 135M Instruct | 17 / 41 | 15 | 3 | 57.6 ms | 71.9 ms |
+| Qwen2.5 0.5B Instruct | 38 / 41 | 34 | 0 | 70.0 ms | 89.8 ms |
+
+Full outputs: [eval/spark-small.json](eval/spark-small.json) and
+[eval/spark-tiny.json](eval/spark-tiny.json).
+
+These checks set an upper bound on fidelity, not a quality score. They do not
+catch meaning changes that keep the guarded tokens. Reading the 38 passing
+Qwen outputs by hand found at least four such changes:
+
+- "Thanks!" became "You're welcome!";
+- "Set MAX_RETRIES to 5" became "Increase…";
+- "Tell Priya…" became a message addressed to Priya;
+- "Do not merge this yet" lost its object.
+
+Qwen also translated both non-English inputs into English and spelled out "3 of
+the 40" as words. It never added an em dash, so the house style is not landing
+yet. SmolLM2 usually drops names and numbers or copies the prompt's example
+sentence, and its three em dashes come from that copied example. Greedy
+decoding makes the outputs repeatable for a given model, prompt, and llama.cpp
+build.
+
+## Prompt experiments (G11)
+
+The aim was to make the default model add em dashes without losing meaning.
+[`prompt_variants.py`](prompt_variants.py) scores the system-prompt and example
+variants in [`eval/prompt-variants.json`](eval/prompt-variants.json) directly
+against llama-server, using the same cases and checks. Results for Qwen2.5 0.5B
+on the Spark:
+
+| Variant | Pass checks | Added em dash | Failure seen on reading the outputs |
+| --- | ---: | ---: | --- |
+| baseline (shipped) | 38 / 41 | 0 | a few replies and meaning shifts (see above) |
+| speaker / speaker4 | 38–39 / 41 | 26–31 | not graded by hand |
+| terse-system | 41 / 41 | 30 | adds claims: "$2.5 million—thank you for your generous support", "14 minutes—please proceed with caution"; Spanish leaks into French |
+| restate (± framing) | 38 / 41 | 20–28 | copies its example's "—yet again" everywhere: "We raised $2.5 million—yet again" |
+| varied (± framing) | 35 / 41 | 26–27 | garbles restated facts: "14 minutes—ten minutes", "3 out of 40—three out of four" |
+
+At this size, pressure toward em dashes makes the model attach a clause. That
+clause either adds a claim or restates a fact wrongly. A 41/41 score on the
+checks hid the worst variant, terse-system. The shipped prompt is unchanged.
+Framing the input as quoted text stopped one question from being answered
+instead of rewritten. No variant stopped "Thanks!" becoming "You're welcome!".
+
+The same experiments with Qwen2.5 1.5B Instruct Q4_K_M (1,117,320,736 bytes, SHA-256
+`6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`, upstream
+revision `91cad511`), on the same hardware and settings:
+
+| Variant | Pass checks | Added em dash | Median | p95 |
+| --- | ---: | ---: | ---: | ---: |
+| baseline | 32 / 41 | 3 | 100 ms | 147 ms |
+| terse-system | 39 / 41 | 15 | 93 ms | 140 ms |
+| restate-framed | 38 / 41 | 10 | 91 ms | 120 ms |
+
+With terse-system, 1.5B adds milder clauses than 0.5B does. They still invent
+some claims ("14 minutes—quite a short time, isn't it?", "No one reviewed the
+change—this needs addressing"), and "back in 20" became "meet back at 20".
+"Thanks!" still becomes "You're welcome!". Paired with the shipped prompt, it
+scores below 0.5B. It is not proposed as a preset.

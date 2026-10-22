@@ -1,0 +1,486 @@
+{
+  "label": "tiny",
+  "cases": 41,
+  "faithful": 17,
+  "errors": 0,
+  "faithful_and_changed": 15,
+  "added_em_dash": 3,
+  "median_ms": 57.58,
+  "p95_ms": 71.94,
+  "failures_by_check": {
+    "error": 0,
+    "missing": 15,
+    "new-number": 1,
+    "language": 2,
+    "negation": 4,
+    "preamble": 0,
+    "quoted": 0,
+    "length": 5
+  },
+  "results": [
+    {
+      "id": "name-1",
+      "category": "names",
+      "input": "Tell Priya the deploy is done.",
+      "wall_ms": 66.2,
+      "output": "This is a matter of urgency—the deployment is complete.",
+      "failures": [
+        "missing:Priya"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "name-2",
+      "category": "names",
+      "input": "Marcus and Aiko will join the call.",
+      "wall_ms": 58.3,
+      "output": "This is a good idea—a chance to discuss the future.",
+      "failures": [
+        "missing:Marcus",
+        "missing:Aiko"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "name-3",
+      "category": "names",
+      "input": "Ask Dr. Okafor about the results.",
+      "wall_ms": 91.36,
+      "output": "Dr. Okafor, thank you for your time. I'm glad you're interested in exploring the implications of your findings.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "name-4",
+      "category": "names",
+      "input": "Can you send this to Zoë at Fjordline?",
+      "wall_ms": 58.19,
+      "output": "I'm sure you're right.",
+      "failures": [
+        "missing:Zoë",
+        "missing:Fjordline",
+        "length"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "number-1",
+      "category": "numbers",
+      "input": "We raised $2.5 million.",
+      "wall_ms": 60.45,
+      "output": "This is a significant amount of money—a substantial amount of money.",
+      "failures": [
+        "missing:2.5"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "number-2",
+      "category": "numbers",
+      "input": "The build takes 14 minutes.",
+      "wall_ms": 54.01,
+      "output": "This is a good start, but it could be more concise.",
+      "failures": [
+        "missing:14"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "number-3",
+      "category": "numbers",
+      "input": "Only 3 of the 40 tests failed.",
+      "wall_ms": 54.88,
+      "output": "Only 3 of the 40 tests failed.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "number-4",
+      "category": "numbers",
+      "input": "Latency dropped by 37%.",
+      "wall_ms": 72.06,
+      "output": "This is a good start, but it could be more polished.",
+      "failures": [
+        "missing:37"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "date-1",
+      "category": "dates",
+      "input": "The meeting moved to March 4 at 3pm.",
+      "wall_ms": 58.15,
+      "output": "This is a timely moment—a chance to discuss the future.",
+      "failures": [
+        "missing:March 4"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "date-2",
+      "category": "dates",
+      "input": "Release is planned for 2027.",
+      "wall_ms": 66.99,
+      "output": "This is a timely and timely announcement—a chance to celebrate.",
+      "failures": [
+        "missing:2027"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "date-3",
+      "category": "dates",
+      "input": "I'm out until Friday.",
+      "wall_ms": 54.34,
+      "output": "That's a good idea.",
+      "failures": [
+        "missing:Friday"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-1",
+      "category": "negation",
+      "input": "Do not merge this yet.",
+      "wall_ms": 59.38,
+      "output": "This warrants thoughtful consideration—a chance to examine the nuances.",
+      "failures": [
+        "negation"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "neg-2",
+      "category": "negation",
+      "input": "I don't think we need a new server.",
+      "wall_ms": 44.52,
+      "output": "That's a good point.",
+      "failures": [
+        "negation",
+        "length"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-3",
+      "category": "negation",
+      "input": "The fix never reached production.",
+      "wall_ms": 65.38,
+      "output": "This is a matter of debate—a matter of interpretation.",
+      "failures": [
+        "negation"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "neg-4",
+      "category": "negation",
+      "input": "No one reviewed the change.",
+      "wall_ms": 47.22,
+      "output": "No one reviewed the change.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "neg-5",
+      "category": "negation",
+      "input": "We can't ship without tests.",
+      "wall_ms": 51.01,
+      "output": "This is a crucial point—a necessity.",
+      "failures": [
+        "negation"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "code-1",
+      "category": "technical",
+      "input": "Run npm install before building.",
+      "wall_ms": 61.78,
+      "output": "This is a good idea—a chance to examine the nuances.",
+      "failures": [
+        "missing:npm install"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "code-2",
+      "category": "technical",
+      "input": "The bug is in parse_config.",
+      "wall_ms": 45.78,
+      "output": "This is a matter of interpretation.",
+      "failures": [
+        "missing:parse_config"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "code-3",
+      "category": "technical",
+      "input": "See https://example.com/docs for details.",
+      "wall_ms": 57.58,
+      "output": "This is a good starting point—a clear and concise overview.",
+      "failures": [
+        "missing:https://example.com/docs"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "code-4",
+      "category": "technical",
+      "input": "Set MAX_RETRIES to 5.",
+      "wall_ms": 66.9,
+      "output": "This is a good choice—a chance to examine the possibilities.",
+      "failures": [
+        "missing:MAX_RETRIES",
+        "missing:5"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "question-1",
+      "category": "questions",
+      "input": "Can we talk tomorrow?",
+      "wall_ms": 59.36,
+      "output": "That's a good idea—a chance to discuss the future.",
+      "failures": [],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "question-2",
+      "category": "questions",
+      "input": "Why is the build slow?",
+      "wall_ms": 46.98,
+      "output": "This is a matter of interpretation.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "question-3",
+      "category": "questions",
+      "input": "Did anyone check the logs?",
+      "wall_ms": 60.38,
+      "output": "Yes, I'm sure you're right.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-1",
+      "category": "short",
+      "input": "Thanks!",
+      "wall_ms": 61.64,
+      "output": "Thank you for your willingness to engage in this conversation.",
+      "failures": [
+        "length"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-2",
+      "category": "short",
+      "input": "Sounds good.",
+      "wall_ms": 44.55,
+      "output": "That's a good start.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-3",
+      "category": "short",
+      "input": "On it.",
+      "wall_ms": 60.94,
+      "output": "This warrants thoughtful consideration—a chance to examine the nuances.",
+      "failures": [
+        "length"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "short-4",
+      "category": "short",
+      "input": "lgtm",
+      "wall_ms": 52.41,
+      "output": "This is a chance to examine the nuances.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-1",
+      "category": "casual",
+      "input": "gonna grab lunch, back in 20",
+      "wall_ms": 55.02,
+      "output": "This is a good start, but it could be more polished.",
+      "failures": [
+        "missing:20"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-2",
+      "category": "casual",
+      "input": "this is kinda broken tbh",
+      "wall_ms": 52.11,
+      "output": "This is kinda broken.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-3",
+      "category": "casual",
+      "input": "my bad, wrong file",
+      "wall_ms": 59.8,
+      "output": "This is a matter of fact—a matter of fact.",
+      "failures": [],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "multi-1",
+      "category": "multi-sentence",
+      "input": "The tests passed. Let's merge it.",
+      "wall_ms": 52.97,
+      "output": "This is a good idea—a chance to merge it.",
+      "failures": [],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "multi-2",
+      "category": "multi-sentence",
+      "input": "I fixed the typo. I also updated the docs.",
+      "wall_ms": 53.2,
+      "output": "This is a good start. I'll keep refining it.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "formal-1",
+      "category": "already-formal",
+      "input": "Please find the attached report for your review.",
+      "wall_ms": 62.68,
+      "output": "This report provides a comprehensive overview of the impact of the COVID-19 pandemic on the economy.",
+      "failures": [
+        "new-number"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "formal-2",
+      "category": "already-formal",
+      "input": "I appreciate your patience in this matter.",
+      "wall_ms": 51.65,
+      "output": "Thank you for your patience.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-1",
+      "category": "tone",
+      "input": "Sorry for the late reply.",
+      "wall_ms": 51.11,
+      "output": "I'm sorry for the delay.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-2",
+      "category": "tone",
+      "input": "I'm really frustrated with this bug.",
+      "wall_ms": 54.83,
+      "output": "This is a frustrating situation.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-3",
+      "category": "tone",
+      "input": "Great work on the launch!",
+      "wall_ms": 53.85,
+      "output": "This is a great start.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "dash-1",
+      "category": "dash",
+      "input": "It works—mostly.",
+      "wall_ms": 54.48,
+      "output": "This is a good start.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "emoji-1",
+      "category": "emoji",
+      "input": "Shipped it 🎉",
+      "wall_ms": 62.27,
+      "output": "This is a delightful opportunity to explore the possibilities.",
+      "failures": [
+        "missing:🎉",
+        "length"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "lang-fr",
+      "category": "language",
+      "input": "La réunion est reportée à demain.",
+      "wall_ms": 71.94,
+      "output": "This is a report to be reviewed—a chance to examine the implications.",
+      "failures": [
+        "language"
+      ],
+      "changed": true,
+      "em_dash": true
+    },
+    {
+      "id": "lang-es",
+      "category": "language",
+      "input": "Gracias por tu ayuda con el proyecto.",
+      "wall_ms": 46.94,
+      "output": "Thank you for your assistance.",
+      "failures": [
+        "language"
+      ],
+      "changed": true,
+      "em_dash": false
+    }
+  ]
+}
