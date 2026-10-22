@@ -20,6 +20,10 @@ public static class Keys {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, System.Text.StringBuilder l);
   [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
   // Classic Notepad: read its Edit control (WM_GETTEXTLENGTH, WM_GETTEXT).
+  // Harness-only reset between scenarios: WM_SETTEXT on the Edit control, so no keys are involved.
+  public static void ClearEdit(IntPtr window) {
+    SendMessage(FindWindowEx(window, IntPtr.Zero, "Edit", null), 0x000C, IntPtr.Zero, new System.Text.StringBuilder(""));
+  }
   public static string EditText(IntPtr window) {
     IntPtr edit = FindWindowEx(window, IntPtr.Zero, "Edit", null);
     int length = (int)SendMessage(edit, 0x000E, IntPtr.Zero, IntPtr.Zero);
@@ -85,7 +89,7 @@ $window = (Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Ob
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
 function Text { [Keys]::EditText($window.MainWindowHandle).TrimEnd("`r", "`n") }
-function Clear { [Keys]::Press(0x41, 0x11); [Keys]::Press(0x2E); Start-Sleep -Milliseconds 300 }
+function Clear { [Keys]::ClearEdit($window.MainWindowHandle); Start-Sleep -Milliseconds 200 }
 
 # 4. Scenarios (same intent as the Linux desktop test).
 [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
@@ -110,8 +114,9 @@ Check 'instruct holds the text until it is inserted' (Text) ''
 [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
 Check 'F7 to instruct, Enter sends, Enter inserts' (Text) "As requested${dash}say hi."
 Clear
-[Keys]::Type('draft'); [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400
-Check 'Ctrl shortcut commits the wording first' (Text) 'draft'
+[Keys]::Type('draft'); Start-Sleep -Milliseconds 300
+[Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400  # Ctrl+A mid-composition
+Check 'Ctrl shortcut keeps the composed text' (Text) 'draft'
 
 Stop-Process $service -Force; Stop-Process -Name Notepad -Force
 "{0}/{1} scenarios passed" -f ($results | Where-Object { $_ }).Count, $results.Count
