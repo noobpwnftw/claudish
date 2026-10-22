@@ -16,8 +16,10 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 
   The full gate `check.py --model --desktop` and CI run 39828326815 (all 5 jobs)
   pass on `265f0ec`.
-- Next: the wizard's Windows path in the VM (PIME present, admin step printed).
-  Then G26 design (window picture as context) and G17/G18 (agentic instruct,
+- G25 is verified on Windows ARM64 too (VM job `setup-wizard.ps1`). That run
+  found and fixed an orphaned llama-server after `service uninstall` (job object)
+  and added a curl.exe fallback for certificate failures on Windows.
+- Next: G26 design (window picture as context) and G17/G18 (agentic instruct,
   candidate-list choices); then G21 (browser model data).
 - Windows: 9/9 typing scenarios pass on Windows 11 ARM64 (VM `claudish-windows`,
   `~/vm/claudish-windows`, account Docker/admin, a local throwaway). The VM has PIME
