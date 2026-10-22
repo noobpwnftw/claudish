@@ -13,9 +13,12 @@ let backend = "";
 let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 let mode = "rewrite";
 const MODES = {
-  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", placeholder: "We should use a smaller model."},
-  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", placeholder: "Thanks for the quick review on"},
-  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", placeholder: "decline the meeting politely, propose Thursday"},
+  rewrite: {title: "THE CLAUDISH EDIT", accept: "Accept rewrite", ask: "Rewrite", enter: "keep your wording", prompt: "NEED A FIRST THOUGHT?",
+    samples: ["This is very important.", "Let's explore the options.", "We should use a smaller model."], placeholder: "We should use a smaller model."},
+  continue: {title: "THE CONTINUATION", accept: "Accept continuation", ask: "Continue", enter: "keep your wording", prompt: "START A SENTENCE",
+    samples: ["Thanks for the quick review on", "We should postpone the launch until", "The best part of this release is"], placeholder: "Thanks for the quick review on"},
+  instruct: {title: "THE DRAFT", accept: "Accept draft", ask: "Write", enter: "send, then insert", prompt: "TRY AN INSTRUCTION",
+    samples: ["decline the meeting politely, propose Thursday", "thank the team for shipping the release", "write a two-line story about a cat"], placeholder: "decline the meeting politely, propose Thursday"},
 };
 
 function status(label) { $("candidate-state").textContent = label; }
@@ -130,6 +133,7 @@ document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEven
   $("accept-label").textContent = MODES[mode].accept;
   $("rewrite-label").textContent = MODES[mode].ask;
   $("enter-hint").textContent = MODES[mode].enter;
+  renderSamples();
   draft.placeholder = MODES[mode].placeholder;
   edited();  // The old candidate belonged to another mode; ask again.
   draft.focus();
@@ -137,11 +141,25 @@ document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEven
 $("accept").addEventListener("click", () => commit(true));
 $("keep").addEventListener("click", () => commit(false));
 $("rewrite").addEventListener("click", requestSuggestion);
-document.querySelectorAll("[data-sample]").forEach((button) => button.addEventListener("click", () => {
+function renderSamples() {
+  $("samples-label").textContent = MODES[mode].prompt;
+  const buttons = MODES[mode].samples.map((sample) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.sample = sample;
+    button.textContent = sample + " ↗";
+    return button;
+  });
+  $("samples").replaceChildren($("samples-label"), ...buttons);
+}
+// One listener for every chip: samples change with the mode. Instruct samples wait for Enter.
+$("samples").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sample]");
+  if (!button) return;
   draft.value = button.dataset.sample;
   edited();
   draft.focus();
-}));
+});
 $("copy").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(output.value);
