@@ -42,3 +42,7 @@ def ico(glyph):
 directory = Path(__file__).resolve().parents[1] / "platforms/windows/claudish"
 for name, glyph in GLYPHS.items():
     (directory / (name + ".ico")).write_bytes(ico(glyph))
+# macOS: the input source's menu-bar icon, a template (black on transparent; the system tints it).
+# platforms/macos/build.py converts it to TIFF with sips, which macOS loads for input sources.
+(Path(__file__).resolve().parents[1] / "platforms/macos/cd.png").write_bytes(
+    png(GLYPHS["icon"], on=(0, 0, 0, 255), off=(0, 0, 0, 0)))

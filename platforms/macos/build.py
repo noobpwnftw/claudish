@@ -23,6 +23,9 @@ def main():
         venv.EnvBuilder(with_pip=True).create(environment)
     python = str(environment / "bin/python")
     subprocess.run([python, "-m", "pip", "install", "-r", str(here / "requirements-build.txt")], check=True)
+    # The menu-bar icon: macOS loads TIFF for input sources (the PNGs tried were not shown).
+    subprocess.run(["sips", "-s", "format", "tiff", str(here / "cd.png"), "--out", str(here / "cd.tiff")],
+                   check=True, capture_output=True)
     subprocess.run([python, "setup.py", "py2app", "--dist-dir", str(root / "dist/macos"),
                     "--bdist-base", str(root / "build/macos")], cwd=here, check=True)
     bundle = root / "dist/macos/Claudish.app"

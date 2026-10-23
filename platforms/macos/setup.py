@@ -15,5 +15,7 @@ setup(
     app=[{"script": "main.py", "dest_base": "Claudish"}],
     options={"py2app": {"plist": info, "packages": ["claudish"],
                         "includes": ["controller", "InputMethodKit", "AppKit", "Foundation"],
-                        "argv_emulation": False}},
+                        "argv_emulation": False,
+                        # the input source's name and menu-bar icon (cd.tiff: build.py makes it)
+                        "resources": ["cd.tiff", "en.lproj"]}},
 )
