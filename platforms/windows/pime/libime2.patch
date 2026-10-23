@@ -1,12 +1,21 @@
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..76c3861 100644
+index ea37cdc..106026c 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
-@@ -257,6 +257,48 @@ std::wstring TextService::compositionString(EditSession* session) const {
+@@ -24,6 +24,7 @@
+ #include "DisplayAttributeInfoEnum.h"
+ #include "ImeModule.h"
+ 
++#include <InputScope.h>
+ #include <assert.h>
+ #include <string>
+ #include <algorithm>
+@@ -257,6 +258,89 @@ std::wstring TextService::compositionString(EditSession* session) const {
      return result;
  }
  
-+bool TextService::surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit) const {
++bool TextService::surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit,
++                                  std::wstring* selected) const {
 +    TfEditCookie cookie = session->editCookie();
 +    ComPtr<ITfRange> anchor;
 +    if (composition_) {
@@ -22,6 +31,13 @@ index ea37cdc..76c3861 100644
 +        }
 +        ITfRange* range = selection.range;
 +        anchor = ComPtr<ITfRange>::takeover(std::move(range));
++        if (selected != nullptr) {  // the selection itself, when nothing is composed
++            auto buf = std::make_unique<wchar_t[]>(size_t(limit) + 1);
++            ULONG got = 0;
++            if (anchor->GetText(cookie, 0, buf.get(), ULONG(limit), &got) == S_OK) {
++                selected->assign(buf.get(), got);
++            }
++        }
 +    }
 +    auto read = [&](bool backward, std::wstring& out) {
 +        ComPtr<ITfRange> range;
@@ -48,20 +64,56 @@ index ea37cdc..76c3861 100644
 +    return true;
 +}
 +
++// GUID_PROP_INPUTSCOPE: declared by msctf.h, defined in no library PIME links.
++static const GUID kInputScopeProperty = {0x1713dd5a, 0x68e7, 0x4a5b, {0x9a, 0xf6, 0x59, 0x2a, 0x59, 0x5c, 0x77, 0x8d}};
++
++std::vector<int> TextService::inputScopes(EditSession* session) const {
++    std::vector<int> result;
++    TfEditCookie cookie = session->editCookie();
++    TF_SELECTION selection;
++    ULONG fetched = 0;
++    if (session->context()->GetSelection(cookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched) != S_OK || fetched == 0) {
++        return result;
++    }
++    ITfRange* raw = selection.range;
++    auto range = ComPtr<ITfRange>::takeover(std::move(raw));
++    ComPtr<ITfReadOnlyProperty> property;
++    if (session->context()->GetAppProperty(kInputScopeProperty, &property) != S_OK || !property) {
++        return result;
++    }
++    VARIANT value;
++    VariantInit(&value);
++    if (property->GetValue(cookie, range, &value) == S_OK && value.vt == VT_UNKNOWN && value.punkVal) {
++        if (auto scope = ComPtr<ITfInputScope>::queryFrom(value.punkVal)) {
++            InputScope* scopes = nullptr;
++            UINT count = 0;
++            if (scope->GetInputScopes(&scopes, &count) == S_OK && scopes) {
++                result.assign(scopes, scopes + count);
++                CoTaskMemFree(scopes);
++            }
++        }
++    }
++    VariantClear(&value);
++    return result;
++}
++
  void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
      ITfContext* context = session->context();
      if(context) {
 diff --git a/src/TextService.h b/src/TextService.h
-index f2c1c09..e853574 100644
+index f2c1c09..18793a0 100644
 --- a/src/TextService.h
 +++ b/src/TextService.h
-@@ -140,6 +140,9 @@ public:
+@@ -140,6 +140,12 @@ public:
      HWND compositionWindow(EditSession* session) const;
  
      std::wstring compositionString(EditSession* session) const;
 +    // The text before and after the composition (or the selection, when not composing), up to
 +    // limit characters each; false when the context does not share its text.
-+    bool surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit) const;
++    bool surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit,
++                         std::wstring* selected = nullptr) const;
++    // The input scopes (IS_URL, IS_EMAIL_SMTPEMAILADDRESS, ...) the app declares at the caret.
++    std::vector<int> inputScopes(EditSession* session) const;
      void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
      void setCompositionCursor(EditSession* session, int pos) const;
  

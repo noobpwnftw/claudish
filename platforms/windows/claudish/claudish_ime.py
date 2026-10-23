@@ -19,6 +19,9 @@ def keylog(*fields):
 
 
 MODE_COMMAND = 100  # the input indicator's click; its menu items follow
+# TSF input scopes (InputScope.h) by the names the service understands.
+INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "number",
+                32: "phone", 33: "phone", 34: "phone", 35: "phone", 36: "phone"}
 TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its way
 
 
@@ -130,6 +133,10 @@ class ClaudishTextService(TextService):
             elif event.keyCode not in (0x10, 0x14, 0x75, 0x77):
                 self.drop_live()
             return False
+        if event.keyCode == 0x09 and self.state.mode == "rewrite" and not self.state.text:
+            # Perhaps a selection to rewrite: only onKeyDown can see it (in its edit session); it
+            # hands Tab back to the app when there is none.
+            return True
         return event.isPrintableChar() or bool(self.state.text)
 
     def drop_live(self):
@@ -166,15 +173,24 @@ class ClaudishTextService(TextService):
         self.setShowCandidates(bool(candidates))
 
     def changed(self):
+        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits")
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
             # ready by the time the key is released, and onKeyUp can show it.
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
-                                 immediate=self.state.live, after=self.around()[1][:500])
+                                 immediate=self.state.live, after=self.around()[1][:500], purpose=self.field())
             self.await_result()
         elif self.worker and not self.state.text:
             self.worker.schedule(self.state.revision, "")
         self.publish()
+
+    def field(self):
+        """The field's kind from the input scopes the app declares (Claudish's PIME), as the
+        service names them; None for prose or when unknown."""
+        for scope in getattr(self, "inputScopes", None) or ():
+            if scope in INPUT_SCOPES:
+                return INPUT_SCOPES[scope]
+        return None
 
     def around(self):
         """(before, after): the text around the composition or the caret, as Claudish's PIME
@@ -257,7 +273,8 @@ class ClaudishTextService(TextService):
                 if self.worker:
                     before, after = self.around()  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
-                                         app=focused_app(), look=self.state.look, before=before, after=after)
+                                         app=focused_app(), look=self.state.look, before=before, after=after,
+                                         purpose=self.field())
                     self.await_result(60)
                 self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
                 self.publish()
@@ -292,13 +309,20 @@ class ClaudishTextService(TextService):
         if key == 0x76:  # F7 switches mode: continue, instruct, rewrite.
             self.next_mode()
             return True
+        if key == 0x09 and self.state.mode == "rewrite" and not self.state.text:
+            selected = getattr(self, "textSelected", None) or ""
+            if not selected or len(selected) > MAX_COMPOSITION:
+                return False  # no selection: Tab is the app's
+            # Rewrite the selection (reconversion): the composition starts over the selected text.
+            self.state.change(selected)
         if key == 0x09:
             action = self.state.tab()
             if action == "request":  # rewrite: ask now; it converts in place when it arrives
                 if self.worker:
                     before, after = self.around()  # where the rewrite goes
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
-                                         app=focused_app(), before=before[-1500:], after=after[:500])
+                                         app=focused_app(), before=before[-1500:], after=after[:500],
+                                         purpose=self.field())
                     self.await_result()
                 self.showMessage("cd_AI: rewriting…", 2)
             if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
