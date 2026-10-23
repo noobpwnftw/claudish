@@ -13,7 +13,7 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 | --- | --- | --- |
 | **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 | **instruct** | `decline the meeting politely` | drafts to pick from with 1–3 |
-| **rewrite** | `this is important` | Tab turns it into `This is of utmost significance.` in place; Tab again keeps it |
+| **rewrite** | `this is important` | Tab turns it into Claudish |
 
 F7 switches modes. Nothing is inserted until you take it, and your own words are
 always one key away. Continue can be ignored forever; the other modes are there
