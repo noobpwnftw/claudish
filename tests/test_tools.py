@@ -102,10 +102,10 @@ class RewriterTests(unittest.TestCase):
             rewriter.rewrite("good")  # a rewrite never starts the tool loop
             run.assert_not_called()
 
-    def test_tools_need_an_openai_compatible_backend_for_now(self):
+    def test_tools_need_a_backend_with_tool_calls(self):
         from claudish.model import Rewriter
         _, settings, prompt, context = self.settings(backend="command", command=["cat"])
-        with self.assertRaisesRegex(ValueError, "cannot use them yet"):
+        with self.assertRaisesRegex(ValueError, "cannot use them"):
             Rewriter.from_settings(settings, prompt, context)
 
 
