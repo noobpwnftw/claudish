@@ -123,6 +123,11 @@ class ClaudishInputController(IMKInputController):
                 self.panel.show_(kIMKLocateCandidatesBelowHint)
             elif "progress" in data or "partial" in data:
                 self.state.note(revision, data.get("progress") or data.get("partial"))
+            elif "done" in data and self.state.done(revision):
+                self.panel.hide()  # a helper took the task: nothing to insert
+                client = self.client()
+                if client is not None:
+                    client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             elif "error" in data:
                 self.state.fail(revision)
 

@@ -89,6 +89,15 @@ and 1 harmful (was 2/23, 1/7, 6 harmful). The general rules (voice only for
 prose, observations next to the request, the kind stated as a fact) did better
 than the hand-made terminal template.
 
+Steps 4–5 are done too: the model asks with a `user__ask` tool (a question with
+choices, shown as is; the answer goes back to it), a helper is a local tool of
+kind "write" asked about in words ("Send this task to claude?"), and a turn
+whose task went to a helper ends as **done** (nothing inserted). Live on Qwen3
+30B: "have claude figure out why the build fails" asked and handed over; "fix"
+after `gti status` asked "Did you mean 'git status'?" and drafted it; "send it
+to the usual place" asked which place; "say thanks for the review" just wrote
+it.
+
 ## Order of work
 
 Each step keeps the gate green and the prompts measured (the fidelity eval and

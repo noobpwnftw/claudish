@@ -112,6 +112,7 @@ class Rewriter:
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
         rewriter.read_terminal = settings.get("read_terminal", True)
+        rewriter.helper = settings.get("helper")
         rewriter.session_command = settings.get("session_command")
         if settings.get("tools"):
             if settings["backend"] not in ("llama", "openai"):
@@ -142,6 +143,7 @@ class Rewriter:
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
+        self.helper = None  # profile "helper": an agent an instruction may hand the task to (G39)
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         custom = prompt is not None  # a --prompt rewrite template wins over a tone
         self.modes = invocation.defaults((self.system, self.examples) if custom or not tone else None, tone)
@@ -345,8 +347,16 @@ class Rewriter:
                 payload["tools"] = offered
             if self.model:
                 payload["model"] = self.model
-            choice, used = self.chat(payload, self.request_headers(), box.image,
-                                     timeout=None if serial else max(self.timeout, TURN_TIMEOUT))
+            try:
+                choice, used = self.chat(payload, self.request_headers(), box.image,
+                                         timeout=None if serial else max(self.timeout, TURN_TIMEOUT))
+            except HTTPError:
+                if not offered:
+                    raise
+                # A server without tool calls (an old llama.cpp without --jinja): answer without tools.
+                payload.pop("tools")
+                choice, used = self.chat(payload, self.request_headers(), box.image,
+                                         timeout=None if serial else max(self.timeout, TURN_TIMEOUT))
             usage = usage or used
             if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
                 raise RuntimeError("the answer ran past its length budget; use a shorter phrase")

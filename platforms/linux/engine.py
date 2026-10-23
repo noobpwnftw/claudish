@@ -62,6 +62,8 @@ class ClaudishEngine(IBus.Engine):
             elif ("progress" in data or "partial" in data) and \
                     self.composition.note(revision, data.get("progress") or data.get("partial")):
                 self.render()
+            elif "done" in data and self.composition.done(revision):
+                self.render()  # a helper took the task: nothing to insert
             elif "error" in data:
                 self.composition.fail(revision)
                 self.render()

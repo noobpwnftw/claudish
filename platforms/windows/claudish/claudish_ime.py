@@ -275,6 +275,9 @@ class ClaudishTextService(TextService):
             elif "progress" in data or "partial" in data:
                 if self.state.note(revision, data.get("progress") or data.get("partial")):
                     self.showMessage("cd_AI: " + " ".join(self.state.status.split())[-60:], 2)
+            elif "done" in data:
+                if self.state.done(revision):
+                    self.showMessage("cd_AI: " + data["done"], 3)  # a helper took the task
             elif "error" in data:
                 self.state.fail(revision)
                 if self.state.failed:

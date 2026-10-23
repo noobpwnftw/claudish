@@ -172,7 +172,9 @@ class Suggestions:
             for event in data["events"]:
                 after = event["seq"] + 1
                 kind = event["type"]
-                if kind == "result":
+                if kind == "result" and event.get("done"):
+                    self.deliver(revision, {"done": event["done"], "session": key})
+                elif kind == "result":
                     self.deliver(revision, {"text": event["text"], "candidates": event.get("candidates") or [event["text"]],
                                             "consulted": event.get("consulted") or [], "session": key})
                 elif kind == "error":

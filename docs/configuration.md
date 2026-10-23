@@ -285,6 +285,28 @@ candidate like any other. For Claude Code:
   Claudish's patched PIME a question shows as it arrives; with a released PIME,
   at your next key press (F6).
 
+### Helpers: handing a task over
+
+An instruction can end in handing the task to an agent such as Claude Code,
+from any text box. Set the profile's `"helper"` to its command, with `{prompt}`
+(a request to read the handoff note) or `{note}` (the note's path):
+
+```json
+{"profiles": {"local": {"backend": "llama", "helper": ["claude", "{prompt}"]}}}
+```
+
+The model offers it when a task takes more than an answer at the caret, or
+when you ask ("have claude look into why the build fails"), and you are asked
+first: "Send this task to claude? 1 Yes 2 No". Yes opens the helper in a new
+terminal window, on a note with the task and what was observed (a terminal's
+screen, redacted), in a file only you can read; nothing is inserted. The note
+never goes on a command line. Not offered when the program is not installed or
+the command skips the helper's own permission prompts. Needs a backend with
+tool calls (llama.cpp, any OpenAI-compatible server).
+
+The model can also ask you itself, as a question with choices ("Did you mean
+git status?"); your answer goes back to it.
+
 ### Tone
 
 Claudish's voice (polished, slightly verbose, fond of em dashes) is the default

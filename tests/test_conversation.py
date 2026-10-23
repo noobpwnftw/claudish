@@ -88,7 +88,8 @@ class ConversationTests(unittest.TestCase):
         with patch.object(rewriter, "chat", short):
             _, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), before="Dear Sam,"), "say hi")
             thread.join(5)
-        self.assertNotIn("tools", short.sent[0])  # a short text box is sent whole: no tools
+        offered = [tool["function"]["name"] for tool in short.sent[0].get("tools") or []]
+        self.assertFalse([name for name in offered if name.startswith("textbox__")])  # a short box is sent whole
 
     def test_idle_conversations_end(self):
         conversations = Conversations()
@@ -166,3 +167,70 @@ class PolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AskAndHelperTests(unittest.TestCase):
+    """The model's own question (shown as is), and a helper as a tool that acts, asked about first."""
+
+    def drive(self, model, answers, helper=None, **driver):
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        rewriter.helper = helper
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), **driver), "fix it")
+            asked = []
+            for choice in answers:
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and len([e for e in session.events if e["type"] == "question"]) <= len(asked):
+                    time.sleep(0.01)
+                question = [e for e in session.events if e["type"] == "question"][len(asked)]
+                asked.append(question)
+                session.answer(question["id"], choice)
+            thread.join(5)
+        return asked, session.events[-1]
+
+    def test_the_model_asks_and_your_choice_goes_back(self):
+        model = Scripted(answer(calls=[("user__ask", {"question": "Did you mean git status?",
+                                                       "choices": ["Yes", "No, git stash"]})]), answer("git stash"))
+        asked, result = self.drive(model, [1], purpose="terminal", screen="$ gti st\nbash: gti: command not found\n$")
+        self.assertEqual(asked[0]["text"], "Did you mean git status?")  # shown as is
+        self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No, git stash"])
+        self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
+        self.assertEqual(result["text"], "git stash")
+
+    def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
+        import os
+        import tempfile
+        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the build fails and fix it"})]),
+                         answer("OK"))
+        folder = tempfile.mkdtemp()
+        with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
+                patch("claudish.handoff.launch", return_value=True) as launch, \
+                patch.dict(os.environ, {"XDG_RUNTIME_DIR": folder}):
+            asked, result = self.drive(model, [0], helper=["claude", "{prompt}"], before="Hi team, the build ")
+        self.assertEqual(asked[0]["text"], "Send this task to claude?")
+        self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
+        self.assertEqual((result["text"], result["candidates"], result["done"]),
+                         ("", [], "claude opened in a new window"))
+        template, note = launch.call_args.args
+        self.assertEqual(template, ["claude", "{prompt}"])
+        self.assertTrue(note.startswith(folder))
+        if os.name == "posix":
+            self.assertEqual(os.stat(note).st_mode & 0o777, 0o600)
+        self.assertIn("Find why the build fails and fix it", Path(note).read_text(encoding="utf-8"))
+
+    def test_no_to_the_helper_lets_the_model_answer(self):
+        model = Scripted(answer(calls=[("helper__claude", {"task": "fix the build"})]), answer("make clean && make"))
+        with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
+                patch("claudish.handoff.launch") as launch:
+            asked, result = self.drive(model, [1], helper=["claude", "{prompt}"])
+        launch.assert_not_called()
+        self.assertEqual(result["text"], "make clean && make")
+        self.assertIn("denied by the user", model.sent[1]["messages"][-1]["content"])
+
+    def test_an_unsupervised_helper_is_never_offered(self):
+        model = Scripted(answer("done"))
+        with patch("claudish.handoff.shutil.which", return_value="/bin/claude"):
+            self.drive(model, [], helper=["claude", "--dangerously-skip-permissions", "{prompt}"])
+        offered = [tool["function"]["name"] for tool in model.sent[0].get("tools") or []]
+        self.assertNotIn("helper__claude", offered)

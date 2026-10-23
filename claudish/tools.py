@@ -67,11 +67,13 @@ class Toolbox:
         """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).
         approve(server, tool, arguments, kind) -> (allowed, reason) is asked before each write or
         destructive call; without it those tools are not offered. progress(text) hears each call.
-        local: {"server__tool": (description, parameters, function(arguments) -> text)}, read-only
-        tools served by Claudish itself (the text box). MCP servers need the SDK; local tools do not.
+        local: {"server__tool": (description, parameters, function(arguments) -> text[, kind[, question]])},
+        tools served by Claudish itself (the text box, questions to the user, helpers): read-only
+        unless kind says "write", and then asked about like any write, in the words of question
+        (a function of the arguments) when given. MCP servers need the SDK; local tools do not.
         Returns (final text, consulted, messages with the tool calls and results appended)."""
         from contextlib import ExitStack
-        consulted, kinds, callers, offered = [], {}, {}, []
+        consulted, kinds, callers, offered, questions = [], {}, {}, [], {}
         spent = 0.0  # model and tool time; waiting for your answer does not count
 
         def timed(call, *args):
@@ -87,8 +89,13 @@ class Toolbox:
                 "name": name, "description": (description or "").strip()[:500],
                 "parameters": parameters or {"type": "object", "properties": {}}}})
 
-        for name, (description, parameters, function) in (local or {}).items():
-            kinds[name], callers[name] = "read", function
+        for name, spec in (local or {}).items():
+            description, parameters, function = spec[:3]
+            kind = spec[3] if len(spec) > 3 else "read"
+            if kind != "read" and approve is None:
+                continue  # a tool that acts is only offered when someone can say yes
+            kinds[name], callers[name] = kind, function
+            questions[name] = spec[4] if len(spec) > 4 else None
             offer(name, description, parameters)
         with ExitStack() as stack:
             if self.servers:
@@ -131,7 +138,9 @@ class Toolbox:
                             "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items()))
                         allowed, reason = True, None
                         if kind != "read":
-                            allowed, reason = approve(server, tool, arguments, kind)
+                            question = questions.get(function["name"])
+                            allowed, reason = (approve(server, tool, arguments, kind, question(arguments))
+                                               if question else approve(server, tool, arguments, kind))
                         if not allowed:
                             result = "denied by the user" + (": " + reason if reason else "")
                         else:

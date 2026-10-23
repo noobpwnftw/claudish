@@ -149,6 +149,14 @@ class Composition:
             self.working, self.failed = False, True
             self.question, self.status = None, ""
 
+    def done(self, revision):
+        """The instruction was carried out elsewhere (a helper took the task): nothing is inserted,
+        and the instruction is finished."""
+        if revision != self.revision or not self.working:
+            return False
+        self.change("")
+        return True
+
     def ask(self, revision, question, session):
         """An agent asks something while working on this instruction: its choices become the list."""
         if revision != self.revision or not self.working:

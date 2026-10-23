@@ -87,42 +87,101 @@ class ModelDriver:
         self.pending = {}  # question id -> [event, answer]
         self.cancelled = False
         self.counter = 0
+        self.handed = None  # what took the task over (a helper), when one did
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every
-        request, with the tools an instruction may use and questions asked through the session."""
+        request, with the tools an instruction may use (the profile's, the text box's, a question
+        to the user, a helper) and their questions asked through the session."""
         rewriter = self.rewriter
         box = rewriter.box("instruct", self.app, self.purpose, self.before, self.after, self.look, self.screen)
         self.conversation.textbox = Textbox(self.before, self.after)
-        local = self.conversation.textbox.tools() if box.clipped() else {}
+        local = dict(self.conversation.textbox.tools() if box.clipped() else {})
+        local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai")  # no conversation or tools for other backends yet
+        self.handed = None
         result = rewriter.answer(
             "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
             approve=lambda *call: self.approve(session, *call),
             progress=lambda summary: session.emit("progress", text=summary), local=local, serial=False)
         if self.cancelled:
             return
+        if self.handed:
+            # The task went to a helper: nothing is inserted, and the instruction is done.
+            session.emit("result", text="", candidates=[], done=self.handed,
+                         consulted=result["consulted"] + [self.handed])
+            return
         session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"])
 
-    def approve(self, session, server, tool, arguments, kind):
-        """Ask through the candidate list; (allowed, reason)."""
+    def own_tools(self, session, box):
+        """Claudish's tools for an instruction: a question to the user (shown as is, the answer goes
+        back to the model), and the profile's helper, which acts and so is asked about first."""
+        tools = {"user__ask": (
+            "Ask the user a short question, shown as is with up to three choices, when the instruction is "
+            "ambiguous or needs their decision (\"Did you mean git status?\"). Their answer is the result.",
+            {"type": "object", "properties": {
+                "question": {"type": "string"},
+                "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
+             "required": ["question"]},
+            lambda arguments: self.ask_user(session, arguments))}
+        from . import handoff
+        helper = self.rewriter.helper
+        if handoff.available(helper):
+            title = handoff.name(helper)
+
+            def hand_over(arguments):
+                task = str(arguments.get("task") or "").strip()[:500]
+                note = handoff.write_note(task, box.observations)
+                if not handoff.launch(helper, note):
+                    return "No terminal window could be opened for %s: answer the instruction yourself." % title
+                self.handed = "%s opened in a new window" % title
+                return "Handed over. Reply with just: OK"
+            tools["helper__" + title] = (
+                "Hand the task to %s, a coding agent that works on the user's machine in its own terminal "
+                "window, when it takes more than an answer here (investigating, editing files, several "
+                "steps), or when the user asks for it." % title,
+                {"type": "object", "properties": {"task": {"type": "string",
+                 "description": "What %s should do, in one or two sentences" % title}}, "required": ["task"]},
+                hand_over, "write", lambda arguments: "Send this task to %s?" % title)
+        return tools
+
+    def question(self, session, text, choices):
+        """A question at the caret; (choice index, your own words) once answered."""
+        if self.cancelled:
+            return 1, "cancelled"
+        self.counter += 1
+        key = "question-%d" % self.counter
+        waiter = [threading.Event(), None]
+        self.pending[key] = waiter
+        session.emit("question", id=key, text=text, choices=choices)
+        waiter[0].wait()
+        return waiter[1] or (1, "cancelled")
+
+    def ask_user(self, session, arguments):
+        labels = [str(c)[:80] for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
+        choice, words = self.question(session, str(arguments.get("question") or "")[:200],
+                                      [{"label": label} for label in labels])
+        if words is not None:
+            return "The user answered: " + words
+        return "The user chose: " + labels[choice] if 0 <= choice < len(labels) else "No answer."
+
+    def approve(self, session, server, tool, arguments, kind, asked=None):
+        """Ask through the candidate list; (allowed, reason). asked: the question in words (a helper:
+        "Send this task to claude?"), else the tool's name."""
         if kind == "write" and (server, tool) in self.conversation.approved:
             return True, None
-        if self.cancelled:
-            return False, "cancelled"
-        self.counter += 1
-        key = "tool-%d" % self.counter
         shown = ", ".join("%s=%s" % (k, str(v)[:40]) for k, v in arguments.items())
+        if asked:
+            what = str(arguments.get("task") or shown)[:80]
+            choice, text = self.question(session, asked, [{"label": "Yes", "legend": what},
+                                                          {"label": "No", "legend": "answer it here instead"}])
+            return (False, text) if text is not None else (choice == 0, None)
         legend = "%s.%s(%s)" % (server, tool, shown)
         choices = [{"label": "Allow", "legend": legend}, {"label": "Deny", "legend": "the model continues without it"}]
         if kind == "write":
             choices.append({"label": "Allow for this conversation", "legend": "%s.%s from now on" % (server, tool)})
-        waiter = [threading.Event(), None]
-        self.pending[key] = waiter
-        session.emit("question", id=key, choices=choices,
-                     text=("Destructive: allow %s.%s?" if kind == "destructive" else "Allow %s.%s?") % (server, tool))
-        waiter[0].wait()
-        choice, text = waiter[1] or (1, "cancelled")
+        choice, text = self.question(session, ("Destructive: allow %s.%s?" if kind == "destructive"
+                                               else "Allow %s.%s?") % (server, tool), choices)
         if text is not None:
             return False, text  # your words go back to the model as the reason
         if choice == 2:
