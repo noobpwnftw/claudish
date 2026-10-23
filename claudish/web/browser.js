@@ -54,6 +54,15 @@ export async function removeStored() {
     for await (const name of root.keys()) await root.removeEntry(name, { recursive: true });
   } catch {}
   try { for (const name of await caches.keys()) await caches.delete(name); } catch {}
+  try {  // older storage layouts: nothing of the page's own is kept there
+    for (const { name } of await indexedDB.databases()) {
+      await new Promise((done) => { const request = indexedDB.deleteDatabase(name); request.onsuccess = request.onerror = request.onblocked = done; });
+    }
+  } catch {}
+}
+// The browser's own count of this site's storage, which can include what the page cannot reach.
+export async function countedBytes() {
+  try { return (await navigator.storage.estimate()).usage || 0; } catch { return 0; }
 }
 
 // Without room to store the model (a small quota: a guest profile, a full disk), it runs from memory:

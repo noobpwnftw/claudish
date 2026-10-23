@@ -620,9 +620,16 @@ if (IN_BROWSER) {
       $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
     }
     await removeStored();
-    const left = await storedBytes();
-    setStatus(left > 1e6 ? `${Math.round(left / 1e6)} MB could not be removed: reload the page and try again.`
-      : "Removed the stored model from this browser.");
+    const { countedBytes } = await import("./browser.js");
+    const left = await storedBytes(), counted = await countedBytes();
+    if (left > 1e6) setStatus(`${Math.round(left / 1e6)} MB could not be removed: reload the page and try again.`);
+    else if (counted > 50e6) {
+      // Space the browser still counts for this site but that no page can reach (an older storage
+      // layout): only the browser's own site settings can clear it.
+      setStatus(`Removed the model. The browser still counts ${Math.round(counted / 1e6)} MB for this site that the `
+        + "page cannot reach: clear it in the browser's site settings (Chrome: the icon left of the address, "
+        + "Site settings, Delete data).");
+    } else setStatus("Removed the stored model from this browser.");
     showStored();
   });
   showStored();
