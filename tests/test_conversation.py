@@ -255,7 +255,7 @@ class AskAndHelperTests(unittest.TestCase):
         import os
         import tempfile
         from claudish import handoff
-        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}), \
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "USERPROFILE": home}), \
                 patch("claudish.handoff.shutil.which", return_value="/bin/claude"):
             self.assertTrue(handoff.available(["claude", "{prompt}"]))
             os.makedirs(os.path.join(home, ".claude"))
@@ -364,7 +364,7 @@ class HandleTests(unittest.TestCase):
         rewriter.modes["instruct"]["candidates"] = 1
         rewriter.helper = ["claude", "--session-id", "{session}", "{prompt}"]
         conversation = rewriter.conversations.get("term")
-        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "XDG_RUNTIME_DIR": home}), \
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "USERPROFILE": home, "XDG_RUNTIME_DIR": home}), \
                 patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch", return_value=True) as launch:
             model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the link error"})]), answer("OK"))
