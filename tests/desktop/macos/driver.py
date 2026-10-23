@@ -43,10 +43,18 @@ class Unfocused(RuntimeError):
     pass
 
 
+TYPING_INTO = None  # a bundle id while a scenario types into another app (Terminal); else the test app
+
+
 def post(code, text=None, shift=False):
-    # Keys go wherever focus is: if the test app is not in front, stop rather than type into
-    # whatever is (a function key there is a system shortcut).
-    if STATE.exists() and not state().get("active") and not front():
+    # Keys go wherever focus is: if the app being typed into is not in front, stop rather than type
+    # into whatever is (a function key there is a system shortcut).
+    if TYPING_INTO:
+        from AppKit import NSWorkspace
+        front_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        if front_app is None or front_app.bundleIdentifier() != TYPING_INTO:
+            raise Unfocused("%s lost focus; stopping before typing elsewhere" % TYPING_INTO)
+    elif STATE.exists() and not state().get("active") and not front():
         raise Unfocused("the test app lost focus; stopping before typing elsewhere")
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, code, down)
@@ -261,6 +269,8 @@ def scenarios():
         # Terminal again, and only type once it is the app taking keys.
         sh("osascript", "-e", 'tell application "Terminal" to activate')
         time.sleep(1.0)
+        global TYPING_INTO
+        TYPING_INTO = "com.apple.Terminal"  # the focus guard watches Terminal now, not the test window
         shift_tap()  # compose
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
@@ -285,6 +295,7 @@ def scenarios():
               screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)
     else:
         check("terminal: the screen is readable (Accessibility for the service's Python)", screen(), "")
+    TYPING_INTO = None
     subprocess.run(["pkill", "-x", "Terminal"], check=False)
 
     # Errors inside an input method never reach the screen: with CLAUDISH_TRACE set (launchctl
