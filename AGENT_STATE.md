@@ -39,24 +39,31 @@ Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on t
   the Spark). Merges only after a clean gate summary (one slip on b40121f, fixed in 7e199dd).
 - Mac VM: rebuilt on a50c06e (token, trace file) after the owner relogged; rig 10/10 incl. Terminal (the rig's focus guard was pulling the test window forward).
 
-## Since the last checkpoint
+## Since the last checkpoint (G45, the visual pass, 2026-10-24)
 
-- G35 (terminals): the service reads a focused terminal through AT-SPI / UI Automation (ctypes) / AX
-  on Tab or Enter in compose; continue is quiet in terminals; never at a password prompt. Linux rig
-  40/40 (GNOME Terminal), Windows VM 4/4 (Windows Terminal portable zip in the VM share's wt/, the
-  classic console), Mac by hand (the rig's Terminal step fails only after its earlier scenarios: open).
-  `claudish fix` and its hooks are retired; benchmarks/evaluate_terminal.py: Qwen3 30B 20/23.
-- G36: per-run service token (~/.config/claudish/service-token, 0600) sent by the adapters.
-  **The Mac VM's installed cd_AI predates it**: rebuild + relogin with the owner before running the
-  rig against a current service (the VM's service is still an older checkout).
-- Persona poll (docs/research/2026-10-23-persona-poll.md) produced G36–G41; owner decisions pending:
-  Space picks draft 1, Enter's meaning in compose, a plain register by default, releases/signing.
-- Next: G38 per-app routing.
+- **Process (owner):** the web is the design: claudish/web/kit.css + kit.js are the look, the
+  design lab (claudish/web/design.html) draws every state in Windows 11, macOS, GNOME and reference
+  skins; natives match it to the pixel; a skin changes tokens only, and what a platform cannot draw
+  changes the design for all. Designs are settled with synthetic reviewers before building
+  (docs/research/2026-10-24-design-review.md; CJK input-method users weigh most on keys).
+- **Settled (docs/design/visual.md):** one panel anatomy from Composition.panel(); choices not
+  numbered (↑↓ Enter; approvals start unhighlighted, Deny first); a sent instruction leaves your
+  text and the panel carries the thread; a rewrite waits in the panel until Tab; a focus change
+  commits only your own words (held exchanges, a pill on return, Shift+Esc); compose keys show from
+  the first key; drops say so; rolled Shift is not a tap.
+- **Built:** macOS panel.py (NSPanel, menu material, verified on the VM, light); Windows: Claudish's
+  PIME only (released PIME dropped), Direct2D/DirectWrite panel, layered suggestion window, toast,
+  caret-placed panel with no composition; GNOME Shell extension (platforms/linux/gnome-extension,
+  installed by install.py; the engine publishes io.claudish.Screen); the demo and homepage on the kit.
+- **Next:** macOS dark and the focus rules on the VM (needs a rebuild: warn the owner); X11 desktop
+  rig on the new engine; Windows checks the reviewers asked for (100/150/200% scale, high contrast);
+  G46 (selection into the buffer) is tabled.
 
 ## Verified
 
-- Gate `scripts/check.py --model` 10 PASS on main; Pages deploy green on `8a091ae`.
-- Linux X11 39/39 (with a Qt app), GNOME 12/12. Windows (patched PIME, VM) Notepad 15/15, Edge 14/14 + 1 known
+- Gate `scripts/check.py --model` 10 PASS on `b3748cc`; Windows VM (Claudish's PIME, Direct2D panel)
+  Notepad 15/15, Edge 14/14; GNOME Wayland with the extension 12/12 (galleries in .tools/gallery).
+- Earlier: Linux X11 39/39 (with a Qt app), GNOME 12/12. Windows (patched PIME, VM) Notepad 15/15, Edge 14/14 + 1 known
   (Ctrl shortcuts, G01, tabled). Mac VM 8/8 on `8fc0332` (rebuilt, owner relogged; the lowercase cd icon shows in the menu bar; the first suggestion after the reinstall arrived).
 - Live Claude Code (haiku, owner's quota): per-conversation agent, textbox MCP, Allow/Deny, Esc.
 
