@@ -149,28 +149,17 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def pick(self, number):
-        """A click on a row of the panel: the same as its number key."""
+        """A click on a row of the panel (1-based): taken as its key would take it."""
         if not self.active:
             return
-        if self.state.question and not self.state.reply:
-            chosen = self.state.answer_choice(number)
+        action = self.state.click(number - 1)
+        if action == "choose":  # a question's choice: answered, as Enter would
+            chosen = self.state.answer_choice()
             if chosen and self.worker is not None:
                 self.worker.answer(*chosen)
             self.show_panel()
-        elif self.state.choosing or self.state.candidate:
-            self.commit_pick(self.client(), number)
-
-    @objc.python_method
-    def commit_pick(self, client, number):
-        """Insert the numbered candidate of an instruction's list (1-9 or a click in the panel)."""
-        text = self.state.pick(number)
-        if text is None:
-            return
-        if self.worker is not None:
-            self.worker.schedule(self.state.revision, "")
-        self.hide_panel()
-        if client is not None:
-            client.insertText_replacementRange_(text, (NSNotFound, 0))
+        elif action == "accept":  # a draft: inserted, as Tab would
+            self.finish(self.client(), suggested=True)
 
     @objc.python_method
     def app(self, client):
@@ -214,7 +203,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def show_ghost(self, client):
-        """Continue's suggestion: cd_AI's own grey text right after the caret (docs/design/visual.md).
+        """Continue's suggestion: cd_AI's own grey text right after the caret (docs/design/design.md).
         Continue asks only at the end of a line (inside), so it never covers the app's text."""
         ghost = self.state.ghost
         if not ghost or self.state.inside:  # text after the caret on its line: nothing to cover it with
@@ -426,7 +415,7 @@ class ClaudishInputController(IMKInputController):
     def handleEvent_client_(self, event, client):
         try:
             handled = self.handle(event, client)
-            special = {36: "Return", 48: "Tab", 51: "Backspace", 53: "Escape", 56: "Shift", 60: "Shift", 97: "F6", 100: "F8"}
+            special = {36: "Return", 48: "Tab", 51: "Backspace", 53: "Escape", 56: "Shift", 60: "Shift", 100: "F8"}
             trace("key", special.get(event.keyCode(), "char"), self.state.mode, "handled" if handled else "passed")
             return handled
         except Exception:
@@ -467,10 +456,9 @@ class ClaudishInputController(IMKInputController):
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
             return True
         if key in (36, 76):  # Return, keypad Enter
-            # Instruct holds the text until Enter sends it; the next Enter inserts the result.
-            action = self.state.enter()
-            if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.state.answer_choice(self.state.chosen)
+            action = self.state.enter()  # Enter talks to the model; it never inserts its text
+            if action == "choose":  # answer with the highlighted choice
+                chosen = self.state.answer_choice()
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
                 self.changed(client)
@@ -490,22 +478,20 @@ class ClaudishInputController(IMKInputController):
                 self.changed(client)  # your instruction stays marked while its exchange is open
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.show_panel(client)
-            elif action in ("accept", "keep"):
-                self.finish(client, suggested=action == "accept")
             return action != "pass"
         if key == 48:  # Tab
             if not self.state.live and not self.state.text:
                 self.take_selection(client)  # a selection: rewrite it in place
             action = self.state.tab()
             if action == "choose":
-                chosen = self.state.answer_choice(self.state.chosen)
+                chosen = self.state.answer_choice()
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
                 self.changed(client)
                 return True
             if action == "accept":
                 self.finish(client, suggested=True)
-            elif action == "request":  # rewrite: ask now; it converts in place when it arrives
+            elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 if self.worker is not None:
                     before, after = self.around_caret(client)  # where the rewrite goes
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
@@ -525,7 +511,7 @@ class ClaudishInputController(IMKInputController):
         if key == 53:  # Escape: one step back
             action = self.state.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
-                chosen = self.state.answer_choice(2)
+                chosen = self.state.dismissal()
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
                 self.show_panel(client)

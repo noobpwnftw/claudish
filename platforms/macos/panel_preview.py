@@ -1,4 +1,4 @@
-"""Draw cd_AI's macOS panel in every state of the design lab at once (docs/design/visual.md), from
+"""Draw cd_AI's macOS panel in every state of the design lab at once (docs/design/design.md), from
 real Composition states, for comparing with claudish/web/design.html#macos: run it on a Mac
 (python3 panel_preview.py [seconds]) and screenshot it. Not part of the input method."""
 import os

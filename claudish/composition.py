@@ -5,17 +5,14 @@ import time
 MAX_COMPOSITION = 512
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
 # continue (where cd_AI starts) types like en_US: your keys go straight in, and the rest of the
-# sentence waits after the caret for Tab. compose holds what you type: Tab rewrites it in place,
-# Enter sends it as an instruction and offers drafts to pick, Shift+Enter keeps it as it is, and
-# Esc steps back until it is gone.
+# sentence waits after the caret for Tab. compose holds what you type: Tab shows a rewrite (Tab
+# again puts it in), Enter sends it as an instruction and offers drafts, Shift+Enter keeps it as it
+# is, and Esc steps back until it is gone (docs/design/design.md).
 MODES = ("continue", "compose")
 # Tab takes the model's text (a suggestion, a rewrite, a draft, an answer to read); Enter talks to the
 # model (sends an instruction, a reply, an answer to its question). Enter never inserts the model's
 # words, so a reflexive second Enter after sending can insert nothing (owner, 2026-10-24).
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
-# Compose's keys show when you pause this long, not while you type (docs/design/visual.md): a fluent
-# typist sees only the composition; a hesitant one always sees the keys.
-HINT_PAUSE_SECONDS = 0.0  # CJK reviewers: what Enter does must show from the first key (2026-10-24)
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
 
@@ -42,6 +39,13 @@ def split_title(text):
     return None, text
 
 
+def blank(**shown):
+    """A panel description with every key a renderer reads (see Composition.panel)."""
+    return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
+                 "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
+                 "replying": False, "take": "Enter", "nudge": False}, **shown)
+
+
 class Composition:
     def __init__(self):
         self.text = ""
@@ -54,7 +58,7 @@ class Composition:
         self.failed = False
         self.look = False  # F8 with an instruction: send a picture of the focused window too
         self.taken = False  # continue: a suggestion was just taken; wait for the next key
-        self.converted = False  # compose: the rewrite shows in place of your words
+        self.converted = False  # compose: a rewrite waits in the panel for Tab (your words stay)
         self.adopted = False  # the composition is text taken from the app (a selection): never dropped
         self.quiet = False  # the field is not prose (a URL, an email address, a number): nothing unasked
         self.inside = False  # text follows the caret on its line: continue waits for the end of a line
@@ -70,8 +74,6 @@ class Composition:
         self.held_app, self.held_at = None, 0.0
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Enter answer it
         self.status = ""  # what the agent is doing, or its draft so far
-        self.offered_at = 0.0  # when the latest result arrived (time.monotonic)
-        self.typed_at = 0.0  # when the composition last changed (time.monotonic): the hints wait for a pause
         self.error = ""  # why the last request failed, in plain words
         self.hosted = ""  # the hosted model the shown result came from ("Claude"); "" when local
 
@@ -80,7 +82,6 @@ class Composition:
         self.answers = []
         self.editing = False
         self.highlight = 0
-        self.typed_at = time.monotonic()
         self.text = text
         self.candidate = ""
         self.candidates = []
@@ -128,19 +129,18 @@ class Composition:
             return self.reply or self.text
         return self.text
 
-    def panel(self, now=None):
+    def panel(self):
         """What the panel next to the caret shows, the same for every adapter and the demo
-        (docs/design/visual.md; drawn as in claudish/web/design.html), or None when nothing shows:
-        {"label", "body", "code"}: the header (who asks or what this is, then the content as is);
-        "rows": [{"key", "text", "legend"}] with "on" the highlighted one (-1: none, an approval);
-        "foot": [(key, verb)], then "tail" (free words); "tile": "ai" or "warn"; "status" with
-        "busy"; "failed" (why); "mark" (a hosted model's name). Continue shows no panel: its
-        suggestion speaks for itself. Compose's keys wait for a pause (hint_due)."""
+        (docs/design/design.md; drawn as in claudish/web/design.html), or None when nothing shows:
+        "thread" (what the composition does not say: "You asked", "You answered"); "label", "body",
+        "code" (the header: who asks or what this is, then the content as is); "rows":
+        [{"text", "legend"}] with "on" the highlighted one (-1: none, an approval) and "take" its
+        key; "foot": [(key, verb)], then "tail" (free words); "tile": "ai" or "warn"; "status" with
+        "busy"; "failed" (why); "mark" (a hosted model's name); "nudge" (Enter was pressed on a
+        draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
-        shown = {"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
-                 "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
-                 "replying": False, "take": "Enter", "nudge": False}
+        shown = blank()
         question = self.question
         if self.sent:
             # What the composition does not say (round 6): "You asked" only while a reply takes the
@@ -160,7 +160,7 @@ class Composition:
                                                           foot=[("Enter", "send reply"), ("Esc", "cancel reply")])
             shown.update(label=label, body=body, code=bool(question.get("code")),
                          on=self.highlight if self.asks or self.selected else -1,
-                         rows=[{"key": "", "text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
+                         rows=[{"text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
                          foot=[("↑↓", "choose")] + ([("Enter", "confirm")] if not approval or self.selected else []),
                          tail="or type why not" if not self.asks else "or type a reply")
         elif self.working and not self.reply:
@@ -170,11 +170,12 @@ class Composition:
                          busy=True, foot=[("Esc", "stop")])
         elif self.working:  # typing while it works: your next words, sent when you press Enter
             shown["status"], shown["busy"] = "Working", True
-        elif self.failed:
-            shown.update(tile="warn", failed=self.error or "The request failed", foot=[("Enter", "retry"), ("Esc", "edit")])
-        elif self.choosing or (self.asked == "instruct" and self.candidate):
+        elif self.failed:  # Tab retries a rewrite, Enter an instruction: each key asks again
+            retry = "Tab" if self.asked == "rewrite" else "Enter"
+            shown.update(tile="warn", failed=self.error or "The request failed", foot=[(retry, "retry"), ("Esc", "edit")])
+        elif self.asked == "instruct" and self.candidate:
             readings = self.candidates or [self.candidate]
-            shown.update(rows=[{"key": "", "text": c, "legend": None} for c in readings], on=self.highlight,
+            shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
                          take="Tab", nudge=self.nudge,
                          mark=self.hosted and "from %s · hosted" % self.hosted)
@@ -183,12 +184,10 @@ class Composition:
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
                          take="Tab",
                          mark=self.hosted and "from %s · hosted" % self.hosted)
-        elif self.look or self.editing or self.hint_due(now) == 0:  # after F8 or Esc: said at once
+        else:  # composing: the keys show from the first key (what Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
                              + ([("Esc", "drop")] if self.editing else [("Shift+Enter", "keep")]))
-        else:
-            return None
-        if self.sent and self.reply:  # typing at the caret: the choices take no number; Enter sends it
+        if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
             shown.update(on=-1, replying=True, tail=None, foot=[("Enter", enter),
@@ -199,30 +198,17 @@ class Composition:
         """The mode switch, briefly at the caret: the mode's tile, its name, and the key back (a
         panel with only a footer)."""
         compose = self.mode == "compose"
-        return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None,
-                "tile": "ai" if compose else "cd", "status": "Compose" if compose else "Continue", "busy": False,
-                "foot": [("Shift", "continue" if compose else "compose")], "failed": None, "mark": None,
-                "thread": [], "replying": False}
+        return blank(tile="ai" if compose else "cd", status="Compose" if compose else "Continue",
+                     foot=[("Shift", "continue" if compose else "compose")])
 
     def dropped_toast(self):
         """After Esc discarded words: say so, briefly, with the key that brings them back."""
-        return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None, "tile": "ai",
-                "status": "Dropped", "busy": False, "foot": [("Shift+Esc", "restore")], "failed": None,
-                "mark": None, "thread": [], "replying": False, "take": "Enter", "nudge": False}
+        return blank(status="Dropped", foot=[("Shift+Esc", "restore")])
 
-    def hint_due(self, now=None):
-        """Seconds until compose's keys show (0: now), or None when they are not waiting: they show
-        on a pause, so adapters redraw once then."""
-        if self.live or not self.text or self.question or self.working or self.failed or self.converted \
-                or self.candidate:
-            return None
-        waited = (time.monotonic() if now is None else now) - self.typed_at
-        return max(0.0, HINT_PAUSE_SECONDS - waited)
-
-    def hint(self, now=None):
+    def hint(self):
         """The panel as one line of plain words, for a window that can only show text (IBus's
         auxiliary text where cd_AI's own panel is not drawn): "Tab rewrite · Enter ask"."""
-        shown = self.panel(now)
+        shown = self.panel()
         if not shown:
             return ""
         words = [w for w in (shown["label"] and shown["body"] and "%s: %s" % (shown["label"], shown["body"])
@@ -249,15 +235,16 @@ class Composition:
 
     @property
     def asks(self):
-        """A question that Enter (or Tab) answers with its first choice: the model's own question or
-        an answer to read. An approval (permission) is answered only with a number."""
+        """A question Enter answers with its highlighted choice from the start: the model's own
+        question. An approval (permission) starts with nothing highlighted: Enter answers only once
+        ↓ has highlighted a choice (Deny first)."""
         return bool(self.question) and not self.reply and not self.question.get("permission")
 
     def tab(self):
-        """What Tab does: "pass" (the app's), "request" (ask for the rewrite; it takes your words'
-        place as it arrives), "wait" (asked already), "convert" (show it in place of your words),
-        "accept" (the rewrite shown, or an instruction's first draft), or "choose" (the first
-        choice of a question that is not an approval)."""
+        """What Tab does (it takes the model's text): "pass" (the app's), "request" (ask for a
+        rewrite; it waits in the panel when it comes), "wait" (asked already), "convert" (a rewrite
+        that came earlier: show it in the panel), "accept" (the rewrite shown, or the highlighted
+        draft), or "choose" (an answer to read: insert it)."""
         if not self.text:
             return "pass"
         if self.question:  # Tab inserts an answer to read; a question's choice is Enter's
@@ -309,12 +296,12 @@ class Composition:
         return "drop"
 
     def restore(self):
-        """Shift+Esc with nothing composed: the instruction Esc dropped comes back to edit; "" when
-        there is none (the key is the app's)."""
+        """Shift+Esc with nothing composed: the exchange a focus change held, back as it was; else
+        what Esc dropped (an instruction to edit, or a reply); "" when there is none (the key is the
+        app's)."""
         if self.held is not None and not self.text and not self.live:
             held, self.held = self.held, None  # the exchange you left, back as it was
             self.__dict__.update({k: v for k, v in held.__dict__.items() if k != "held"})
-            self.held = None
             return self.reply or self.text
         if self.live or not self.dropped:
             return ""
@@ -328,9 +315,10 @@ class Composition:
         return self.text
 
     def enter(self):
-        """What Enter does now: "pass" (the app's), "submit" (send it as an instruction), "wait",
-        "accept" (the rewrite shown, or the first draft), "reply" (an agent asked, and you typed
-        your answer), or "choose" (the first choice of a question that is not an approval)."""
+        """What Enter does (it talks to the model, and never inserts its text): "pass" (the
+        app's), "submit" (send it as an instruction), "reply" (send what you typed to the model's
+        question), "choose" (answer with the highlighted choice), or "wait" (nothing to send: on a
+        draft, the row lights Tab, the key that takes it)."""
         if not self.text:
             return "pass"
         if self.question:
@@ -360,7 +348,7 @@ class Composition:
         (then Shift+Enter is the app's, a newline in most chat boxes)."""
         if not self.text or self.live:
             return ""
-        kept = self.shown if not self.question else self.text
+        kept = self.shown  # what the composition shows (your words, or a reply)
         self.change("")
         return kept
 
@@ -428,24 +416,36 @@ class Composition:
             return True
         self.highlight = max(0, min(count - 1, self.highlight + step))
         if not self.question:
-            self.candidate = self.candidates[self.highlight]  # Enter and Tab take the highlighted draft
+            self.candidate = self.candidates[self.highlight]  # Tab takes the highlighted draft
         return True
 
-    @property
-    def chosen(self):
-        """The number Enter (or Tab) answers a question with: the highlighted choice."""
-        return self.highlight + 1
-
-    def answer_choice(self, number):
-        """(session, question id, choice index) for the chosen choice (Enter on the highlight, or a
-        click), or None."""
-        question = self.question
-        if not question or self.reply or not 1 <= number <= len(question.get("choices") or []):
+    def click(self, index):
+        """A click on a row (0-based): it is highlighted, then taken as its key would take it:
+        "choose" (answer a question with it), "accept" (insert that draft), or None."""
+        rows = (self.question.get("choices") or []) if self.question else self.candidates
+        if self.reply or not 0 <= index < len(rows) or not (self.question or self.asked == "instruct"):
             return None
-        label = question["choices"][number - 1].get("label", "")
-        self.question, self.status = None, "answered: " + label
+        self.highlight, self.selected = index, True
+        if self.question:
+            return "choose"
+        self.candidate = self.candidates[index]
+        return "accept"
+
+    def answer_choice(self, index=None):
+        """(session, question id, choice index) for the highlighted choice (or `index`), or None.
+        The answer joins the thread ("You answered")."""
+        question = self.question
+        index = self.highlight if index is None else index
+        if not question or self.reply or not 0 <= index < len(question.get("choices") or []):
+            return None
+        label = question["choices"][index].get("label", "")
+        self.question, self.status = None, ""
         self.answers.append(label)
-        return question["session"], question["id"], number - 1
+        return question["session"], question["id"], index
+
+    def dismissal(self):
+        """Esc on an answer to read: answer it with its last choice (Dismiss), or None."""
+        return self.answer_choice(len((self.question or {}).get("choices") or []) - 1)
 
     def passes(self, char):
         """A key that goes straight to the app instead of starting a composition: anything but a
@@ -459,13 +459,13 @@ class Composition:
         question, words = self.question, self.reply.strip()
         if not question or not words:
             return None
-        self.question, self.reply, self.status = None, "", "answered: " + words
+        self.question, self.reply, self.status = None, "", ""
         self.answers.append(words)
         return question["session"], question["id"], words
 
     def insert(self, char):
         """Add a typed character; False when the adapter should commit first (the composition is
-        full, or a rewrite shows in place: typing on keeps it and starts afresh)."""
+        full). Typing on past a rewrite in the panel goes on with your words; the rewrite goes."""
         if self.sent:
             # What you type now is a reply (or your next words): it takes the instruction's place
             # in the composition. A Space with nothing typed does nothing (an IME user's reflex to
@@ -483,9 +483,9 @@ class Composition:
 
     def backspace(self):
         if self.sent:
-            self.reply = self.reply[:-1]  # nothing typed: nothing goes (the instruction is in the panel)
+            self.reply = self.reply[:-1]  # with nothing typed, nothing goes: the instruction stays
             return
-        if self.converted:  # back to your words, as Esc
+        if self.converted:  # the rewrite goes; your words stay
             self.converted = False
             return
         self.change(self.text[:-1])
@@ -499,7 +499,7 @@ class Composition:
             self.look = False
             self.change("")
             return ""
-        kept = self.shown if not self.question else self.text
+        kept = self.shown
         self.mode = "continue"
         self.look = False
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context
@@ -526,9 +526,8 @@ class Composition:
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.highlight = 0
-        self.offered_at = time.monotonic()
         if self.asked == "rewrite" and self.working:
-            self.converted = True  # you asked with Tab: it takes your words' place as it arrives
+            self.converted = True  # you asked with Tab: it shows in the panel as it arrives
         self.working = False
         self.question, self.status = None, ""
         if self.nudged == ("pending", self.text, self.reply) and self.asked == "instruct":
@@ -568,20 +567,6 @@ class Composition:
         if self.mode == "continue" and len(self.candidate) > len(self.text) and self.candidate.startswith(self.text):
             return self.candidate[len(self.text):]
         return ""
-
-    @property
-    def choosing(self):
-        """A numbered list is shown: number keys pick. Only for an instruction's drafts, which you
-        asked for and are waiting on, or an agent's question; while you type, digits are text."""
-        return bool(self.question) or (self.asked == "instruct" and len(self.candidates) > 1)
-
-    def pick(self, number):
-        """Commit the numbered candidate (1-based); None if there is no such candidate."""
-        if self.question or not (self.choosing and 1 <= number <= len(self.candidates)):
-            return None
-        text = self.candidates[number - 1]
-        self.change("")
-        return text
 
     def commit(self, suggested=False):
         """The text to insert: the candidate if asked for or already shown in place, else your words."""
@@ -623,9 +608,7 @@ class Composition:
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "A draft is ready" if held.candidate else
                   "The request failed" if held.failed else "Working on what you asked")
-        return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None, "tile": "ai",
-                "status": status, "busy": held.working, "foot": [("Shift+Esc", "open")], "failed": None,
-                "mark": None, "thread": [], "replying": False, "take": "Enter"}
+        return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
 
     def route(self, revision):
         """A result for the held exchange (its revision): applied there, not to what is on screen."""

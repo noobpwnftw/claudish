@@ -287,9 +287,6 @@ class ClaudishEngine(IBus.Engine):
             self.finish()
             return False
         self.poll()
-        if keyval == IBus.KEY_F6 and self.composition.text:
-            self.render()
-            return True
         if keyval == IBus.KEY_F8 and self.composition.toggle_look():
             self.render()
             return True
@@ -305,8 +302,8 @@ class ClaudishEngine(IBus.Engine):
             return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
-            if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.composition.answer_choice(self.composition.chosen)
+            if action == "choose":  # answer with the highlighted choice
+                chosen = self.composition.answer_choice()
                 if chosen:
                     self.suggestions.answer(*chosen)
                 self.render()
@@ -326,8 +323,6 @@ class ClaudishEngine(IBus.Engine):
                 self.render()
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.render()
-            elif action in ("accept", "keep"):
-                self.finish(action == "accept")
             return action != "pass"
         if keyval == IBus.KEY_Tab:
             around = None
@@ -335,14 +330,14 @@ class ClaudishEngine(IBus.Engine):
                 around = self.take_selection()  # a selection: rewrite it in place
             action = self.composition.tab()
             if action == "choose":
-                chosen = self.composition.answer_choice(self.composition.chosen)
+                chosen = self.composition.answer_choice()
                 if chosen:
                     self.suggestions.answer(*chosen)
                 self.render()
                 return True
             if action == "accept":
                 self.finish(True)
-            elif action == "request":  # rewrite: ask now; it converts in place when it arrives
+            elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 before, after = around or self.around_caret()  # where the rewrite goes
                 self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
                                           immediate=True, app=self.app, before=before[-1500:], after=after[:500],
@@ -363,7 +358,7 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_Escape:
             action = self.composition.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
-                chosen = self.composition.answer_choice(2)
+                chosen = self.composition.dismissal()
                 if chosen:
                     self.suggestions.answer(*chosen)
                 self.render()

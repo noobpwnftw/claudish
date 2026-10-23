@@ -31,18 +31,14 @@ different input method for each app window"; macOS, Settings → Keyboard → In
 Sources → "Automatically switch to a document's input source"; GNOME Tweaks →
 Keyboard → "Switch input sources individually for each window".
 
-Enter commits composition first; press it again to send a newline. This first
-version edits composition at its end. Linux commits original wording before
-forwarding navigation and shortcuts. On Windows, the first navigation key
-commits composition and is consumed; press again to navigate. Ctrl/Alt/Win
-shortcuts pressed while composing commit your wording and are consumed; press the shortcut again to run it, as with navigation keys. Characters typed with AltGr
-(Ctrl+Alt) stay in the composition, as they do on Linux. Application-driven focus
-changes and composition termination need particular attention in Windows testing.
+A composition is edited at its end. Navigation keys and Ctrl/Alt/Win shortcuts pressed while
+composing commit your words first; on Windows the first such key is consumed, so press it again.
+Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
 Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,
 platforms/windows/pime, calls back when it does). Short phrases work best: the buffer is
 limited to 512 characters and generation to 64 tokens. A truncated or failed
-rewrite is never offered; Enter/Escape still commits your wording.
+rewrite is never offered; Shift+Enter still keeps your words.
 
 ## Browser demo
 
@@ -51,7 +47,7 @@ input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and the panel, drawn with the same kit as the design lab
 (`/design.html`) and the desktop adapters. It opens in compose, the pitch (Tab
 offers a rewrite, Enter sends it as an instruction and offers drafts to choose
-with ↑↓ and Enter, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
+with ↑↓ and take with Tab, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
 pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default; a choice lasts only for the current page,
@@ -179,5 +175,6 @@ described the same way for every mode:
   suggestion's start) and after it; for rewrite, where your phrase goes; for
   instruct, a window of the text box, with the rest available as retrieval.
 
-Windows (PIME) reports only the app so far; macOS reports no field kind.
+Windows (Claudish's PIME) reports the app, the field's input scope and the text around the
+caret; macOS reports no field kind.
 

@@ -359,7 +359,6 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.key(48)
         self.assertEqual(self.client.commits, ["thank the team", " ", "Thank you, team—truly."])
-        self.assertFalse(self.key(98))  # F7 is the app's
         # Shift held for a capital is not a tap.
         for flags in (1 << 17,):
             self.controller.handleEvent_client_(types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56,
@@ -369,7 +368,7 @@ class MacOSAdapterTests(unittest.TestCase):
                                             modifierFlags=lambda: 0, characters=lambda: ""), self.client)
         self.assertEqual(state.mode, "compose")
 
-    def test_instruct_lists_several_readings_and_digits_pick(self):
+    def test_instruct_lists_several_drafts_and_arrow_tab_takes_one(self):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
@@ -382,7 +381,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, ["Hi there."])
         self.assertEqual(state.text, "")
 
-    def test_an_agents_question_is_answered_with_a_digit(self):
+    def test_an_approval_is_answered_with_the_arrows(self):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))  # send: the agent starts working
@@ -400,7 +399,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, [])  # an answer is not text
         worker.result = (state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
         self.controller.pollSuggestions_(None)
-        self.type_text("not 2")  # words instead of a number, digits included
+        self.type_text("not 2")  # words instead of a choice, digits included: a reply
         self.assertEqual(self.client.marked, "not 2")
         self.assertTrue(self.key(36))
         self.assertEqual(worker.answered_text, ("s1", "perm-2", "not 2"))

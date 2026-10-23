@@ -70,9 +70,10 @@ class ClaudishTextService(TextService):
         if self.worker is None:
             self.worker = Suggestions()
         self.setKeyboardOpen(True)
+        # The drafts also go to TSF's candidate list (apps that draw candidates themselves): PIME
+        # lists as many as there are selection keys. Choices are not numbered; the panel is ours.
         self.setSelKeys("123456789")
-        # A vertical list in the system's UI font, as Chinese input methods show drafts (PIME draws it).
-        self.customizeUI(candPerRow=1, candFontName="Segoe UI", candFontSize=15, candUseCursor=True)
+        self.customizeUI(candPerRow=1)
         # The mode in the taskbar's input indicator (PIME's Windows 8+ mode icon); its menu picks one.
         self.addButton("windows-mode-icon", icon=mode_icon(self.state.mode), commandId=MODE_COMMAND,
                        tooltip=mode_tooltip(self.state.mode))
@@ -198,9 +199,6 @@ class ClaudishTextService(TextService):
         self.setCandidateList([row["text"] for row in panel["rows"]] if panel else [])
         self.setShowCandidates(bool(panel))
         self.panel_shown = panel
-        due = self.state.hint_due()
-        if due:  # compose's keys show after a pause: call back then
-            self.setTimer(int(due * 1000) + 20)
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
@@ -315,10 +313,9 @@ class ClaudishTextService(TextService):
             self.changed()
             return True
         if key == 0x0D:
-            # Instruct holds the text until Enter sends it; the next Enter inserts the result.
-            action = self.state.enter()
-            if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.state.answer_choice(self.state.chosen)
+            action = self.state.enter()  # Enter talks to the model; it never inserts its text
+            if action == "choose":  # answer with the highlighted choice
+                chosen = self.state.answer_choice()
                 if chosen and self.worker:
                     self.worker.answer(*chosen)
                 self.publish()
@@ -352,12 +349,12 @@ class ClaudishTextService(TextService):
         if key == 0x09:
             action = self.state.tab()
             if action == "choose":
-                chosen = self.state.answer_choice(self.state.chosen)
+                chosen = self.state.answer_choice()
                 if chosen and self.worker:
                     self.worker.answer(*chosen)
                 self.publish()
                 return True
-            if action == "request":  # rewrite: ask now; it converts in place when it arrives
+            if action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 if self.worker:
                     before, after = self.around()  # where the rewrite goes
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
@@ -381,7 +378,7 @@ class ClaudishTextService(TextService):
         elif key == 0x1B:
             action = self.state.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
-                chosen = self.state.answer_choice(2)
+                chosen = self.state.dismissal()
                 if chosen and self.worker:
                     self.worker.answer(*chosen)
                 self.publish()
@@ -399,9 +396,6 @@ class ClaudishTextService(TextService):
                 self.publish()
                 return True
             self.setCommitString(self.state.commit())
-        elif key == 0x0D:
-            # Enter reaches here only with a result to take (see above).
-            self.setCommitString(self.state.commit(True))
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):

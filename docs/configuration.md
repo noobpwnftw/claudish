@@ -242,10 +242,11 @@ profile:
 ```
 
 - Tools the server marks read-only (`readOnlyHint`), and the ones you vouch for
-  with `"trust"`, run without asking. Any other tool asks first, in the candidate
-  list: **1** Allow, **2** Deny, **3** Allow for this conversation; a tool marked
-  destructive (`destructiveHint`) asks every time. Typing words instead of a number
-  denies the call with your words as the reason. `"deny": [TOOL, ...]` keeps a tool
+  with `"trust"`, run without asking. Any other tool asks first, in the panel: Deny,
+  Allow, Allow for this conversation, with nothing highlighted (the first ↓ lands on
+  Deny, so Allow is a deliberate ↓↓ Enter); a tool marked destructive
+  (`destructiveHint`) asks every time. Typing words instead denies the call with your
+  words as the reason. `"deny": [TOOL, ...]` keeps a tool
   from ever being offered.
 - Instructions in the same text box are one **conversation**: later instructions
   see earlier ones, the drafts, and the tool results ("now make it shorter" works).
@@ -258,8 +259,8 @@ profile:
   chat templates handle tool calls by default, vLLM, Ollama). On the Spark, Qwen2.5-14B called the right tool and
   drafted from its result ("41 tests have passed… test_upload_retry timed out
   after 30 seconds", 3.1 s), and called none for a haiku. Qwen2.5-1.5B never
-  called a tool and wrote around the gap. Claude and agent CLIs come later; an
-  agent CLI behind the `command` backend already uses its own tools.
+  called a tool and wrote around the gap. Claude runs the same loop with the SDK's
+  client-side tools, and an agent CLI (`session_command`) uses its own.
 
 ### Agent sessions: an agent at the caret
 

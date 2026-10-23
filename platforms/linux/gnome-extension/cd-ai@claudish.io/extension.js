@@ -1,4 +1,4 @@
-// cd_AI's panel and suggestion in GNOME Shell (docs/design/visual.md; the design lab's GNOME mock,
+// cd_AI's panel and suggestion in GNOME Shell (docs/design/design.md; the design lab's GNOME mock,
 // claudish/web/design.html#gnome). The IBus engine (platforms/linux/engine.py) publishes what to
 // show on the session bus (io.claudish.Screen: the panel as Composition.panel() describes it,
 // continue's suggestion, the mode switch); this draws it at the IBus cursor, on X11 and Wayland
@@ -131,8 +131,6 @@ export default class CdAiExtension extends Extension {
             const on = index === panel.on;
             const line = new St.BoxLayout({style_class: on ? 'cd-row cd-on' : 'cd-row'});
             line.add_child(new St.Widget({style_class: on ? 'cd-bar' : 'cd-bar cd-off', y_expand: true}));
-            if (row.key)  // choices are not numbered: digits are text, as Space is
-                line.add_child(label(row.key, 'cd-key'));
             const text = label('', 'cd-text', true);
             const words = GLib.markup_escape_text(row.text, -1);
             text.clutter_text.set_markup(row.legend

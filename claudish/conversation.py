@@ -1,6 +1,6 @@
 """Conversations per text box, and the model driver that runs each instruction as a turn in one.
 
-Design: docs/design/instruct.md. A conversation belongs to a text box (the adapter sends an id per
+Design: docs/design/architecture.md. A conversation belongs to a text box (the adapter sends an id per
 input context) and keeps the instructions, the drafts offered and taken, and the tool calls with
 their results; the text around the caret is sent fresh each turn. Conversations live only in memory
 and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
@@ -177,9 +177,10 @@ class ModelDriver:
 
     def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False):
         """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
-        model's own question or an answer to read: Enter takes the first choice) or "permission"
-        (an approval: only a number answers it, so Enter never approves anything, and its safe
-        choice is listed first). label and body: how the panel shows it (who asks, then what)."""
+        model's own question: its first choice highlighted, Enter answers) or "permission" (an
+        approval: nothing highlighted until ↓, which lands on its safe choice, listed first; a
+        reflexive Enter approves nothing). label and body: how the panel shows it (who asks, then
+        what)."""
         if self.cancelled:
             return 1, "cancelled"
         self.counter += 1
@@ -229,7 +230,7 @@ class ModelDriver:
         shown = ", ".join("%s=%s" % (k, str(v)[:40]) for k, v in arguments.items())
         if asked:
             # The whole task, in the question itself: nothing the helper will be told is hidden.
-            # The safe choice is 1 (No): a reflexive 1 never hands anything over.
+            # The safe choice (No) is first: the first ↓ lands on it, so nothing is handed over by reflex.
             what = str(arguments.get("task") or shown)
             choice, text = self.question(session, "%s %s" % (asked, what),
                                          [{"label": "No", "legend": "answer it here"},

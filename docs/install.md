@@ -50,17 +50,10 @@ Or step by step:
    sources) and prints a fix for anything wrong. On Linux, for example, it
    catches a session that started before the installer's search-path change
    ("log out and back in"); on Windows on ARM, PIME's missing x86 runtime.
-6. **Learn five keys.** Everything else is typing.
-
-| Key | Does |
-| --- | --- |
-| Shift (tap) | switch: continue ↔ compose |
-| Tab | take the model's text: the rest of the sentence, a rewrite (shown first; Tab again puts it in), the highlighted draft (with nothing offered, Tab is the app's) |
-| Enter | compose: send your words as an instruction (they stay underlined while the model works), a reply, or the answer to a question; it never inserts the model's text; with nothing composed, the app's |
-| Shift+Enter | compose: keep your words as typed |
-| ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text |
-| Esc | one step back: what you typed → edit (your instruction back at the caret) → dropped; Shift+Esc brings it back |
-| F8 | in compose, with an instruction: also send a picture of the window you are typing in |
+6. **Learn the keys:** Shift switches mode; in compose, Tab takes the model's text, Enter
+   talks to the model, Shift+Enter keeps your words, Esc steps back. The full table is in the
+   [README](../README.md#keys); the design behind it is
+   [design/design.md](design/design.md).
 
 ## Start the model and service
 

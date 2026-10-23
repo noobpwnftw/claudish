@@ -95,16 +95,16 @@ def scenarios():
 
     focus("other")
     type_text("very important")
-    key("Tab")  # asks; the rewrite takes your words' place as it arrives, still a composition
-    wait_for(lambda: state().get("preedit") == "particularly crucial", what="the rewrite in place")
-    check("Tab converts the rewrite in place", (state().get("preedit"), state()["other"]),
-          ("particularly crucial", ""))
-    key("Escape")  # your words again
-    wait_for(lambda: state().get("preedit") == "very important", what="your words again")
-    check("Esc brings your words back", state().get("preedit"), "very important")
-    key("Tab", "Tab")  # the rewrite again (no new request), then kept
+    key("Tab")  # asks; the rewrite waits in the panel, your words stay the composition
+    settle(1.0)
+    check("Tab shows a rewrite; your words stay", (state().get("preedit"), state()["other"]),
+          ("very important", ""))
+    key("Escape")  # the rewrite goes; your words stay
+    settle()
+    check("Esc dismisses the rewrite, your words stay", state().get("preedit"), "very important")
+    key("Tab", "Tab")  # the rewrite again (no new request), then put in
     wait_for(lambda: state()["other"], what="candidate commit")
-    check("Tab again keeps the rewrite", state()["other"], "particularly crucial")
+    check("Tab again puts the rewrite in", state()["other"], "particularly crucial")
 
     focus("view")
     type_text("very")
@@ -114,7 +114,7 @@ def scenarios():
     key("Tab")
     time.sleep(0.2)
     check("Tab asks; nothing is committed", state()["view"], "")
-    wait_for(lambda: state().get("preedit") == "particularly good", what="the rewrite of the whole phrase")
+    settle(1.0)  # the rewrite waits in the panel
     key("Tab")
     wait_for(lambda: state()["view"], what="the rewrite kept")
     check("the rewrite is of everything typed", state()["view"], "particularly good")
@@ -254,10 +254,10 @@ def qt_scenarios():
         time.sleep(0.3)
         type_text("very important")
         key("Tab")
-        wait_for(lambda: qt_state().get("preedit") == "particularly crucial", what="the rewrite in Qt")
+        time.sleep(1.0)  # the rewrite waits in the panel; your words stay
         key("Tab")
         wait_for(lambda: qt_state()["qline"], what="the Qt commit")
-        check("Qt: Tab rewrites in place, Tab keeps it", qt_state()["qline"], "particularly crucial")
+        check("Qt: Tab shows a rewrite, Tab puts it in", qt_state()["qline"], "particularly crucial")
         key("ctrl+a", "BackSpace")
         key("shift")  # continue: straight in
         type_text("this is very important")
@@ -286,7 +286,8 @@ def qt_scenarios():
 
 def agent_session(service):
     """G18: restart the service with an agent profile (the scripted stream-json agent) and run a
-    session at the caret: a partial draft, a permission question answered with 1, then Enter."""
+    session at the caret: a partial draft, a permission question (Deny first: ↓↓ Enter allows),
+    then Tab inserts the result."""
     service.terminate()
     service.wait(timeout=5)
     service = background(sys.executable, "-m", "claudish", "serve", "--profile", "agent", cwd=str(SRC))
@@ -297,12 +298,12 @@ def agent_session(service):
     key("Return")  # starts the session
     time.sleep(2.0)  # partial draft, then the permission question
     check("the agent waits for an answer", state()["view"], "")
-    key("1")  # Allow
+    key("Down", "Down", "Return")  # nothing highlighted: the first ↓ is Deny, the second Allow
     time.sleep(1.0)
-    key("Return")  # insert the result
+    key("Tab")  # Tab takes the model's text
     wait_for(lambda: state()["view"], what="agent result")
-    check("agent session: 1 allows the tool, Enter inserts", state()["view"], "The branch is clean—nothing to commit.")
-    # Words instead of a number: the agent hears them as a refusal with your reason.
+    check("agent session: ↓↓ Enter allows the tool, Tab inserts", state()["view"], "The branch is clean—nothing to commit.")
+    # Words instead of a choice: the agent hears them as a refusal with your reason.
     key("ctrl+a", "BackSpace")
     type_text("is my branch clean")
     key("Return")
@@ -313,7 +314,7 @@ def agent_session(service):
           ("use git diff", ""))
     key("Return")  # sends the reply
     time.sleep(1.0)
-    key("Return")  # inserts the result
+    key("Tab")  # inserts the result
     wait_for(lambda: state()["view"], what="agent result after a typed reply")
     check("a typed reply reaches the agent", state()["view"], "Understood—I left it alone. (use git diff)")
     return service
@@ -414,7 +415,7 @@ def terminal_scenario():
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
         time.sleep(1.0)
-        key("Return")  # its draft, inserted at the prompt (running it would be the user's Enter)
+        key("Tab")  # its draft, inserted at the prompt (running it would be the user's Enter)
         try:
             wait_for(lambda: "having read the terminal" in screen(), what="the draft at the prompt")
         except TimeoutError:

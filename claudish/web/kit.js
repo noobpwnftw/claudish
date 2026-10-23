@@ -1,7 +1,7 @@
 "use strict";
 // The one look at the caret (kit.css), built from a panel description in the shape of Claudish's
 // Composition.panel() (claudish/composition.py): the demo and the design lab draw from it, as the
-// input methods do on each platform (docs/design/visual.md). Nodes, not HTML: the words come
+// input methods do on each platform (docs/design/design.md). Nodes, not HTML: the words come
 // from a model.
 (() => {
   const el = (tag, className, text) => {
@@ -38,7 +38,7 @@
   }
 
   // The panel: an optional header (a small label, then the content as is), the rows (the
-  // highlighted one carries its own Enter; every row keeps that column), the footer.
+  // highlighted one carries the key that takes it; every row keeps that column), the footer.
   // pick(number): a click on a row.
   function panel(spec, keys = {}, pick = null) {
     const rows = spec.rows || [];
@@ -59,7 +59,6 @@
     }
     rows.forEach((row, index) => {
       const line = el("div", "k-row" + (index === spec.on ? " on" : ""));
-      if (row.key) line.append(el("span", "k-key", row.key));  // choices are not numbered (digits are text)
       const words = el("span", "k-text" + (spec.mono ? " k-mono" : ""), row.text);
       if (row.legend) words.append(el("span", "k-legend", " — " + row.legend));
       line.append(words);

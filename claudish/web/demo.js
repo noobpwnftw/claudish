@@ -51,15 +51,14 @@ const state = {
   failed: false,
   error: "",     // why the last request failed, in plain words
   hosted: "",    // the hosted model behind the shown answer, said in the panel
-  typedAt: 0,    // compose's keys show after a pause (performance.now)
   reply: "",     // what you type once an instruction is sent: a reply, or your next words
   highlight: 0,  // the highlighted draft (↑ and ↓ move it)
   editing: false,  // the instruction came back to the caret (Esc edit): the next Esc drops it
-  dropped: "",   // the last instruction Esc dropped: Shift+Esc brings it back
+  dropped: "",   // the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
+  droppedReply: false,
   nudged: null,  // Enter on the model's text: what the panel showed then (Tab's key lights while it lasts)
   revision: 0,
 };
-const HINT_PAUSE_MS = 1000;  // as claudish/composition.py's HINT_PAUSE_SECONDS
 let timer = null;
 let typing = null;  // a sample typing itself
 
@@ -74,22 +73,22 @@ function change(text) {
   state.error = state.hosted = state.reply = "";
   state.highlight = 0;
   state.editing = false;
-  state.typedAt = performance.now();
   state.revision++;
 }
 const live = () => state.mode === "continue";
 const composing = () => !live() && Boolean(state.text);
 // Sent: the instruction stays the composition while its exchange is open, and a reply takes its
-// place (docs/design/visual.md). A rewrite waits in the panel: only Tab puts the model's words in.
+// place (docs/design/design.md). A rewrite waits in the panel: only Tab puts the model's words in.
 const sent = () => state.asked === "instruct" && (state.working || state.failed || Boolean(state.candidate));
 const shown = () => sent() ? state.reply || state.text : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
-const choosing = () => state.asked === "instruct" && state.candidates.length > 1;
 function automatic() {
-  // Only continue asks on a pause, at a word boundary (not at the start of an empty line). Rewrite
-  // asks on Tab and instruct on Enter: nothing is sent while you type.
-  return live() && Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
+  // Only continue asks on a pause, at a word boundary (not at the start of an empty line), and only
+  // at the end of a line: in the middle of text a suggestion would cover what follows. Rewrite asks
+  // on Tab and instruct on Enter: nothing is sent while you type.
+  const inside = Boolean(doc.text[doc.caret]) && doc.text[doc.caret] !== "\n";
+  return live() && !inside && Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
 }
 // Continue's context is the text before the caret, as an input method reads the app's surrounding
 // text: typed, pasted, or already there.
@@ -103,7 +102,7 @@ function commit(text) {
 // Before the caret moves, a selection is edited, or a shortcut runs, the input method commits your
 // words (navigation and shortcuts end a composition) and continue starts a fresh context.
 function settle() {
-  if (composing()) commit(state.text);
+  if (composing()) commit(shown());  // what the composition shows (your words, or a reply)
   change(live() ? context() : "");
 }
 
@@ -176,19 +175,18 @@ function panel() {
   const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
   if (state.working) return {...shown, status: state.asked === "rewrite" ? "Rewriting" : "Working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
-  if (state.failed) return {...shown, tile: "warn", failed: state.error || "The request failed",
-                            foot: [["Enter", "retry"], ["Esc", "edit"]], ...typing};
+  if (state.failed) return {...shown, tile: "warn", failed: state.error || "The request failed",  // Tab retries a rewrite
+                            foot: [[state.asked === "rewrite" ? "Tab" : "Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
-    return {...shown, rows: readings.map((text) => ({key: "", text, legend: null})), on: state.highlight, mark,
+    return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight, mark,
             foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab",
             nudge: nudge(), ...typing};
   }
   if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark,
                                foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab"};
-  if (state.editing || hintDue() === 0)
-    return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
-  return null;
+  // Composing: the keys show from the first key (what Enter does must be known).
+  return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
 }
 // A click on a draft: it goes in at the caret (choices are not numbered; the mouse picks directly).
 function pickRow(number) {
@@ -196,11 +194,9 @@ function pickRow(number) {
   if (picked === undefined || state.reply) return;
   commit(picked); change(""); changed();
 }
-// Milliseconds until compose's keys show (0: now); null when they are not waiting.
-function hintDue() {
-  if (live() || !state.text || state.working || state.failed || state.converted || state.candidate) return null;
-  return Math.max(0, HINT_PAUSE_MS - (performance.now() - state.typedAt));
-}
+
+// Never silently: a drop says so, briefly, with the key that brings it back.
+const dropped = () => toast({tile: "ai", status: "Dropped", foot: [["Shift+Esc", "restore"]]});
 
 // A Shift tap (or a click on the input source): continue <-> compose. Leaving compose keeps what
 // you see, as it is.
@@ -218,11 +214,12 @@ function switchMode() {
   toast();
 }
 
-// The mode switch, briefly at the caret: the mode's tile, its name, and the key back.
-function toast() {
+// Briefly at the caret: the mode switch (its tile, its name, and the key back), or what Esc
+// dropped, with the key that brings it back (composition.py's toast and dropped_toast).
+function toast(spec = null) {
   const compose = state.mode === "compose";
-  const node = Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
-                          foot: [["Shift", compose ? "continue" : "compose"]]});
+  const node = Kit.toast(spec || {tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
+                                  foot: [["Shift", compose ? "continue" : "compose"]]});
   const editor = $("editor").getBoundingClientRect(), caret = CARET.getBoundingClientRect();
   node.style.left = `${Math.max(12, caret.left - editor.left - 14)}px`;
   node.style.top = `${caret.bottom - editor.top + 6}px`;
@@ -254,9 +251,10 @@ function key(name, shift = false) {
   }
   if (live()) return liveKey(name);
   // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Enter takes.
-  if ((name === "ArrowUp" || name === "ArrowDown") && choosing() && !state.reply) {  // ↑ and ↓ move the highlight
+  if ((name === "ArrowUp" || name === "ArrowDown") && state.asked === "instruct" && state.candidates.length > 1
+      && !state.reply) {  // ↑ and ↓ move the highlight, without wrapping
     const count = state.candidates.length;
-    state.highlight = (state.highlight + (name === "ArrowUp" ? count - 1 : 1)) % count;
+    state.highlight = Math.max(0, Math.min(count - 1, state.highlight + (name === "ArrowUp" ? -1 : 1)));
     render();
     return true;
   }
@@ -299,19 +297,26 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Escape") {  // one step back: what you typed, then edit, then drop
+    if (shift && state.dropped && state.droppedReply && sent() && !state.reply) {  // Shift+Esc: the cleared reply
+      state.reply = state.dropped; state.dropped = ""; render();
+      return true;
+    }
     if (shift && !state.text && state.dropped) {  // Shift+Esc: the dropped instruction, back to edit
       change(state.dropped); state.dropped = ""; state.editing = true; render();
       return true;
     }
     if (!state.text) return false;
-    if (sent() && state.reply) { state.reply = ""; render(); return true; }
+    if (sent() && state.reply) {  // what you typed goes, and says so; Shift+Esc brings it back
+      state.dropped = state.reply; state.droppedReply = true; state.reply = ""; render(); dropped(); return true;
+    }
     if (state.converted) { state.converted = false; state.editing = true; render(); return true; }  // your words again
     if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
     // Sent, or a rewrite pending or failed: back to your words, to edit (a late answer is ignored).
     if (sent() || state.working || state.failed) { change(state.text); state.editing = true; render(); return true; }
-    state.dropped = state.text;
+    state.dropped = state.text; state.droppedReply = false;
     change("");
     render();
+    dropped();
     return true;
   }
   if (name === "Backspace") {
@@ -400,9 +405,6 @@ function render() {
   window.replaceChildren(...(spec ? [Kit.panel(spec, {}, pickRow)] : []));
   if (spec) document.querySelectorAll("#editor > .k-toast").forEach((toast) => toast.remove());  // a panel replaces a toast
   window.hidden = !spec;
-  clearTimeout(render.pause);
-  const due = hintDue();
-  if (due) render.pause = setTimeout(render, due);  // compose's keys, after a pause
   placeCandidateWindow();
   $("copy").disabled = $("clear").disabled = !doc.text;
 }
@@ -453,7 +455,7 @@ sink.addEventListener("keydown", (event) => {
   if (event.key === "Shift") { if (!event.repeat) shiftDownAt = performance.now(); return; }
   shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
   const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
-    .includes(event.key) || (choosing() && (event.key === "ArrowUp" || event.key === "ArrowDown"));
+    .includes(event.key) || (state.asked === "instruct" && state.candidates.length > 1 && (event.key === "ArrowUp" || event.key === "ArrowDown"));
   if (named) {
     if (event.key === "Enter" && event.shiftKey && !composing()) return;  // a newline, as the app's
     stopTyping();

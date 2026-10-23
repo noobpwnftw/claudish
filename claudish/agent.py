@@ -4,7 +4,7 @@ The profile's "session_command" starts it, for example:
   ["claude", "--print", "--input-format", "stream-json", "--output-format", "stream-json",
    "--verbose", "--include-partial-messages", "--permission-prompts", "host"]
 Claudish is the host: each permission request becomes a question in the candidate list, and the
-answer goes back on stdin. One agent process lives per conversation (docs/design/instruct.md), so
+answer goes back on stdin. One agent process lives per conversation (docs/design/architecture.md), so
 follow-up instructions continue the same agent session; a process that ended is resumed by its
 session id. Message shapes follow the Agent SDK's control protocol
 (claude_agent_sdk/_internal/query.py): control_request can_use_tool -> control_response.
@@ -244,7 +244,7 @@ class ClaudeCodeDriver:
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}
         # What is approved is the body, in full; the safe choice is 1 (a reflexive 1 never
-        # approves) and nothing is highlighted (docs/design/visual.md).
+        # approves) and nothing is highlighted (docs/design/design.md).
         tool_input = body.get("input") if isinstance(body.get("input"), dict) else {}
         command = tool_input.get("command")
         label = "Claude Code wants to run" if isinstance(command, str) else "Claude Code wants to use %s" % tool

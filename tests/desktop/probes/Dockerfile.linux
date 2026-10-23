@@ -1,5 +1,0 @@
-# Probe image: GNOME Terminal and AT-SPI on top of the Linux desktop rig image.
-FROM claudish-desktop-linux
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends gnome-terminal gir1.2-vte-2.91 at-spi2-core python3-pyatspi gir1.2-atspi-2.0 && rm -rf /var/lib/apt/lists/*
-USER tester

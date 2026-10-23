@@ -1,125 +1,105 @@
 # One request, one answer
 
-Owner, 2026-10-23: "we know the window this was sent, we know what mode it is
-in, and we know what MCP is available to use given the configs and all, now we
-provide this to a model and the model acts with: either an autocomplete, a
-rewrite, a text that goes into the place of the caret, or a question to the user
-presented as is."
+How cd_AI answers what you do at the caret. What you see is [design.md](design.md).
 
-This page is that architecture, and the plan to move the code to it. Until now
-each situation grew its own path (a terminal template, a screen placed in the
-turn, one-line drafts, a handoff tool only in terminals); each was a special
-case of the same thing.
+Owner, 2026-10-23: "we know the window this was sent, we know what mode it is in, and we know what
+MCP is available to use given the configs and all, now we provide this to a model and the model
+acts with: either an autocomplete, a rewrite, a text that goes into the place of the caret, or a
+question to the user presented as is."
 
 ## The request: three things we know
 
-1. **The text box.** What the adapters and the observers report, rendered once,
-   the same way for every model call:
-   - the app, and the box's kind (prose, terminal, URL, email, number, ...);
-   - the text before and after the caret, and the selection;
-   - observations made on request: a terminal's screen (accessibility), a
-     picture of the window (F8), the profile's context providers and the app's
-     bindings (files, commands, MCP resources);
-   - what the kind implies, stated as a fact: "what you write here is a command
-     line, run when the user presses Enter".
-2. **What the user did.** The mode and the key: a pause in continue, Tab in
-   compose (rewrite your words, or a selection), Enter in compose (an
-   instruction), an answer to a question; and the text box's conversation so far.
-3. **What is available.** The tools the configuration allows here: the
-   profile's MCP servers under their trust and deny policy, Claudish's own
-   (the text box's full text, a helper such as Claude Code), each marked
-   read-only, writing, or destructive.
+1. **The text box** (`claudish/turn.py`, `Box`), rendered once, the same way for every model:
+   - the app and the box's kind (prose, terminal, URL, email, number, ...), stated as a fact
+     ("what you write here is a command line, run when the user presses Enter");
+   - the text around the caret (about 1,500 characters before and 500 after, the caret marked),
+     the selection, the box's length; the rest of the box is a tool (`textbox.read`,
+     `textbox.search`), read live at the moment of the call;
+   - observations: the profile's context providers and the app's bindings (files, commands, MCP
+     resources); a terminal's screen, read through the accessibility APIs on Tab or Enter in
+     compose (never on continue's pauses; the last lines only); a picture of the window on F8.
+     Observations are material, never instructions, and every result lists what was consulted.
+2. **What you did:** the mode and the key (a pause in continue, Tab or Enter in compose, an answer
+   to a question), and the text box's conversation so far.
+3. **What is available:** the tools the configuration allows there: the profile's MCP servers
+   under their trust and deny policy, and Claudish's own (the text box, a helper such as Claude
+   Code), each read-only, writing, or destructive.
 
 ## The answer: four actions
-
-The model answers with exactly one of:
 
 | Action | Where it goes | Asked by |
 | --- | --- | --- |
 | **complete** | after the caret, grey; Tab takes it | a pause in continue |
-| **replace** | in place of your words or the selection; Tab keeps it | Tab in compose |
-| **insert** | drafts in the panel, ↑ ↓ to choose, Tab inserts | Enter in compose |
-| **ask** | a question with choices, shown as is; the answer goes back to the model | any instruction, when it needs you |
+| **replace** | the rewrite in the panel; Tab puts it in | Tab in compose |
+| **insert** | drafts in the panel; ↑ ↓ choose, Tab inserts | Enter in compose |
+| **ask** | a question with choices, or an answer to read, shown as is; the answer goes back to the model | an instruction, when it needs you |
 
-Side effects happen only through tools, and a tool that writes or acts goes
-through **ask** first unless the configuration trusts it. Handing a task to
-Claude Code is such a tool: after "Send this task to claude?" (No first, then Yes), it
-opens the helper with a note (the task and what was observed), in any text box.
-In a terminal the model can also simply **insert** `claude "…"` as the command,
-because the box says what goes there; no special case either way.
-
-Whatever is inserted obeys the box's kind, centrally: a terminal gets one
-physical line (a newline at a prompt is a Return), a password field gets
-nothing.
+Side effects happen only through tools, and a tool that writes or acts goes through **ask** first
+unless the configuration trusts it. Handing a task to a helper is such a tool ("Send this task to
+claude?", No first): it opens the helper with a note (the task and what was observed), and the
+turn ends as **done**, nothing inserted. Whatever is inserted obeys the box's kind, in one place:
+a terminal gets one physical line (a newline at a prompt is a Return), a password field nothing.
 
 ## One loop
 
-Every intent runs the same loop: describe the request, call the model with the
-tools that intent may use, handle tool calls (asking when policy says so),
-return one action. The intents differ only in budget: continue gets no tools
-and a few tokens (it runs at every pause), rewrite no tools, an instruction all
-the tools and the conversation. An agent CLI (Claude Code over stream-json) is
-another implementation of the same loop: it receives the same request and its
-permission prompts become **ask**.
+Every intent runs the same loop (`Rewriter.answer`): describe the request, call the model with the
+tools that intent may use, run tool calls (asking when policy says so), return one action. The
+intents differ only in budget: continue gets no tools and a few tokens (it runs at every pause),
+a rewrite no tools, an instruction all the tools and the conversation. An agent CLI (Claude Code
+over stream-json) is the loop's other implementation: it gets the same request, and its
+permission prompts and its own questions become **ask**.
 
-## What changes in the code
+## A conversation per text box
 
-| Today | Becomes |
-| --- | --- |
-| `modes.py` templates per mode, `TERMINAL_SYSTEM`, tone templates | one system prompt: Claudish's role, the tone (a voice line), the action asked for; templates stay overridable per action |
-| `describe`, `window`, `terminal`, `in_terminal`, `screen_note` (conversation.py) | one `TextBox` description: kind facts, the window around the caret, observations (fenced as material, not instructions), what was consulted |
-| `Rewriter.terminal`, screen reads in `rewrite` and `make_driver` | observers run by the request builder, by kind and intent (a terminal's screen for compose, never for continue) |
-| `Rewriter.rewrite` (single shot) and `ModelDriver.run` (tools, conversation) | one loop; rewrite and continue are turns without tools |
-| result candidates, session events, `one_line` in two places | one response type (complete, replace, insert, ask) and one place that applies the box's constraints |
-| the parked handoff branch (`agent/handoff`: a terminal-only tool and a key) | a helper tool among the others, behind **ask**, anywhere |
+A conversation belongs to a text box (IBus's input context, TSF's document, IMK's client), and each
+instruction is a turn in it. It keeps every instruction, the drafts offered and the one taken, each
+tool call and result (large results trimmed), your answers, and approvals given for the session;
+each turn sends the box fresh, so your edits are what the model sees. An agent keeps one process
+per conversation, resumed by session id if it ends. A conversation ends when the text box goes
+away or after 30 idle minutes; conversations live only in the service's memory.
 
-The adapters change little: they already send the box (app, kind, text around
-the caret) and the key, and already render a candidate, a list, or a question.
+## The tool policy
 
-## Where it stands
+| Class | From | What happens |
+| --- | --- | --- |
+| read | `readOnlyHint`, or listed in `trust` | runs; listed in what was consulted |
+| write | everything else | asks: Deny first, Allow, Allow for this session |
+| destructive | `destructiveHint` | asks every time; never for the session; the question says it is destructive |
+| denied | listed in `deny` | never offered to the model |
 
-Steps 1–3 are done (2026-10-23): `claudish/turn.py` holds the text box (`Box`:
-kind, app, the text around the caret, observations, constraints), the observers,
-and the system prompt; `Rewriter.answer` is the one loop for `/suggest` and for
-instruction sessions alike; the terminal template, `in_terminal`, and the
-per-path screen reads are gone. Measured against the special-cased version:
-fidelity 38/41 (unchanged); the terminal set, Qwen3 30B 20/23 fixed
-(unchanged), Qwen2.5 1.5B 7/23 fixed with 6/7 legitimate commands left alone
-and 1 harmful (was 2/23, 1/7, 6 harmful). The general rules (voice only for
-prose, observations next to the request, the kind stated as a fact) did better
-than the hand-made terminal template.
+A question shows what will actually happen (the tool and its key arguments), not a paraphrase.
+Typed words refuse it with your words as the reason. The same policy answers an agent's
+permission requests.
 
-Steps 4–5 are done too: the model asks with a `user__ask` tool (a question with
-choices, shown as is; the answer goes back to it), a helper is a local tool of
-kind "write" asked about in words ("Send this task to claude?"), and a turn
-whose task went to a helper ends as **done** (nothing inserted). Live on Qwen3
-30B: "have claude figure out why the build fails" asked and handed over; "fix"
-after `gti status` asked "Did you mean 'git status'?" and drafted it; "send it
-to the usual place" asked which place; "say thanks for the review" just wrote
-it.
+## Bounds and trust
 
-An agent (Claude Code over stream-json) is the same loop's other
-implementation: it gets the same text box description and observations; its
-permission prompts are **ask** (Allow / Deny); its own questions
-(`AskUserQuestion`) are **ask** too, shown as is with its options, the answers
-going back keyed by the question (checked live with Claude Code 2.1.308 on
-haiku); and in a terminal its answer is one line, like any insert.
+- **Budgets:** rounds of tool calls (4 by default), wall time (60 s), and tokens for hosted
+  backends; when one runs out, the model gets one last turn without tools.
+- **Tool results are data:** text from a tool, a page, or the app's context can never approve a
+  call; every write still needs your answer.
+- **Esc** stops the turn at any point; nothing is inserted until you take it.
+- **Drafts after tools:** tools run once; the final answer can be sampled again over the same
+  results, so an instruction that looked things up still offers up to three drafts.
 
-An answer to read ("what does this error mean?") is **ask** too: the model's
-`user__show` puts it in front of you as is ("The model says: …") with Insert
-it or Dismiss; inserted, it still fits the box. Live on Qwen3 30B the model
-chose it for an explanation and a sum, asked about a typo, and wrote a thank-you
-directly.
+## Context, best source first
 
-## Order of work
+1. The app's MCP server: structured, published by the app (apps publish; Claudish reads).
+2. The OS: the focused app and field, the text around the caret and the selection.
+3. What a screen reader sees: the accessibility APIs (AT-SPI, UI Automation, AX) identify the
+   focused element and expose its text with nothing installed in the app; for terminals this is
+   the screen (GNOME Terminal, Windows Terminal and the console, Terminal.app). macOS needs the
+   Accessibility permission for the service's Python; Linux needs the accessibility bus.
+4. A picture of the focused window, on request (F8), for a vision-capable backend; never in a
+   secure field; labelled when the backend is hosted.
+5. The text alone.
 
-Each step keeps the gate green and the prompts measured (the fidelity eval and
-the terminal eval must not get worse):
+In a terminal the model sees the screen and your words ("fix") and does one of three things, each
+with a shape at the caret: the command itself (a draft at the prompt; running it is your Enter),
+a question when your intent is unclear ("did you mean `git status`?"), or an offer to hand the work
+to a helper.
 
-1. `TextBox` and one description renderer; port every path to it with the same
-   prompt text.
-2. One system prompt per action, with the tone as a line; terminal facts come
-   from the box kind (re-run the terminal eval: 20/23 on Qwen3 30B today).
-3. One loop for all intents; `Rewriter.rewrite` and `ModelDriver` merge.
-4. The typed response, and the box constraints applied in one place.
-5. Helpers as tools behind **ask** (G39), in any text box.
+## Backends
+
+OpenAI-compatible servers (llama.cpp, vLLM, Ollama: `tools` and `tool_calls`), Claude through the
+official SDK (client-side tools), and agent CLIs (Claude Code over stream-json). Typed text goes
+only to a backend the user configured; hosted backends are labelled.

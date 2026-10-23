@@ -83,7 +83,6 @@ try:
     assert not engine.do_process_key_event(ord("W"), 0, 0)
     assert engine.composition.text == "Pasted words. W", engine.composition.text
     del engine.before_caret
-    assert engine.do_process_key_event(IBus.KEY_F7, 0, 0) is False  # F7 is the app's now
     shift_tap()
     assert engine.composition.mode == "compose" and engine.composition.text == ""  # the words are in the app
     # Compose holds the text; Enter sends it as an instruction, and the next Enter inserts the result.
@@ -103,7 +102,7 @@ try:
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     engine.composition.offer(engine.composition.revision, "Hello.", ["Hi there.", "Greetings."])
-    assert engine.composition.choosing
+    assert len(engine.composition.panel()["rows"]) > 1  # the drafts, as rows
     engine.render()
     assert engine.do_process_key_event(IBus.KEY_Down, 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)

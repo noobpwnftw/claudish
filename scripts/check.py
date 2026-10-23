@@ -4,9 +4,9 @@ python scripts/check.py            # unit tests, compile, diff, IBus and PIME sm
 python scripts/check.py --model    # also: real model, rewrite, fidelity eval, browser demo, static demo
 python scripts/check.py --desktop  # also: real IBus + GTK typing (X11, and GNOME Shell on Wayland) in containers
 
-Each check reports PASS, FAIL, or SKIP with a reason. Remote CI (push a ci/*
-branch) is still the only Windows and macOS coverage; use it for adapter or
-packaging changes.
+Each check reports PASS, FAIL, or SKIP with a reason. Windows and macOS: the VM
+rigs (tests/desktop/windows/vm.sh, tests/desktop/macos/driver.py) and remote CI
+(push a ci/* branch) for adapter or packaging changes.
 """
 import argparse
 import glob
@@ -158,7 +158,7 @@ def main():
         if patched:
             run("PIME smoke", [sys.executable, "tests/pime_smoke.py", "--pime-source", str(patched)])
         else:
-            fail("PIME smoke", "platforms/windows/pime/pime.patch does not apply to the pinned PIME")
+            results.append(("PIME smoke", "FAIL", "platforms/windows/pime/pime.patch does not apply to the pinned PIME"))
     else:
         skip("PIME smoke", reason)
     if args.model:

@@ -1,4 +1,6 @@
-# Inside the Windows VM: Python (native ARM64), PIME 2.0 with its Python backend, and Claudish from the shared folder.
+# Inside the Windows VM, once: Python (native ARM64), released PIME for its launcher and Python backend, and
+# Claudish from the shared folder. Then jobs/build-pime.ps1 replaces PIME's text service with Claudish's (the only
+# one the adapter supports), and jobs/deploy.ps1 installs each new checkout.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $shared = '\\host.lan\Data'

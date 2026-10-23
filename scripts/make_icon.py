@@ -1,5 +1,5 @@
 """Render cd_AI's icons from the wordmark's type (a serif "cd", a monospaced "AI"),
-at high resolution and scaled down, so they are crisp at every size (G45; docs/design/visual.md).
+at high resolution and scaled down, so they are crisp at every size (G45; docs/design/design.md).
 
   python scripts/make_icon.py        (needs Pillow and the Noto Serif / Noto Sans Mono fonts)
 

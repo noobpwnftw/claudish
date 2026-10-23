@@ -1,8 +1,8 @@
-"""cd_AI's own panel and suggestion overlay on macOS (the visual pass, G45; docs/design/visual.md).
+"""cd_AI's own panel and suggestion overlay on macOS (the visual pass, G45; docs/design/design.md).
 
 The panel draws Composition.panel()'s description as the design lab does (claudish/web/design.html,
-macOS skin): an optional header (a small label, then the content as is), numbered rows (the
-highlighted one a neutral fill with the system accent bar and its own ↩), and one footer (the AI
+macOS skin): an optional header (a small label, then the content as is), rows (the highlighted
+one a neutral fill with the system accent bar and the key that takes it), and one footer (the AI
 tile or a warning mark, what is happening, each key with its verb, a hosted model's name). The
 overlay draws continue's suggestion right after the caret, in the system font at the caret's
 height. Non-activating panels: the app keeps the keyboard; a click on a row picks it.
@@ -174,15 +174,11 @@ class Panel:
             views.append(label(spec["body"], SIZE - 1 if spec["code"] else SIZE, mono=spec["code"], width=inner))
             widest = max([widest] + [v.fittingSize().width + 2 * (PAD + ROW_X) for v in views])
             blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1) + 2 * ROW_Y + 1))
-        takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's ↩
-        numbered = any(row["key"] for row in spec["rows"])  # choices are not numbered: digits are text
-        keys = 20 if numbered else 0
-        text_width = inner - keys - (TAKE if takes else 0)
-        replying = spec.get("replying")  # you are typing at the caret: the choices take no number
+        takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's key
+        text_width = inner - (TAKE if takes else 0)
+        replying = spec.get("replying")  # you are typing a reply at the caret: the choices fade
         for index, row in enumerate(spec["rows"]):
             on = index == spec["on"]
-            number = label("" if replying else row["key"], SIZE, NSFontWeightMedium if on else NSFontWeightRegular,
-                           NSColor.labelColor() if on else secondary)
             legend = " — " + row["legend"] if row.get("legend") else ""
             text = label(row["text"] + legend, SIZE, color=secondary if replying else None, width=text_width)
             if legend:  # the legend in the secondary colour
@@ -190,8 +186,8 @@ class Panel:
                 words.addAttribute_value_range_("NSColor", secondary, (len(row["text"]), len(legend)))
                 text.setAttributedStringValue_(words)
             size = text.fittingSize()
-            widest = max(widest, size.width + keys + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
-            blocks.append(("row", (number, text, on, index + 1, keys), max(size.height, 18) + 2 * ROW_Y))
+            widest = max(widest, size.width + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
+            blocks.append(("row", (text, on, index + 1), max(size.height, 18) + 2 * ROW_Y))
         foot = self.footer(spec, secondary)
         widest = max(widest, sum(self.size(v).width + gap for v, gap in foot) + 2 * (PAD + ROW_X))
         blocks.append(("foot", foot, 20 + 2 * ROW_Y - 1))
@@ -268,7 +264,7 @@ class Panel:
             top -= 2
 
     def place_row(self, parts, y, h, width, pick):
-        number, text, on, picked, keys = parts
+        text, on, picked = parts
         row = Row.alloc().initWithFrame_(NSMakeRect(PAD, y, width - 2 * PAD, h))
         if pick is not None:
             row.picked = lambda: pick(picked)
@@ -284,10 +280,7 @@ class Panel:
             size = take.frame().size if self.spec.get("nudge") else take.fittingSize()
             take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
             row.addSubview_(take)
-        size = number.fittingSize()
-        number.setFrame_(NSMakeRect(ROW_X, h - ROW_Y - size.height, 12, size.height))
-        text.setFrame_(NSMakeRect(ROW_X + keys, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
-        row.addSubview_(number)
+        text.setFrame_(NSMakeRect(ROW_X, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
         row.addSubview_(text)
         self.effect.addSubview_(row)
 
@@ -317,7 +310,7 @@ class Panel:
 
 class Overlay:
     """Continue's suggestion: cd_AI's own grey text right after the caret, in the system font at
-    the caret's height (docs/design/visual.md), never typed."""
+    the caret's height (docs/design/design.md), never typed."""
 
     def __init__(self):
         self.window = None

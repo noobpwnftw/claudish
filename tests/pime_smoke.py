@@ -138,7 +138,6 @@ def main():
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
             assert key(9)["commitString"] == " Hello—truly."
-            assert key(0x76, method="filterKeyDown")["return"] is False  # F7 is the app's now
             shift_tap()  # compose, starting empty: the words are in the app already
             for char in "as is":
                 key(ord(char.upper()), ord(char))

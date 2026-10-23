@@ -12,10 +12,10 @@ for inputs, outputs, fidelity, and model comparisons.
 Status:
 
 - **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
-  key events in containers (`scripts/check.py --desktop`): X11 (26 scenarios), and
+  key events in containers (`scripts/check.py --desktop`): X11 with GTK and Qt, and
   GNOME Shell 46 on Wayland, headless, with IBus started by the shell and keys typed
-  through Mutter's RemoteDesktop API (10 scenarios); plus `claudish service` under a
-  real systemd user manager. Qt apps and KDE are not yet tested. On GNOME, a
+  through Mutter's RemoteDesktop API; plus `claudish service` under a real systemd
+  user manager (the scenario counts are in the README). KDE is not yet tested. On GNOME, a
   composition left in a field when you click another one lands in the field you
   clicked: GNOME commits it after GTK has moved focus, as for every input method.
   Your words survive exactly once; Enter or Esc before you click keeps them in place.

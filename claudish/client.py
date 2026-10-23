@@ -85,7 +85,7 @@ class Suggestions:
         self.pending = None
         self.results = collections.deque()  # (revision, data); a session yields several
         self.closed = False
-        # This text box's conversation: instructions are turns in it (docs/design/instruct.md).
+        # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()

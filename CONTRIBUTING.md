@@ -50,11 +50,14 @@ or SKIP with a reason:
 
 Platform coverage beyond Linux:
 
-- **Windows:** `tests/desktop/windows` runs Windows 11 on ARM under qemu/KVM
-  (`vm.sh start`, then `vm.sh sync` and `vm.sh run jobs/setup.ps1` /
-  `jobs/typing.ps1`). It types into Notepad through TSF and PIME.
-- **macOS:** the Cocoa-double tests run everywhere; a real bundle build runs only
-  on GitHub CI. Remote CI is opt-in: push a branch named `ci/<topic>`.
+- **Windows:** `tests/desktop/windows` runs Windows 11 on ARM under qemu/KVM:
+  `vm.sh start`; once, `vm.sh run jobs/setup.ps1` and `jobs/buildtools.ps1`; for each
+  change, `vm.sh sync`, `vm.sh pime` and `vm.sh run jobs/build-pime.ps1` (when the PIME
+  patches change), `vm.sh run jobs/deploy.ps1`, then `jobs/typing.ps1` (Notepad),
+  `typing-edge.ps1` and `typing-terminal.ps1`; `gallery.sh` takes the screenshots.
+- **macOS:** the Cocoa-double tests run everywhere; `tests/desktop/macos/driver.py`
+  types into a real app on a Mac (`gallery.sh` takes the screenshots over VNC); a
+  bundle build runs on GitHub CI. Remote CI is opt-in: push a branch named `ci/<topic>`.
 
 Changes to templates or models are measured, not argued: `benchmarks/evaluate.py`
 for fidelity, `benchmarks/judge.py` (a larger local model, calibrated against

@@ -1,4 +1,4 @@
-"""The text box as retrieval (docs/design/instruct.md): read a range, or search, of the text box an
+"""The text box as retrieval (docs/design/architecture.md): read a range, or search, of the text box an
 instruction was typed in, as it was when the instruction was sent. The model driver offers these as
 tools when the text box is longer than the window it already sees; an agent gets them over MCP
 (python -m claudish textbox-mcp)."""

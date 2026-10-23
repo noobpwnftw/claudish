@@ -1,4 +1,4 @@
-/* cd_AI at the caret: the one look every platform draws (docs/design/visual.md). The demo and the
+/* cd_AI at the caret: the one look every platform draws (docs/design/design.md). The demo and the
    design lab (design.html) use it as is; the native input methods match it, skin by skin, to the
    pixel. A skin sets only the tokens: type, colours, shape, and the key names. */
 
@@ -24,18 +24,16 @@
 .k-comp{text-decoration:underline solid currentColor;text-decoration-thickness:1px;text-underline-offset:.2em}
 
 /* The panel next to the caret, one anatomy for every state: an optional header (a small label for
-   who asks or what this is, then the content as is), the rows (a muted number, the text; the
-   highlighted one tinted with an accent bar and its own Enter key, so it never depends on colour
-   alone), and one footer: the AI tile, then each key with its verb. Sized to its content. */
+   who asks or what this is, then the content as is), the rows (the highlighted one tinted, with
+   an accent bar and the key that takes it, so it never depends on colour alone), and one footer:
+   the AI tile, then each key with its verb. Sized to its content. */
 .k-panel{position:absolute;z-index:3;box-sizing:border-box;min-width:min(var(--k-min),calc(100% - 24px));max-width:min(var(--k-max),calc(100% - 24px));width:max-content;
   padding:var(--k-pad);background:var(--k-surface);color:var(--k-text);border:1px solid var(--k-border);
   border-radius:var(--k-radius);box-shadow:var(--k-shadow);-webkit-backdrop-filter:var(--k-backdrop);backdrop-filter:var(--k-backdrop);
   font-family:var(--k-font);font-size:var(--k-size);line-height:var(--k-line);text-align:left;font-synthesis:none}
 .k-panel.bare{min-width:0}
 .k-head{padding:calc(var(--k-row-y) + 1px) var(--k-row-x) var(--k-row-y)}
-/* While you type a reply (at the caret), the choices take no number: the numbers go, the words
-   stay readable (muted, 4.5:1). */
-.k-panel.replying .k-row .k-key{visibility:hidden}
+/* While you type a reply (at the caret), the choices fade: muted, still readable (4.5:1). */
 .k-panel.replying .k-row .k-text{color:var(--k-muted)}
 /* The exchange so far: your earlier turns, one line each. Your words at full size and colour,
    underlined as they were at the caret (your composition, moved into the panel); the label is the
@@ -53,11 +51,9 @@
 .k-row:hover{background:color-mix(in srgb,var(--k-text) 5%,transparent)}
 .k-row.on{background:color-mix(in srgb,var(--k-text) var(--k-sel-mix),var(--k-surface))}
 .k-row.on::before{content:"";position:absolute;left:2px;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--k-select)}
-/* A list with a highlight keeps a trailing column for its Enter on every row: the key never
+/* A list with a highlight keeps a trailing column for its key on every row: the key never
    touches the text, and every row wraps at the same width. */
 .k-panel.takes .k-row{padding-right:calc(var(--k-row-x) + var(--k-take-w,3.6em))}
-.k-key{flex:none;min-width:.75em;text-align:center;color:var(--k-muted);font-variant-numeric:tabular-nums}
-.k-row.on .k-key{color:var(--k-text)}
 .k-text{min-width:0;flex:1;text-wrap:pretty;overflow-wrap:anywhere}
 .k-legend{color:var(--k-muted)}
 .k-take{position:absolute;right:var(--k-row-x);top:50%;transform:translateY(-50%);font-size:var(--k-small);color:var(--k-muted)}
@@ -86,11 +82,11 @@
 .k-tile.ai{background:#d97757;color:#fff}
 .k-tile.cd{background:color-mix(in srgb,var(--k-text) 12%,var(--k-surface));color:var(--k-text)}
 
-/* High contrast: the system's colours; the highlight keeps its bar and its Enter key. */
+/* High contrast: the system's colours; the highlight keeps its bar and its key. */
 @media (forced-colors:active){
   .k-panel,.k-toast{border:1px solid CanvasText;background:Canvas;color:CanvasText;box-shadow:none}
   .k-row.on{background:Highlight;color:HighlightText;forced-color-adjust:none}
-  .k-row.on .k-key,.k-row.on .k-take,.k-row.on .k-legend{color:HighlightText}
+  .k-row.on .k-take,.k-row.on .k-legend{color:HighlightText}
   .k-row.on::before{background:HighlightText}
   .k-ghost{color:GrayText}
   .k-cap{border-color:CanvasText}

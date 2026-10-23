@@ -219,7 +219,7 @@ class Rewriter:
         # back, for `claudish recent` (G41). Shared with routed profiles, like the sessions.
         self.recent = collections.deque(maxlen=RECENT)
         from .conversation import Conversations
-        self.conversations = Conversations()  # one per text box (docs/design/instruct.md)
+        self.conversations = Conversations()  # one per text box (docs/design/architecture.md)
         self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window

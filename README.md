@@ -12,7 +12,7 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 | | You type | cd_AI |
 | --- | --- | --- |
 | **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
-| **compose**, then Tab | `this is important` | Tab turns it into Claudish |
+| **compose**, then Tab | `this is important` | a rewrite in Claudish, waiting; Tab again puts it in |
 | **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 
 Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
@@ -57,9 +57,9 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 
 | Platform | Tested |
 | --- | --- |
-| Linux (IBus) | real typing in containers: GTK, Qt, and GNOME Terminal on X11 (40 scenarios), GNOME on Wayland (12) |
+| Linux (IBus) | real typing in containers: GTK, Qt, and GNOME Terminal on X11, GNOME on Wayland with the Shell extension (13 scenarios) |
 | Windows (PIME/TSF) | Windows 11 ARM64 in a VM: Notepad, Edge, Windows Terminal, the classic console, on Claudish's patched PIME |
-| macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, focus changes, instruct (9 scenarios); the suggestion is underlined rather than grey |
+| macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, focus changes, instruct, Terminal (10 scenarios) |
 
 Claudish is an experiment in internal beta; the [roadmap](ROADMAP.md) says what
 is next. It is maintained by an AI agent (Claude Code) working under its

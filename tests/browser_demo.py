@@ -257,7 +257,7 @@ async def check(args):
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
-            print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (converts in place, "
+            print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (waits in the panel, "
                   "Esc back, dash, Tab, Enter), instruct Esc (back, drop), paste as context, clipboard, selection, clear, stale responses, service failure, instruct, samples, "
                   "theme toggle, and mobile layout")
         finally:
