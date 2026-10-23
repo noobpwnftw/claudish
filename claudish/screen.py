@@ -204,17 +204,26 @@ def read_uia(app):
 
 
 def read_ax(app):
-    from AppKit import NSWorkspace
+    """macOS: the focused element of the app the input method named (its bundle identifier), else
+    the frontmost app. Asking the named app directly matters: a long-running service has no AppKit
+    run loop, so its idea of the frontmost app can be stale."""
+    from AppKit import NSRunningApplication, NSWorkspace
     from ApplicationServices import (AXIsProcessTrusted, AXUIElementCopyAttributeValue, AXUIElementCreateApplication,
                                      kAXFocusedUIElementAttribute, kAXValueAttribute)
-    front = NSWorkspace.sharedWorkspace().frontmostApplication()
-    bundle = str(front.bundleIdentifier() or "") if front is not None else ""
-    if not is_terminal(bundle) or not AXIsProcessTrusted():
+    if not AXIsProcessTrusted():
         return None
-    # The system-wide focused element fails (-25204) where the frontmost app's own answer works.
-    error, focused = AXUIElementCopyAttributeValue(AXUIElementCreateApplication(front.processIdentifier()),
-                                                   kAXFocusedUIElementAttribute, None)
-    if error or focused is None:
-        return None
-    error, value = AXUIElementCopyAttributeValue(focused, kAXValueAttribute, None)
-    return str(value) if not error and value else None
+    if app and is_terminal(app):
+        running = list(NSRunningApplication.runningApplicationsWithBundleIdentifier_(app) or [])
+    else:
+        front = NSWorkspace.sharedWorkspace().frontmostApplication()
+        running = [front] if front is not None and is_terminal(str(front.bundleIdentifier() or "")) else []
+    for application in running:
+        # The system-wide focused element fails (-25204) where the app's own answer works.
+        error, focused = AXUIElementCopyAttributeValue(AXUIElementCreateApplication(application.processIdentifier()),
+                                                       kAXFocusedUIElementAttribute, None)
+        if error or focused is None:
+            continue
+        error, value = AXUIElementCopyAttributeValue(focused, kAXValueAttribute, None)
+        if not error and value:
+            return str(value)
+    return None
