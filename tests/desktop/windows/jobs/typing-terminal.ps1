@@ -22,14 +22,15 @@ function Invoke-Terminal($name, $window) {
     [Keys]::Press(0x1B); [Keys]::Press(0x10); Start-Sleep -Milliseconds 300
     [Keys]::Type('gti status'); Start-Sleep -Milliseconds 400
   }
-  Check "${name}: continue types the command straight in" (Last-Line) ((Last-Line) -replace 'gti status$', '') + 'gti status'
+  Check "${name}: continue types the command straight in" ((Last-Line) -like '*>gti status') $true
   [Keys]::Press(0x0D); Wait-Screen 'not recognized'
   [Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
   [Keys]::Type('fix'); [Keys]::Press(0x0D)  # the instruction, with the screen's last lines
   Start-Sleep -Milliseconds 1500
   [Keys]::Press(0x0D)  # the draft, inserted at the prompt; running it would be the user's Enter
   Wait-Screen 'having read the terminal'
-  Check "${name}: fix sees the screen, the draft lands at the prompt" ((Last-Line) -replace '^.*>', '') 'As requested—fix, having read the terminal.'
+  # (cmd shows the em dash as a hyphen; this file is read as ANSI, so match any character there)
+  Check "${name}: fix sees the screen, the draft lands at the prompt" ((Last-Line) -match '>As requested.fix, having read the terminal\.$') $true
 }
 
 if (-not (Test-Path C:\wt\terminal-1.25.2733.0\WindowsTerminal.exe)) { Expand-Archive \\host.lan\Data\wt\wt.zip C:\wt -Force }
@@ -40,7 +41,9 @@ Invoke-Terminal 'Windows Terminal' $wt.MainWindowHandle
 Stop-Process -Name WindowsTerminal -Force
 
 $console = Start-Process conhost.exe -ArgumentList 'cmd.exe' -PassThru; Start-Sleep 3
-$handle = (Get-Process -Id $console.Id).MainWindowHandle
+# A console window reports its shell as the owner, not conhost.
+$shell = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($console.Id) AND Name='cmd.exe'" | Select-Object -First 1
+$handle = (Get-Process -Id $shell.ProcessId).MainWindowHandle
 Invoke-Terminal 'classic console' $handle
 Stop-Process -Id $console.Id -Force -ErrorAction SilentlyContinue
 Complete-Scenarios
