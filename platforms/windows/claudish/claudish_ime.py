@@ -70,6 +70,8 @@ class ClaudishTextService(TextService):
             self.worker = Suggestions()
         self.setKeyboardOpen(True)
         self.setSelKeys("123456789")
+        # A vertical list in the system's UI font, as Chinese input methods show drafts (PIME draws it).
+        self.customizeUI(candPerRow=1, candFontName="Segoe UI", candFontSize=15, candUseCursor=True)
         # The mode in the taskbar's input indicator (PIME's Windows 8+ mode icon); its menu picks one.
         self.addButton("windows-mode-icon", icon=mode_icon(self.state.mode), commandId=MODE_COMMAND,
                        tooltip=mode_tooltip(self.state.mode))
@@ -172,7 +174,7 @@ class ClaudishTextService(TextService):
             # (TSF compositions cannot be greyed), and Tab takes it.
             self.setCompositionString("")
             ghost = self.state.ghost
-            self.setCandidateList(["Tab: …" + ghost.lstrip()] if ghost else [])
+            self.setCandidateList(["⇥ " + ghost.lstrip()] if ghost else [])  # the rest of the sentence; Tab takes it
             self.setShowCandidates(bool(ghost))
             return
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words

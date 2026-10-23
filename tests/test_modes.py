@@ -33,6 +33,12 @@ class ModeTests(unittest.TestCase):
         self.assertTrue(modes.parroted("continue", done, done + "I hope this finds you well—a quick update on the release.", examples))
         self.assertFalse(modes.parroted("continue", done, done + "Let's merge it today.", examples))
         self.assertFalse(modes.parroted("rewrite", "x", "x the budget—this week got away from me.", examples))
+        # Nonsense in, the template's example out ("tttt" -> the meeting decline): not an answer.
+        instruct = modes.defaults()["instruct"]["examples"]
+        example = instruct[1]["content"]
+        self.assertTrue(modes.parroted("instruct", "tttt", example, instruct))
+        self.assertFalse(modes.parroted("instruct", instruct[0]["content"], example, instruct))  # asked for it
+        self.assertFalse(modes.parroted("instruct", "tttt", "Could you clarify what you need?", instruct))
 
     def test_every_mode_is_told_about_the_text_box(self):
         rewriter = Rewriter(max_tokens=64)

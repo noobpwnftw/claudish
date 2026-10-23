@@ -113,12 +113,16 @@ def finish(mode, text, output):
 
 
 def parroted(mode, text, candidate, examples=()):
-    """A continuation that is not new: one of the template's own example answers, or words
-    already in the text before the caret. Offering those is noise from any model."""
-    if mode != "continue" or not candidate.startswith(text):
+    """An answer that is not about what you typed: one of the template's own example answers
+    (a small model given nonsense, "tttt", repeats its example), or, in continue, words already
+    in the text before the caret. Offering those is noise from any model."""
+    answers = {m["content"].strip().lower() for m in examples if m.get("role") == "assistant"}
+    if mode != "continue":
+        asked = {m["content"].strip().lower() for m in examples if m.get("role") == "user"}
+        return candidate.strip().lower() in answers and text.strip().lower() not in asked
+    if not candidate.startswith(text):
         return False
     rest = candidate[len(text):].strip().lower()
     if not rest:
         return True
-    answers = {m["content"].strip().lower() for m in examples if m.get("role") == "assistant"}
     return rest in answers or (len(rest) >= 12 and rest in text.lower())

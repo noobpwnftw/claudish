@@ -124,7 +124,7 @@ def main():
             assert key(ord("!"), ord("!"), "filterKeyUp")["return"] is True
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
             reply = key(ord("!"), ord("!"), "onKeyUp")
-            assert reply.get("candidateList") == ["Tab: …Hello—truly."] and reply.get("showCandidates"), reply
+            assert reply.get("candidateList") == ["⇥ Hello—truly."] and reply.get("showCandidates"), reply
             assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None

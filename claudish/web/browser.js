@@ -47,13 +47,17 @@ async function inMemory(modelUrl, onProgress) {
   return new Blob(chunks);
 }
 
-// Port of claudish.modes.parroted: the template's own example answers, or words already before the
-// caret, are not suggestions.
+// Port of claudish.modes.parroted: the template's own example answers (a small model given nonsense,
+// "tttt", repeats its example), or words already before the caret, are not suggestions.
 function parroted(mode, text, candidate, examples) {
-  if (mode !== "continue" || !candidate.startsWith(text)) return false;
+  const answers = new Set(examples.filter((m) => m.role === "assistant").map((m) => m.content.trim().toLowerCase()));
+  if (mode !== "continue") {
+    const asked = new Set(examples.filter((m) => m.role === "user").map((m) => m.content.trim().toLowerCase()));
+    return answers.has(candidate.trim().toLowerCase()) && !asked.has(text.trim().toLowerCase());
+  }
+  if (!candidate.startsWith(text)) return false;
   const rest = candidate.slice(text.length).trim().toLowerCase();
   if (!rest) return true;
-  const answers = new Set(examples.filter((m) => m.role === "assistant").map((m) => m.content.trim().toLowerCase()));
   return answers.has(rest) || (rest.length >= 12 && text.toLowerCase().includes(rest));
 }
 
