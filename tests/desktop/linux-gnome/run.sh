@@ -11,6 +11,7 @@ user() { docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION
 for i in $(seq 60); do docker exec "$id" test -S /run/user/1001/bus 2>/dev/null && break; sleep 0.5; done
 user python3 /claudish/platforms/linux/install.py >/dev/null
 user gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'claudish')]"
+user gsettings set org.gnome.shell disable-extension-version-validation true
 # A login would load install.py's environment.d file; GNOME Shell starts ibus-daemon with it.
 user sh -c 'set -a; . ~/.config/environment.d/90-claudish-ibus.conf; set +a;
   nohup gnome-shell --headless --unsafe-mode --wayland --virtual-monitor 1280x800 >/tmp/gnome-shell.log 2>&1 &'

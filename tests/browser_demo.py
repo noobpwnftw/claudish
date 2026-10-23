@@ -166,9 +166,8 @@ async def check(args):
             await page.locator("#editor").click()
             await keys.type("Keep this thought intact.", delay=10)
             await keys.press("Tab")  # asks: the service fails
-            await expect(page.locator("#status")).to_contain_text("model unavailable")
             await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
-            await expect(window).to_contain_text("the rewrite failed")
+            await expect(window).to_contain_text("The request failed")  # the panel says why; Enter retries
             await keys.press("Escape")  # past the failure: your words, still composing
             await keys.press("Shift+Enter")  # kept
             await expect(committed).to_have_attribute("data-text", "Keep this thought intact.")
@@ -184,26 +183,26 @@ async def check(args):
             await page.wait_for_timeout(600)
             assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
             await keys.press("Enter")
-            await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
+            await expect(window.locator(".k-row").first).to_be_visible(timeout=10000)  # the drafts
             assert any(body and body.get("mode") == "instruct" for body in sent), sent
             # Esc closes the drafts and keeps the instruction to refine; Enter sends it again.
             await keys.press("Escape")
             await expect(page.locator("#preedit")).to_have_text("thank the team for shipping the release")
-            await expect(window.locator("button.candidate-row")).to_have_count(0)  # drafts closed
-            await expect(window).to_contain_text("do it as an instruction")
+            await expect(window.locator(".k-row")).to_have_count(0)  # drafts closed
+            await expect(window).to_contain_text("ask", timeout=3000)  # after a pause, the keys: Tab rewrite, Enter ask
             await keys.press("Enter")
-            await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
-            choices = window.locator("button.candidate-row")
+            await expect(window.locator(".k-row").first).to_be_visible(timeout=10000)  # the drafts
+            choices = window.locator(".k-row")
             if await choices.count() > 1:
                 if args.screenshots:
                     await page.screenshot(path=str(args.screenshots / "instruct.png"))
                 count = await choices.count()
-                second = (await choices.nth(1).text_content())[1:]
+                second = await choices.nth(1).locator(".k-text").text_content()
                 await keys.press("2")
                 await expect(committed).to_have_attribute("data-text", second)
                 print("instruct offered %d readings; 2 inserted the second" % count)
             else:
-                draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
+                draft = await window.locator(".k-row .k-text").first.text_content()
                 await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
                 await keys.press("Enter")
                 await expect(committed).to_have_attribute("data-text", draft)
@@ -241,7 +240,7 @@ async def check(args):
             # A sample types itself, key by key, in its own mode.
             await page.locator("[data-label=rewrite]").click()
             await expect(page.locator("#source-mode")).to_have_text("compose")
-            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)  # typed, then Tab
+            await expect(window).to_contain_text("Your words", timeout=10000)  # typed, then Tab: the rewrite in place
 
             await page.set_viewport_size({"width": 390, "height": 844})
             assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")

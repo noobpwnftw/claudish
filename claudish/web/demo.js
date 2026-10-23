@@ -51,8 +51,12 @@ const state = {
   adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
   failed: false,
+  error: "",     // why the last request failed, in plain words
+  hosted: "",    // the hosted model behind the shown answer, said in the panel
+  typedAt: 0,    // compose's keys show after a pause (performance.now)
   revision: 0,
 };
+const HINT_PAUSE_MS = 1000;  // as claudish/composition.py's HINT_PAUSE_SECONDS
 let timer = null;
 let typing = null;  // a sample typing itself
 
@@ -64,6 +68,8 @@ function change(text) {
   state.adopted = false;
   state.asked = null;
   state.working = state.failed = false;
+  state.error = state.hosted = "";
+  state.typedAt = performance.now();
   state.revision++;
 }
 const live = () => state.mode === "continue";
@@ -108,7 +114,7 @@ async function ask(revision) {
   const text = state.text, mode = live() ? "continue" : state.asked, started = performance.now();
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
-  setStatus(mode === "continue" ? "" : hosted ? "working remotely…" : "working…");
+  setStatus("");  // the panel says what is happening
   try {
     let data;
     if (IN_BROWSER) {
@@ -124,6 +130,7 @@ async function ask(revision) {
     state.candidate = data.text;
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
     state.offeredAt = performance.now();
+    state.hosted = hosted && data.backend !== "browser" ? (data.backend === "claude" ? "Claude" : "a hosted model") : "";
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: in place as it arrives
     state.working = false;
     const elapsed = Math.round(performance.now() - started);
@@ -134,13 +141,40 @@ async function ask(revision) {
     if (revision !== state.revision) return;
     state.working = false;
     if (mode === "continue") return;  // continue stays quiet: no suggestion is a fine answer
-    state.failed = true;
-    setStatus(error.name === "AbortError" ? "The model took too long; your words are still here."
-      : `${error.message} Your words are still here.`);
+    state.failed = true;  // the panel says why; your words stay
+    state.error = error.name === "AbortError" ? "The model took too long"
+      : error instanceof TypeError ? "The model is offline" : "The request failed";
+    setStatus("");
   } finally {
     clearTimeout(limit);
     render();
   }
+}
+
+// What the panel shows: the same description as claudish/composition.py's panel(), so the demo
+// looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
+function panel() {
+  if (live() || !state.text) return null;
+  const shown = {label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
+                 status: null, busy: false, failed: null, mark: null};
+  const mark = state.hosted ? `from ${state.hosted} · hosted` : null;
+  if (state.working) return {...shown, status: state.asked === "rewrite" ? "Rewriting" : "Working", busy: true,
+                             foot: [["Esc", "stop"]]};
+  if (state.failed) return {...shown, tile: "warn", failed: state.error || "The request failed",
+                            foot: [["Enter", "retry"], ["Esc", "back"]]};
+  if (state.asked === "instruct" && state.candidate) {
+    const readings = state.candidates.length ? state.candidates : [state.candidate];
+    return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: 0, mark,
+            foot: [...(readings.length > 1 ? [[`1–${readings.length}`, "pick"]] : []), ["Esc", "back"]]};
+  }
+  if (state.converted) return {...shown, label: "Your words", body: state.text, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
+  if (hintDue() === 0) return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"]]};
+  return null;
+}
+// Milliseconds until compose's keys show (0: now); null when they are not waiting.
+function hintDue() {
+  if (live() || !state.text || state.working || state.failed || state.converted || state.candidate) return null;
+  return Math.max(0, HINT_PAUSE_MS - (performance.now() - state.typedAt));
 }
 
 // A Shift tap (or a click on the input source): continue <-> compose. Leaving compose keeps what
@@ -156,6 +190,20 @@ function switchMode() {
   }
   showMode();
   changed();
+  toast();
+}
+
+// The mode switch, briefly at the caret: the mode's tile, its name, and the key back.
+function toast() {
+  const compose = state.mode === "compose";
+  const node = Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
+                          foot: [["Shift", compose ? "back" : "compose"]]});
+  const editor = $("editor").getBoundingClientRect(), caret = CARET.getBoundingClientRect();
+  node.style.left = `${Math.max(12, caret.left - editor.left - 14)}px`;
+  node.style.top = `${caret.bottom - editor.top + 6}px`;
+  document.querySelectorAll("#editor > .k-toast").forEach((old) => old.remove());
+  $("editor").append(node);
+  setTimeout(() => node.remove(), 1600);
 }
 
 // Keys, as an input method sees them. Returns true when the key was taken.
@@ -294,7 +342,6 @@ function render() {
   const [start, end] = selection();
   const preedit = PREEDIT, caret = CARET, suggestion = GHOST;
   preedit.textContent = composing() ? shown() : "";
-  preedit.classList.toggle("converted", state.converted);
   suggestion.textContent = ghost();
   const nodes = [];
   if (selected()) {
@@ -308,44 +355,14 @@ function render() {
   }
   page.replaceChildren(...nodes, PLACEHOLDER);
   PLACEHOLDER.hidden = Boolean(doc.text || state.text);
+  // The panel, as every platform draws it (kit.js; claudish/composition.py's panel()).
   const window = $("candidates");
-  window.replaceChildren();
-  const lines = [];
-  if (composing() && state.asked === "instruct") {
-    if (state.working) lines.push(["", "working…"]);
-    else if (state.failed) lines.push(["Enter", "the request failed: send it again"]);
-    else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
-    else if (state.candidate) lines.push(["Enter", state.candidate]);
-  } else if (composing()) {
-    // A rewrite has no list: Tab asks, and it takes your words' place as it arrives.
-    if (state.working) lines.push(["", "rewriting…"]);
-    else if (state.failed) lines.push(["Tab", "the rewrite failed: try again"]);
-    else if (state.converted) lines.push(["Tab", "keep it"]);  // Enter keeps it too
-    else lines.push(["Tab", "rewrite it"], ["Enter", "do it as an instruction"]);
-  }
-  window.hidden = !lines.length;
-  for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
-    const row = document.createElement(label && label !== "Enter" && label !== "Tab" ? "button" : "div");
-    row.className = "candidate-row";
-    if (row.tagName === "BUTTON") {
-      row.type = "button";
-      row.addEventListener("mousedown", (event) => { event.preventDefault(); key(label); });
-    }
-    if (label) { const k = document.createElement("kbd"); k.textContent = label; row.append(k); }
-    const span = document.createElement("span");
-    span.textContent = text;
-    row.append(span);
-    window.append(row);
-  }
-  if (lines.length) {
-    const foot = document.createElement("div");
-    foot.className = "candidate-foot";
-    // One pattern everywhere: "Key: action".
-    foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to your words"
-      : state.converted || state.working || state.failed ? "Esc: your words"
-      : "Shift+Enter: keep it as it is · Esc: drop it";
-    window.append(foot);
-  }
+  const spec = panel();
+  window.replaceChildren(...(spec ? [Kit.panel(spec, {}, (number) => key(String(number)))] : []));
+  window.hidden = !spec;
+  clearTimeout(render.pause);
+  const due = hintDue();
+  if (due) render.pause = setTimeout(render, due);  // compose's keys, after a pause
   placeCandidateWindow();
   $("copy").disabled = $("clear").disabled = !doc.text;
 }
@@ -354,11 +371,11 @@ function placeCandidateWindow() {
   const window = $("candidates");
   const editor = $("editor").getBoundingClientRect();
   const caret = CARET.getBoundingClientRect();
-  // As input methods do, the window sits under the start of the composition (or the caret).
-  const start = PREEDIT.getClientRects()[0] || caret;
-  const left = Math.max(12, Math.min(start.left - editor.left - 8, editor.width - window.offsetWidth - 12));
+  // As on every platform: under the caret's line, the panel's content starting at the caret.
+  const inset = 14;  // the panel's border, padding, and row inset (kit.css)
+  const left = Math.max(12, Math.min(caret.right - editor.left - inset, editor.width - window.offsetWidth - 12));
   window.style.left = `${left}px`;
-  window.style.top = `${caret.bottom - editor.top + 8}px`;
+  window.style.top = `${caret.bottom - editor.top + 6}px`;
   sink.style.left = `${caret.left - editor.left}px`;  // the browser's own IME window follows the caret too
   sink.style.top = `${caret.top - editor.top}px`;
 }

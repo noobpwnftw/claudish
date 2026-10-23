@@ -8,6 +8,8 @@
   <link rel="icon" href="/favicon.png">
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/demo.css">
+  <link rel="stylesheet" href="/kit.css">
+  <script src="/kit.js" defer></script>
   <script src="/demo.js" defer></script>
 </head>
 <body>
@@ -36,8 +38,8 @@
           <div class="room-title"><span class="live-dot"></span> NOTES <span class="room-sub">a text box in any app</span></div>
           <button id="source" class="source-badge" type="button"><b>cd</b><span id="source-mode">compose</span><span class="source-key">Shift</span></button>
         </div>
-        <div class="editor" id="editor">
-          <div class="page" id="page" aria-hidden="true" data-text=""><span id="preedit" class="preedit"></span><span id="caret" class="caret"></span><span id="ghost" class="ghost"></span><span id="placeholder" class="editor-placeholder">Click here and type. You are typing in cd_AI.</span></div>
+        <div class="editor kit" id="editor">
+          <div class="page" id="page" aria-hidden="true" data-text=""><span id="preedit" class="preedit k-comp"></span><span id="caret" class="caret"></span><span id="ghost" class="ghost k-ghost"></span><span id="placeholder" class="editor-placeholder">Click here and type. You are typing in cd_AI.</span></div>
           <textarea id="input" class="sink" aria-label="Type here, in cd_AI" aria-describedby="hint" autocapitalize="off" autocomplete="off" spellcheck="false" autofocus></textarea>
           <div id="candidates" class="candidate-window" hidden></div>
         </div>

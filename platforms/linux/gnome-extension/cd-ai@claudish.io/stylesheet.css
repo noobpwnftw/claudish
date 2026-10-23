@@ -1,0 +1,30 @@
+/* The design lab's GNOME skin, light (claudish/web/design.css, .host.gnome). Dark: stylesheet-dark.css. */
+.cd-panel { background-color: #fafafb; color: #2e2e32; border: 1px solid rgba(0,0,6,0.14); border-radius: 12px;
+  padding: 6px; box-shadow: 0 4px 14px 2px rgba(0,0,6,0.13); font-size: 14.5px; min-width: 240px; max-width: 440px; }
+.cd-panel.cd-bare { min-width: 0; }
+.cd-head { padding: 6px 10px 5px; spacing: 2px; }
+.cd-label { font-size: 12.5px; font-weight: 600; color: #5e5e63; }
+.cd-body { color: #2e2e32; }
+.cd-code { font-family: monospace; font-size: 13.5px; }
+.cd-row { padding: 5px 10px 5px 2px; border-radius: 6px; spacing: 0; }
+.cd-on { background-color: rgba(46,46,50,0.07); }
+.cd-bar { width: 3px; margin: 2px 5px 2px 0; border-radius: 2px; background-color: #3584e4; }
+.cd-bar.cd-off { background-color: transparent; }
+.cd-key { min-width: 12px; margin-right: 10px; color: #5e5e63; }
+.cd-on .cd-key { color: #2e2e32; }
+.cd-text { color: #2e2e32; }
+.cd-take { min-width: 44px; }
+.cd-foot { padding: 5px 10px 4px; spacing: 12px; font-size: 12.5px; color: #5e5e63; }
+.cd-hint { spacing: 5px; }
+.cd-cap { font-size: 12.5px; color: #2e2e32; border: 1px solid rgba(0,0,6,0.28); border-radius: 4px; padding: 0 5px; }
+.cd-row .cd-cap { margin-left: 8px; }
+.cd-verb { color: #5e5e63; }
+.cd-status { color: #2e2e32; }
+.cd-failed { color: #c01c28; }
+.cd-tile { width: 18px; height: 18px; border-radius: 4px; background-color: #d97757; color: #ffffff;
+  font-family: monospace; font-size: 10px; font-weight: bold; }
+.cd-tile.cd-neutral { background-color: rgba(46,46,50,0.12); color: #2e2e32; }
+.cd-warn { width: 18px; height: 18px; border-radius: 9px; background-color: #c01c28; color: #fafafb;
+  font-size: 12px; font-weight: bold; }
+.cd-spinner { icon-size: 12px; color: #5e5e63; }
+.cd-ghost { color: #8a8a8f; }

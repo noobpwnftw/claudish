@@ -76,7 +76,7 @@ const STATES = [
 ];
 
 // Key names: the platform's own (a skin token). macOS menus show glyphs, without boxes.
-const KEYS = {macos: {Enter: "↩", Esc: "⎋", Tab: "⇥"}};
+const KEYS = {macos: {Enter: "↩", Esc: "⎋", Tab: "⇥", Shift: "⇧"}};
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, className, text) => {
@@ -86,52 +86,20 @@ const el = (tag, className, text) => {
   return node;
 };
 
-// "Tab: keep" becomes a keycap and its verb; anything else plain words.
-function hint(text, skin) {
-  const span = el("span", "k-hint");
-  const match = /^([^:]+): (.+)$/.exec(text);
-  if (match) {
-    span.append(el("span", "k-cap", (KEYS[skin] || {})[match[1]] || match[1]), match[2]);
-  } else {
-    span.textContent = text;
+// A state's panel, in the shape of Composition.panel() (claudish/composition.py), which kit.js
+// draws for the lab, the demo, and (natively) every platform. "Tab: keep" is a key and its verb;
+// any other footer words are the free words after the keys.
+function described(spec) {
+  const foot = [], tail = [];
+  for (const words of spec.foot || []) {
+    const match = /^([^:]+): (.+)$/.exec(words);
+    if (match) foot.push([match[1], match[2]]); else tail.push(words);
   }
-  return span;
-}
-
-function panel(spec, skin) {
-  const node = el("div", "k-panel" + (spec.rows || spec.body ? "" : " bare") + (spec.on >= 0 ? " takes" : ""));
-  if (spec.body) {
-    const head = el("div", "k-head");
-    if (spec.label) head.append(el("span", "k-label", spec.label));
-    head.append(el("span", "k-body" + (spec.code ? " code" : ""), spec.body));
-    node.append(head);
-  }
-  (spec.rows || []).forEach(([key, text, legend], index) => {
-    const row = el("div", "k-row" + (index === spec.on ? " on" : ""));
-    row.append(el("span", "k-key", key));
-    const words = el("span", "k-text" + (spec.mono ? " k-mono" : ""), text);
-    if (legend) words.append(el("span", "k-legend", " — " + legend));
-    row.append(words);
-    if (index === spec.on) {  // the highlighted row says it is what Enter takes
-      const take = el("span", "k-take");
-      take.append(el("span", "k-cap", (KEYS[skin] || {}).Enter || "Enter"));
-      row.append(take);
-    }
-    node.append(row);
-  });
-  const foot = el("div", "k-foot");
-  foot.append(spec.failed ? el("span", "k-warn", "!") : el("span", "k-tile ai", "AI"));  // a failure reads without colour
-  if (spec.status) {
-    const status = el("span", "k-status");
-    if (spec.busy) status.append(el("span", "k-spin"));
-    status.append(spec.status);
-    foot.append(status);
-  }
-  if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
-  (spec.foot || []).forEach((text) => foot.append(hint(text, skin)));
-  if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
-  node.append(foot);
-  return node;
+  return {label: spec.label || null, body: spec.body || null, code: Boolean(spec.code), mono: Boolean(spec.mono),
+          rows: (spec.rows || []).map(([key, text, legend]) => ({key, text, legend: legend || null})),
+          on: spec.on === undefined ? -1 : spec.on, foot, tail: tail.join(" ") || null,
+          tile: spec.failed ? "warn" : "ai", status: spec.status || null, busy: Boolean(spec.busy),
+          failed: spec.failed || null, mark: spec.mark || null};
 }
 
 // The host: a window of the platform's own kind with a text box, the caret in it.
@@ -155,29 +123,25 @@ function frame(skin, state) {
     line.append(lead, el("span", "k-ghost", state.ghost.slice(lead.length)));
   }
   text.append(line);
-  if (state.panel) text.append(panel(state.panel, skin));
-  if (state.toast) {
-    const toast = el("div", "k-toast");
+  if (state.panel) text.append(Kit.panel(described(state.panel), KEYS[skin] || {}));
+  if (state.toast) {  // Composition.toast(): a panel with only a footer
     const compose = state.toast === "compose";
-    toast.append(compose ? el("span", "k-tile ai", "AI") : el("span", "k-tile cd", "cd"),
-                 el("span", "k-toast-name", compose ? "Compose" : "Continue"),
-                 hint(compose ? "Shift: back" : "Shift: compose", skin));
-    text.append(toast);
+    text.append(Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
+                           foot: [["Shift", compose ? "back" : "compose"]]}, KEYS[skin] || {}));
   }
   host.append(bar, text);
   return host;
 }
 
-// As input methods do: the panel under the composition's start, its text aligned with your words.
+// Under the caret's line, the panel's content starting at the caret: every platform knows the
+// caret (GNOME knows nothing else, so no platform anchors to the composition's start).
 function place(host) {
   const text = host.querySelector(".host-text");
   const anchor = host.querySelector(".anchor");
   const caret = host.querySelector(".host-caret");
   const box = text.getBoundingClientRect();
   const line = caret.getBoundingClientRect();
-  // The composition's part on the caret's line (a long one wraps): the panel goes under its start.
-  const parts = anchor.firstChild ? [...anchor.firstChild.getClientRects()] : [];
-  const start = parts.filter((r) => r.bottom > line.top + 1 && r.top < line.bottom - 1)[0] || line;
+  const start = line;
   const lineBottom = line.bottom;
   for (const floating of host.querySelectorAll(".k-panel, .k-toast")) {
     const style = getComputedStyle(floating);

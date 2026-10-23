@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """IBus adapter. Run using the system Python that supplies python3-gi."""
+import json
 import os
 import sys
 import time
@@ -8,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
-from gi.repository import GLib, IBus
+from gi.repository import Gio, GLib, IBus
 from claudish.composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
@@ -39,6 +40,56 @@ PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "em
             IBus.InputPurpose.NAME: "name", IBus.InputPurpose.NUMBER: "number", IBus.InputPurpose.PHONE: "phone",
             IBus.InputPurpose.DIGITS: "digits", IBus.InputPurpose.ALPHA: "alpha"}
 
+SCREEN_XML = """<node><interface name="io.claudish.Screen">
+  <method name="Get"><arg type="s" direction="out"/></method>
+  <signal name="Changed"><arg type="s"/></signal>
+</interface></node>"""
+
+
+class Screen:
+    """What cd_AI shows at the caret, for cd_AI's GNOME Shell extension to draw
+    (platforms/linux/gnome-extension): the panel (Composition.panel()), continue's suggestion, and
+    the mode switch, as JSON on the session bus. The extension owns io.claudish.Shell; while it
+    does, the engine draws nothing with IBus's own popup. Elsewhere (no GNOME Shell, or no
+    extension), IBus's popup shows the rows and the hint as plain text."""
+
+    def __init__(self):
+        self.shell, self.state = False, "{}"
+        try:
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            info = Gio.DBusNodeInfo.new_for_xml(SCREEN_XML).interfaces[0]
+            self.bus.register_object("/io/claudish/Screen", info, self.call, None, None)
+            Gio.bus_own_name_on_connection(self.bus, "io.claudish.Screen", Gio.BusNameOwnerFlags.NONE, None, None)
+            Gio.bus_watch_name_on_connection(self.bus, "io.claudish.Shell", Gio.BusNameWatcherFlags.NONE,
+                                             lambda *_: self.watch(True), lambda *_: self.watch(False))
+        except GLib.Error as error:  # no session bus: IBus's popup only
+            trace("screen bus", error.message)
+            self.bus = None
+
+    def watch(self, present):
+        trace("shell extension", "present" if present else "absent")
+        self.shell = present
+
+    def call(self, connection, sender, path, interface, method, parameters, invocation):
+        invocation.return_value(GLib.Variant("(s)", (self.state,)))
+
+    def publish(self, panel=None, ghost="", toast=None):
+        self.state = json.dumps({"panel": panel, "ghost": ghost, "toast": toast})
+        if self.bus is not None:
+            self.bus.emit_signal(None, "/io/claudish/Screen", "io.claudish.Screen", "Changed",
+                                 GLib.Variant("(s)", (self.state,)))
+
+
+SCREEN = None
+
+
+def screen():
+    global SCREEN
+    if SCREEN is None:
+        SCREEN = Screen()
+    return SCREEN
+
+
 class ClaudishEngine(IBus.Engine):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,6 +99,7 @@ class ClaudishEngine(IBus.Engine):
         self.sensitive = False
         self.app = None  # The focused program, for bindings ("supported text boxes").
         self.purpose = None  # The field's kind as the app reports it ("terminal", "email", ...).
+        self.drawn = None  # the panel as last shown, redrawn when the state's description changes
         self.timer = GLib.timeout_add(40, self.poll)
 
     def poll(self):
@@ -55,7 +107,8 @@ class ClaudishEngine(IBus.Engine):
         if result:
             revision, data = result
             trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
-            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
+            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ()),
+                                                         data.get("hosted", "")):
                 self.render()
             elif "question" in data and self.composition.ask(revision, data["question"], data["session"]):
                 self.render()
@@ -65,15 +118,30 @@ class ClaudishEngine(IBus.Engine):
             elif "done" in data and self.composition.done(revision):
                 self.render()  # a helper took the task: nothing to insert
             elif "error" in data:
-                self.composition.fail(revision)
+                self.composition.fail(revision, data["error"])
                 self.render()
+        if not self.composition.live and self.composition.panel() != self.drawn:
+            self.render()  # the pause before compose's keys, or anything else the description shows
         return True
 
     def render(self):
-        if self.composition.live:
+        state = self.composition
+        panel = None if state.live else state.panel()
+        self.drawn = panel
+        if screen().shell:
+            # cd_AI's GNOME Shell extension draws the panel and the suggestion (the design lab's
+            # GNOME mock); IBus keeps only the composition, as the platform's plain preedit.
+            text = "" if state.live else state.shown
+            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
+                                              IBus.PreeditFocusMode.CLEAR if state.live else IBus.PreeditFocusMode.COMMIT)
+            self.hide_lookup_table()
+            self.update_auxiliary_text(IBus.Text.new_from_string(""), False)
+            screen().publish(panel, state.ghost if state.live and not state.inside else "")
+            return
+        if state.live:
             # Continue: your words are in the app already; the preedit is only the greyed suggestion,
             # cleared (never committed) by a focus change.
-            ghost = self.composition.ghost
+            ghost = state.ghost
             preedit = IBus.Text.new_from_string(ghost)
             if ghost:
                 attributes = IBus.AttrList()
@@ -83,23 +151,20 @@ class ClaudishEngine(IBus.Engine):
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
-        state = self.composition
         text = state.shown  # rewrite after Tab: the rewrite, in place of your words
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
-        # Several readings of an instruction: a numbered list, like any CJK input method's.
-        if state.choosing:
+        # IBus's own popup (without the extension): the rows as a numbered list, the rest as one line.
+        if panel and panel["rows"]:
             table = IBus.LookupTable.new(9, 0, True, False)
-            lines = ([c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
-                      for c in state.question["choices"]] if state.question else state.candidates)
-            for line in lines:
-                table.append_candidate(IBus.Text.new_from_string(line))
-            # An approval highlights nothing: only a number answers it (Enter never approves).
-            table.set_cursor_visible(not (state.question and not state.asks))
+            for row in panel["rows"]:
+                table.append_candidate(IBus.Text.new_from_string(
+                    row["text"] + (" — " + row["legend"] if row.get("legend") else "")))
+            table.set_cursor_visible(panel["on"] >= 0)  # an approval highlights nothing: only a number answers it
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
-        hint = state.hint()  # the same short words as every adapter; the question says who asks
+        hint = state.hint()  # the panel's words as one line
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
 
     def changed(self):
@@ -171,10 +236,12 @@ class ClaudishEngine(IBus.Engine):
         if char and char.isprintable():
             if not state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
                 state.change(self.before_caret())
-            typed = state.type_live(char)
+            state.type_live(char)  # continue types exactly the key: the app inserts it itself
             self.changed()
-            self.commit_text(IBus.Text.new_from_string(typed))
-            return True
+            # Passed on rather than committed: the app then reports its caret after the key (a
+            # commit from here leaves the reported caret one character behind, and the suggestion
+            # would be drawn over the space you just typed).
+            return False
         state.change("")  # Enter, arrows, anything else: the app's, and the context starts over
         self.changed()
         return False
@@ -340,7 +407,9 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(kept))
         self.changed()
         self.show_mode()
-        if not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
+        if screen().shell:  # the mode switch, briefly at the caret
+            screen().publish(self.drawn, "", self.composition.toast())
+        elif not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
             self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
 
     def show_mode(self, register=False):
@@ -405,6 +474,7 @@ class ClaudishEngine(IBus.Engine):
         self.refresh_surrounding()
 
     def do_destroy(self):
+        screen().publish()  # nothing at the caret
         GLib.source_remove(self.timer)
         self.suggestions.close()
         IBus.Engine.do_destroy(self)

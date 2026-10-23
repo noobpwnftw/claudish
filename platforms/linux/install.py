@@ -4,9 +4,15 @@
 IBus (1.5.29 tested) reads components only from IBUS_COMPONENT_PATH, which
 defaults to the system directory. A per-user install therefore also writes an
 environment.d file that adds the user directory; it takes effect at next login.
+
+On GNOME it also installs and enables cd_AI's GNOME Shell extension (gnome-extension/), which
+draws cd_AI's panel and suggestion at the caret; it draws nothing unless cd_AI is typing.
 """
 import argparse
+import ast
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -15,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_COMPONENTS = Path("/usr/share/ibus/component")
 USER_COMPONENTS = Path.home() / ".local/share/ibus/component"
 ENVIRONMENT = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "environment.d/90-claudish-ibus.conf"
+EXTENSION = "cd-ai@claudish.io"
+EXTENSIONS = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "gnome-shell/extensions"
 
 # layout "default" keeps the user's keyboard layout (AltGr, dead keys); the engine works with any layout.
 COMPONENT = '''<?xml version="1.0" encoding="utf-8"?>
@@ -47,6 +55,34 @@ def component_path_setting():
     return "IBUS_COMPONENT_PATH=%s\n" % ":".join(parts)
 
 
+def enabled_extensions():
+    found = subprocess.run(["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+                           capture_output=True, text=True)
+    if found.returncode != 0:
+        return None
+    value = found.stdout.strip()
+    return list(ast.literal_eval(value[value.index("["):])) if "[" in value else []
+
+
+def set_extension(enabled):
+    """Link (or unlink) the GNOME Shell extension for this user and list it as enabled; it loads at
+    the next login (GNOME Shell on Wayland cannot reload)."""
+    link = EXTENSIONS / EXTENSION
+    if enabled:
+        EXTENSIONS.mkdir(parents=True, exist_ok=True)
+        if not link.exists():
+            link.symlink_to(ROOT / "platforms/linux/gnome-extension" / EXTENSION)
+    elif link.is_symlink():
+        link.unlink()
+    current = enabled_extensions()
+    if current is None:
+        return False
+    wanted = sorted(set(current) | {EXTENSION}) if enabled else [e for e in current if e != EXTENSION]
+    if wanted != current:
+        subprocess.run(["gsettings", "set", "org.gnome.shell", "enabled-extensions", str(wanted)], check=False)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--system", action="store_true", help="Install for all users (run with sudo)")
@@ -59,6 +95,9 @@ def main():
             if path.exists():
                 path.unlink()
                 print("Removed", path)
+        if not args.system and shutil.which("gnome-shell"):
+            set_extension(False)
+            print("Removed the GNOME Shell extension", EXTENSION)
         print("Log out and back in (or run `ibus restart`) to finish.")
         return
     try:
@@ -72,6 +111,11 @@ def main():
         ENVIRONMENT.write_text(component_path_setting(), encoding="utf-8")
         print("Added the user component directory to IBus's search path in", ENVIRONMENT)
         print("If your session does not read environment.d, use `sudo %s --system` instead." % sys.argv[0])
+        if shutil.which("gnome-shell"):
+            if set_extension(True):
+                print("Installed and enabled the GNOME Shell extension", EXTENSION, "(it draws cd_AI's panel)")
+            else:
+                print("Linked the GNOME Shell extension %s; enable it in Extensions." % EXTENSION)
     print("Log out and back in, then add English → cd_AI — Claudish in Input Sources.")
     print("The source folder must stay in place. Remove with --uninstall%s." % (" --system" if args.system else ""))
 

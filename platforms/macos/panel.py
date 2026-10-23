@@ -159,8 +159,9 @@ class Panel:
             y -= h
             getattr(self, "place_" + kind)(views, y, h, width, pick)
         (cx, cy), (cw, ch) = rect
-        # Under the caret's line, the rows' text aligned with your words (as input methods place it).
-        frame = NSMakeRect(cx - PAD - ROW_X, cy - height - 6, width, height)
+        # Under the caret's line, the content starting at the caret (as on every platform: GNOME
+        # knows only the caret).
+        frame = NSMakeRect(cx + cw - PAD - ROW_X, cy - height - 6, width, height)
         screen = NSScreen.mainScreen().visibleFrame()
         if frame.origin.y < screen.origin.y:  # no room below: above the line
             frame.origin.y = cy + ch + 6

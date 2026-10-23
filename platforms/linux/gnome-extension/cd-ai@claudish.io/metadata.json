@@ -1,0 +1,7 @@
+{
+  "uuid": "cd-ai@claudish.io",
+  "name": "cd_AI",
+  "description": "Draws cd_AI's panel and suggestion at the caret (the design in claudish/web/design.html). cd_AI is an input method; this shows what it offers.",
+  "url": "https://github.com/noobpwnftw/claudish",
+  "shell-version": ["45", "46", "47", "48", "49"]
+}

@@ -24,9 +24,9 @@ engine.commit_text = lambda text: commits.append(text.get_text())
 try:
     # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
     assert engine.composition.mode == "continue"
-    for char in "ls -la":
-        assert engine.do_process_key_event(ord(char), 0, 0)
-    assert "".join(commits) == "ls -la", commits
+    for char in "ls -la":  # passed on: the app inserts each key and reports its caret after it
+        assert not engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.composition.text == "ls -la" and not commits, commits
     assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # nothing offered: Tab is the app's
     commits.clear()
 
@@ -66,7 +66,7 @@ try:
     # Continue types into the app; the context follows; Tab takes a suggestion.
     shift_tap()
     assert engine.composition.mode == "continue"
-    assert engine.do_process_key_event(ord("!"), 0, 0) and commits[-1] == "!"
+    assert not engine.do_process_key_event(ord("!"), 0, 0) and engine.composition.text.endswith("!")  # the app's
     assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # no suggestion: Tab is the app's
     engine.composition.offer(engine.composition.revision, engine.composition.text + " Hello—truly.")
     assert engine.composition.ghost == " Hello—truly."
@@ -77,7 +77,7 @@ try:
     # A fresh start in continue (after a click or a paste) begins from the app's text before the caret.
     engine.composition.change("")
     engine.before_caret = lambda: "Pasted words. "
-    assert engine.do_process_key_event(ord("W"), 0, 0)
+    assert not engine.do_process_key_event(ord("W"), 0, 0)
     assert engine.composition.text == "Pasted words. W", engine.composition.text
     del engine.before_caret
     assert engine.do_process_key_event(IBus.KEY_F7, 0, 0) is False  # F7 is the app's now

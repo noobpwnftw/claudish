@@ -245,7 +245,7 @@ index feb9813..12eb1d5 100644
  	State state_;
  };
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..ae37057 100644
+index 28d8286..d157a0a 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -268,6 +268,7 @@ void TextService::updateCandidates(Ime::EditSession* session) {
@@ -262,7 +262,7 @@ index 28d8286..ae37057 100644
  	if (selectionRect(session, &textRect)) {
 -		// FIXME: where should we put the candidate window?
 -		candidateWindow_->move(textRect.left, textRect.bottom);
-+		// Claudish: under the line, the rows' text lined up with the composition (design lab).
++		// Claudish: under the caret's line, the content starting at the caret (design lab).
 +		candidateWindow_->move(textRect.left - candidateWindow_->textInset(), textRect.bottom + Ime::scaled(6));
  	}
  
@@ -330,18 +330,19 @@ index 28d8286..ae37057 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 5c89d15..597f568 100644
+index 5c89d15..0f2b594 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
-@@ -23,6 +23,7 @@
+@@ -23,6 +23,8 @@
  #include <LibIME2/src/TextService.h>
  #include <LibIME2/src/CandidateWindow.h>
  #include <LibIME2/src/MessageWindow.h>
 +#include <LibIME2/src/Panel.h>
++#include <LibIME2/src/Style.h>
  #include <LibIME2/src/EditSession.h>
  #include <LibIME2/src/LangBarButton.h>
  #include "PIMEImeModule.h"
-@@ -122,6 +123,15 @@ public:
+@@ -122,6 +124,15 @@ public:
  		updateFont_ = true;
  	}
  
@@ -357,7 +358,7 @@ index 5c89d15..597f568 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +176,8 @@ private:
+@@ -166,6 +177,8 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;

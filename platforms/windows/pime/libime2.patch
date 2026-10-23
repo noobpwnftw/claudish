@@ -400,7 +400,7 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..3695b05
+index 0000000..d27a364
 --- /dev/null
 +++ b/src/Panel.cpp
 @@ -0,0 +1,433 @@
@@ -523,7 +523,7 @@ index 0000000..3695b05
 +}
 +
 +int PanelPainter::textInset() const {
-+    return (int)(px(PAD) + px(ROW_X) + (spec_.rows.empty() ? 0 : px(NUMBER) + px(NUMBER_GAP)));
++    return (int)(px(PAD) + px(ROW_X));  // the content's left edge goes under the caret
 +}
 +
 +SIZE PanelPainter::layout(const PanelSpec& spec) {
@@ -839,7 +839,7 @@ index 0000000..3695b05
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..984347d
+index 0000000..8eb55f4
 --- /dev/null
 +++ b/src/Panel.h
 @@ -0,0 +1,125 @@
@@ -899,8 +899,8 @@ index 0000000..984347d
 +    SIZE layout(const PanelSpec& spec);
 +    // Paints the last layout into the DC (the window's client area); spin: the spinner's angle.
 +    void paint(HDC dc, const RECT& rc, float spin);
-+    // The x of the rows' text, from the panel's left edge: the window is placed so that it lines up
-+    // with the composition's first character.
++    // The x of the content's left edge, from the panel's: the window is placed so that it starts
++    // under the caret.
 +    int textInset() const;
 +
 +private:

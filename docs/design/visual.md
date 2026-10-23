@@ -85,6 +85,9 @@ an anti-AI writer, an accessibility consultant and an office manager
 - **Space** in compose types a space; it never picks a candidate.
 - **Contrast:** muted text 4.5:1 or more, the suggestion 3:1 or more; a forced-colors rendering
   keeps the bar and the Enter key.
+- **The panel sits under the caret's line, its content starting at the caret** (clamped to the
+  screen). GNOME reports only the caret, not where the composition starts, so no platform anchors
+  to the composition (found on the first GNOME build).
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark
   terminal in light mode is expected).
 
