@@ -188,7 +188,7 @@ async def check(args):
             await keys.press("Escape")
             await expect(page.locator("#preedit")).to_have_text("thank the team for shipping the release")
             await expect(window.locator("button.candidate-row")).to_have_count(0)  # drafts closed
-            await expect(window).to_contain_text("Enter sends")
+            await expect(window).to_contain_text("send")
             await keys.press("Enter")
             await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             choices = window.locator("button.candidate-row")

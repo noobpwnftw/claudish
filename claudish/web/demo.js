@@ -285,10 +285,10 @@ function render() {
   const lines = [];
   if (composing() && state.mode === "instruct") {
     if (state.working) lines.push(["", "working…"]);
-    else if (state.failed) lines.push(["", "the request failed · Enter retries · Esc goes back"]);
+    else if (state.failed) lines.push(["Enter", "the request failed: retry"]);
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
-    else lines.push(["", "Enter sends"]);
+    else lines.push(["Enter", "send"]);
   } else if (composing() && state.candidate) {
     // Rewrite has no list: a hint that it is ready, then the rewrite itself in place of your words.
     lines.push(["Tab", state.converted ? "keep the rewrite" : "rewrite it"]);
@@ -310,9 +310,10 @@ function render() {
   if (lines.length) {
     const foot = document.createElement("div");
     foot.className = "candidate-foot";
-    foot.textContent = choosing() ? "1–3 picks · Enter takes the first · Esc: back to the instruction"
-      : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc drops it")
-      : state.converted ? "Enter keeps it too · Esc: your words" : "Enter or Esc keeps your words";
+    // One pattern everywhere: "Key: action".
+    foot.textContent = choosing() ? "1–3: pick · Enter: the first · Esc: back to the instruction"
+      : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc: drop it")
+      : state.converted ? "Enter: keep it · Esc: your words" : "Enter or Esc: keep your words";
     window.append(foot);
   }
   placeCandidateWindow();
