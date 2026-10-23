@@ -214,7 +214,8 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
-        template, note = launch.call_args.args
+        template, note, launcher = launch.call_args.args
+        self.assertIsNone(launcher)
         self.assertEqual(template, ["claude", "{prompt}"])
         self.assertTrue(note.startswith(folder))
         if os.name == "posix":
@@ -267,3 +268,18 @@ class AskAndHelperTests(unittest.TestCase):
             self.drive(model, [], helper=["claude", "--dangerously-skip-permissions", "{prompt}"])
         offered = [tool["function"]["name"] for tool in model.sent[0].get("tools") or []]
         self.assertNotIn("helper__claude", offered)
+
+
+class HelpersTests(unittest.TestCase):
+    def test_named_helpers_are_separate_tools_and_a_launcher_opens_them(self):
+        from claudish import handoff
+        with patch("claudish.handoff.shutil.which", side_effect=lambda program: "/bin/" + program
+                   if program in ("claude", "codex", "tmux") else None):
+            self.assertEqual(sorted(handoff.helpers({"claude": ["claude", "{prompt}"], "codex": ["codex", "{prompt}"],
+                                                     "gone": ["nothere", "{prompt}"]})), ["claude", "codex"])
+            self.assertEqual(list(handoff.helpers(["claude", "{prompt}"])), ["claude"])
+            with patch("subprocess.Popen") as popen:
+                self.assertTrue(handoff.launch(["claude", "{prompt}"], "/run/n.md", ["tmux", "new-window", "{command}"]))
+            argv = popen.call_args.args[0]
+            self.assertEqual(argv[:3], ["tmux", "new-window", "claude"])
+            self.assertIn("/run/n.md", argv[3])  # one argument, no shell

@@ -116,6 +116,7 @@ class Rewriter:
         rewriter.look_command = settings.get("look_command")
         rewriter.read_terminal = settings.get("read_terminal", True)
         rewriter.helper = settings.get("helper")
+        rewriter.launcher = settings.get("launcher")
         rewriter.session_command = settings.get("session_command")
         if settings.get("tools"):
             if settings["backend"] not in ("llama", "openai"):
@@ -150,7 +151,8 @@ class Rewriter:
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
-        self.helper = None  # profile "helper": an agent an instruction may hand the task to (G39)
+        self.helper = None  # profile "helper": an agent (or named agents) an instruction may hand the task to (G39)
+        self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.

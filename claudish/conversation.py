@@ -128,14 +128,11 @@ class ModelDriver:
              "required": ["question"]},
             lambda arguments: self.ask_user(session, arguments))}
         from . import handoff
-        helper = self.rewriter.helper
-        if handoff.available(helper):
-            title = handoff.name(helper)
-
-            def hand_over(arguments):
+        for title, helper in handoff.helpers(self.rewriter.helper).items():
+            def hand_over(arguments, title=title, helper=helper):
                 task = str(arguments.get("task") or "").strip()[:500]
                 note = handoff.write_note(task, box.observations)
-                if not handoff.launch(helper, note):
+                if not handoff.launch(helper, note, getattr(self.rewriter, "launcher", None)):
                     return "No terminal window could be opened for %s: answer the instruction yourself." % title
                 self.handed = "%s opened in a new window" % title
                 return "Handed over. Reply with just: OK"
@@ -145,7 +142,7 @@ class ModelDriver:
                 "steps), or when the user asks for it." % title,
                 {"type": "object", "properties": {"task": {"type": "string",
                  "description": "What %s should do, in one or two sentences" % title}}, "required": ["task"]},
-                hand_over, "write", lambda arguments: "Send this task to %s?" % title)
+                hand_over, "write", lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
     def question(self, session, text, choices):

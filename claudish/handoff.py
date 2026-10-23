@@ -22,6 +22,16 @@ UNSUPERVISED = ("--dangerously-skip-permissions", "bypasspermissions", "--yolo",
 UNSAFE = re.compile(r"[\"$`!%^&|<>;'\r\n]")
 
 
+def helpers(setting):
+    """{name: command} from a profile's "helper": one command, or named commands; only the ones
+    that can be offered (installed, supervised)."""
+    if isinstance(setting, list):
+        setting = {name(setting): setting}
+    if not isinstance(setting, dict):
+        return {}
+    return {str(key): value for key, value in setting.items() if available(value) and str(key).isidentifier()}
+
+
 def available(template):
     """Configured, installed, and supervised: neither its command nor (for Claude Code) its own
     settings skip its permission prompts."""
@@ -94,13 +104,17 @@ def line(template, note):
     return " ".join(words)
 
 
-def launch(template, note):
+def launch(template, note, launcher=None):
     """Open the helper on the note in a new terminal window; True when one opened. The arguments go
-    as a list (no shell parses them), except on macOS, where Terminal runs a checked line."""
+    as a list (no shell parses them), except on macOS, where Terminal runs a checked line. A
+    profile's launcher says how instead (["tmux", "new-window", "{command}"], ["ghostty", "-e",
+    "{command}"]): {command} becomes the helper's arguments."""
     import platform
     import subprocess
     argv, home, system = arguments(template, note), os.path.expanduser("~"), platform.system()
-    if system == "Darwin":
+    if launcher:
+        commands = [[part for item in launcher for part in (argv if item == "{command}" else [item])]]
+    elif system == "Darwin":
         text = line(template, note)
         if text is None:
             return False

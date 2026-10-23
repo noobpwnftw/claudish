@@ -333,6 +333,14 @@ never goes on a command line. Not offered when the program is not installed or
 the command skips the helper's own permission prompts. Needs a backend with
 tool calls (llama.cpp, any OpenAI-compatible server).
 
+Several helpers can be named, each its own tool behind its own question, and a
+`"launcher"` says how they open (`{command}` is the helper's command):
+
+```json
+{"profiles": {"local": {"helper": {"claude": ["claude", "{prompt}"], "codex": ["codex", "{prompt}"]},
+                        "launcher": ["tmux", "new-window", "{command}"]}}}
+```
+
 The model can also ask you itself, as a question with choices ("Did you mean
 git status?"); your answer goes back to it.
 
