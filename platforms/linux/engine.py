@@ -99,10 +99,11 @@ class ClaudishEngine(IBus.Engine):
         else:
             self.hide_lookup_table()
         if state.question:
-            hint = ("agent asks: %s · Enter: send your reply · Esc: clear it" % state.question.get("text", "")
+            # The question says who asks ("The model asks: ...", "Allow notes.x?", "Send this task to claude?").
+            hint = ("%s · Enter: send your reply · Esc: clear it" % state.question.get("text", "")
                     if state.reply else
-                    "agent asks: %s · 1–%d: choose, or type a reply · Esc: stop" % (state.question.get("text", ""),
-                                                                                    len(state.question["choices"])))
+                    "%s · 1–%d: choose, or type a reply · Esc: stop" % (state.question.get("text", ""),
+                                                                        len(state.question["choices"])))
         elif state.working and state.status:
             hint = "compose · %s · Esc: stop" % " ".join(state.status.split())[-90:]
         elif state.choosing:

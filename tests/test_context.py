@@ -15,6 +15,10 @@ from claudish.model import Rewriter
 from claudish.server import make_server
 
 
+def joined(context):
+    return "\n".join(text for _, text in context.sections())
+
+
 class ContextTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
@@ -27,34 +31,33 @@ class ContextTests(unittest.TestCase):
                            {"type": "command", "name": "diff", "command": [sys.executable, "-c", "print('+ add retry')"]},
                            {"type": "command", "command": "%s -c \"print('string form')\"" % sys.executable}],
                           base=self.root)
-        block = context.render(before="Summary: ", after=" Thanks.")
-        self.assertIn('<context name="glossary.md">\nFjordline: the ferry company.\n</context>', block)
-        self.assertIn('<context name="diff">\n+ add retry\n</context>', block)
-        self.assertIn("string form", block)
-        self.assertIn("Summary: ▮ Thanks.", block)
-        self.assertEqual(Context().render(), "")
+        found = dict(context.sections())
+        self.assertEqual(found["glossary.md"], "Fjordline: the ferry company.")
+        self.assertEqual(found["diff"].strip(), "+ add retry")
+        self.assertIn("string form", "".join(found.values()))
+        self.assertEqual(Context().sections(), [])  # the text around the caret is the text box's, not a provider's
 
     def test_cache_ttl(self):
         context = Context([{"type": "file", "path": "glossary.md", "ttl": 60}], base=self.root)
-        context.render()
+        joined(context)
         (self.root / "glossary.md").write_text("changed", encoding="utf-8")
-        self.assertIn("Fjordline", context.render())  # still cached
+        self.assertIn("Fjordline", joined(context))  # still cached
         context.providers[0].expires = 0
-        self.assertIn("changed", context.render())
+        self.assertIn("changed", joined(context))
 
     def test_failing_or_slow_providers_do_not_block_rewrites(self):
         context = Context([{"type": "command", "command": [sys.executable, "-c", "import sys; sys.exit(3)"]},
                            {"type": "command", "timeout": 0.2,
                             "command": [sys.executable, "-c", "import time; time.sleep(5)"]},
                            {"type": "file", "path": "missing.md"}], base=self.root)
-        self.assertEqual(context.render(), "")
+        self.assertEqual(joined(context), "")
         self.assertIn("exit status 3", context.providers[0].error)
 
     def test_budget_truncates(self):
         (self.root / "big.md").write_text("x" * 5000, encoding="utf-8")
         context = Context([{"type": "file", "path": "big.md"}, {"type": "file", "path": "glossary.md"}],
                           base=self.root, max_chars=1000)
-        block = context.render()
+        block = joined(context)
         self.assertIn("x" * 1000, block)
         self.assertNotIn("x" * 1001, block)
         self.assertNotIn("Fjordline", block)
@@ -70,7 +73,7 @@ class ContextTests(unittest.TestCase):
                                                        "max_context_chars": 500}}}), encoding="utf-8")
         _, _, _, context = config.resolve(path)
         self.assertEqual(context.max_chars, 500)
-        self.assertIn("Fjordline", context.render())
+        self.assertIn("Fjordline", joined(context))
 
     def test_context_reaches_the_model_prompt(self):
         rewriter = Rewriter(context=Context([{"type": "file", "path": "glossary.md"}], base=self.root))
@@ -177,10 +180,10 @@ class MCPContextTests(unittest.TestCase):
                  "arguments": {"number": 7}, "env": {"TEST_TOKEN": "$SECRET_FOR_TEST"}, "timeout": 20},
                 {"type": "mcp", "command": self.server, "resource": "notes://style", "timeout": 20},
                 {"type": "mcp", "name": "broken", "command": self.server, "tool": "broken", "timeout": 20}])
-        block = context.render()
-        self.assertIn('<context name="pr">\nPR #7: + retry the flaky upload (token t-42)\n</context>', block)
-        self.assertIn("Prefer em dashes.", block)
-        self.assertNotIn('name="broken"', block)
+        found = dict(context.sections())
+        self.assertEqual(found["pr"], "PR #7: + retry the flaky upload (token t-42)")
+        self.assertIn("Prefer em dashes.", "".join(found.values()))
+        self.assertNotIn("broken", found)  # a failing provider contributes nothing
         self.assertIn("broken", context.providers[2].error)
 
     def test_url_transport_to_an_app_exposing_mcp(self):
@@ -206,7 +209,7 @@ class MCPContextTests(unittest.TestCase):
                  "tool": "pull_request_diff", "arguments": {"number": 9}, "timeout": 20},
                 {"type": "mcp", "url": url, "resource": "notes://style", "timeout": 20}])
         self.assertEqual(context.providers[0].headers, {"Authorization": "Bearer t-7"})
-        block = context.render()
+        block = joined(context)
         self.assertIn("PR #9: + retry the flaky upload", block)
         self.assertIn("Prefer em dashes.", block)
 

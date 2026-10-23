@@ -205,10 +205,6 @@ class Context:
         self.providers = [Provider(spec, base, servers) for spec in specs]
         self.max_chars = max_chars
 
-    def render(self, before="", after="", extra=()):
-        """Return a block to append to the system prompt, or "" when there is no context."""
-        return self.gather(before, after, extra)[0]
-
     def sections(self, extra=()):
         """[(name, text)]: what the providers (and the app's bindings, extra) contribute, within
         max_chars. The text around the caret is not one of them: the text box describes it."""
@@ -221,28 +217,6 @@ class Context:
                 found.append((provider.name, text[:budget]))
                 budget -= len(text[:budget])
         return found
-
-    def gather(self, before="", after="", extra=()):
-        """(block, names of the providers that contributed); extra providers come from app bindings."""
-        sections = []
-        for provider in list(self.providers) + list(extra):
-            text = provider.get()
-            if text:
-                sections.append((provider.name, text))
-        if before or after:
-            sections.append(("text around the caret", (before[-1500:] + "▮" + after[:500]).strip()))
-        if not sections:
-            return "", []
-        budget, parts = self.max_chars, []
-        for name, text in sections:
-            if budget <= 0:
-                break
-            text = text[:budget]
-            budget -= len(text)
-            parts.append('<context name="%s">\n%s\n</context>' % (name.replace('"', "'"), text))
-        block = ("\n\nReference context for this text. Use it for names, terms, and facts; "
-                 "do not copy it into the rewrite unless the text refers to it.\n" + "\n".join(parts))
-        return block, [name for name, _ in sections]
 
 
 class Binding:

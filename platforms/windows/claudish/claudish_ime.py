@@ -270,7 +270,7 @@ class ClaudishTextService(TextService):
                 self.state.offer(revision, data["text"], data.get("candidates", ()))
             elif "question" in data:
                 if self.state.ask(revision, data["question"], data["session"]):
-                    self.showMessage("cd_AI asks: %s (1-%d)" % (data["question"].get("text", ""),
+                    self.showMessage("%s (1-%d)" % (data["question"].get("text", ""),
                                                                 len(data["question"].get("choices") or [])), 5)
             elif "progress" in data or "partial" in data:
                 if self.state.note(revision, data.get("progress") or data.get("partial")):

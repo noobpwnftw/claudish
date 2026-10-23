@@ -137,6 +137,15 @@ def context_test(app, profile=None, show=False):
                 [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
     print("App %r, profile %r: %d binding(s) match, %d provider(s) would be consulted"
           % (app, name, len(bindings), len(providers)))
+    # Which AI answers there: the app's binding, then that profile's choice per mode.
+    answering = next((b.profile for b in bindings if b.profile), None) or name
+    _, routed, _, _ = config.resolve(profile=answering) if answering != name else (None, settings, None, None)
+    for mode in ("continue", "rewrite", "instruct"):
+        chosen = (routed["modes"].get(mode) or {}).get("profile") or answering
+        _, chosen_settings, _, _ = config.resolve(profile=chosen) if chosen != name else (None, settings, None, None)
+        print("  %-9s answered by profile %r (%s%s)" % (mode, chosen, chosen_settings["backend"],
+                                                       ", hosted" if chosen_settings.get("hosted") or
+                                                       chosen_settings["backend"] == "claude" else ""))
     status = 0
     for origin, provider in providers:
         text = provider.get()
