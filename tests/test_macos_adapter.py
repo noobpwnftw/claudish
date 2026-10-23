@@ -167,6 +167,8 @@ def load_adapter():
     objc.super = builtins.super
     objc.python_method = lambda method: method
     objc.signature = lambda signature: lambda method: method
+    objc.registerMetaDataForSelector = lambda *args: None
+    objc._C_OUT = b"o"
     appkit = types.ModuleType("AppKit")
     appkit.NSAttributedString = Grey
     appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor")

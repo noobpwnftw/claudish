@@ -34,6 +34,20 @@ SURROUNDING = 8000
 PANEL = OVERLAY = None  # one panel and one overlay for the server, shared by its controllers
 
 
+def unpack(rect):
+    """((x, y), (w, h)) from an NSRect or a nested tuple."""
+    origin, size = (rect.origin, rect.size) if hasattr(rect, "origin") else rect
+    x, y = (origin.x, origin.y) if hasattr(origin, "x") else origin
+    w, h = (size.width, size.height) if hasattr(size, "width") else size
+    return (x, y), (w, h)
+
+
+# IMK's attributesForCharacterIndex:lineHeightRectangle: hands the rectangle back through a pointer;
+# PyObjC needs to be told, or it passes NULL and only the attributes come back.
+objc.registerMetaDataForSelector(b"NSObject", b"attributesForCharacterIndex:lineHeightRectangle:",
+                                 {"arguments": {3: {"type_modifier": objc._C_OUT}}})
+
+
 class Shown:
     """The panel as the controller's call sites use it (they were written for IMKCandidates): show
     and update draw cd_AI's own panel from the state; hide hides it."""
@@ -194,18 +208,32 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def caret(self, client):
-        """The caret's line in screen coordinates, ((x, y), (w, h)), for the panel and the overlay."""
+        """The caret's line in screen coordinates ((x, y), (w, h)), y at the line's bottom, for the
+        panel and the overlay. IMK's lineHeightRectangle is what input methods place windows by;
+        firstRectForCharacterRange came back with y at the line's top in our tests, so it is the
+        fallback, corrected for that."""
         try:
             selected = client.selectedRange()
             location = selected.location if hasattr(selected, "location") else selected[0]
+        except Exception:
+            location = 0
+        try:
+            found = client.attributesForCharacterIndex_lineHeightRectangle_(location, None)
+            rect = found[1] if isinstance(found, tuple) and len(found) == 2 else None
+            if rect is not None:
+                (x, y), (w, h) = unpack(rect)
+                if h > 0:
+                    trace("caret line", round(x), round(y), round(w), round(h), "at", location)
+                    return (x, y), (w, h)
+        except Exception:
+            trace("caret line failed", traceback.format_exc().splitlines()[-1])
+        try:
             found = client.firstRectForCharacterRange_actualRange_((location, 0), None)
             rect = found[0] if isinstance(found, tuple) and len(found) == 2 and not hasattr(found, "origin") else found
-            origin, size = (rect.origin, rect.size) if hasattr(rect, "origin") else rect
-            x, y = (origin.x, origin.y) if hasattr(origin, "x") else origin
-            w, h = (size.width, size.height) if hasattr(size, "width") else size
+            (x, y), (w, h) = unpack(rect)
             if h > 0:
-                trace("caret", round(x), round(y), round(w), round(h), "at", location)
-                return (x, y), (w, h)
+                trace("caret first", round(x), round(y), round(w), round(h), "at", location)
+                return (x, y - h), (w, h)
         except Exception:
             trace("caret failed", traceback.format_exc().splitlines()[-1])
         return (200, 400), (0, 18)
