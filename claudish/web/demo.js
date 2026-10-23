@@ -413,12 +413,17 @@ function placeCandidateWindow() {
   const window = $("candidates");
   const editor = $("editor").getBoundingClientRect();
   const caret = CARET.getBoundingClientRect();
+  // The panel fits the editor (a phone's is narrower than the panel's 440 px), as a real panel
+  // fits its screen.
+  const panel = window.querySelector(".k-panel, .k-toast");
+  if (panel) panel.style.maxWidth = panel.style.minWidth = "";
+  if (panel && editor.width - 16 < panel.offsetWidth) panel.style.maxWidth = panel.style.minWidth = `${editor.width - 16}px`;
   // As on every platform: under the line, the panel's content starting where the composition
   // starts (what IMK, TSF and IBus report while something is composed), or at the caret.
   const start = PREEDIT.textContent ? PREEDIT.getClientRects()[0] || caret : caret;
   const inset = 14;  // the panel's border, padding, and row inset (kit.css)
   const from = PREEDIT.textContent ? start.left : caret.right;
-  let left = Math.max(12, Math.min(from - editor.left - inset, editor.width - window.offsetWidth - 12));
+  let left = Math.max(8, Math.min(from - editor.left - inset, editor.width - window.offsetWidth - 8));
   // It opens there and stays where it opened while it shows on that line and its anchor is at or
   // right of it: it never slides while you type; if you delete back past it, it moves.
   const line = Math.round(caret.bottom - editor.top), opened = placeCandidateWindow.opened;

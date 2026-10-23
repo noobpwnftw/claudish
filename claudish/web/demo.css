@@ -21,6 +21,9 @@ h1,h2,.lede,.candidate,.feedback,.samples>span{text-wrap:balance}
 .editor{position:relative;min-height:230px;padding:26px 28px;background:var(--editor-bg);cursor:text}
 .editor.focused{background:var(--focus-bg)}
 .page{font-family:var(--serif);font-size:24px;line-height:1.6;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+/* The composition wraps as text does: a space at a line's end takes no underline (pre-wrap kept it,
+   so the underline hung past the words). */
+.page .preedit{white-space:normal}
 .caret{display:inline-block;position:relative;width:0;height:1.15em;vertical-align:-.2em}.caret::after{content:"";position:absolute;left:-1px;top:0;width:2px;height:100%;background:transparent}
 .editor.focused .caret::after{background:var(--ink);animation:blink 1.1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
