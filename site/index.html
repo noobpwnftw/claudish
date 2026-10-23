@@ -28,7 +28,7 @@
         <div class="hero-text">
           <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
           <h1 id="title">If you can type there,<br>you can use AI <em>there.</em></h1>
-          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: a small local one by default, or your own API key. The answer arrives as a candidate at the caret. Nothing is inserted until you accept it.</p>
+          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: a small local one by default, or your own API key. The answer arrives as a candidate at the caret.</p>
           <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
@@ -84,7 +84,7 @@
           <li><b>Or yours.</b> Claude with your API key, any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app: the PR diff in your editor, the ticket in your browser. Import the MCP servers you already use with Claude.</li>
           <li><b>Tools and agents.</b> An instruction may call read-only tools, or run an agent whose permission questions arrive as choices. You approve every side effect.</li>
-          <li><b>Restraint.</b> It runs only on what you type, never watches the screen, and never inserts anything you did not accept. Password fields bypass it.</li>
+          <li><b>Restraint.</b> It runs only on what you type, looks at the screen only when you press F8, and never inserts anything you did not accept. Password fields bypass it.</li>
         </ul>
       </section>
 
@@ -120,7 +120,7 @@ python3 -m claudish setup</pre>
           <tr><td>Linux (IBus)</td><td>Verified with real IBus and GTK typing in containers: X11 (26 scenarios) and GNOME on Wayland (10). Qt and KDE are not yet tested.</td></tr>
           <tr><td>Windows (PIME/TSF)</td><td>Verified on Windows 11 ARM64: Notepad and Edge, setup end to end. x64 hardware untested.</td></tr>
           <tr><td>macOS (IMK)</td><td>Builds in CI and passes event tests; not yet run on a Mac.</td></tr>
-          <tr><td>Browser demo</td><td>The model runs in the page through WebAssembly; nothing you type leaves it.</td></tr>
+          <tr><td>Browser demo</td><td>The model runs in the page, through WebAssembly.</td></tr>
         </table>
       </section>
     </main>
