@@ -306,6 +306,42 @@ Supported text boxes are a progressive enhancement, never a prerequisite:
    never for secure fields, and labelled as hosted when the backend is.
 4. **The text alone:** what you typed and what the field exposes.
 
+### Apps without MCP: what a screen reader sees (G35)
+
+Most apps will never publish MCP, and a terminal is the clearest case: it is not
+a text box (the input method protocols give nothing around the caret), and
+asking users to install a shell hook is a workaround, not integration. The
+accessibility APIs that screen readers use already identify the focused element
+and expose its text, on every platform, with nothing installed in the app.
+Probes on 2026-10-23 (`tests/desktop/probes/`), typing `cd /tmp`, `gti status`,
+and `ls /nope`, then reading the focused element:
+
+| Platform | Terminal | Identified by | Text | Time |
+| --- | --- | --- | --- | --- |
+| Linux, AT-SPI | GNOME Terminal (VTE) | role `terminal`, app `gnome-terminal-server` (the same name IBus reports), focused state | the visible screen: prompts, commands, errors | 0.5 ms |
+| Windows, UI Automation | Windows Terminal 1.25 | class `TermControl`, process `WindowsTerminal` | the visible screen, through TextPattern | 95 ms first, 4 ms after |
+| Windows, UI Automation | classic console | process `conhost`, document "Text Area" | the visible screen (lines padded with spaces) | 277 ms first |
+| macOS, AX | Terminal.app | frontmost app `com.apple.Terminal`, focused `AXTextArea` | the visible screen, through `AXValue` | 39 ms |
+
+This is the second tier of "Context, best source first", and it serves far more
+than terminals (chat and mail apps, Electron apps). Consequences:
+
+- **Identify first:** the field purpose (IBus `TERMINAL`) and the focused app
+  name, then the accessible role. A terminal is never prose: continue stays
+  quiet there, and an instruction's draft is one command line, which lands at
+  the prompt like typed text (running it is your Enter).
+- **Read only when asked:** a terminal screen can hold secrets. Read on Tab or
+  Enter in compose, never on continue's pauses; send the last lines only, and
+  let profile bindings decide which apps are read at all.
+- **Costs:** macOS needs the Accessibility permission (one more consent; the
+  macOS system-wide focused element fails with -25204, so ask the frontmost
+  app); Linux needs the accessibility bus (on in GNOME and KDE, off in a bare X
+  session; Qt apps need it enabled); Windows needs nothing. Terminals without
+  accessibility (xterm, and likely kitty and Alacritty) fall back to the picture.
+- **Then `claudish fix` goes:** "fix" typed as an instruction in a terminal does
+  what the command did, with what is on screen as its context, and its shell
+  hook and own prompt retire. Its 30 cases become a test of instruct in terminals.
+
 ## Onboarding (G19)
 
 ### The pathway: nothing to learn on day one
