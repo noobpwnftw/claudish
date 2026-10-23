@@ -133,7 +133,7 @@ class ClaudishEngine(IBus.Engine):
             # GNOME mock); IBus keeps only the composition, as the platform's plain preedit.
             text = "" if state.live else state.shown
             self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
-                                              IBus.PreeditFocusMode.CLEAR if state.live else IBus.PreeditFocusMode.COMMIT)
+                                              self.focus_mode())
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)
             screen().publish(panel, state.ghost if state.live and not state.inside else "")
@@ -151,9 +151,9 @@ class ClaudishEngine(IBus.Engine):
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
-        text = state.shown  # rewrite after Tab: the rewrite, in place of your words
+        text = state.shown  # your words (a rewrite waits in the panel), or a reply once sent
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
-                                          IBus.PreeditFocusMode.COMMIT)
+                                          self.focus_mode())
         # IBus's own popup (without the extension): the rows as a numbered list, the rest as one line.
         if panel and panel["rows"]:
             table = IBus.LookupTable.new(9, 0, True, False)
@@ -166,6 +166,12 @@ class ClaudishEngine(IBus.Engine):
             self.hide_lookup_table()
         hint = state.hint()  # the panel's words as one line
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
+
+    def focus_mode(self):
+        """What IBus does with the preedit when focus leaves: your own words for the document are
+        committed; a reply meant for the model (once an instruction is sent) is cleared. The
+        preedit never holds the model's words."""
+        return IBus.PreeditFocusMode.CLEAR if self.composition.sent else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.around_caret()[1] if self.composition.live else ""
@@ -347,7 +353,10 @@ class ClaudishEngine(IBus.Engine):
             self.render()  # ↑ and ↓ move the highlight
             return True
         if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK and self.composition.restore():
-            self.render()  # Shift+Esc: the instruction Esc dropped, back to edit
+            if self.composition.working:  # held while it worked: ask again
+                self.suggestions.schedule(self.composition.revision, self.composition.text, "instruct",
+                                          immediate=True, app=self.app, purpose=self.purpose)
+            self.render()  # Shift+Esc: what Esc dropped, or the exchange you left, back
             return True
         if keyval == IBus.KEY_Escape:
             action = self.composition.escape()
@@ -445,10 +454,17 @@ class ClaudishEngine(IBus.Engine):
         self.update_quiet()
         self.refresh_surrounding()
         self.show_mode(register=True)
+        pill = self.composition.returned(self.app)  # back where an exchange was held: a pill, no keys
+        if pill and screen().shell:
+            screen().publish(None, "", pill)
 
     def do_focus_out(self):
         trace("focus-out")
-        # IBus commits the visible preedit through PreeditFocusMode.COMMIT.
+        if self.composition.sent:  # an instruction's exchange: held for this app, its work going on
+            self.composition.leave(self.app)
+            self.render()
+            return
+        # IBus commits the visible preedit (your own words) through PreeditFocusMode.COMMIT.
         self.do_reset()
 
     def do_disable(self):

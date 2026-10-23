@@ -72,6 +72,9 @@ class ClaudishInputController(IMKInputController):
         if self.timer is None:
             self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
                 0.04, self, "pollSuggestions:", None, True)
+        pill = self.state.returned(self.app(self.client()))  # back where an exchange was held
+        if pill:
+            self.show_toast(pill)
 
     def deactivateServer_(self, sender):
         try:
@@ -375,6 +378,15 @@ class ClaudishInputController(IMKInputController):
             if client is not None:
                 client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             return
+        if self.state.sent and not suggested:
+            # The app ends the composition (a click, a focus change): an instruction's exchange is
+            # held for this app, its work going on; a reply you were typing is never inserted.
+            self.state.leave(self.app(client))
+            self.hide_panel()
+            if client is not None:
+                client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+            return
+        # Your own words, never the model's unless you asked for them (a rewrite waits for Tab).
         text = self.state.commit(suggested)
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")
@@ -477,6 +489,9 @@ class ClaudishInputController(IMKInputController):
             self.show_panel(client)
             return True
         if key == 53 and flags & NSEventModifierFlagShift and self.state.restore():  # Shift+Esc: the dropped one, back
+            if self.state.working and self.worker is not None:  # held while it worked: ask again
+                self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
+                                     app=self.app(client))
             self.changed(client)
             return True
         if key == 53:  # Escape: one step back

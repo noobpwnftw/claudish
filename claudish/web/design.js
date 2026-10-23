@@ -25,9 +25,9 @@ const STATES = [
   {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
    before: "Team: ", comp: "running late, start without me",
    panel: {status: "Rewriting", busy: true, foot: ["Esc: stop"]}},
-  {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel shows yours, as large, until you keep it.",
-   before: "Team: ", comp: "I'm running a little late — please start without me.",
-   panel: {label: "Your words", body: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
+  {id: "converted", title: "Compose: a rewrite", note: "Your words stay in your text; the rewrite waits in the panel, and only Tab puts it in (a focus change never can).",
+   before: "Team: ", comp: "running late, start without me",
+   panel: {label: "Rewrite", body: "I'm running a little late — please start without me.", foot: ["Tab: keep", "Esc: undo"]}},
   // An instruction, once sent, leaves your text: the panel carries the exchange as a thread of
   // labelled turns ("You asked", the model's question, "You answered"), and the caret is free, so
   // whatever you type next is at the caret, where typing goes.

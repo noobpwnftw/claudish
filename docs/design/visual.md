@@ -117,6 +117,18 @@ an anti-AI writer, an accessibility consultant and an office manager
   Shift+Esc brings back a dropped instruction or a cleared reply. In the thread your words are in
   the text colour, underlined as they were at the caret (your composition, moved into the panel);
   the labels are the muted part. (A neutral rule beside them read as a second caret.)
+- **A rewrite waits in the panel (owner, 2026-10-24):** the composition always holds your words;
+  Tab shows the rewrite in the panel ("Rewrite"), Tab again puts it in. Apps commit the visible
+  composition themselves (a browser, a classic Win32 control, a click in a Mac text view, IBus on
+  focus-out), so a rewrite in the composition could reach your text without a key.
+- **Focus changes (seven reviewers, unanimous):** a focus change may commit your own words for the
+  document, never the model's words, never words meant for the model, and it never sends or
+  approves. Composing: your words go in as typed. A rewrite showing: your words. An instruction
+  sent: the exchange is held for that text box (a question or an approval waits; results go to
+  it); a reply you were typing is not inserted. The grey suggestion disappears. Back in that text
+  box (or app, where no box can be told apart): a passive pill ("3 drafts ready · Shift+Esc
+  open") that takes no keys; Shift+Esc opens the exchange (asking again if it was still working);
+  it expires after ten minutes. A result is never inserted into another box.
 - **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
   ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark

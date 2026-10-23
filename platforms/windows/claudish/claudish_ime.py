@@ -117,7 +117,12 @@ class ClaudishTextService(TextService):
         if document and document != getattr(self, "last_document", None):
             if getattr(self, "last_document", None) is not None and self.worker:
                 self.worker.new_conversation()
+            if self.state.sent:  # an instruction's exchange, left in the other text box: held for it
+                self.state.leave(self.last_document)
             self.last_document = document
+            pill = self.state.returned(document)  # back where one was held: a pill, taking no keys
+            if pill:
+                self.setToast(pill, 3)
 
     def filterKeyDown(self, event):
         keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
@@ -367,6 +372,10 @@ class ClaudishTextService(TextService):
             self.publish()
             return True
         elif key == 0x1B and event.isKeyDown(0x10) and self.state.restore():  # Shift+Esc: the dropped one, back
+            if self.state.working and self.worker:  # held while it worked: ask again
+                self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
+                                     app=focused_app(), purpose=self.field())
+                self.await_result(60)
             self.publish()
             return True
         elif key == 0x1B:
@@ -427,8 +436,10 @@ class ClaudishTextService(TextService):
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
         if self.state.sent:
-            # An instruction sent leaves your text (it ends the composition on purpose); a focus
-            # change hides its panel. Either way the exchange goes on, and returns with the box.
+            # An instruction sent leaves your text (it ends the composition on purpose): the
+            # exchange goes on. Forced (focus left): it is held for this box, offered on return.
+            if forced:
+                self.state.leave(getattr(self, "last_document", None))
             return
         self.state.change("")
         if self.worker:
