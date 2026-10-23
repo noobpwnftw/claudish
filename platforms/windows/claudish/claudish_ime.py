@@ -249,7 +249,9 @@ class ClaudishTextService(TextService):
                     self.showMessage("cd_AI: the request failed; Enter sends it again", 3)
 
     def onKeyDown(self, event):
-        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
+        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text),
+               "around=%s/%s" % tuple(len(s) for s in self.around()),
+               "selected=%d" % len(getattr(self, "textSelected", None) or ""), "scopes=%s" % getattr(self, "inputScopes", None))
         self.poll_results()
         key = event.keyCode
         if self.shortcut(event):
