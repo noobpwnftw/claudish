@@ -45,7 +45,7 @@ h2{font-family:var(--serif);font-weight:400;font-size:clamp(28px,3vw,38px);lette
 h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 10px}
 .body{font-size:15px;line-height:1.75;color:var(--muted);max-width:640px}
 .small{font-size:13px}
-.card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:11px;letter-spacing:.3px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label)}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1}.io-key{margin:0 0 0 auto}
+.card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:11px;letter-spacing:.3px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label);text-wrap:balance}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1;text-wrap:balance}.io-key{margin:0 0 0 auto}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .card{border:1px solid var(--line);border-radius:6px;background:var(--editor-bg);display:flex;flex-direction:column;overflow:hidden}
 .card-body{padding:22px 22px 18px}.card-body p{font-size:14px;line-height:1.65;color:var(--muted);margin:0}
@@ -59,6 +59,7 @@ tr:first-child td{border-top:0}
 .features{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px}
 .features li{font-size:15px;line-height:1.7;color:var(--muted)}
 .features b{color:var(--ink);font-weight:600}
+.features.everyone{margin-top:34px}
 .prompt{border:1px solid var(--workspace-border);border-radius:6px;overflow:hidden;background:var(--editor-bg);box-shadow:0 4px 0 var(--workspace-shadow);margin-top:22px}
 .prompt-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--toolbar-bg);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:1.2px;color:var(--muted)}
 .copy{border:1px solid var(--key-border);background:transparent;color:var(--label);border-radius:3px;padding:6px 12px;font-size:12px;cursor:pointer}

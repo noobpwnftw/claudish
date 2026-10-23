@@ -60,9 +60,26 @@
         </div>
       </section>
 
+      <section class="section" aria-labelledby="everyone">
+        <div class="eyebrow">02 / FOR EVERYONE WHO WRITES</div>
+        <h2 id="everyone">Help where you write, in your own words.</h2>
+        <p class="body">No new app and no copying into a chat window: the help comes to the box you are already typing in, and nothing happens until you press a key.</p>
+        <div class="cards">
+          <article class="card"><div class="card-body"><h3>Fix it, keep it yours</h3><p>With the fix tone, Tab corrects spelling and grammar and keeps your words: for dyslexia, a second language, or a hurried day.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">pump 3 tripped again, no injuries</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; pick a draft, or press Esc for your own words back.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">We were two bags short today. Could you credit them by Tuesday?</span><kbd class="io-key">1–3</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Ask what it means</h3><p>Ask about what is in front of you. The answer is shown to read, and goes into your text only if you say so.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">what does this error mean</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">It can't find a piece it needs to build.</span><kbd class="io-key">Esc</kbd></div></div></article>
+        </div>
+        <ul class="features everyone">
+          <li><b>Nothing goes anywhere by itself.</b> It never sends, posts, or saves for you. Every suggestion waits for your key, and Esc brings back what you typed.</li>
+          <li><b>Fewer keystrokes.</b> Tab finishes a sentence, and a few words become a whole reply: kind to tired hands and sore wrists.</li>
+          <li><b>Your tone.</b> Claudish's own voice, polished and fond of em dashes, is the default. Choose fix, plain, or describe your own.</li>
+          <li><b>Private by default.</b> A small model runs on your own computer. Password fields are never touched, and a hosted model is used only if you add your key.</li>
+        </ul>
+      </section>
+
       <section class="section split" aria-labelledby="keys">
         <div>
-          <div class="eyebrow">02 / THE KEYS</div>
+          <div class="eyebrow">03 / THE KEYS</div>
           <h2 id="keys">Everything else is typing.</h2>
           <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. Claudish extends it from what you meant to say to what you meant to do.</p>
         </div>
@@ -78,19 +95,19 @@
       </section>
 
       <section class="section" aria-labelledby="byoi">
-        <div class="eyebrow">03 / BRING YOUR OWN INTELLIGENCE</div>
+        <div class="eyebrow">04 / BRING YOUR OWN INTELLIGENCE</div>
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
           <li><b>Local by default.</b> llama.cpp and a 491 MB model, downloaded and checksum-verified by setup. Nothing leaves your machine.</li>
           <li><b>Or yours.</b> Claude with your API key, any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app: the PR diff in your editor, the ticket in your browser. Import the MCP servers you already use with Claude.</li>
-          <li><b>Tools and agents.</b> An instruction may call read-only tools, or run an agent whose permission questions arrive as choices. You approve every side effect.</li>
+          <li><b>Tools and agents.</b> An instruction may call your MCP tools, ask you a question, or hand the task to Claude Code or another agent. You approve every side effect.</li>
           <li><b>Restraint.</b> It runs only on what you type, looks at the screen only when you press F8, and never inserts anything you did not accept. Password fields bypass it.</li>
         </ul>
       </section>
 
       <section class="section" id="install" aria-labelledby="install-title">
-        <div class="eyebrow">04 / INSTALL</div>
+        <div class="eyebrow">05 / INSTALL</div>
         <h2 id="install-title">Let your agent do it.</h2>
         <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want Claudish. It shows you the plan before it changes anything, and leaves sudo and administrator steps to you.</p>
         <div class="prompt">
@@ -115,7 +132,7 @@ python3 -m claudish setup</pre>
       </section>
 
       <section class="section" aria-labelledby="status">
-        <div class="eyebrow">05 / WHERE IT STANDS</div>
+        <div class="eyebrow">06 / WHERE IT STANDS</div>
         <h2 id="status">An experiment, tested honestly.</h2>
         <table class="status">
           <tr><td>Linux (IBus)</td><td>Verified with real typing in containers: GTK, Qt, and GNOME Terminal on X11 (40 scenarios), GNOME on Wayland (12). KDE is not yet tested.</td></tr>
