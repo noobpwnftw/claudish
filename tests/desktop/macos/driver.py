@@ -182,7 +182,7 @@ def scenarios():
     wait_for(lambda: state().get("marked"))
     check("continue: the suggestion waits as marked text", state().get("marked"), "and then some—naturally.")
     # KNOWN (ROADMAP G01): IMK drops the marked text's color on its way to the app, so the suggestion
-    # is drawn like typed text; the fix is an overlay window after the caret.
+    # is drawn underlined in the text color (accepted for now).
     print("KNOWN continue: the suggestion is drawn in %s, not grey" % state().get("marked_color"))
     key("Tab")
     wait_for(lambda: document().endswith("naturally."))
