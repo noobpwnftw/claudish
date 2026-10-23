@@ -66,8 +66,8 @@ async def check(url, executable, screenshots=None):
         before = await committed.get_attribute("data-text")
         await keys.type("This is very important.", delay=20)
         await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
-        await expect(page.locator("#candidates")).to_contain_text("Your words", timeout=60000)  # the rewrite in place
-        rewrite = await page.locator("#preedit").text_content()
+        await expect(page.locator("#candidates")).to_contain_text("Rewrite", timeout=60000)  # it waits in the panel
+        rewrite = await page.locator("#candidates .k-body").text_content()  # the rewrite, in the panel
         assert rewrite.strip(), "empty rewrite"
         await keys.press("Tab")  # keeps it
         await expect(committed).to_have_attribute("data-text", before + rewrite)

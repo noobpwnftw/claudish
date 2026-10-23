@@ -82,8 +82,8 @@ async def check(args):
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
             await expect(window).to_contain_text("rewrite", timeout=3000)  # after a pause: Tab rewrite, Enter ask
             await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
-            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
-            rewrite = await page.locator("#preedit").text_content()
+            await expect(window).to_contain_text("Rewrite", timeout=10000)  # it waits in the panel; your words stay
+            rewrite = await page.locator("#candidates .k-body").text_content()  # the rewrite, in the panel
             print("Real backend, rewrite:", repr(rewrite))
             assert rewrite != "This is very important.", rewrite
             if args.screenshots:
@@ -221,7 +221,7 @@ async def check(args):
             await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
             await keys.press("Tab")
-            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
+            await expect(window).to_contain_text("Rewrite", timeout=10000)  # it waits in the panel; your words stay
             await expect(committed).to_have_attribute("data-text", "")  # out of the text while it is rewritten
             await keys.press("Escape")
             await keys.press("Escape")
@@ -233,7 +233,7 @@ async def check(args):
             await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
             await page.locator("[data-label=rewrite]").click()  # types, then Tab rewrites it
-            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
+            await expect(window).to_contain_text("Rewrite", timeout=10000)  # it waits in the panel; your words stay
             await expect(committed).to_have_attribute("data-text", "")  # the selection went; no empty line
             await keys.press("Escape")
             await keys.press("Escape")  # the sample goes too
@@ -242,7 +242,7 @@ async def check(args):
             # A sample types itself, key by key, in its own mode.
             await page.locator("[data-label=rewrite]").click()
             await expect(page.locator("#source-mode")).to_have_text("compose")
-            await expect(window).to_contain_text("Your words", timeout=10000)  # typed, then Tab: the rewrite in place
+            await expect(window).to_contain_text("Rewrite", timeout=10000)  # typed, then Tab: the rewrite waits in the panel
 
             await page.set_viewport_size({"width": 390, "height": 844})
             assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
