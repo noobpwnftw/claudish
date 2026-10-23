@@ -11,62 +11,72 @@ const SKINS = {
   gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel and the suggestion, on X11 and Wayland alike.", app: "Text Editor"},
 };
 
-// Each state: the text box around the caret, what cd_AI draws there, and the panel.
+// Each state: the text box around the caret, what cd_AI draws there, and the panel. The footer's
+// grammar is one everywhere: each key with its verb, in the order Enter, numbers, Tab, Esc, then
+// "or type a reply". The highlighted row carries its own Enter. In an approval or a handoff the
+// safe choice is 1 (a pinyin hand presses 1 by reflex) and nothing is highlighted (Enter never
+// approves); what is approved is the body, in full contrast.
 const STATES = [
   {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.",
    before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The panel's AI tile says compose; the keys say what is next.",
-   before: "Quick update for the team: ", comp: "running late, start without me",
-   panel: {foot: ["Tab: rewrite", "Enter: ask AI"]}},
+  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The AI tile says compose; the keys say what comes next.",
+   before: "Team: ", comp: "running late, start without me",
+   panel: {foot: ["Tab: rewrite", "Enter: ask"]}},
   {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
-   before: "Quick update for the team: ", comp: "running late, start without me",
-   panel: {status: "rewriting"}},
-  {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel keeps yours, until you keep it.",
-   before: "Quick update for the team: ", comp: "I'm running a little late — please start without me.",
-   panel: {was: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
-  {id: "drafts", title: "An instruction's drafts", note: "Enter asked; three readings come back. The first is highlighted.",
+   before: "Team: ", comp: "running late, start without me",
+   panel: {status: "Rewriting", foot: ["Esc: stop"]}},
+  {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel shows yours, as large, until you keep it.",
+   before: "Team: ", comp: "I'm running a little late — please start without me.",
+   panel: {label: "Your words", body: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
+  {id: "drafts", title: "An instruction's drafts", note: "Enter asked; three readings come back. The first is highlighted, and Enter takes it.",
    before: "Hi Sam, ", comp: "decline the offsite politely",
    panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
            on: 0, foot: ["1–3: pick", "Esc: back"]}},
-  {id: "hosted", title: "A hosted model answered", note: "The same drafts, with a mark when the answer came from a hosted model.",
+  {id: "hosted", title: "A hosted model answered", note: "The same drafts, saying in words where they came from.",
    before: "Hi Sam, ", comp: "decline the offsite politely",
    panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
-                  ["2", "I'd love to join, but I won't be able to attend the offsite."]],
-           on: 0, foot: ["1–2: pick", "Esc: back"], mark: "hosted: Claude"}},
-  {id: "ask", title: "The model asks", note: "A question as is. Enter takes the highlighted first choice.",
+                  ["2", "I'd love to join, but I won't be able to attend the offsite."],
+                  ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
+           on: 0, foot: ["1–3: pick", "Esc: back"], mark: "sent to Claude"}},
+  {id: "ask", title: "The model asks", note: "A question as is. Enter takes the highlighted choice; your own words answer too.",
    before: "", comp: "summarize this thread",
    panel: {label: "The model asks", body: "The whole thread, or only the last reply?",
            rows: [["1", "The whole thread"], ["2", "Only the last reply"]], on: 0,
-           foot: ["Enter: the first", "1–2", "or type a reply"]}},
-  {id: "permission", title: "An approval", note: "Nothing is highlighted: only a number answers it, so Enter never approves.",
+           foot: ["1–2: pick", "or type a reply"]}},
+  {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted and 1 is Deny: only 2 approves.",
    before: "", comp: "push my branch",
-   panel: {body: "Allow Bash?", rows: [["1", "Allow", "git push origin parser-fix"], ["2", "Deny"]], on: -1,
-           foot: ["1–2", "or type a reply"]}},
-  {id: "handoff", title: "A handoff", note: "Sending a task to a helper is a question too, answered with a number.",
+   panel: {label: "Claude Code wants to run", body: "git push origin parser-fix", code: true,
+           rows: [["1", "Deny"], ["2", "Allow"]], on: -1, foot: ["1–2: pick", "or type a reply"]}},
+  {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: 1 keeps it here.",
    before: "", comp: "have claude fix the failing parser test",
-   panel: {label: "Send this task to claude?", body: "Fix the failing parser test",
-           rows: [["1", "Yes", "it opens in a new window"], ["2", "No", "answer it here instead"]], on: -1,
-           foot: ["1–2", "or type a reply"]}},
+   panel: {label: "Hand off to Claude Code", body: "Fix the failing parser test",
+           rows: [["1", "No", "answer it here"], ["2", "Yes", "it opens in a new window"]], on: -1,
+           foot: ["1–2: pick", "or type a reply"]}},
   {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width.",
    before: "", comp: "what does this error mean",
    panel: {label: "The model says", body: "The parser reached the end of the file while a string was still open. The quote on line 12 is never closed, so everything after it was read as part of the string.",
            rows: [["1", "Insert it", "at the caret"], ["2", "Dismiss", "nothing is inserted"]], on: 0,
-           foot: ["Enter: the first", "1–2", "or type a reply"]}},
-  {id: "progress", title: "An agent at work", note: "One muted line: what it is doing.",
+           foot: ["1–2: pick", "or type a reply"]}},
+  {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.",
    before: "", comp: "fix the failing parser test",
-   panel: {status: "Reading tests/test_parser.py"}},
-  {id: "failed", title: "A failed request", note: "Your words stay; Enter sends them again.",
+   panel: {status: "Reading tests/test_parser.py", foot: ["Esc: stop"]}},
+  {id: "failed", title: "A failed request", note: "Your words stay; the panel says why, and Enter sends them again.",
    before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {failed: "failed", foot: ["Enter: retry", "Esc: back"]}},
+   panel: {failed: "The model is offline", foot: ["Enter: retry", "Esc: back"]}},
   {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.",
    terminal: true, before: "~/claudish $ ", comp: "undo my last commit but keep the changes",
    panel: {rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
            foot: ["1–2: pick", "Esc: back"]}},
-  {id: "mode", title: "A mode switch", note: "A Shift tap: the mode's tile and name, briefly, at the caret.",
+  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode's tile and name, briefly, at the caret.",
    before: "Thanks for the review — I'll", toast: "compose"},
+  {id: "mode-continue", title: "A mode switch: continue", note: "And back: the same, with the cd tile.",
+   before: "Thanks for the review — I'll", toast: "continue"},
 ];
+
+// Key names: the platform's own (a skin token). macOS menus show glyphs, without boxes.
+const KEYS = {macos: {Enter: "↩", Esc: "⎋", Tab: "⇥"}};
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, className, text) => {
@@ -76,26 +86,24 @@ const el = (tag, className, text) => {
   return node;
 };
 
-// "Tab: keep" becomes a keycap and its action; "1–2" a keycap alone; anything else plain words.
-function hint(text) {
+// "Tab: keep" becomes a keycap and its verb; anything else plain words.
+function hint(text, skin) {
   const span = el("span", "k-hint");
   const match = /^([^:]+): (.+)$/.exec(text);
   if (match) {
-    span.append(el("span", "k-cap", match[1]), match[2]);
-  } else if (/^[0-9–-]+$/.test(text) || /^(Tab|Enter|Esc)$/.test(text)) {
-    span.append(el("span", "k-cap", text));
+    span.append(el("span", "k-cap", (KEYS[skin] || {})[match[1]] || match[1]), match[2]);
   } else {
     span.textContent = text;
   }
   return span;
 }
 
-function panel(spec) {
+function panel(spec, skin) {
   const node = el("div", "k-panel" + (spec.rows || spec.body ? "" : " bare"));
   if (spec.body) {
     const head = el("div", "k-head");
     if (spec.label) head.append(el("span", "k-label", spec.label));
-    head.append(el("span", "k-body", spec.body));
+    head.append(el("span", "k-body" + (spec.code ? " code" : ""), spec.body));
     node.append(head);
   }
   (spec.rows || []).forEach(([key, text, legend], index) => {
@@ -104,17 +112,18 @@ function panel(spec) {
     const words = el("span", "k-text" + (spec.mono ? " k-mono" : ""), text);
     if (legend) words.append(el("span", "k-legend", " — " + legend));
     row.append(words);
+    if (index === spec.on) {  // the highlighted row says it is what Enter takes
+      const take = el("span", "k-take");
+      take.append(el("span", "k-cap", (KEYS[skin] || {}).Enter || "Enter"));
+      row.append(take);
+    }
     node.append(row);
   });
-  if (spec.was) node.append(el("div", "k-was", spec.was));
   const foot = el("div", "k-foot");
   foot.append(el("span", "k-tile ai", "AI"));
-  if (spec.status) {
-    const status = el("span", "k-status k-dots", spec.status);
-    foot.append(status);
-  }
+  if (spec.status) foot.append(el("span", "k-status k-dots", spec.status));
   if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
-  (spec.foot || []).forEach((text) => foot.append(hint(text)));
+  (spec.foot || []).forEach((text) => foot.append(hint(text, skin)));
   if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
   node.append(foot);
   return node;
@@ -136,9 +145,12 @@ function frame(skin, state) {
   const anchor = el("span", "anchor");
   if (state.comp) anchor.append(el("span", "k-comp", state.comp));
   line.append(anchor, el("span", "host-caret"));
-  if (state.ghost) line.append(el("span", "k-ghost", state.ghost));
+  if (state.ghost) {  // a space typed before the suggestion is the app's text, in its font
+    const lead = /^\s*/.exec(state.ghost)[0];
+    line.append(lead, el("span", "k-ghost", state.ghost.slice(lead.length)));
+  }
   text.append(line);
-  if (state.panel) text.append(panel(state.panel));
+  if (state.panel) text.append(panel(state.panel, skin));
   if (state.toast) {
     const toast = el("div", "k-toast");
     const tile = state.toast === "compose" ? el("span", "k-tile ai", "AI") : el("span", "k-tile cd", "cd");
@@ -164,7 +176,9 @@ function place(host) {
     const style = getComputedStyle(floating);
     const inset = parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth)
       + (floating.classList.contains("k-panel") ? parseFloat(getComputedStyle(floating).getPropertyValue("--k-row-x")) || 0 : 0);
-    const left = Math.max(8, Math.min(start.left - box.left - inset, box.width - floating.offsetWidth - 8));
+    // Clamped to the screen, as a real input method's window is (it floats over the app's).
+    const left = Math.max(8 - box.left, Math.min(start.left - box.left - inset,
+                                                 document.documentElement.clientWidth - box.left - floating.offsetWidth - 8));
     floating.style.left = `${left}px`;
     floating.style.top = `${lineBottom - box.top + 6}px`;
     // The window is as tall as what it shows, with the same margin below as above.
@@ -206,9 +220,9 @@ function render() {
 }
 
 const DRAWN = [
-  ["The suggestion after the caret", "cd_AI's overlay window at the caret", "cd_AI's overlay panel (panel.py)", "the extension's label at the IBus cursor"],
+  ["The suggestion after the caret", "a layered overlay window in Claudish's PIME, at the TSF caret rect", "cd_AI's overlay panel (panel.py), at IMK's caret rect", "the extension's label at the IBus cursor location"],
   ["The composition (plain underline)", "TSF composition", "IMK marked text", "IBus preedit (Wayland text-input)"],
-  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window", "cd_AI's panel (panel.py)", "the extension's candidate popup"],
+  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite (GDI cannot anti-alias the rounded keycaps and tile)", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D-Bus (the Shell's IBus popup has no header, keycaps, or tile)"],
   ["The mode switch", "the same overlay window", "the same overlay panel", "the extension's label"],
   ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's colour scheme"],
 ];
