@@ -8,7 +8,6 @@ MAX_COMPOSITION = 512
 # Enter sends it as an instruction and offers drafts to pick, Shift+Enter keeps it as it is, and
 # Esc steps back until it is gone.
 MODES = ("continue", "compose")
-LABELS = {"continue": "Tab continues: ", "instruct": "Enter inserts: "}
 # Enter right after an instruction's drafts appear is a double-tapped Enter, not a choice: it would
 # insert (and the next Enter send) a draft nobody read.
 ENTER_GUARD_SECONDS = 0.3
@@ -71,6 +70,34 @@ class Composition:
         if self.question and self.reply:
             return self.reply
         return self.candidate if self.converted else self.text
+
+    def hint(self):
+        """The one short line shown with the composition, the same words in every adapter: only a
+        key that does something you might not guess, or what is happening. "" when nothing needs
+        saying (continue says nothing; its suggestion speaks for itself)."""
+        if self.live:
+            return ""
+        if self.question:
+            if self.reply:
+                return "Enter: reply · Esc: clear"
+            return "%s · 1–%d" % (self.question.get("text", ""), len(self.question.get("choices") or []))
+        if self.working:
+            status = " ".join((self.status or "").split())
+            return (status[:77] + "…" if len(status) > 80 else status) or (
+                "rewriting…" if self.asked == "rewrite" else "working…")
+        if self.failed:
+            return "failed · Enter: retry · Esc: back"
+        if self.choosing:
+            return "1–%d: pick · Esc: back" % len(self.candidates)
+        if self.converted:
+            return "Tab: keep · Esc: undo"
+        if self.asked == "instruct" and self.candidate:
+            return "Enter: insert · Esc: back"
+        if self.look:
+            return "with this window · F8: without"
+        if self.text:
+            return "Tab: rewrite · Enter: ask AI"
+        return ""
 
     def tab(self):
         """What Tab does: "pass" (the app's), "request" (ask for the rewrite; it takes your words'

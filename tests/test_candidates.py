@@ -143,6 +143,29 @@ class ModeFeelTests(unittest.TestCase):
         state.offered_at -= 1  # a moment later, Enter takes the first draft
         self.assertEqual(state.enter(), "accept")
 
+    def test_hints_are_short_and_only_when_a_key_needs_saying(self):
+        state = Composition()
+        self.assertEqual(state.hint(), "")  # continue: quiet
+        state.mode = "compose"
+        self.assertEqual(state.hint(), "")
+        state.change("say hi")
+        self.assertEqual(state.hint(), "Tab: rewrite · Enter: ask AI")
+        state.submit()
+        self.assertEqual(state.hint(), "working…")
+        state.offer(state.revision, "Hi!", ["Hello!", "Hey!"])
+        self.assertEqual(state.hint(), "1–3: pick · Esc: back")
+        state.change("this is important")
+        state.tab()
+        state.offer(state.revision, "This is crucial.")
+        self.assertEqual(state.hint(), "Tab: keep · Esc: undo")
+        state.change("x")
+        state.submit()
+        state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
+                                   "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
+        self.assertEqual(state.hint(), "The model asks: Did you mean git status? · 1–2")
+        for hint in ("Tab: rewrite · Enter: ask AI", "1–3: pick · Esc: back", "Tab: keep · Esc: undo"):
+            self.assertLessEqual(len(hint), 30)
+
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()
         state.mode = "compose"

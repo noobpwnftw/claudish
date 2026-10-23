@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
-from claudish.composition import LABELS, MAX_COMPOSITION, MODES, Composition, ShiftTap
+from claudish.composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -81,8 +81,7 @@ class ClaudishEngine(IBus.Engine):
                 preedit.set_attributes(attributes)
             self.update_preedit_text_with_mode(preedit, 0, bool(ghost), IBus.PreeditFocusMode.CLEAR)
             self.hide_lookup_table()
-            self.update_auxiliary_text(IBus.Text.new_from_string("continue · Tab: take the rest · Esc: dismiss · "
-                                                                 "Shift: compose"), bool(ghost))
+            self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
         state = self.composition
         text = state.shown  # rewrite after Tab: the rewrite, in place of your words
@@ -98,32 +97,8 @@ class ClaudishEngine(IBus.Engine):
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
-        if state.question:
-            # The question says who asks ("The model asks: ...", "Allow notes.x?", "Send this task to claude?").
-            hint = ("%s · Enter: send your reply · Esc: clear it" % state.question.get("text", "")
-                    if state.reply else
-                    "%s · 1–%d: choose, or type a reply · Esc: stop" % (state.question.get("text", ""),
-                                                                        len(state.question["choices"])))
-        elif state.working and state.status:
-            hint = "compose · %s · Esc: stop" % " ".join(state.status.split())[-90:]
-        elif state.choosing:
-            hint = ("compose · 1–%d: pick one · Enter: the first · Esc: back to the instruction"
-                    % len(state.candidates))
-        elif state.converted:
-            hint = "compose · Tab: keep it · Esc: your words"
-        elif state.candidate:
-            hint = LABELS.get(state.asked or state.mode, "") + state.candidate
-        elif state.working:
-            hint = ("compose · rewriting… · Esc: your words" if state.asked == "rewrite" else
-                    "compose · %s… · Esc: stop" % ("looking and working" if state.look else "working"))
-        elif state.failed:
-            hint = "compose · the request failed · Tab or Enter: try again · Esc: back"
-        elif state.look:
-            hint = "compose + window picture · Enter: send it as an instruction · F8: no picture"
-        else:
-            hint = ("compose · Tab: rewrite it · Enter: send it as an instruction · Shift+Enter: keep it"
-                    " · Esc: drop it")
-        self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
+        hint = state.hint()  # the same short words as every adapter; the question says who asks
+        self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
 
     def changed(self):
         if self.composition.automatic:  # continue: the text so far is the context; what follows the caret too
