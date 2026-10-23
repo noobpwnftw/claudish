@@ -119,6 +119,10 @@ class ModeFeelTests(unittest.TestCase):
         state = Composition()
         state.mode = "compose"
         self.assertTrue(state.passes(" "))  # after the previous word: straight into the app
+        for char in ".,:;!?\"'(-":
+            self.assertTrue(state.passes(char), char)  # punctuation too
+        for char in "a7é日":
+            self.assertFalse(state.passes(char), char)  # letters and digits start a composition
         state.insert("h")
         self.assertFalse(state.passes(" "))  # inside a phrase it is part of it
         state.mode = "continue"

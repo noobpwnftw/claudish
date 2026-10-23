@@ -166,9 +166,10 @@ class Composition:
         return question["session"], question["id"], number - 1
 
     def passes(self, char):
-        """A key that goes straight to the app instead of starting a composition: whitespace with
-        nothing composed (the space after the previous word is not part of what you compose)."""
-        return not self.live and not self.text and char.isspace()
+        """A key that goes straight to the app instead of starting a composition: anything but a
+        letter or a digit with nothing composed (the space or the punctuation after the previous
+        word is not part of what you compose)."""
+        return not self.live and not self.text and not char.isalnum()
 
     def answer_text(self):
         """(session, question id, your words) for a typed reply, or None. The agent hears it as a

@@ -232,7 +232,8 @@ function key(name, shift = false) {
   }
   if (name.length === 1) {
     if (selected() && !state.text) removeSelection();  // typing replaces the selection
-    if (!state.text && /\s/.test(name)) { commit(name); changed(); return true; }  // nothing composed: the app's
+    // Nothing composed: only a letter or a digit starts a composition; spaces and punctuation are the app's.
+    if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
     change(state.text + (name === "-" ? "—" : name));
