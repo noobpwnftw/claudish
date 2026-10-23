@@ -400,7 +400,7 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..f20ede5
+index 0000000..3695b05
 --- /dev/null
 +++ b/src/Panel.cpp
 @@ -0,0 +1,433 @@
@@ -422,7 +422,7 @@ index 0000000..f20ede5
 +
 +// The skin's geometry in pixels at 96 DPI (design.css, .host.windows).
 +static const float PAD = 4, ROW_X = 10, ROW_Y = 5, NUMBER = 12, NUMBER_GAP = 10, TAKE = 48, HEAD_GAP = 2;
-+static const float SIZE = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
++static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
 +static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
 +
 +static ID2D1Factory* d2d = nullptr;
@@ -478,7 +478,7 @@ index 0000000..f20ede5
 +    if (!text_) {
 +        const wchar_t* ui = uiFont();
 +        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-+                                 DWRITE_FONT_STRETCH_NORMAL, px(SIZE), L"", &text_);
++                                 DWRITE_FONT_STRETCH_NORMAL, px(FONT), L"", &text_);
 +        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
 +                                 DWRITE_FONT_STRETCH_NORMAL, px(SMALL), L"", &small_);
 +        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
@@ -544,14 +544,14 @@ index 0000000..f20ede5
 +            label_.x = px(PAD) + px(ROW_X);
 +            label_.y = y;
 +            y += label_.h + px(HEAD_GAP);
-+            widest = std::max(widest, label_.w + 2 * (px(PAD) + px(ROW_X)));
++            widest = (std::max)(widest, label_.w + 2 * (px(PAD) + px(ROW_X)));
 +        }
 +        body_.layout = makeLayout(spec.body, spec.code ? mono_ : text_, inner);
 +        measure(body_.layout, &body_.w, &body_.h);
 +        body_.x = px(PAD) + px(ROW_X);
 +        body_.y = y;
 +        y += body_.h + px(ROW_Y);
-+        widest = std::max(widest, body_.w + 2 * (px(PAD) + px(ROW_X)));
++        widest = (std::max)(widest, body_.w + 2 * (px(PAD) + px(ROW_X)));
 +    }
 +    // The rows: a number, the text (its legend muted); a list with a highlight keeps a trailing
 +    // column on every row for the highlighted row's Enter, so every row wraps alike.
@@ -566,7 +566,7 @@ index 0000000..f20ede5
 +        measure(line.layout, &line.w, &line.h);
 +        number.layout = makeLayout(row.key, text_, px(NUMBER) + 4);
 +        measure(number.layout, &number.w, &number.h);
-+        float h = std::max(line.h, px(18)) + 2 * px(ROW_Y);
++        float h = (std::max)(line.h, px(18)) + 2 * px(ROW_Y);
 +        rowTop_.push_back(y);
 +        rowHeight_.push_back(h);
 +        line.x = textX;
@@ -575,7 +575,7 @@ index 0000000..f20ede5
 +        number.y = y + px(ROW_Y);
 +        rows_.push_back(line);
 +        numbers_.push_back(number);
-+        widest = std::max(widest, textX + line.w + (takes ? px(TAKE) : 0) + px(ROW_X) + px(PAD));
++        widest = (std::max)(widest, textX + line.w + (takes ? px(TAKE) : 0) + px(ROW_X) + px(PAD));
 +        y += h;
 +    }
 +    if (takes)
@@ -621,12 +621,12 @@ index 0000000..f20ede5
 +        add(FootItem::Verb, spec.tail, small_, px(ITEM_GAP));
 +    if (!spec.mark.empty())
 +        add(FootItem::Mark, spec.mark, small_, 0);
-+    widest = std::max(widest, x - px(ITEM_GAP) + px(ROW_X) + px(PAD));
++    widest = (std::max)(widest, x - px(ITEM_GAP) + px(ROW_X) + px(PAD));
 +    y += footHeight_ + px(PAD);
-+    width_ = std::min(px(MAX_WIDTH), widest);
++    width_ = (std::min)(px(MAX_WIDTH), widest);
 +    height_ = y;
 +    if (!foot_.empty() && foot_.back().kind == FootItem::Mark)  // the hosted mark, at the end
-+        foot_.back().x = std::max(foot_.back().x, width_ - px(PAD) - px(ROW_X) - foot_.back().w);
++        foot_.back().x = (std::max)(foot_.back().x, width_ - px(PAD) - px(ROW_X) - foot_.back().w);
 +    SIZE size = { (LONG)std::ceil(width_), (LONG)std::ceil(height_) };
 +    return size;
 +}
@@ -785,7 +785,7 @@ index 0000000..f20ede5
 +                                              reinterpret_cast<IUnknown**>(&dwrite))))
 +        return;
 +    // The UI font at the caret's height (the line is about 1.25 times the font's size).
-+    const float size = std::max(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
++    const float size = (std::max)(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
 +    IDWriteTextFormat* format = nullptr;
 +    dwrite->CreateTextFormat(uiFont(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
 +                             DWRITE_FONT_STRETCH_NORMAL, size, L"", &format);
@@ -795,7 +795,7 @@ index 0000000..f20ede5
 +    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, 4000, 1000, &layout);
 +    float w, h;
 +    measure(layout, &w, &h);
-+    const int width = std::max(1, (int)w + 2), height = std::max(1, (int)h);
++    const int width = (std::max)(1, (int)w + 2), height = (std::max)(1, (int)h);
 +    // A premultiplied 32-bit bitmap, painted, then handed to the layered window.
 +    BITMAPINFO info = {};
 +    info.bmiHeader.biSize = sizeof(info.bmiHeader);
