@@ -46,7 +46,7 @@ body.solo .shell{padding:0;max-width:none}
 .host.macos .host-text{border-radius:0 0 12px 12px;--h-font:Helvetica,'Helvetica Neue',Arial,sans-serif;--h-size:15px;--h-line:1.5;
   --k-font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;--k-size:14px;--k-small:12px;--k-line:1.38;
   --k-surface:rgba(246,246,246,.86);--k-backdrop:blur(24px) saturate(1.6);--k-text:#1d1d1f;--k-muted:#636366;--k-ghost:#8e8e93;--k-sel-mix:7%;--k-select:#007aff;--k-error:#d70015;--k-border:rgba(0,0,0,.14);
-  --k-shadow:0 8px 24px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.1);--k-radius:12px;--k-row-radius:7px;--k-pad:5px;--k-row-x:9px;--k-row-y:4px;--k-cap-border:none;--k-cap-pad:0;--k-cap-size:14px;--h-mono:'SF Mono',Menlo,monospace}
+  --k-shadow:0 8px 24px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.1);--k-radius:12px;--k-row-radius:7px;--k-pad:5px;--k-row-x:9px;--k-row-y:4px;--k-cap-border:none;--k-cap-pad:0;--k-cap-size:14px;--k-lit-bg:transparent;--k-lit-border:none;--k-lit-color:var(--k-select);--k-lit-pad:0;--k-lit-weight:700;--h-mono:'SF Mono',Menlo,monospace}
 .host.macos .lights{position:absolute;left:12px;width:52px;height:12px;background:radial-gradient(circle 6px at 6px 6px,#ff5f57 5.5px,transparent 6px),radial-gradient(circle 6px at 26px 6px,#febc2e 5.5px,transparent 6px),radial-gradient(circle 6px at 46px 6px,#28c840 5.5px,transparent 6px)}
 .host.macos.terminal{--h-bg:#ffffff;--h-text:#000}
 .host.macos.terminal .host-text{--h-font:'SF Mono',Menlo,monospace;--h-size:13px}

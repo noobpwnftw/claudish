@@ -7,7 +7,8 @@ Writes, and these files are committed:
   platforms/windows/claudish/icon.ico            the input method (16-256 px): "cd" on cream
   platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile
   platforms/windows/claudish/mode-compose.ico    compose: "AI" on the accent colour
-  platforms/macos/cd.png, cd@2x.png              the menu-bar template (black on clear; macOS tints it)
+  platforms/macos/cd.png, cd@2x.png              the menu-bar template: a tile with "cd" cut out, as macOS's
+                                                 own "A" (black on clear; macOS tints it)
   site/favicon.png, claudish/web/favicon.png     the site's and the demo's icon
 
 The fonts are open (SIL OFL): Noto Serif stands in for the site's Georgia, Noto Sans Mono for its
@@ -57,14 +58,23 @@ def save_frames(frames, path):
 
 
 def template(text, font_path, size):
-    """A macOS menu-bar template: black glyphs on clear, cropped to the ink, height `size`."""
-    font = ImageFont.truetype(font_path, BIG)
-    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
-    left, top, width, height = text_box(probe, text, font)
-    image = Image.new("RGBA", (width + 8, height + 8), (0, 0, 0, 0))
-    ImageDraw.Draw(image).text((4 - left, 4 - top), text, font=font, fill=(0, 0, 0, 255))
-    ratio = size / image.height
-    return image.resize((max(1, round(image.width * ratio)), size), Image.LANCZOS)
+    """A macOS input-source template, as the system's own "A": a filled rounded tile with the text
+    cut out of it (clear), black elsewhere, so macOS tints it for the menu bar and the input menu.
+    `size` is the canvas height (16 at 1x); the tile is 14/16 of it, a little wider than tall, the
+    text centred on its ink at about two thirds of the tile's height."""
+    work = size * 16  # drawn large, reduced once
+    tall, wide = round(work * 14 / 16), round(work * 18 / 16)
+    image = Image.new("L", (wide, work), 0)
+    draw = ImageDraw.Draw(image)
+    top = (work - tall) // 2
+    draw.rounded_rectangle((0, top, wide - 1, top + tall - 1), radius=round(tall * 0.24), fill=255)
+    font = ImageFont.truetype(font_path, round(tall * 0.78))
+    left, ink_top, width, height = text_box(draw, text, font)
+    draw.text(((wide - width) / 2 - left, (work - height) / 2 - ink_top), text, font=font, fill=0)
+    alpha = image.resize((round(wide / 16), size), Image.LANCZOS)
+    black = Image.new("RGBA", alpha.size, (0, 0, 0, 255))
+    black.putalpha(alpha)
+    return black
 
 
 def main():

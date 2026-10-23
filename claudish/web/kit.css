@@ -67,7 +67,8 @@
 .k-hint{white-space:nowrap}
 .k-cap{display:inline-block;font-size:var(--k-cap-size);line-height:1.25;padding:var(--k-cap-pad);margin-right:5px;border:var(--k-cap-border);border-radius:4px;color:var(--k-text)}
 /* Enter on a draft: the row's Tab, lit until the next key (no animation; the footer is not lit). */
-.k-cap.lit{background:color-mix(in srgb,var(--k-select) 20%,var(--k-surface));border:1px solid var(--k-select);color:var(--k-text);padding:1px 5px}
+.k-cap.lit{background:var(--k-lit-bg,color-mix(in srgb,var(--k-select) 20%,var(--k-surface)));border:var(--k-lit-border,1px solid var(--k-select));
+  color:var(--k-lit-color,var(--k-text));padding:var(--k-lit-pad,1px 5px);font-weight:var(--k-lit-weight,inherit)}
 .k-mark{margin-left:auto;white-space:nowrap}
 .k-status{color:var(--k-text)}
 .k-status.failed{color:var(--k-error)}
