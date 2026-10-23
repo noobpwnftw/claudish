@@ -6,13 +6,13 @@
    suggestion at least 3:1 on the page. */
 .kit{
   --k-font:system-ui,-apple-system,'Segoe UI',sans-serif;--k-size:15px;--k-small:12.5px;--k-line:1.4;
-  --k-surface:#fbfaf6;--k-text:#141413;--k-muted:#6b6a64;--k-ghost:#8c8a83;--k-sel-mix:16%;
-  --k-accent:#d97757;--k-error:#b3261e;--k-border:#d6d3c8;--k-shadow:0 8px 24px rgba(20,20,19,.12),0 1px 3px rgba(20,20,19,.08);
+  --k-surface:#fbfaf6;--k-text:#141413;--k-muted:#6b6a64;--k-ghost:#8c8a83;--k-sel-mix:7%;
+  --k-accent:#d97757;--k-select:#d97757;--k-error:#b3261e;--k-border:#d6d3c8;--k-shadow:0 8px 24px rgba(20,20,19,.12),0 1px 3px rgba(20,20,19,.08);
   --k-radius:10px;--k-row-radius:6px;--k-pad:4px;--k-row-x:9px;--k-row-y:5px;--k-gap:10px;--k-backdrop:none;
   --k-min:240px;--k-max:440px;--k-cap-border:1px solid #bdbab0;--k-cap-pad:1px 5px;
 }
 :root[data-theme="dark"] .kit,.kit.dark{
-  --k-surface:#262522;--k-text:#faf9f5;--k-muted:#b0aea5;--k-ghost:#8a887f;--k-sel-mix:20%;--k-error:#f2b8b5;
+  --k-surface:#262522;--k-text:#faf9f5;--k-muted:#b0aea5;--k-ghost:#8a887f;--k-sel-mix:11%;--k-error:#f2b8b5;
   --k-border:#4d4a43;--k-shadow:0 10px 28px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.4);--k-cap-border:1px solid #6b6963;
 }
 
@@ -38,28 +38,37 @@
 .k-body.code{font-family:var(--k-mono,ui-monospace,SFMono-Regular,Consolas,monospace);font-size:.93em;overflow-wrap:anywhere}
 .k-row{position:relative;display:flex;align-items:baseline;gap:var(--k-gap);padding:var(--k-row-y) var(--k-row-x);border-radius:var(--k-row-radius)}
 .k-row:hover{background:color-mix(in srgb,var(--k-text) 5%,transparent)}
-.k-row.on{background:color-mix(in srgb,var(--k-accent) var(--k-sel-mix),var(--k-surface))}
-.k-row.on::before{content:"";position:absolute;left:3px;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--k-accent)}
+.k-row.on{background:color-mix(in srgb,var(--k-text) var(--k-sel-mix),var(--k-surface))}
+.k-row.on::before{content:"";position:absolute;left:2px;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--k-select)}
+/* A list with a highlight keeps a trailing column for its Enter on every row: the key never
+   touches the text, and every row wraps at the same width. */
+.k-panel.takes .k-row{padding-right:calc(var(--k-row-x) + var(--k-take-w,3.6em))}
 .k-key{flex:none;min-width:.75em;text-align:center;color:var(--k-muted);font-variant-numeric:tabular-nums}
 .k-row.on .k-key{color:var(--k-text)}
 .k-text{min-width:0;flex:1;text-wrap:pretty;overflow-wrap:anywhere}
 .k-legend{color:var(--k-muted)}
-.k-take{flex:none;align-self:center;font-size:var(--k-small);color:var(--k-muted)}
+.k-take{position:absolute;right:var(--k-row-x);top:50%;transform:translateY(-50%);font-size:var(--k-small);color:var(--k-muted)}
+.k-take .k-cap{margin-right:0}
 .k-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:var(--k-row-y) var(--k-row-x) calc(var(--k-row-y) - 1px);font-size:var(--k-small);color:var(--k-muted)}
 .k-head+.k-foot,.k-row+.k-foot{margin-top:2px}
 .k-hint{white-space:nowrap}
 .k-cap{display:inline-block;font-size:var(--k-small);line-height:1.25;padding:var(--k-cap-pad);margin-right:5px;border:var(--k-cap-border);border-radius:4px;color:var(--k-text)}
 .k-mark{margin-left:auto;white-space:nowrap}
 .k-status{color:var(--k-text)}
-.k-status.failed{color:var(--k-error);font-weight:600}
-.k-dots::after{content:"…"}
+.k-status.failed{color:var(--k-error)}
+.k-warn{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--k-error);color:var(--k-surface);font-size:12px;font-weight:700;line-height:1}
+/* Working: a small ring before the words (the platform's own spinner where it has one). */
+.k-spin{display:inline-block;width:.8em;height:.8em;margin-right:6px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--k-muted) 35%,transparent);border-top-color:var(--k-muted);vertical-align:-.1em;animation:k-spin .9s linear infinite}
+@keyframes k-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.k-spin{animation:none}}
 
 /* A mode switch: the mode's tile and name, briefly, at the caret, in the panel's shape. */
 .k-toast{position:absolute;z-index:3;display:inline-flex;align-items:center;gap:7px;padding:5px 10px 5px 6px;background:var(--k-surface);color:var(--k-text);
   border:1px solid var(--k-border);border-radius:var(--k-radius);box-shadow:var(--k-shadow);font-family:var(--k-font);font-size:var(--k-small);white-space:nowrap}
 .k-tile{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;line-height:1}
-.k-tile.cd{background:#faf9f5;color:#1f1e1d;font-family:Georgia,serif;font-size:11px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
-.k-tile.ai{background:#d97757;color:#fff;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.k-tile.ai,.k-tile.cd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.k-tile.ai{background:#d97757;color:#fff}
+.k-tile.cd{background:color-mix(in srgb,var(--k-text) 12%,var(--k-surface));color:var(--k-text)}
 
 /* High contrast: the system's colours; the highlight keeps its bar and its Enter key. */
 @media (forced-colors:active){

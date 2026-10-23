@@ -51,6 +51,48 @@ it"). Where a platform cannot draw one, the design changes for all of them: the 
 the platform's plain underline (macOS cannot colour it, Wayland cannot style it), and the
 suggestion is cd_AI's own text, not the app's (only macOS reports the app's font).
 
+## Settled in review (2026-10-24, two rounds, seven synthetic reviewers)
+
+The lab went through two rounds with a Windows, a macOS and a GNOME designer, a pinyin power user,
+an anti-AI writer, an accessibility consultant and an office manager
+([research/2026-10-24-design-review.md](../research/2026-10-24-design-review.md)). Decisions:
+
+- **One panel anatomy:** an optional header (a small label for who asks or what this is, then the
+  content as is), numbered rows, one footer. The footer is the AI tile, then each key with its
+  verb in the order Enter, numbers, Tab, Esc, then free text ("or type a reply"). Key names are a
+  skin token (macOS ↩ ⎋ ⇥ without boxes, at the hint's size and contrast; Windows and GNOME words
+  in keycaps).
+- **The highlighted row** is a neutral fill with a bar in **the platform's accent** and its own
+  Enter key in a trailing column every row keeps (so rows wrap alike and the cue is not colour
+  alone). Claudish orange means only AI: the tile.
+- **Approvals and handoffs:** the label says who asks ("Claude Code wants to run", "Hand off to
+  Claude Code"); what is approved is the body, at full contrast (a command in monospace);
+  **1 is the safe choice** (Deny, No), since a pinyin hand presses 1 by reflex; nothing is
+  highlighted, so Enter never approves; typed words are a refusal with a reason ("or type why
+  not").
+- **Your words are never smaller than the machine's:** after a rewrite the panel shows "Your
+  words" at full size and contrast.
+- **Failure:** a warning mark instead of the AI tile, the reason in the platform's error colour,
+  regular weight ("The model is offline").
+- **Busy:** a small spinner (the platform's own where it has one), what is happening, Esc: stop.
+- **Hosted:** plain words at the footer's end ("from Claude · hosted").
+- **The compose hints show when you pause** (about a second without a key), not while you type:
+  a fluent typist sees only the composition, a hesitant one always sees the keys, with no
+  counters and nothing learned. States that need a decision (questions, approvals, failures)
+  always show their keys.
+- **Mode switch:** the mode's tile, its name, and the key back ("Compose · Shift back"); continue's
+  tile is neutral. The taskbar, menu bar or top bar shows the mode all along.
+- **Space** in compose types a space; it never picks a candidate.
+- **Contrast:** muted text 4.5:1 or more, the suggestion 3:1 or more; a forced-colors rendering
+  keeps the bar and the Enter key.
+- **Panels follow the system theme,** not the app under the caret (a light panel over a dark
+  terminal in light mode is expected).
+
+Checks the mock cannot make, before a platform signs off: Windows in Segoe UI Variable at 100%,
+150% and 200% scale, in high contrast and over Notepad's dark theme; macOS glyphs in SF Pro and
+the menu material over a busy background in both appearances; GNOME colours from the Shell
+stylesheet, text scaling, and caret rectangles on Wayland (GTK4, Electron, terminals).
+
 ## Order of work
 
 1. The lab: every state, every skin, both themes, until each passes review.

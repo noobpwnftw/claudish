@@ -19,12 +19,12 @@ const SKINS = {
 const STATES = [
   {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.",
    before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The AI tile says compose; the keys say what comes next.",
+  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. When you pause, the keys show; while you type, only the AI tile.",
    before: "Team: ", comp: "running late, start without me",
    panel: {foot: ["Tab: rewrite", "Enter: ask"]}},
   {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
    before: "Team: ", comp: "running late, start without me",
-   panel: {status: "Rewriting", foot: ["Esc: stop"]}},
+   panel: {status: "Rewriting", busy: true, foot: ["Esc: stop"]}},
   {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel shows yours, as large, until you keep it.",
    before: "Team: ", comp: "I'm running a little late — please start without me.",
    panel: {label: "Your words", body: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
@@ -39,7 +39,7 @@ const STATES = [
    panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["1–3: pick", "Esc: back"], mark: "sent to Claude"}},
+           on: 0, foot: ["1–3: pick", "Esc: back"], mark: "from Claude · hosted"}},
   {id: "ask", title: "The model asks", note: "A question as is. Enter takes the highlighted choice; your own words answer too.",
    before: "", comp: "summarize this thread",
    panel: {label: "The model asks", body: "The whole thread, or only the last reply?",
@@ -48,7 +48,7 @@ const STATES = [
   {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted and 1 is Deny: only 2 approves.",
    before: "", comp: "push my branch",
    panel: {label: "Claude Code wants to run", body: "git push origin parser-fix", code: true,
-           rows: [["1", "Deny"], ["2", "Allow"]], on: -1, foot: ["1–2: pick", "or type a reply"]}},
+           rows: [["1", "Deny"], ["2", "Allow"]], on: -1, foot: ["1–2: pick", "or type why not"]}},
   {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: 1 keeps it here.",
    before: "", comp: "have claude fix the failing parser test",
    panel: {label: "Hand off to Claude Code", body: "Fix the failing parser test",
@@ -61,7 +61,7 @@ const STATES = [
            foot: ["1–2: pick", "or type a reply"]}},
   {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.",
    before: "", comp: "fix the failing parser test",
-   panel: {status: "Reading tests/test_parser.py", foot: ["Esc: stop"]}},
+   panel: {status: "Reading tests/test_parser.py", busy: true, foot: ["Esc: stop"]}},
   {id: "failed", title: "A failed request", note: "Your words stay; the panel says why, and Enter sends them again.",
    before: "Hi Sam, ", comp: "decline the offsite politely",
    panel: {failed: "The model is offline", foot: ["Enter: retry", "Esc: back"]}},
@@ -69,9 +69,9 @@ const STATES = [
    terminal: true, before: "~/claudish $ ", comp: "undo my last commit but keep the changes",
    panel: {rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
            foot: ["1–2: pick", "Esc: back"]}},
-  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode's tile and name, briefly, at the caret.",
+  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and how to go back, briefly at the caret. The taskbar or menu bar shows it all along.",
    before: "Thanks for the review — I'll", toast: "compose"},
-  {id: "mode-continue", title: "A mode switch: continue", note: "And back: the same, with the cd tile.",
+  {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.",
    before: "Thanks for the review — I'll", toast: "continue"},
 ];
 
@@ -99,7 +99,7 @@ function hint(text, skin) {
 }
 
 function panel(spec, skin) {
-  const node = el("div", "k-panel" + (spec.rows || spec.body ? "" : " bare"));
+  const node = el("div", "k-panel" + (spec.rows || spec.body ? "" : " bare") + (spec.on >= 0 ? " takes" : ""));
   if (spec.body) {
     const head = el("div", "k-head");
     if (spec.label) head.append(el("span", "k-label", spec.label));
@@ -120,8 +120,13 @@ function panel(spec, skin) {
     node.append(row);
   });
   const foot = el("div", "k-foot");
-  foot.append(el("span", "k-tile ai", "AI"));
-  if (spec.status) foot.append(el("span", "k-status k-dots", spec.status));
+  foot.append(spec.failed ? el("span", "k-warn", "!") : el("span", "k-tile ai", "AI"));  // a failure reads without colour
+  if (spec.status) {
+    const status = el("span", "k-status");
+    if (spec.busy) status.append(el("span", "k-spin"));
+    status.append(spec.status);
+    foot.append(status);
+  }
   if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
   (spec.foot || []).forEach((text) => foot.append(hint(text, skin)));
   if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
@@ -153,8 +158,10 @@ function frame(skin, state) {
   if (state.panel) text.append(panel(state.panel, skin));
   if (state.toast) {
     const toast = el("div", "k-toast");
-    const tile = state.toast === "compose" ? el("span", "k-tile ai", "AI") : el("span", "k-tile cd", "cd");
-    toast.append(tile, state.toast);
+    const compose = state.toast === "compose";
+    toast.append(compose ? el("span", "k-tile ai", "AI") : el("span", "k-tile cd", "cd"),
+                 el("span", "k-toast-name", compose ? "Compose" : "Continue"),
+                 hint(compose ? "Shift: back" : "Shift: compose", skin));
     text.append(toast);
   }
   host.append(bar, text);
