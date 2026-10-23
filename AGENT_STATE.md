@@ -24,7 +24,7 @@ Checkpoint 2026-10-23 (late), `main` at `8a091ae`. An interactive session on the
 ## Verified
 
 - Gate `scripts/check.py --model` 10 PASS on main; Pages deploy green on `8a091ae`.
-- Linux X11 36/36, GNOME 12/12. Windows (patched PIME, VM) Notepad 15/15, Edge 14/14 + 1 known
+- Linux X11 39/39 (with a Qt app), GNOME 12/12. Windows (patched PIME, VM) Notepad 15/15, Edge 14/14 + 1 known
   (Ctrl shortcuts, G01, tabled). Mac VM 9/9 after the owner added cd_AI by hand and relogged.
 - Live Claude Code (haiku, owner's quota): per-conversation agent, textbox MCP, Allow/Deny, Esc.
 
@@ -40,7 +40,7 @@ Checkpoint 2026-10-23 (late), `main` at `8a091ae`. An interactive session on the
   `open -g` — tracing needs another route if it recurs.
 - Parked: Claude API tool loop (needs a key); G30 auto-update (needs releases); G21 trained
   model; visual pass (macOS custom candidate panel, PIME candidate window, demo/home polish);
-  upstream PIME proposal (a public post: needs the owner's OK). Linux GTK reports no selection.
+  upstream PIME proposal (a public post: needs the owner's OK). Linux GTK reports no selection (Qt does: rewriting a selection is verified there).
 
 ## Environment and owned resources
 

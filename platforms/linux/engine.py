@@ -143,8 +143,9 @@ class ClaudishEngine(IBus.Engine):
 
     def take_selection(self):
         """Rewrite with nothing composed: the app's selection becomes the composition (CJK input
-        methods call it reconversion), removed from the app until you keep the rewrite or your
-        words. Returns (before, after) around it, or None when there is no selection to take."""
+        methods call it reconversion). Nothing is deleted: input replaces a selection, as typing
+        does (Qt removes it as the composition starts, then would apply a deletion's offset from
+        the new caret). Returns (before, after) around it, or None when there is no selection."""
         if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
             return None
         try:
@@ -156,7 +157,6 @@ class ClaudishEngine(IBus.Engine):
         start, end = min(cursor, anchor), max(cursor, anchor)
         if start == end or end - start > MAX_COMPOSITION:
             return None
-        self.delete_surrounding_text(start - cursor, end - start)
         self.composition.adopt(value[start:end])
         return value[:start], value[end:]
 

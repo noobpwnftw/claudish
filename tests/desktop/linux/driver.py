@@ -118,7 +118,7 @@ def scenarios():
     check("the rewrite is of everything typed", state()["view"], "particularly good")
 
     # Rewriting a selection needs the toolkit to report it: GTK3 and GTK4 (IBus 1.5.29) report the
-    # anchor at the cursor, so Tab with a selection is the app's there (see ROADMAP G34).
+    # anchor at the cursor, so Tab with a selection is the app's there (Qt does: qt_scenarios()).
 
     focus("entry")
     key("ctrl+a", "BackSpace")
@@ -225,6 +225,58 @@ def scenarios():
     type_text("pass-word")
     time.sleep(0.3)
     check("password field bypasses the engine", state()["password"], "pass-word")
+
+
+
+QT_STATE, QT_COMMANDS = WORK / "qt-state.json", WORK / "qt-commands"
+
+
+def qt_state():
+    try:
+        return json.loads(QT_STATE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def qt_scenarios():
+    """Qt (5, through the IBus input context plugin): typing, and rewriting a selection, which GTK
+    cannot offer (it reports no selection anchor). Starts in compose, where scenarios() ends."""
+    app = background(sys.executable, str(Path(__file__).with_name("app_qt.py")), str(QT_STATE), str(QT_COMMANDS))
+    try:
+        wait_for(qt_state, what="Qt test app")
+        QT_COMMANDS.write_text("qline")
+        wait_for(lambda: qt_state().get("focus") == "qline", what="focus on the Qt line edit")
+        time.sleep(0.3)
+        type_text("very important")
+        key("Tab")
+        wait_for(lambda: qt_state().get("preedit") == "particularly crucial", what="the rewrite in Qt")
+        key("Tab")
+        wait_for(lambda: qt_state()["qline"], what="the Qt commit")
+        check("Qt: Tab rewrites in place, Tab keeps it", qt_state()["qline"], "particularly crucial")
+        key("ctrl+a", "BackSpace")
+        key("shift")  # continue: straight in
+        type_text("this is very important")
+        key("shift")  # back to compose, with nothing composed
+        time.sleep(0.3)
+        QT_COMMANDS.write_text("qline select-last-word")
+        wait_for(lambda: not QT_COMMANDS.read_text(), what="the Qt selection")
+        time.sleep(0.3)
+        key("Tab")  # the selection becomes the composition and is rewritten
+        try:
+            wait_for(lambda: qt_state().get("preedit"), what="the selection taken")
+        except TimeoutError:
+            pass
+        check("Qt: Tab takes the selection to rewrite", (qt_state()["qline"], bool(qt_state().get("preedit"))),
+              ("this is very ", True))
+        key("Escape", "Escape")  # your words again, then back into the app as they were
+        time.sleep(0.4)
+        check("Qt: Esc puts the selection back", (qt_state()["qline"], qt_state().get("preedit")),
+              ("this is very important", ""))
+    finally:
+        app.terminate()
+        app.wait()
+        # No window manager: give the GTK window the keyboard back.
+        subprocess.run(["xdotool", "search", "--name", "^Claudish test app$", "windowfocus"])
 
 
 def agent_session(service):
@@ -387,6 +439,7 @@ def main():
         marker.unlink()
     try:
         scenarios()
+        qt_scenarios()
         service = agent_session(service)
         surrounding_context(service)
     except TimeoutError:
