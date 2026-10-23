@@ -352,6 +352,9 @@ class ClaudishInputController(IMKInputController):
         if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not text or not text.isprintable():
             self.finish(client)
             return False
+        if all(self.state.passes(char) for char in text):  # nothing composed: the space is the app's text
+            client.insertText_replacementRange_(text, (NSNotFound, 0))
+            return True
         for char in text:
             if not self.state.insert(char):
                 self.finish(client)

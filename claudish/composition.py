@@ -121,6 +121,11 @@ class Composition:
         self.question, self.status = None, "answered: " + question["choices"][number - 1].get("label", "")
         return question["session"], question["id"], number - 1
 
+    def passes(self, char):
+        """A key that goes straight to the app instead of starting a composition: whitespace with
+        nothing composed (the space after the previous word is not part of what you rewrite or ask)."""
+        return not self.live and not self.text and char.isspace()
+
     def insert(self, char):
         """Add a typed character; False when the adapter should commit first (the composition is
         full, or a converted rewrite: typing on keeps it and starts afresh)."""

@@ -213,6 +213,7 @@ function key(name, shift = false) {
   }
   if (name.length === 1) {
     if (selected() && !state.text) removeSelection();  // typing replaces the selection
+    if (!state.text && /\s/.test(name)) { commit(name); changed(); return true; }  // nothing composed: the app's
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
     change(state.text + (name === "-" && state.mode === "rewrite" ? "—" : name));

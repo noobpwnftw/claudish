@@ -239,6 +239,8 @@ class ClaudishTextService(TextService):
             self.setCommitString(self.state.commit(self.state.mode == "instruct"))
         elif key == 0x08:
             self.state.backspace()
+        elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):
+            self.setCommitString(chr(event.charCode))  # nothing composed: the space is the app's text
         elif event.isPrintableChar():
             char = chr(event.charCode)
             if not self.state.insert(char):

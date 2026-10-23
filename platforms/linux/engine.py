@@ -238,6 +238,9 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             return True
         char = IBus.keyval_to_unicode(keyval)
+        if char and self.composition.passes(char):
+            self.commit_text(IBus.Text.new_from_string(char))
+            return True
         if char and char.isprintable():
             if not self.composition.insert(char):
                 self.finish()

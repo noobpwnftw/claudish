@@ -63,6 +63,16 @@ class ModeFeelTests(unittest.TestCase):
         self.assertFalse(state.insert("x"))  # typing on keeps it too (the adapter commits first)
         self.assertEqual(state.commit(), "Exceptionally good.")
 
+    def test_a_leading_space_is_the_apps_not_the_compositions(self):
+        state = Composition()
+        state.mode = "rewrite"
+        self.assertTrue(state.passes(" "))  # after the previous word: straight into the app
+        state.insert("h")
+        self.assertFalse(state.passes(" "))  # inside a phrase it is part of it
+        state.mode = "continue"
+        state.change("")
+        self.assertFalse(state.passes(" "))  # continue types everything into the app anyway
+
     def test_rewrite_backspace_after_converting_is_your_words_again(self):
         state = Composition()
         state.mode = "rewrite"

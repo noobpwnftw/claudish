@@ -261,6 +261,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(53))  # Esc again: the instruction is dropped, nothing inserted
         self.assertEqual((state.text, self.client.marked, self.client.commits), ("", "", []))
 
+    def test_a_leading_space_goes_to_the_app(self):
+        self.assertTrue(self.key(49, " "))
+        self.assertEqual((self.client.commits, self.controller.state.text), ([" "], ""))
+        self.type_text("hi there")
+        self.assertEqual(self.client.marked, "hi there")
+
     def test_shortcuts_and_navigation_commit_original_and_pass_through(self):
         self.type_text("original")
         self.assertFalse(self.key(8, "c", self.module.NSEventModifierFlagCommand))
