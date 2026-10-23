@@ -5,6 +5,7 @@ This does not register or exercise the native TSF component.
 """
 import argparse
 import json
+import os
 import importlib.util
 import shutil
 import sys
@@ -32,7 +33,16 @@ def main():
         with patch("pime_claudish.claudish_ime.Suggestions") as worker_class:
             worker_class.return_value.poll.return_value = None
             service = ClaudishTextService(None)
-            service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            # The mode in the taskbar's input indicator; its menu and a click switch it.
+            button = [b for b in reply["addButton"] if b["id"] == "windows-mode-icon"][0]
+            assert button["icon"].endswith("mode-continue.ico") and os.path.exists(button["icon"]), button
+            reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
+            assert service.state.mode == "instruct" and reply["changeButton"][0]["icon"].endswith("mode-instruct.ico"), reply
+            menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
+            assert [(m["text"], m["checked"]) for m in menu] == [("continue", False), ("instruct", True), ("rewrite", False)], menu
+            service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
+            assert service.state.mode == "continue"
 
             def key(code, char=0, method="onKeyDown", modifiers=()):
                 states = [0] * 256

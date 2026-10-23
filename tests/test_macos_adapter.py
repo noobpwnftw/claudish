@@ -27,6 +27,9 @@ class Client:
     def bundleIdentifier(self):
         return "com.apple.TextEdit"
 
+    def selectInputMode_(self, mode):
+        self.input_mode = mode
+
 
 class TextClient(Client):
     """A client that shares its text, like NSTextView: the app's text with the marked text at the
@@ -477,6 +480,21 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_a_client_without_text_access_gives_no_context(self):
         self.assertEqual(self.controller.around_caret(self.client), ("", ""))  # Client lacks selectedRange
+
+    def test_the_mode_is_an_input_mode_in_the_menu_bar(self):
+        self.controller.state.mode = "continue"
+        self.assertTrue(self.key(98))
+        self.assertEqual(self.client.input_mode, "org.claudish.inputmethod.Claudish.Instruct")
+        tag = int.from_bytes(b"imim", "big")
+        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.Rewrite", tag, self.client)
+        self.assertEqual(self.controller.state.mode, "rewrite")  # picked from the input menu
+        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.Rewrite", tag, self.client)
+        self.assertEqual(self.controller.state.mode, "rewrite")  # already there: nothing changes
+        with (ROOT / "platforms/macos/Info.plist").open("rb") as source:
+            listed = plistlib.load(source)["ComponentInputModeDict"]["tsVisibleInputModeOrderedArrayKey"]
+        self.assertEqual(listed, [self.module.MODE_IDS[m] for m in ("continue", "instruct", "rewrite")])
+        for mode in ("continue", "instruct", "rewrite"):
+            self.assertTrue((ROOT / "platforms/macos" / ("mode-%s.png" % mode)).exists())
 
     def test_bundle_registration_names_match_controller(self):
         with (ROOT / "platforms/macos/Info.plist").open("rb") as source:

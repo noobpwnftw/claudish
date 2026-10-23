@@ -24,6 +24,11 @@ def trace(*fields):
 
 
 SURROUNDING = 8000
+# Each mode is an input mode of the input source (Info.plist), shown in the menu bar.
+MODE_IDS = {"continue": "org.claudish.inputmethod.Claudish.Continue",
+            "instruct": "org.claudish.inputmethod.Claudish.Instruct",
+            "rewrite": "org.claudish.inputmethod.Claudish.Rewrite"}
+INPUT_MODE_TAG = int.from_bytes(b"imim", "big")  # kTSMDocumentInputModePropertyTag
 # One candidate panel for the server, as in Apple's sample: a panel per controller registers with
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
@@ -173,6 +178,32 @@ class ClaudishInputController(IMKInputController):
             return text
         return NSAttributedString.alloc().initWithString_attributes_(
             text, {NSForegroundColorAttributeName: NSColor.secondaryLabelColor()})
+
+    @objc.python_method
+    def next_mode(self, client, tell=True):
+        """F7, or a pick from the input menu: continue -> instruct -> rewrite. tell: show the mode in
+        the menu bar (each mode is an input mode of cd_AI, with its own icon)."""
+        entering_live = self.state.mode == "rewrite" and self.state.text
+        self.state.next_mode()
+        if entering_live:  # continue types into the app: the held words go in, and stay as context
+            client.insertText_replacementRange_(self.state.text, (NSNotFound, 0))
+        self.changed(client)
+        if tell:
+            try:
+                client.selectInputMode_(MODE_IDS[self.state.mode])
+            except Exception:  # not every client implements it
+                pass
+
+    def setValue_forTag_client_(self, value, tag, sender):
+        """A mode picked from the input menu (or cd_AI selected in a mode): switch to it as F7 does."""
+        modes = {mode_id: mode for mode, mode_id in MODE_IDS.items()}
+        if tag != INPUT_MODE_TAG or str(value) not in modes:
+            return
+        client = self.client()
+        for _ in MODE_IDS:
+            if self.state.mode == modes[str(value)] or client is None:
+                break
+            self.next_mode(client, tell=False)
 
     @objc.python_method
     def take_selection(self, client):
@@ -333,11 +364,7 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         if key == 98:  # F7 switches mode: continue, instruct, rewrite (the input method's key while active).
-            entering_live = self.state.mode == "rewrite" and self.state.text
-            self.state.next_mode()
-            if entering_live:  # continue types into the app: the held words go in, and stay as context
-                client.insertText_replacementRange_(self.state.text, (NSNotFound, 0))
-            self.changed(client)
+            self.next_mode(client)
             return True
         if self.state.live:
             return self.live_key(client, key, chars)

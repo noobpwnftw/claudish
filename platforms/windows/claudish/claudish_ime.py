@@ -1,6 +1,6 @@
 """PIME/TSF adapter. Shared files are copied here by install.ps1."""
 from textService import TextService
-from .composition import Composition
+from .composition import MODES, Composition
 from .client import Suggestions
 
 
@@ -14,6 +14,18 @@ def keylog(*fields):
                 log.write(" ".join(str(field) for field in fields) + "\n")
         except OSError:
             pass
+
+
+MODE_COMMAND = 100  # the input indicator's click; its menu items follow
+
+
+def mode_icon(mode):
+    import os
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "mode-%s.ico" % mode)
+
+
+def mode_tooltip(mode):
+    return "cd_AI · %s (F7 switches mode)" % mode
 
 
 def focused_app():
@@ -50,6 +62,31 @@ class ClaudishTextService(TextService):
             self.worker = Suggestions()
         self.setKeyboardOpen(True)
         self.setSelKeys("123456789")
+        # The mode in the taskbar's input indicator (PIME's Windows 8+ mode icon); its menu picks one.
+        self.addButton("windows-mode-icon", icon=mode_icon(self.state.mode), commandId=MODE_COMMAND,
+                       tooltip=mode_tooltip(self.state.mode))
+
+    def next_mode(self):
+        """F7, or a pick from the input indicator's menu."""
+        if self.state.mode == "rewrite" and self.state.text:
+            self.setCommitString(self.state.text)  # continue types into the app: the held words go in
+        self.state.next_mode()
+        self.showMessage("cd_AI: " + self.state.mode, 2)
+        self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
+        self.changed()
+
+    def onCommand(self, commandId, commandType):
+        if commandId == MODE_COMMAND:  # a click on the indicator: the next mode, as F7
+            self.next_mode()
+        elif MODE_COMMAND < commandId <= MODE_COMMAND + len(MODES):  # a pick from its menu
+            while self.state.mode != MODES[commandId - MODE_COMMAND - 1]:
+                self.next_mode()
+
+    def onMenu(self, buttonId):
+        if buttonId != "windows-mode-icon":
+            return None
+        return [{"text": mode, "id": MODE_COMMAND + 1 + index, "checked": mode == self.state.mode}
+                for index, mode in enumerate(MODES)]
 
     def onDeactivate(self):
         if self.worker:
@@ -222,11 +259,7 @@ class ClaudishTextService(TextService):
                 self.publish()
             return bool(self.state.text)
         if key == 0x76:  # F7 switches mode: continue, instruct, rewrite.
-            if self.state.mode == "rewrite" and self.state.text:
-                self.setCommitString(self.state.text)  # continue types into the app: the held words go in
-            self.state.next_mode()
-            self.showMessage("cd_AI: " + self.state.mode, 2)
-            self.changed()
+            self.next_mode()
             return True
         if key == 0x09:
             action = self.state.tab()
