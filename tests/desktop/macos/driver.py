@@ -267,7 +267,15 @@ def scenarios():
             if wait_for(lambda: "having read the terminal" in screen(), timeout=1):
                 break
         if "having read the terminal" not in screen():
+            from AppKit import NSWorkspace
+            front = NSWorkspace.sharedWorkspace().frontmostApplication()
+            print("--- front app: %s" % (front.bundleIdentifier() if front else None), flush=True)
             print("--- Terminal's last lines\n" + "\n".join(screen().splitlines()[-4:]), flush=True)
+            # What the service received and answered (claudish recent): did it read the screen?
+            from claudish.client import call
+            for item in call("http://127.0.0.1:18765", "/recent")["recent"][-2:]:
+                print("--- recent: %s %s %s consulted=%s -> %s" % (item["mode"], item.get("app"), item.get("kind"),
+                      item.get("consulted"), item.get("candidates")), flush=True)
         check("terminal: fix sees the screen, the draft lands at the prompt",
               screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)
     else:
