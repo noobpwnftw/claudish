@@ -128,11 +128,12 @@ rewrite, and instruct).
 The keys are the same everywhere, on every platform:
 
 - **A Shift tap** switches mode: continue (keys straight in) or compose (Tab rewrites, Enter instructs, Shift+Enter keeps), as Shift switches English and pinyin (owner, 2026-10-23; F7 retired).
-- **Tab** accepts the candidate.
-- **Enter** keeps your wording in layers 1 and 2. In layer 3 it sends; when the
-  result is ready, Enter inserts it.
+- **Tab** takes the model's text: the suggestion, a rewrite, the highlighted draft
+  (owner, 2026-10-24).
+- **Enter** talks to the model: in layer 3 it sends; it never inserts the model's text, so a
+  reflexive second Enter inserts nothing.
 - **Esc** keeps what you typed, in every mode.
-- **↑ ↓** move the highlight through a list; Enter takes it. Choices are not numbered: in English
+- **↑ ↓** move the highlight through a list; Tab inserts a draft, Enter sends an answer. Choices are not numbered: in English
   digits are text, as Space is (owner, 2026-10-24).
 
 Invariants: nothing lands in your app without a key you pressed, your own text
@@ -173,13 +174,13 @@ sends that answer into the same session. When the agent finishes:
 ```
   write a release note from the last 5 commits▮
  ┌──────────────────────────────────────────────────────┐
- │ Enter inserts:                                         │
+ │ Tab inserts:                                           │
  │ This release—modest in scope, considerable in care—   │
- │ adds context providers, invocation modes, and…  (12 ¶) │  ← preview; Enter commits all of it
+ │ adds context providers, invocation modes, and…  (12 ¶) │  ← preview; Tab commits all of it
  └──────────────────────────────────────────────────────┘
 ```
 
-Enter commits the whole result as one undo step. Esc returns to your prompt;
+Tab commits the whole result as one undo step. Esc returns to your prompt;
 press Esc again to keep it as typed, or edit it and press Enter for another
 turn in the same session.
 

@@ -400,7 +400,7 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..2318242
+index 0000000..1cbff77
 --- /dev/null
 +++ b/src/Panel.cpp
 @@ -0,0 +1,478 @@
@@ -615,7 +615,7 @@ index 0000000..2318242
 +        y += h;
 +    }
 +    if (takes)
-+        take_ = makeLayout(L"Enter", small_, 200);
++        take_ = makeLayout(spec.take, small_, 200);
 +    // The footer: the AI tile (or a warning mark), what is happening, each key with its verb, the
 +    // free words, and a hosted model's name at the end.
 +    if (!spec.rows.empty() || !spec.body.empty())
@@ -884,10 +884,10 @@ index 0000000..2318242
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..96d74e9
+index 0000000..f1ae753
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,153 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -930,6 +930,7 @@ index 0000000..96d74e9
 +    bool busy = false;    // with a spinner
 +    std::wstring failed;  // why a request failed
 +    std::wstring mark;    // a hosted model's name, at the footer's end
++    std::wstring take = L"Enter";  // the highlighted row's key: Tab takes a draft, Enter confirms a choice
 +
 +    bool empty() const {
 +        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();

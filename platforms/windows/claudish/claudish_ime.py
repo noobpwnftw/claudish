@@ -380,6 +380,12 @@ class ClaudishTextService(TextService):
             return True
         elif key == 0x1B:
             action = self.state.escape()
+            if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
+                chosen = self.state.answer_choice(2)
+                if chosen and self.worker:
+                    self.worker.answer(*chosen)
+                self.publish()
+                return True
             if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
                 self.setToast(self.state.dropped_toast(), 2)
             if action == "clear":  # the reply goes; the question stays

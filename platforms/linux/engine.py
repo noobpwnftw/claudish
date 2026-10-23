@@ -360,6 +360,12 @@ class ClaudishEngine(IBus.Engine):
             return True
         if keyval == IBus.KEY_Escape:
             action = self.composition.escape()
+            if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
+                chosen = self.composition.answer_choice(2)
+                if chosen:
+                    self.suggestions.answer(*chosen)
+                self.render()
+                return True
             if action in ("clear", "drop") and screen().shell:  # said, with the key that brings it back
                 screen().publish(None, "", self.composition.dropped_toast())
             if action == "keep":

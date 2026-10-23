@@ -197,9 +197,12 @@ def scenarios(keys):
     keys.press("Return")
     settle()
     check("instruct holds the text until it is inserted", state()["view"], "")
-    keys.press("Return")
+    keys.press("Return")  # a reflexive second Enter inserts nothing: Enter talks to the model
+    settle()
+    check("a second Enter inserts nothing", state()["view"], "")
+    keys.press("Tab")  # Tab takes the model's text
     wait_for(lambda: state()["view"], what="instruct result")
-    check("instruct: Enter sends, Enter inserts", state()["view"], "As requested—say hi.")
+    check("instruct: Enter sends, Tab inserts", state()["view"], "As requested—say hi.")
 
     focus("password")
     keys.type("pass-word")

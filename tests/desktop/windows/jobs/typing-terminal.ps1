@@ -27,7 +27,7 @@ function Invoke-Terminal($name, $window) {
   Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
   [Keys]::Type('fix'); [Keys]::Press(0x0D)  # the instruction, with the screen's last lines
   Start-Sleep -Milliseconds 1500
-  [Keys]::Press(0x0D)  # the draft, inserted at the prompt; running it would be the user's Enter
+  [Keys]::Press(0x09)  # Tab: the draft, inserted at the prompt; running it would be the user's Enter
   Wait-Screen 'having read the terminal'
   # (cmd shows the em dash as a hyphen; this file is read as ANSI, so match any character there)
   Check "${name}: fix sees the screen, the draft lands at the prompt" ((Last-Line) -match '>As requested.fix, having read the terminal\.$') $true

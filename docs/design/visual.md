@@ -129,6 +129,10 @@ an anti-AI writer, an accessibility consultant and an office manager
   box (or app, where no box can be told apart): a passive pill ("3 drafts ready · Shift+Esc
   open") that takes no keys; Shift+Esc opens the exchange (asking again if it was still working);
   it expires after ten minutes. A result is never inserted into another box.
+- **Tab takes the model's text; Enter talks to the model (owner, 2026-10-24).** Tab: continue's
+  suggestion, a rewrite, the highlighted draft, an answer to read. Enter: send an instruction, a
+  reply, the answer to a question. Enter never inserts the model's words, so a reflexive second
+  Enter after sending inserts nothing (the double-Enter guard is gone).
 - **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
   ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark

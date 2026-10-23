@@ -37,8 +37,7 @@ def main():
         sys.path.insert(0, temporary)
         from pime_claudish.claudish_ime import ClaudishTextService
         import pime_claudish.composition
-        pime_claudish.composition.ENTER_GUARD_SECONDS = 0  # Enter right after a result; the guard has its own test
-        pime_claudish.composition.PICK_GUARD_SECONDS = pime_claudish.composition.ROLLED_SHIFT_SECONDS = 0
+        pime_claudish.composition.ROLLED_SHIFT_SECONDS = 0  # a Shift right after a key; the filter has its own test
         # The foreground app is pinned: on Windows the real one is the console running this smoke,
         # a terminal, where continue is quiet.
         with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \
@@ -159,7 +158,8 @@ def main():
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
-            assert key(0x0D)["commitString"] == "Once upon a time."
+            assert "commitString" not in key(0x0D)  # Enter talks to the model; it never inserts its text
+            assert key(9)["commitString"] == "Once upon a time."  # Tab takes it
             worker_class.return_value.poll.return_value = None
             # Several readings: the candidate window lists them; 2 inserts the second.
             for char in "greet":
@@ -171,7 +171,7 @@ def main():
             assert reply.get("candidateList") == ["Hello.", "Hi there."], reply
             worker_class.return_value.poll.return_value = None
             key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
-            assert key(0x0D)["commitString"] == "Hi there."
+            assert key(9)["commitString"] == "Hi there."  # Tab inserts the highlighted draft
             # An agent session asks a question: the choices are the list, and Enter takes the highlighted one.
             for char in "check":
                 key(ord(char.upper()), ord(char))

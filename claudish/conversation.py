@@ -175,7 +175,7 @@ class ModelDriver:
                 hand_over, "write", lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
-    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False):
+    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False):
         """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
         model's own question or an answer to read: Enter takes the first choice) or "permission"
         (an approval: only a number answers it, so Enter never approves anything, and its safe
@@ -187,7 +187,7 @@ class ModelDriver:
         waiter = [threading.Event(), None]
         self.pending[key] = waiter
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
-                     label=label, body=text if body is None else body, code=code)
+                     label=label, body=text if body is None else body, code=code, read=read)
         waiter[0].wait()
         return waiter[1] or (1, "cancelled")
 
@@ -200,7 +200,7 @@ class ModelDriver:
         choice, words = self.question(session, MODEL_SAYS + text,
                                       [{"label": "Insert it", "legend": "at the caret"},
                                        {"label": "Dismiss", "legend": "nothing is inserted"}],
-                                      label=MODEL_SAYS.rstrip(": "), body=text)
+                                      label=MODEL_SAYS.rstrip(": "), body=text, read=True)
         if words is None and choice == 0:
             self.inserted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
         else:

@@ -140,7 +140,7 @@ export default class CdAiExtension extends Extension {
             text.x_expand = true;
             line.add_child(text);
             if (takes) {  // the trailing column: the highlighted row's Enter
-                const take = label(on ? 'Enter' : '', on ? 'cd-cap' : 'cd-take');
+                const take = label(on ? panel.take || 'Enter' : '', on ? 'cd-cap' : 'cd-take');  // Tab takes a draft
                 line.add_child(take);
             }
             box.add_child(line);

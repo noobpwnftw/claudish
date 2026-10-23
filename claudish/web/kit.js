@@ -65,7 +65,8 @@
       line.append(words);
       if (index === spec.on) {
         const take = el("span", "k-take");
-        take.append(el("span", "k-cap", keys.Enter || "Enter"));
+        const key = spec.take || "Enter";  // Tab takes a draft; Enter confirms a choice
+        take.append(el("span", "k-cap", keys[key] || key));
         line.append(take);
       }
       if (pick) line.addEventListener("mousedown", (event) => { event.preventDefault(); pick(index + 1); });

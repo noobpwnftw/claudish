@@ -13,7 +13,7 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 | --- | --- | --- |
 | **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 | **compose**, then Tab | `this is important` | Tab turns it into Claudish |
-| **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Enter) |
+| **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 
 Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
 until you take it, and your own words are always one key away. Continue can be
@@ -45,10 +45,10 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 | Key | Does |
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
-| Tab | continue: take the suggestion; compose: show a rewrite, then Tab again puts it in (with nothing offered, Tab is the app's) |
-| Enter | compose: send it as an instruction (it leaves your text; the panel shows it), then insert the highlighted draft (with nothing composed, a newline) |
+| Tab | take the model's text: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft, an answer to read (with nothing offered, Tab is the app's) |
+| Enter | compose: send it as an instruction (it leaves your text; the panel shows it), a reply, or the answer to the model's question; Enter never inserts the model's text (with nothing composed, a newline) |
 | Shift+Enter | compose: keep your words as they are |
-| ↑ ↓ | choose a draft or an answer; Enter takes it (choices are not numbered: digits are text) |
+| ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text |
 | F8 | with an instruction: also send a picture of this window |
 | Esc | one step back: what you typed, then edit (your instruction back at the caret), then drop |
 | Shift+Esc | bring back what Esc dropped, or the exchange you left when you switched windows |

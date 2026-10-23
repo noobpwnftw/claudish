@@ -76,8 +76,9 @@ async def check(url, executable, screenshots=None):
         await keys.press("Enter")  # sends
         await expect(window.locator(".k-row").first).to_be_visible(timeout=60000)  # the drafts
         draft = await window.locator(".k-row .k-text").first.text_content()
-        await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
-        await keys.press("Enter")  # inserts
+        await keys.press("Enter")  # a reflexive second Enter inserts nothing: Enter talks to the model
+        await expect(committed).to_have_attribute("data-text", before + rewrite)
+        await keys.press("Tab")  # Tab takes the model's text
         await expect(committed).to_have_attribute("data-text", before + rewrite + draft)
         # While the model runs, Remove stops it and deletes what the page stored (its files are open
         # while it runs), including anything an earlier download left.

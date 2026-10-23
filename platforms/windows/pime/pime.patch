@@ -1,5 +1,5 @@
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..45e351d 100644
+index 7829c72..e596259 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -17,7 +17,7 @@ index 7829c72..45e351d 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -101,6 +108,69 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -101,6 +108,71 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	return success;
  }
  
@@ -36,6 +36,8 @@ index 7829c72..45e351d 100644
 +	spec.status = text("status");
 +	spec.failed = text("failed");
 +	spec.mark = text("mark");
++	if (!text("take").empty())
++		spec.take = text("take");
 +	if (!text("tile").empty())
 +		spec.tile = text("tile");
 +	auto flag = [&](const char* key) {
@@ -87,7 +89,7 @@ index 7829c72..45e351d 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +202,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +204,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -103,7 +105,7 @@ index 7829c72..45e351d 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -190,6 +269,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -190,6 +271,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->setCompositionString(session, L"", 0);
  				endComposition = true;
  			}
@@ -116,7 +118,7 @@ index 7829c72..45e351d 100644
  		}
  		else {
  			if (!textService_->isComposing()) {
-@@ -345,6 +430,76 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +432,76 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -193,7 +195,7 @@ index 7829c72..45e351d 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +507,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +509,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -207,7 +209,7 @@ index 7829c72..45e351d 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +516,22 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +518,22 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -230,7 +232,7 @@ index 7829c72..45e351d 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +625,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +627,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -238,7 +240,7 @@ index 7829c72..45e351d 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +658,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +660,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);

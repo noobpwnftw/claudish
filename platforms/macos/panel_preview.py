@@ -47,11 +47,10 @@ def states():
                                "body": "git push origin parser-fix", "code": True,
                                "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
     yield "permission", asked.panel()
-    asked.ask(asked.revision, {"id": "r", "label": "The model says", "body": (
+    asked.ask(asked.revision, {"id": "r", "label": "The model says", "read": True, "body": (
         "The parser reached the end of the file while a string was still open. The quote on line 12 is never "
         "closed, so everything after it was read as part of the string."),
-        "choices": [{"label": "Insert it", "legend": "at the caret"},
-                    {"label": "Dismiss", "legend": "nothing is inserted"}]}, "s")
+        "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
     yield "answer", asked.panel()
     working = composed("fix the failing parser test")
     working.submit()

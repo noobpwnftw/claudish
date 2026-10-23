@@ -208,8 +208,7 @@ class MacOSAdapterTests(unittest.TestCase):
         # These tests press Enter the moment a result arrives; the double-Enter guard is tested in
         # test_candidates.
         # (through the adapter's own module: loading it under patched sys.modules can leave a copy)
-        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ENTER_GUARD_SECONDS": 0, "PICK_GUARD_SECONDS": 0,
-                                                                          "ROLLED_SHIFT_SECONDS": 0})
+        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ROLLED_SHIFT_SECONDS": 0})
         cls.guard.start()
 
     @classmethod
@@ -375,8 +374,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
         self.assertTrue(self.key(125))  # ↓ highlights the second
-        self.controller.state.offered_at = 0  # past the double-Enter guard
-        self.assertTrue(self.key(36))  # and Enter inserts it
+        self.assertTrue(self.key(48))  # and Tab inserts it (Enter never inserts the model's text)
         self.assertEqual(self.client.commits, ["Hi there."])
         self.assertEqual(state.text, "")
 
@@ -421,7 +419,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(36)  # retry
         worker.result = (state.revision, {"text": "Once upon a time—a cat."})
         self.controller.pollSuggestions_(None)
-        self.key(36)  # the second Enter inserts the result
+        self.key(36)  # a second Enter inserts nothing: Enter talks to the model
+        self.assertEqual(self.client.commits, [])
+        self.key(48)  # Tab takes the result
         self.assertEqual(self.client.commits, ["Once upon a time—a cat."])
 
     def test_requests_name_the_focused_app(self):

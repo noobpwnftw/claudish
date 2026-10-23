@@ -21,6 +21,10 @@ ACCENT = (217 / 255, 119 / 255, 87 / 255)  # Claudish's: the AI tile only
 KEYS = {"Enter": "↩", "Esc": "esc", "Tab": "⇥", "Shift": "⇧", "Shift+Enter": "⇧↩", "Shift+Esc": "⇧esc"}  # macOS menus' names
 
 
+def spec_take(spec):
+    return (spec or {}).get("take") or "Enter"
+
+
 def rounded_mask(radius):
     """A stretchable rounded-rectangle mask: a visual-effect view clips its material only to a
     mask image (a layer's corner radius leaves square corners of material behind)."""
@@ -120,6 +124,7 @@ class Panel:
         pick(number): a click on a row."""
         if self.window is None:
             self.build()
+        self.spec = spec
         for view in list(self.effect.subviews()):
             view.removeFromSuperview()
         inner = MAX_WIDTH - 2 * PAD - 2 * ROW_X
@@ -250,7 +255,8 @@ class Panel:
             bar = box(NSColor.controlAccentColor(), 1.5)
             bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
             row.addSubview_(bar)
-            take = label(KEYS["Enter"], SMALL + 1, NSFontWeightMedium, NSColor.secondaryLabelColor())
+            key = spec_take(self.spec)  # Tab takes a draft; Enter confirms a choice
+            take = label(KEYS.get(key, key), SMALL + 1, NSFontWeightMedium, NSColor.secondaryLabelColor())
             size = take.fittingSize()
             take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
             row.addSubview_(take)

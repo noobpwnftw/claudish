@@ -496,6 +496,12 @@ class ClaudishInputController(IMKInputController):
             return True
         if key == 53:  # Escape: one step back
             action = self.state.escape()
+            if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
+                chosen = self.state.answer_choice(2)
+                if chosen and self.worker is not None:
+                    self.worker.answer(*chosen)
+                self.show_panel(client)
+                return True
             if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
                 self.show_toast(self.state.dropped_toast(), client)
             if action == "clear":  # the reply goes; the question stays

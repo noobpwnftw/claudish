@@ -13,7 +13,6 @@ const HINTS = {
   compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Enter sends it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
 };
 const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
-const ENTER_GUARD_MS = 300;  // Enter this soon after drafts appear is a double tap: it waits
 // [label, mode, text, the key that finishes it]
 const SAMPLES = [
   ["rewrite", "compose", "This is very important.", "Tab"],
@@ -46,7 +45,6 @@ const state = {
   asked: null,       // compose: what the pending or shown result is ("rewrite" or "instruct")
   candidate: "",
   candidates: [],
-  offeredAt: 0,  // when the latest answer arrived (performance.now)
   converted: false,  // compose: the rewrite shows in the panel (your words stay the composition)
   adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
@@ -139,7 +137,6 @@ async function ask(revision) {
     if (revision !== state.revision) return;  // you typed since: a stale answer never lands
     state.candidate = data.text;
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
-    state.offeredAt = performance.now();
     state.hosted = hosted && data.backend !== "browser" ? (data.backend === "claude" ? "Claude" : "a hosted model") : "";
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
@@ -177,7 +174,7 @@ function panel() {
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
     return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: state.highlight, mark,
-            foot: [...(readings.length > 1 ? [[`1–${readings.length}`, "pick"]] : []), ["Esc", "edit"]], ...typing};
+            foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab", ...typing};
   }
   if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
   if (state.editing || hintDue() === 0)
@@ -262,12 +259,9 @@ function key(name, shift = false) {
       state.asked = "instruct"; state.working = true; render(); ask(state.revision);
       return true;
     }
-    // Right after the drafts appear, Enter is a double-tapped Enter, not a choice.
-    if (state.asked === "instruct" && state.candidate && performance.now() - state.offeredAt < ENTER_GUARD_MS) return true;
-    if (state.converted) { commit(state.candidate); change(""); changed(); return true; }
-    if (state.asked === "instruct" && state.candidate) {  // the highlighted draft, at the caret
-      commit(state.candidates[state.highlight] || state.candidate); change(""); changed(); return true;
-    }
+    // Enter talks to the model: it never inserts the model's text (Tab does), so a reflexive second
+    // Enter after sending inserts nothing.
+    if (state.converted || (state.asked === "instruct" && state.candidate)) return true;
     if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
       state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
     }
@@ -284,8 +278,8 @@ function key(name, shift = false) {
     if (!state.text) return false;
     // The first Tab asks for the rewrite, which takes your words' place as it arrives; the next
     // keeps it (or an instruction's first draft). A pending answer is not stale text: Tab waits.
-    if (state.converted || (state.asked === "instruct" && state.candidate)) {
-      commit(state.candidate); change(""); changed();
+    if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft
+      commit(state.converted ? state.candidate : state.candidates[state.highlight] || state.candidate); change(""); changed();
     } else if (state.asked === "rewrite" && state.candidate) { state.converted = true; render(); }
     else if (!state.working) {
       state.asked = "rewrite"; state.working = true; state.failed = false; render(); ask(state.revision);

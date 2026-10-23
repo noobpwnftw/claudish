@@ -177,7 +177,7 @@ def scenarios():
     type_text("say hi")  # still compose
     key("Return")  # Enter sends it as an instruction.
     settle()
-    key("Tab")  # Tab accepts too.
+    key("Tab")  # Tab takes the draft.
     wait_for(lambda: state()["view"], what="instruct draft")
     check("Enter sends an instruction, Tab inserts", state()["view"], "As requested—say hi.")
 
@@ -187,26 +187,29 @@ def scenarios():
     check("instruct holds the text while typing", state()["view"], "")
     key("Return")  # send
     settle()
-    key("Return")  # insert
+    key("Return")  # a reflexive second Enter inserts nothing
+    settle()
+    check("a second Enter inserts nothing", state()["view"], "")
+    key("Tab")  # insert
     wait_for(lambda: state()["view"], what="instruct result")
-    check("Enter sends, the next Enter inserts", state()["view"], "As requested—write a story.")
+    check("Enter sends, Tab inserts", state()["view"], "As requested—write a story.")
 
     key("ctrl+a", "BackSpace")
     type_text("describe this")
     key("F8")  # look: the service captures this window with ImageMagick and sends it along
     key("Return")
     settle(1.5)
-    key("Return")
+    key("Tab")
     wait_for(lambda: state()["view"], what="instruct result with a window picture")
     check("F8 sends a real picture of the window", state()["view"], "As requested—describe this, having looked at the window.")
 
     key("ctrl+a", "BackSpace")
     type_text("greet")
-    key("Return")  # three readings come back as a numbered list
+    key("Return")  # three readings come back, the first highlighted
     settle()
-    key("2")
+    key("Down", "Tab")  # choices are not numbered: ↓ then Tab
     wait_for(lambda: state()["view"], what="the second reading")
-    check("2 inserts the second of several readings", state()["view"], "Certainly—as requested—greet.")
+    check("↓ Tab inserts the second of several readings", state()["view"], "Certainly—as requested—greet.")
 
     key("ctrl+a", "BackSpace")
     type_text("greet")

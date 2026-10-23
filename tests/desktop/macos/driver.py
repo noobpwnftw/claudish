@@ -251,15 +251,15 @@ def scenarios():
     wait_for(lambda: document().endswith("naturally."))
     check("continue: Tab takes the suggestion", document(), "Thanks for the review s and then some—naturally.")
 
-    # 4. Compose (a Shift tap), type, Enter sends it as an instruction, Enter inserts.
+    # 4. Compose (a Shift tap), type, Enter sends it as an instruction, Tab inserts the draft.
     key("Return")
     shift_tap()
     type_text("say hi")
     key("Return")
     time.sleep(1.5)
-    key("Return")
+    key("Tab")
     wait_for(lambda: document().endswith("say hi."))
-    check("instruct: Enter sends, Enter inserts", document().split("\n")[-1], "As requested—say hi.")
+    check("instruct: Enter sends, Tab inserts", document().split("\n")[-1], "As requested—say hi.")
 
     # 5. G35: in Terminal.app an instruction sees the screen (the service reads it through AX; its
     # Python needs the Accessibility permission), and the draft lands at the prompt.
@@ -280,11 +280,11 @@ def scenarios():
         shift_tap()  # compose
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
-        # Enter again takes the draft once it is there (while it is pending, Enter waits); after
-        # that Enter would be the shell's, so stop as soon as the draft shows.
+        # Tab takes the draft once it is there (while it is pending, Tab waits); after that Tab
+        # would be the shell's, so stop as soon as the draft shows.
         for _ in range(10):
             time.sleep(1)
-            key("Return")
+            key("Tab")
             if wait_for(lambda: "having read the terminal" in screen(), timeout=1):
                 break
         if "having read the terminal" not in screen():

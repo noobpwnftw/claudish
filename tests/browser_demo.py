@@ -176,7 +176,7 @@ async def check(args):
             await page.unroute("**/suggest", unavailable)
             await page.locator("#clear").click()
 
-            # Instruct (Enter in compose): held until Enter; a digit picks.
+            # Instruct (Enter in compose): held until Enter; ↓ and Tab pick.
             sent = []
             page.on("request", lambda request: sent.append(request.post_data_json)
                     if request.url.endswith("/suggest") else None)
@@ -200,15 +200,14 @@ async def check(args):
                     await page.screenshot(path=str(args.screenshots / "instruct.png"))
                 count = await choices.count()
                 second = await choices.nth(1).locator(".k-text").text_content()
-                await page.wait_for_timeout(400)  # past the double-Enter guard
-                await keys.press("ArrowDown")  # choices are not numbered: ↓ then Enter
-                await keys.press("Enter")
+                await keys.press("Enter")  # Enter talks to the model: it never inserts a draft
+                await keys.press("ArrowDown")  # choices are not numbered: ↓ then Tab
+                await keys.press("Tab")
                 await expect(committed).to_have_attribute("data-text", second)
-                print("instruct offered %d readings; ↓ Enter inserted the second" % count)
+                print("instruct offered %d readings; ↓ Tab inserted the second" % count)
             else:
                 draft = await window.locator(".k-row .k-text").first.text_content()
-                await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
-                await keys.press("Enter")
+                await keys.press("Tab")  # Tab takes the model's text
                 await expect(committed).to_have_attribute("data-text", draft)
             await page.locator("#clear").click()
             await keys.type("never mind", delay=10)  # an instruction you drop: Esc, nothing inserted

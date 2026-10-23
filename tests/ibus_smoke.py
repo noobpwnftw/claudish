@@ -15,8 +15,7 @@ spec = importlib.util.spec_from_file_location("claudish_ibus", root / "platforms
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 import claudish.composition
-claudish.composition.ENTER_GUARD_SECONDS = 0  # Enter right after a result; the guard has its own test
-claudish.composition.PICK_GUARD_SECONDS = claudish.composition.ROLLED_SHIFT_SECONDS = 0  # likewise
+claudish.composition.ROLLED_SHIFT_SECONDS = 0  # a Shift right after a key; the filter has its own test
 IBus.init()
 connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 engine = module.ClaudishEngine(connection=connection, object_path="/org/claudish/TestEngine")
@@ -96,9 +95,10 @@ try:
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     assert engine.composition.working and engine.composition.request_mode == "instruct"
     engine.composition.offer(engine.composition.revision, "Once upon a time—a cat.")
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and commits[-1] != "Once upon a time—a cat."  # Enter talks
+    assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab takes the model's text
     assert commits[-1] == "Once upon a time—a cat."
-    # Several readings of an instruction: a list (not numbered: digits are text); ↓ Enter inserts the second.
+    # Several readings of an instruction: a list (not numbered: digits are text); ↓ Tab inserts the second.
     for char in "greet":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
@@ -106,7 +106,7 @@ try:
     assert engine.composition.choosing
     engine.render()
     assert engine.do_process_key_event(IBus.KEY_Down, 0, 0)
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
     assert commits[-1] == "Hi there." and not engine.composition.text
     # Shift+Enter keeps your words as they are, and stays in compose.
     for char in "as is":

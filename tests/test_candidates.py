@@ -68,7 +68,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.panel()["label"], state.panel()["body"]), ("Rewrite", "Exceptionally good."))
         self.assertEqual((state.escape(), state.shown, state.panel()["label"]), ("back", "very good", None))
         self.assertEqual(state.tab(), "convert")  # the rewrite again, without asking again
-        self.assertEqual(state.enter(), "accept")  # Enter keeps it too
+        self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))  # Tab keeps it; Enter does not
         self.assertEqual(state.commit(True), "Exceptionally good.")
         state.change("very good")
         state.tab()
@@ -152,8 +152,9 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.text, state.reply, state.choosing), ("mo", "", False))
         state.submit()
         state.offer(state.revision, "No, thank you.")
-        state.offered_at -= 1  # a moment later, Enter takes the first draft
-        self.assertEqual(state.enter(), "accept")
+        # Tab takes the model's text; Enter only talks to the model, so a reflexive second Enter
+        # after sending can never insert a draft nobody read (owner, 2026-10-24).
+        self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))
 
     def test_enter_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
@@ -162,7 +163,7 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
                                    "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
-        self.assertEqual((state.enter(), state.tab()), ("choose", "choose"))  # as with drafts
+        self.assertEqual((state.enter(), state.tab()), ("choose", "wait"))  # an answer is Enter's; Tab takes text
         state.answer_choice(1)
         state.ask(state.revision, {"id": "p", "text": "Allow notes.delete?", "permission": True,
                                    "choices": [{"label": "Allow"}, {"label": "Deny"}]}, "s")
@@ -195,7 +196,8 @@ class ModeFeelTests(unittest.TestCase):
         drafts = state.panel()
         self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
         self.assertEqual((drafts["foot"], drafts["mark"]),
-                         ([("↑↓", "choose"), ("Enter", "insert"), ("Esc", "edit")], "from Claude · hosted"))
+                         ([("↑↓", "choose"), ("Tab", "insert"), ("Esc", "edit")], "from Claude · hosted"))
+        self.assertEqual(drafts["take"], "Tab")  # the highlighted row says Tab takes it
         self.assertEqual(drafts["thread"], [{"label": "You asked", "body": "say hi"}])  # the instruction left your text
         state.change("this is important")
         state.tab()
@@ -219,6 +221,18 @@ class ModeFeelTests(unittest.TestCase):
         approval = state.panel()  # nothing highlighted; typed words only refuse
         self.assertEqual((approval["body"], approval["code"], approval["on"], approval["tail"]),
                          ("git push", True, -1, "or type why not"))
+
+    def test_an_answer_to_read_goes_in_with_tab_and_esc_dismisses_it(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("what does this error mean")
+        state.submit()
+        state.ask(state.revision, {"id": "r", "read": True, "label": "The model says", "body": "A quote is open.",
+                                   "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
+        shown = state.panel()
+        self.assertEqual((shown["rows"], shown["foot"]), ([], [("Tab", "insert"), ("Esc", "dismiss")]))
+        self.assertEqual((state.enter(), state.tab(), state.chosen), ("wait", "choose", 1))  # Tab: Insert it
+        self.assertEqual(state.escape(), "dismiss")
 
     def test_choices_are_not_numbered_and_an_approval_starts_unhighlighted(self):
         """Owner: digits are text in English, as Space is; "2 + Enter" and "↓ + Enter" are both two

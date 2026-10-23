@@ -128,8 +128,10 @@ function Invoke-Scenarios {
   [Keys]::Type('say hi')
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
   Check 'instruct holds the text until it is inserted' (Get-Text) ''
-  [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
-  Check 'Enter sends an instruction, Enter inserts' (Get-Text) "As requested${dash}say hi."
+  [Keys]::Press(0x0D); Start-Sleep -Milliseconds 300  # a reflexive second Enter inserts nothing
+  Check 'a second Enter inserts nothing' (Get-Text) ''
+  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab takes the model's text
+  Check 'Enter sends an instruction, Tab inserts' (Get-Text) "As requested${dash}say hi."
   Reset-Target
   [Keys]::Type('never mind'); [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800
   [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc: the draft closes, the instruction stays
