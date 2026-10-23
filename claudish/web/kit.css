@@ -33,6 +33,19 @@
   font-family:var(--k-font);font-size:var(--k-size);line-height:var(--k-line);text-align:left;font-synthesis:none}
 .k-panel.bare{min-width:0}
 .k-head{padding:calc(var(--k-row-y) + 1px) var(--k-row-x) var(--k-row-y)}
+/* While you type a reply (at the caret), the choices take no number: the numbers go, the words
+   stay readable (muted, 4.5:1). */
+.k-panel.replying .k-row .k-key{visibility:hidden}
+.k-panel.replying .k-row .k-text{color:var(--k-muted)}
+/* The exchange so far: your earlier turns as context, one line each, muted, at full size, with a
+   neutral rule beside them (who said what, without relying on colour); the current turn below. */
+.k-turn{position:relative;padding-left:calc(var(--k-row-x) + 6px)}
+.k-turn::before{content:"";position:absolute;left:var(--k-row-x);top:calc(var(--k-row-y) + 2px);bottom:calc(var(--k-row-y) + 1px);width:2px;border-radius:1px;background:color-mix(in srgb,var(--k-text) 35%,var(--k-surface))}
+.k-turn .k-label{display:inline;margin-right:6px}
+.k-turn .k-body{display:inline;color:var(--k-muted)}
+.k-turn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-turn+.k-turn{padding-top:0}
+.k-turn+.k-head:not(.k-turn){padding-top:calc(var(--k-row-y) + 3px)}
 .k-label{display:block;font-size:var(--k-small);font-weight:600;color:var(--k-muted);margin-bottom:2px}
 .k-body{display:block;text-wrap:pretty}
 .k-body.code{font-family:var(--k-mono,ui-monospace,SFMono-Regular,Consolas,monospace);font-size:.93em;overflow-wrap:anywhere}
@@ -58,7 +71,7 @@
 .k-status.failed{color:var(--k-error)}
 .k-warn{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--k-error);color:var(--k-surface);font-size:12px;font-weight:700;line-height:1}
 /* Working: a small ring before the words (the platform's own spinner where it has one). */
-.k-spin{display:inline-block;width:.8em;height:.8em;margin-right:6px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--k-muted) 35%,transparent);border-top-color:var(--k-muted);vertical-align:-.1em;animation:k-spin .9s linear infinite}
+.k-spin{display:inline-block;width:.8em;height:.8em;margin-right:6px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--k-muted) 45%,transparent);border-top-color:var(--k-muted);vertical-align:-.1em;animation:k-spin .9s linear infinite}
 @keyframes k-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.k-spin{animation:none}}
 

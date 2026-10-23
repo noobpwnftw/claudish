@@ -85,9 +85,30 @@ an anti-AI writer, an accessibility consultant and an office manager
 - **Space** in compose types a space; it never picks a candidate.
 - **Contrast:** muted text 4.5:1 or more, the suggestion 3:1 or more; a forced-colors rendering
   keeps the bar and the Enter key.
-- **The panel sits under the caret's line, its content starting at the caret** (clamped to the
-  screen). GNOME reports only the caret, not where the composition starts, so no platform anchors
-  to the composition (found on the first GNOME build).
+- **A panel opens under the caret and stays where it opened until it closes** (its content
+  starting at the caret, clamped to the screen, above the line when there is no room below); it
+  moves only if the caret leaves that line. It never slides while you type. GNOME reports only
+  the caret, not where the composition starts, so no platform anchors to the composition.
+
+**After an instruction is sent (round 3, the same reviewers):**
+
+- **The composition is only ever what you are typing now.** Enter sends the instruction and it
+  leaves your text; in the same frame the panel shows "You asked" and what is happening. Nothing
+  waits underlined in your document.
+- **The panel is the exchange, not a chat:** your earlier turns ("You asked", "You answered") as
+  context, one line each, muted, at full size, with a neutral rule beside them; the current turn
+  (a question, a command to approve, the drafts, an answer) at full contrast. Only the first "You
+  asked" and the latest turn show; turns between fold into one line.
+- **Typing a reply goes where typing goes: the caret.** The reply is the composition; the
+  choices keep their words and lose their numbers; the footer says Enter sends it.
+- **Keys:** a digit picks only with nothing composed and in range, otherwise it is text; ↑ and ↓
+  move the highlight; Space with nothing composed does nothing; Enter takes the highlight or
+  sends the reply. **Esc, one ladder:** a reply composed, Esc cancels it; else Esc edits (the
+  instruction comes back to the caret); in editing, Esc drops it; while working, Esc stops.
+- **Focus:** leaving the text box hides the panel; the work goes on; returning shows it again
+  where it was, and Esc still brings the instruction back. A result never goes into another box.
+- **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
+  ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark
   terminal in light mode is expected).
 

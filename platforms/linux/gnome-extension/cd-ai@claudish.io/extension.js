@@ -15,6 +15,7 @@ import * as IBusManager from 'resource:///org/gnome/shell/misc/ibusManager.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const GAP = 6;  // between the caret's line and the panel
+const CARET_GAP = 5;  // between the caret and the suggestion
 
 // A tile or a mark: its glyph centred in a fixed square (a sized label keeps its text top-left).
 function mark(text, styleClass) {
@@ -178,7 +179,9 @@ export default class CdAiExtension extends Extension {
         }
         if (this._ghost.visible) {
             const [, tall] = this._ghost.get_preferred_height(-1);
-            this._ghost.set_position(Math.round(x + width), Math.round(y + (height - tall) / 2));
+            // Just past the caret's line (the reported x is a few pixels left of the drawn caret):
+            // the suggestion never covers the space you typed.
+            this._ghost.set_position(Math.round(x + Math.max(width, 2) + CARET_GAP), Math.round(y + (height - tall) / 2));
         }
     }
 }

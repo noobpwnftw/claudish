@@ -28,48 +28,67 @@ const STATES = [
   {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel shows yours, as large, until you keep it.",
    before: "Team: ", comp: "I'm running a little late — please start without me.",
    panel: {label: "Your words", body: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
-  {id: "drafts", title: "An instruction's drafts", note: "Enter asked; three readings come back. The first is highlighted, and Enter takes it.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
+  // An instruction, once sent, leaves your text: the panel carries the exchange as a thread of
+  // labelled turns ("You asked", the model's question, "You answered"), and the caret is free, so
+  // whatever you type next is at the caret, where typing goes.
+  {id: "sent", title: "An instruction, sent", note: "Enter sent it: it leaves your text, and the panel says what you asked while the model works.",
+   before: "Hi Sam, ",
+   panel: {thread: [["You asked", "decline the offsite politely"]], status: "Working", busy: true, foot: ["Esc: stop"]}},
+  {id: "drafts", title: "An instruction's drafts", note: "Three readings come back under what you asked. The first is highlighted, and Enter inserts it at the caret.",
+   before: "Hi Sam, ",
+   panel: {thread: [["You asked", "decline the offsite politely"]],
+           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["1–3: pick", "Esc: back"]}},
+           on: 0, foot: ["1–3: pick", "Esc: edit"]}},
   {id: "hosted", title: "A hosted model answered", note: "The same drafts, saying in words where they came from.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
+   before: "Hi Sam, ",
+   panel: {thread: [["You asked", "decline the offsite politely"]],
+           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["1–3: pick", "Esc: back"], mark: "from Claude · hosted"}},
-  {id: "ask", title: "The model asks", note: "A question as is. Enter takes the highlighted choice; your own words answer too.",
-   before: "", comp: "summarize this thread",
-   panel: {label: "The model asks", body: "The whole thread, or only the last reply?",
+           on: 0, foot: ["1–3: pick", "Esc: edit"], mark: "from Claude · hosted"}},
+  {id: "ask", title: "The model asks", note: "Its question under what you asked. A number picks; Enter takes the highlighted choice; or just type.",
+   before: "",
+   panel: {thread: [["You asked", "summarize this thread"]], label: "The model asks", body: "The whole thread, or only the last reply?",
            rows: [["1", "The whole thread"], ["2", "Only the last reply"]], on: 0,
            foot: ["1–2: pick", "or type a reply"]}},
+  {id: "reply", title: "Typing a reply", note: "What you type is at the caret: your reply. The choices lose their numbers (digits are text now); the panel stays where it opened.",
+   before: "", comp: "only the last two days",
+   panel: {thread: [["You asked", "summarize this thread"]], label: "The model asks", body: "The whole thread, or only the last reply?",
+           rows: [["1", "The whole thread"], ["2", "Only the last reply"]], on: -1, replying: true, anchor: "comp",
+           foot: ["Enter: send reply", "Esc: cancel reply"]}},
+  {id: "answered", title: "Answered", note: "Your reply leaves your text too, and joins the thread while the model works on.",
+   before: "",
+   panel: {thread: [["You asked", "summarize this thread"], ["You answered", "only the last two days"]],
+           status: "Working", busy: true, foot: ["Esc: stop"]}},
   {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted and 1 is Deny: only 2 approves.",
-   before: "", comp: "push my branch",
-   panel: {label: "Claude Code wants to run", body: "git push origin parser-fix", code: true,
+   before: "",
+   panel: {thread: [["You asked", "push my branch"]], label: "Claude Code wants to run", body: "git push origin parser-fix", code: true,
            rows: [["1", "Deny"], ["2", "Allow"]], on: -1, foot: ["1–2: pick", "or type why not"]}},
   {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: 1 keeps it here.",
-   before: "", comp: "have claude fix the failing parser test",
-   panel: {label: "Hand off to Claude Code", body: "Fix the failing parser test",
+   before: "",
+   panel: {thread: [["You asked", "have claude fix the failing parser test"]], label: "Hand off to Claude Code", body: "Fix the failing parser test",
            rows: [["1", "No", "answer it here"], ["2", "Yes", "it opens in a new window"]], on: -1,
            foot: ["1–2: pick", "or type a reply"]}},
   {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width.",
-   before: "", comp: "what does this error mean",
-   panel: {label: "The model says", body: "The parser reached the end of the file while a string was still open. The quote on line 12 is never closed, so everything after it was read as part of the string.",
+   before: "",
+   panel: {thread: [["You asked", "what does this error mean"]], label: "The model says",
+           body: "The parser reached the end of the file while a string was still open. The quote on line 12 is never closed, so everything after it was read as part of the string.",
            rows: [["1", "Insert it", "at the caret"], ["2", "Dismiss", "nothing is inserted"]], on: 0,
-           foot: ["1–2: pick", "or type a reply"]}},
+           foot: ["1–2: pick", "or type to ask more"]}},
   {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.",
-   before: "", comp: "fix the failing parser test",
-   panel: {status: "Reading tests/test_parser.py", busy: true, foot: ["Esc: stop"]}},
-  {id: "failed", title: "A failed request", note: "Your words stay; the panel says why, and Enter sends them again.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {failed: "The model is offline", foot: ["Enter: retry", "Esc: back"]}},
+   before: "",
+   panel: {thread: [["You asked", "fix the failing parser test"]], status: "Reading tests/test_parser.py", busy: true, foot: ["Esc: stop"]}},
+  {id: "failed", title: "A failed request", note: "The panel says why; Enter sends it again, Esc brings your instruction back to the caret.",
+   before: "Hi Sam, ",
+   panel: {thread: [["You asked", "decline the offsite politely"]], failed: "The model is offline", foot: ["Enter: retry", "Esc: edit"]}},
   {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.",
-   terminal: true, before: "~/claudish $ ", comp: "undo my last commit but keep the changes",
-   panel: {rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
-           foot: ["1–2: pick", "Esc: back"]}},
-  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and how to go back, briefly at the caret. The taskbar or menu bar shows it all along.",
+   terminal: true, before: "~/claudish $ ",
+   panel: {thread: [["You asked", "undo my last commit but keep the changes"]],
+           rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
+           foot: ["1–2: pick", "Esc: edit"]}},
+  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.",
    before: "Thanks for the review — I'll", toast: "compose"},
   {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.",
    before: "Thanks for the review — I'll", toast: "continue"},
@@ -95,9 +114,10 @@ function described(spec) {
     const match = /^([^:]+): (.+)$/.exec(words);
     if (match) foot.push([match[1], match[2]]); else tail.push(words);
   }
-  return {label: spec.label || null, body: spec.body || null, code: Boolean(spec.code), mono: Boolean(spec.mono),
+  return {thread: (spec.thread || []).map(([label, body]) => ({label, body})),
+          label: spec.label || null, body: spec.body || null, code: Boolean(spec.code), mono: Boolean(spec.mono),
           rows: (spec.rows || []).map(([key, text, legend]) => ({key, text, legend: legend || null})),
-          on: spec.on === undefined ? -1 : spec.on, foot, tail: tail.join(" ") || null,
+          on: spec.on === undefined ? -1 : spec.on, replying: Boolean(spec.replying), foot, tail: tail.join(" ") || null,
           tile: spec.failed ? "warn" : "ai", status: spec.status || null, busy: Boolean(spec.busy),
           failed: spec.failed || null, mark: spec.mark || null};
 }
@@ -105,6 +125,7 @@ function described(spec) {
 // The host: a window of the platform's own kind with a text box, the caret in it.
 function frame(skin, state) {
   const host = el("div", `host ${skin}` + (state.terminal ? " terminal" : ""));
+  if (state.panel && state.panel.anchor) host.dataset.anchor = state.panel.anchor;
   const bar = el("div", "host-bar");
   const app = state.terminal ? {windows: "Terminal", macos: "Terminal", gnome: "Console", reference: "TERMINAL"}[skin]
     : SKINS[skin].app || "NOTES";
@@ -127,7 +148,7 @@ function frame(skin, state) {
   if (state.toast) {  // Composition.toast(): a panel with only a footer
     const compose = state.toast === "compose";
     text.append(Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
-                           foot: [["Shift", compose ? "back" : "compose"]]}, KEYS[skin] || {}));
+                           foot: [["Shift", compose ? "continue" : "compose"]]}, KEYS[skin] || {}));
   }
   host.append(bar, text);
   return host;
@@ -141,7 +162,10 @@ function place(host) {
   const caret = host.querySelector(".host-caret");
   const box = text.getBoundingClientRect();
   const line = caret.getBoundingClientRect();
-  const start = line;
+  // A panel opens under the caret and stays where it opened while it is open: for a reply, where
+  // the caret was when the instruction left (the reply's composition starts there).
+  const opened = host.dataset.anchor === "comp" && anchor.firstChild ? anchor.firstChild.getClientRects()[0] : null;
+  const start = opened ? {left: opened.left, right: opened.left} : line;
   const lineBottom = line.bottom;
   for (const floating of host.querySelectorAll(".k-panel, .k-toast")) {
     const style = getComputedStyle(floating);

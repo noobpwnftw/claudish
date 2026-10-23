@@ -42,7 +42,15 @@
   // pick(number): a click on a row.
   function panel(spec, keys = {}, pick = null) {
     const rows = spec.rows || [];
-    const node = el("div", "k-panel" + (rows.length || spec.body ? "" : " bare") + (spec.on >= 0 ? " takes" : ""));
+    const thread = spec.thread || [];
+    const node = el("div", "k-panel" + (rows.length || spec.body || thread.length ? "" : " bare") + (spec.on >= 0 ? " takes" : "")
+                         + (spec.replying ? " replying" : ""));
+    // The exchange so far, as labelled turns ("You asked", "You answered"): your words at full size.
+    for (const turn of thread) {
+      const head = el("div", "k-head k-turn");
+      head.append(el("span", "k-label", turn.label), el("span", "k-body", turn.body));
+      node.append(head);
+    }
     if (spec.body) {
       const head = el("div", "k-head");
       if (spec.label) head.append(el("span", "k-label", spec.label));

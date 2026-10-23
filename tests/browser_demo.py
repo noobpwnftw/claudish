@@ -80,7 +80,7 @@ async def check(args):
             before = await committed_text()
             await keys.type("This is very important.", delay=20)
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
-            await expect(window).to_contain_text("rewrite it")
+            await expect(window).to_contain_text("rewrite", timeout=3000)  # after a pause: Tab rewrite, Enter ask
             await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
             await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
             rewrite = await page.locator("#preedit").text_content()
