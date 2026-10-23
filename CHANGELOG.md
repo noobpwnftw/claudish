@@ -8,9 +8,16 @@ offers. English goes in. Em dashes come out.
 
 ### What is in it
 
-- **Three layers, one keyboard (F7):** rewrite (ordinary English into polished
-  Claudish), continue (autocomplete for prose), and instruct (type what you want;
-  Enter sends it; the draft lands at the caret).
+- **Two modes, one Shift:** continue (keys go straight in; the rest of the
+  sentence waits after the caret for Tab) and compose (Tab rewrites your words
+  in place, as a CJK input method converts; Enter sends them as an instruction
+  and offers drafts to pick with 1–3; Shift+Enter keeps them as typed; Esc
+  steps back). A Shift tap switches, as it switches English and pinyin.
+- **Terminals:** an instruction typed at a terminal prompt ("fix") sees what the
+  terminal shows, read through the accessibility APIs (GNOME Terminal, Windows
+  Terminal, the classic console, Terminal.app); nothing is installed in the shell.
+- **A private local API:** the service accepts text-box details, sessions, and
+  answers only from the input methods (a per-run token in a file only you can read).
 - **Input methods** for Linux (IBus), Windows (PIME/TSF), and macOS
   (InputMethodKit). Nothing is inserted until you accept it; password fields
   bypass Claudish.

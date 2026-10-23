@@ -236,7 +236,7 @@ function key(name, shift = false) {
     if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
-    change(state.text + (name === "-" ? "—" : name));
+    change(state.text + name);  // as typed: em dashes come from the model, never from a key
     changed();
     return true;
   }

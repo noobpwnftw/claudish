@@ -99,7 +99,7 @@ function Invoke-Scenarios {
   Check 'composition is not committed while typing' (Get-Text) ''
   [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 500  # Shift+Enter keeps your words
   $dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
-  Check 'Shift+Enter keeps your words, dash substituted' (Get-Text) "hello${dash}world"
+  Check 'Shift+Enter keeps your words as typed' (Get-Text) 'hello-world'
   Reset-Target
   [Keys]::Type('very important'); Start-Sleep -Milliseconds 300
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab asks; the rewrite takes your words' place

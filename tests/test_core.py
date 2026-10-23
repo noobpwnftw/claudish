@@ -17,9 +17,9 @@ class CompositionTests(unittest.TestCase):
         state = Composition()
         for char in "hello-world":
             state.insert(char)
-        self.assertEqual(state.text, "hello—world")
+        self.assertEqual(state.text, "hello-world")
         state.offer(state.revision, "Hello—world, thoughtfully considered.")
-        self.assertEqual(state.commit(), "hello—world")
+        self.assertEqual(state.commit(), "hello-world")
         state.insert("a")
         state.offer(state.revision, "A nuanced perspective.")
         self.assertEqual(state.commit(True), "A nuanced perspective.")

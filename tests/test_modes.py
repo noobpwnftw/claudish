@@ -78,6 +78,16 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(screen.tail("\n".join(str(n) for n in range(100))).split("\n")[0], "60")
         self.assertTrue(screen.is_terminal("WindowsTerminal.exe") and screen.is_terminal("com.apple.Terminal"))
         self.assertFalse(screen.is_terminal("notepad.exe") or screen.is_terminal(None))
+        # At a password prompt the screen is not sent (what you compose there would be the secret).
+        with patch.object(screen, "read_atspi", return_value="$ sudo apt update\n[sudo] password for ana: "), \
+                patch.object(screen.sys, "platform", "linux"):
+            self.assertIsNone(screen.read("gnome-terminal-server"))
+        with patch.object(screen, "read_atspi", return_value="$ ssh box\nEnter passphrase for key '/k': "), \
+                patch.object(screen.sys, "platform", "linux"):
+            self.assertIsNone(screen.read("gnome-terminal-server"))
+        with patch.object(screen, "read_atspi", return_value="$ gti status\nbash: gti: command not found\n$ "), \
+                patch.object(screen.sys, "platform", "linux"):
+            self.assertEqual(screen.read("gnome-terminal-server").splitlines()[-1], "$")
 
     def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
         rewriter = Rewriter(max_tokens=64)

@@ -72,26 +72,26 @@ def main():
             for char in "hello-world":
                 assert key(ord(char.upper()), ord(char), "filterKeyDown")["return"]
                 reply = key(ord(char.upper()), ord(char))
-            assert reply["compositionString"] == "hello—world"
+            assert reply["compositionString"] == "hello-world"
             # A modifier and a shortcut must not consume or rewrite composition.
             assert not key(0x10, method="filterKeyDown")["return"]
             # Ctrl/Alt shortcuts mid-composition: commit the wording first, then pass the key on.
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
             reply = key(ord("C"), modifiers=(0x11,))
-            assert reply["commitString"] == "hello—world" and reply["return"], reply  # committed, key consumed
+            assert reply["commitString"] == "hello-world" and reply["return"], reply  # committed, key consumed
             for char in "hello-world":
                 key(ord(char.upper()), ord(char))
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True
-            assert service.state.text == "hello—world"
+            assert service.state.text == "hello-world"
             # AltGr arrives as Ctrl+Alt; a printable result belongs in the phrase.
             assert key(ord("Q"), ord("@"), "filterKeyDown", modifiers=(0x11, 0x12))["return"]
-            assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello—world@"
+            assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello-world@"
             key(0x08)
-            assert service.state.text == "hello—world"
+            assert service.state.text == "hello-world"
             # Tab asks for the rewrite and commits nothing; a Shift tap keeps your words as typed.
             assert "commitString" not in key(9)
             reply = shift_tap()
-            assert reply["commitString"] == "hello—world" and service.state.mode == "continue", reply
+            assert reply["commitString"] == "hello-world" and service.state.mode == "continue", reply
             assert key(0x10, method="filterKeyDown")["return"] is False  # Shift held for a capital: no tap
             key(ord("A"), ord("A"), "filterKeyDown")  # every key reaches filterKeyDown first
             key(ord("A"), ord("A"))

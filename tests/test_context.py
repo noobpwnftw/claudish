@@ -92,7 +92,8 @@ class ContextTests(unittest.TestCase):
             for body, status in [({"text": "very good", "before": "x" * 4000}, 200),
                                  ({"text": "very good", "before": "x" * 4001}, 400),
                                  ({"text": "very good", "after": 5}, 400)]:
-                request = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                request = Request(url, data=json.dumps(body).encode(),
+                                  headers={"Content-Type": "application/json", "X-Claudish-Token": server.token})
                 if status == 200:
                     with urlopen(request) as reply:
                         self.assertEqual(json.load(reply)["text"], "particularly good")
@@ -142,7 +143,7 @@ class BindingTests(unittest.TestCase):
         try:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
             request = Request(url, data=json.dumps({"text": "very good", "app": "gtk3-demo"}).encode(),
-                              headers={"Content-Type": "application/json"})
+                              headers={"Content-Type": "application/json", "X-Claudish-Token": server.token})
             with urlopen(request) as reply:
                 self.assertEqual(json.load(reply)["consulted"], ["pr.md"])
             request = Request(url, data=json.dumps({"text": "very good", "app": ["x"]}).encode(),

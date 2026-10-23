@@ -105,7 +105,7 @@ class ServerTests(unittest.TestCase):
 
         def post(body):
             request = Request("http://127.0.0.1:%d/suggest" % server.server_port, json.dumps(body).encode(),
-                              {"Content-Type": "application/json"})
+                              {"Content-Type": "application/json", "X-Claudish-Token": server.token})
             try:
                 with opener.open(request, timeout=5) as response:
                     return response.status, json.load(response)

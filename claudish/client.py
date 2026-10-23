@@ -1,5 +1,6 @@
 """A single coalescing worker: UI callbacks never wait for inference."""
 import collections
+import os
 import random
 import json
 import threading
@@ -11,6 +12,44 @@ from urllib.request import Request, build_opener, ProxyHandler
 # CA bundle (about 12 ms), and doing that on the worker raced OpenSSL's cleanup at process exit.
 OPENER = build_opener(ProxyHandler({}))
 
+def token_path():
+    """The service's token: written by the service at start (readable by this user only) and sent by
+    the input methods, so other local processes cannot make the service read a text box, a
+    terminal, or a window, or answer an agent's questions."""
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "claudish", "service-token")
+
+
+def read_token():
+    try:
+        with open(token_path()) as source:
+            return source.read().strip()
+    except OSError:
+        return ""
+
+
+def write_token():
+    """A new token for this service run, in a file only this user can read."""
+    import secrets
+    path = token_path()
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    token = secrets.token_urlsafe(32)
+    temporary = path + ".tmp"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as out:
+        out.write(token)
+    os.replace(temporary, path)
+    return token
+
+
+def headers():
+    sent = {"Content-Type": "application/json"}
+    token = read_token()
+    if token:
+        sent["X-Claudish-Token"] = token
+    return sent
+
+
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
 def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None, look=False,
@@ -21,8 +60,7 @@ def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite"
     for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
         if value:
             body[key] = value
-    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"),
-                      headers={"Content-Type": "application/json"})
+    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"), headers=headers())
     with OPENER.open(request, timeout=timeout) as response:
         return json.load(response)
 
@@ -30,7 +68,7 @@ def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite"
 def call(endpoint, path, body=None, timeout=10):
     """A JSON request to the local service: POST with a body, else GET."""
     data = json.dumps(body).encode("utf-8") if body is not None else None
-    request = Request(endpoint + path, data=data, headers={"Content-Type": "application/json"})
+    request = Request(endpoint + path, data=data, headers=headers())
     with OPENER.open(request, timeout=timeout) as response:
         return json.load(response)
 

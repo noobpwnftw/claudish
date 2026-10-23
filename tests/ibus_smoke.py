@@ -36,29 +36,29 @@ try:
     assert engine.composition.mode == "compose"
     for char in "hello-world":
         assert engine.do_process_key_event(ord(char), 0, 0)
-    assert engine.composition.text == "hello—world"
+    assert engine.composition.text == "hello-world"
     # Shift held for a capital is not a tap.
     engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
     engine.do_process_key_event(ord("X"), 0, IBus.ModifierType.SHIFT_MASK)
     engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.RELEASE_MASK)
-    assert engine.composition.mode == "compose" and engine.composition.text == "hello—worldX"
+    assert engine.composition.mode == "compose" and engine.composition.text == "hello-worldX"
     engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
     # AltGr, Num Lock, and similar keys alone must not end the phrase.
     for keyval in (IBus.KEY_ISO_Level3_Shift, IBus.KEY_Num_Lock, IBus.KEY_Meta_L, IBus.KEY_Hyper_L):
         assert not engine.do_process_key_event(keyval, 0, 0)
     assert engine.do_process_key_event(IBus.KEY_EuroSign, 0, IBus.ModifierType.MOD5_MASK)
-    assert engine.composition.text == "hello—world€" and not commits
+    assert engine.composition.text == "hello-world€" and not commits
     engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
     shift_tap()  # Shift keeps your words as typed, and goes back to continue
-    assert commits == ["hello—world"] and engine.composition.mode == "continue"
-    assert engine.composition.text == "hello—world"  # in the app now: continue's context
+    assert commits == ["hello-world"] and engine.composition.mode == "continue"
+    assert engine.composition.text == "hello-world"  # in the app now: continue's context
     shift_tap()
     for char in "draft":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab asks for the rewrite
     assert engine.composition.working and engine.composition.request_mode == "rewrite"
     engine.composition.offer(engine.composition.revision, "A considered draft.")  # in place as it arrives
-    assert engine.composition.shown == "A considered draft." and commits[-1] == "hello—world"
+    assert engine.composition.shown == "A considered draft." and commits[-1] == "hello-world"
     engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab again keeps it
     assert commits[-1] == "A considered draft."
     # Continue types into the app; the context follows; Tab takes a suggestion.

@@ -17,7 +17,13 @@ def checked_purpose(purpose):
     return purpose
 
 
-def make_server(rewriter, port=18765):
+def make_server(rewriter, port=18765, token=None):
+    """token: what the input methods send (client.write_token() for a real service); a fresh one
+    when None. Without it, a request is the demo's: text and a mode only, without the profile's
+    context; sessions and their answers always need it."""
+    import secrets
+    token = token or secrets.token_urlsafe(32)
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass  # Do not log typed text.
@@ -40,6 +46,10 @@ def make_server(rewriter, port=18765):
                 self.wfile.write(body)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+
+        def trusted(self):
+            """Sent by an input method (it can read the token file), not just any local process."""
+            return hmac.compare_digest(self.headers.get("X-Claudish-Token") or "", token)
 
         def valid_host(self):
             return self.headers.get("Host") in (
@@ -70,6 +80,8 @@ def make_server(rewriter, port=18765):
         def post_session(self):
             """POST /sessions {text, app?}; /sessions/ID/answer {question, choice | text}; /sessions/ID/cancel."""
             parts = self.path.strip("/").split("/")
+            if not self.trusted() and not (len(parts) == 3 and parts[0] == "conversations" and parts[2] == "textbox"):
+                return self.reply(403, {"error": "the service token is required"})
             data = self.json_request(BODY_LIMIT if parts == ["sessions"] else 32768)
             if data is None:
                 return
@@ -139,6 +151,8 @@ def make_server(rewriter, port=18765):
 
         def get_session(self):
             """GET /sessions/ID?after=N: new events, waiting up to a second for the first."""
+            if not self.trusted():
+                return self.reply(403, {"error": "the service token is required"})
             path, _, query = self.path.partition("?")
             session = rewriter.sessions.get(path[len("/sessions/"):])
             if session is None:
@@ -211,8 +225,13 @@ def make_server(rewriter, port=18765):
                 purpose = checked_purpose(data.get("purpose"))
             except (ValueError, UnicodeError):
                 return self.reply(400, {"error": "invalid text request"})
+            trusted = self.trusted()
+            if not trusted and (app or look or before or after or purpose):
+                # What is around the caret, the app (which can mean reading a terminal) and window
+                # pictures come only from an input method.
+                return self.reply(403, {"error": "the service token is required"})
             try:
-                result = rewriter.rewrite(text, before, after, mode, app, look, purpose)
+                result = rewriter.rewrite(text, before, after, mode, app, look, purpose, context=trusted)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
             self.reply(200, result)
@@ -233,5 +252,6 @@ def make_server(rewriter, port=18765):
             return sock, address
 
     server = Server(("127.0.0.1", port), Handler)
+    server.token = token
     rewriter.url = "http://127.0.0.1:%d" % server.server_port  # for the agents' textbox MCP server
     return server

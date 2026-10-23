@@ -94,16 +94,16 @@ async def check(args):
             await keys.press("Tab")
             await keys.press("Tab")  # converted, then kept
             await expect(committed).to_have_attribute("data-text", before + rewrite)
-            await keys.type("hello-world", delay=20)  # in compose, the dash is Claudish
-            await expect(page.locator("#preedit")).to_have_text("hello—world")
+            await keys.type("hello-world", delay=20)  # kept as typed (em dashes come from the model)
+            await expect(page.locator("#preedit")).to_have_text("hello-world")
             await keys.press("Shift+Enter")  # keeps your words as they are
-            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world")
+            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello-world")
             # Paste in compose joins the composition, to be rewritten like typed words.
             await page.evaluate("() => navigator.clipboard.writeText('a pasted phrase')")
             await keys.press("Control+V")
             await expect(page.locator("#preedit")).to_have_text("a pasted phrase")
             await keys.press("Shift+Enter")  # kept as it is
-            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world" + "a pasted phrase")
+            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello-world" + "a pasted phrase")
             await page.locator("#copy").click()
             assert await page.evaluate("() => navigator.clipboard.readText()") == await committed_text()
             # A text box: a right click keeps the keyboard; select, copy, and type over a selection.

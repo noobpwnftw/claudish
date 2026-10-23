@@ -89,7 +89,7 @@ def scenarios():
     check("composition is not committed while typing", state()["entry"], "")
     key("shift+Return")
     wait_for(lambda: state()["entry"], what="commit")
-    check("Shift+Enter keeps your words, dash substituted", state()["entry"], "hello—world")
+    check("Shift+Enter keeps your words as typed", state()["entry"], "hello-world")
 
     focus("other")
     type_text("very important")

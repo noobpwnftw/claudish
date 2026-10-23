@@ -19,12 +19,13 @@ Status:
   composition left in a field when you click another one lands in the field you
   clicked: GNOME commits it after GTK has moved focus, as for every input method.
   Your words survive exactly once; Enter or Esc before you click keeps them in place.
-- **Windows:** verified on Windows 11 ARM64 in a KVM VM through PIME/TSF: classic
-  Notepad 9/9 typing scenarios, Edge 8/8 with one known issue (a shortcut right
-  after a cleared field can lose the composed word). x64 hardware is untested;
+- **Windows:** verified on Windows 11 ARM64 in a KVM VM through Claudish's
+  patched PIME: classic Notepad 15/15, Edge 14/14 with one known issue (a
+  shortcut right after a cleared field can lose the composed word), Windows
+  Terminal and the classic console 4/4. x64 hardware is untested;
   CI runs the unit tests on Windows.
-- **macOS:** covered by event-routing tests with Cocoa test doubles and a native
-  bundle build in CI; not yet run on a Mac.
+- **macOS:** real typing on macOS 26 in a UTM VM (tests/desktop/macos), plus
+  event-routing tests with Cocoa test doubles and a bundle build in CI.
 - **Browser demo:** tested with real inference in Chromium.
 
 ## Implementation

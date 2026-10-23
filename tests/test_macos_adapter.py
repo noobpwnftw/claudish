@@ -233,16 +233,16 @@ class MacOSAdapterTests(unittest.TestCase):
         for char in text:
             self.assertTrue(self.key(0, char))
 
-    def test_dash_utf16_ranges_and_pending_tab(self):
+    def test_typed_text_utf16_ranges_and_pending_tab(self):
         self.type_text("Hi-😀")
-        self.assertEqual(self.client.marked, "Hi—😀")
+        self.assertEqual(self.client.marked, "Hi-😀")
         self.assertEqual(self.client.selection, (5, 0))
         self.assertTrue(self.key(48, "\t"))
         self.assertFalse(self.client.commits)
         self.key(51)
-        self.assertEqual(self.client.marked, "Hi—")
+        self.assertEqual(self.client.marked, "Hi-")
         self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter keeps your words as they are
-        self.assertEqual(self.client.commits, ["Hi—"])
+        self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
     def test_rewrite_converts_in_place_without_a_list(self):

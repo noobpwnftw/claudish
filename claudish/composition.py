@@ -189,7 +189,7 @@ class Composition:
             return True
         if len(self.text) >= MAX_COMPOSITION or self.converted:
             return False
-        self.change(self.text + ("—" if char == "-" else char))
+        self.change(self.text + char)  # as typed: em dashes come from the model, never from a key
         return True
 
     def backspace(self):

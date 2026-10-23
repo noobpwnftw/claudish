@@ -7,7 +7,6 @@ Typing in detail, the browser demos, and `claudish fix`.
 | Key/action | Result |
 | --- | --- |
 | Type | Accumulate the phrase in an editable composition buffer |
-| `-` | Insert `—` immediately |
 | Pause for 180 ms | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
 | F6 | Show a suggestion that arrived after your last key; only needed on Windows with a released PIME (Claudish's patched PIME shows it as it arrives) |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second: Shift with another key (a capital, Shift+Enter) or held (Shift+click) is not one. Leaving compose keeps what you see, as it is. GNOME's top bar shows C or AI; Windows' taskbar indicator shows the mode icon; Linux also shows it in the status line, Windows in a notice |

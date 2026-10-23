@@ -263,11 +263,13 @@ class Rewriter:
             raise
         return data["choices"][0], data.get("usage", {})
 
-    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None):
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None,
+                context=True):
         """look: attach a picture of the focused window (instruct only; the user asked for it with F8).
         before/after: the text box around the caret, where the result goes (continue: the text is
         what comes before, so only after adds); purpose: the field's kind; screen: a terminal's
-        last lines, read here when None."""
+        last lines, read here when None; context: False for the demo's requests (no token): the
+        profile's context and bindings are not used."""
         started = time.perf_counter()
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
@@ -280,11 +282,11 @@ class Rewriter:
             from .capture import capture
             image, width, height = capture(self.look_command)
         if screen is None:
-            purpose, screen = self.terminal(app, purpose, mode)
+            purpose, screen = self.terminal(app, purpose, mode) if context else (purpose, "")
         elif screen:
             purpose = "terminal"
         spec = self.modes[mode]
-        block, consulted = self.gather(app, before, after)
+        block, consulted = self.gather(app, before, after) if context else ("", [])
         if screen:
             from .conversation import screen_note
             consulted = consulted + [screen_note(screen)]

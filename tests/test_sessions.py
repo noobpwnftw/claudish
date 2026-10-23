@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
@@ -32,7 +33,7 @@ class ServiceTests(unittest.TestCase):
     def call(self, path, body=None):
         url = "http://127.0.0.1:%d%s" % (self.server.server_port, path)
         request = Request(url, json.dumps(body).encode() if body is not None else None,
-                          {"Content-Type": "application/json"})
+                          {"Content-Type": "application/json", "X-Claudish-Token": self.server.token})
         try:
             with self.opener.open(request, timeout=10) as response:
                 return response.status, json.load(response)
@@ -157,6 +158,41 @@ class ServiceTests(unittest.TestCase):
         # The profile's servers as configured for Claudish, plus the text box; a denied tool is never
         # offered, a trusted one runs unasked, and the profile's context goes with the turn.
         self.assertEqual(result, "servers=notes,textbox disallowed=mcp__notes__delete_branch answers=allow,deny context=True")
+
+    def test_only_an_input_method_with_the_token_drives_sessions_or_reads_the_text_box(self):
+        """Any local process can reach the port; only the input methods can read the token file."""
+        url = "http://127.0.0.1:%d" % self.server.server_port
+
+        def anonymous(path, body=None):
+            request = Request(url + path, json.dumps(body).encode() if body is not None else None,
+                              {"Content-Type": "application/json"})
+            try:
+                with self.opener.open(request, timeout=10) as response:
+                    return response.status
+            except HTTPError as error:
+                return error.code
+        self.assertEqual(anonymous("/sessions", {"text": "hi"}), 403)
+        self.assertEqual(anonymous("/sessions/x/answer", {"question": "q", "choice": 0}), 403)
+        self.assertEqual(anonymous("/sessions/x?after=0"), 403)
+        self.assertEqual(anonymous("/conversations/x/end", {}), 403)
+        # The demo's request (text and a mode) works; what is around the caret, the app (which can
+        # mean reading a terminal), and window pictures do not.
+        self.assertEqual(anonymous("/suggest", {"text": "very good", "mode": "rewrite"}), 200)
+        for extra in ({"app": "gnome-terminal-server"}, {"before": "Dear Ana"}, {"purpose": "terminal"},
+                      {"look": True, "mode": "instruct"}):
+            self.assertEqual(anonymous("/suggest", dict({"text": "fix", "mode": "rewrite"}, **extra)), 403, extra)
+
+    def test_the_token_file_is_private_and_new_for_each_run(self):
+        import os
+        import tempfile
+        from claudish import client
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"XDG_CONFIG_HOME": home}):
+            first = client.write_token()
+            self.assertEqual(client.read_token(), first)
+            self.assertEqual(client.headers()["X-Claudish-Token"], first)
+            if os.name == "posix":
+                self.assertEqual(os.stat(client.token_path()).st_mode & 0o777, 0o600)
+            self.assertNotEqual(client.write_token(), first)
 
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)

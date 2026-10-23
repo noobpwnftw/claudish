@@ -137,7 +137,8 @@ def main():
             parser.error(str(exc))
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
-        server = make_server(rewriter, args.port)
+        from .client import write_token
+        server = make_server(rewriter, args.port, write_token())
         if rewriter.hosted:
             target = ("the Anthropic API (%s)" % settings["claude_model"] if rewriter.claude
                       else " ".join(settings["command"]) if settings["backend"] == "command"

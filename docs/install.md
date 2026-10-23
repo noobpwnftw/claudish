@@ -50,14 +50,15 @@ Or step by step:
    sources) and prints a fix for anything wrong. On Linux, for example, it
    catches a session that started before the installer's search-path change
    ("log out and back in"); on Windows on ARM, PIME's missing x86 runtime.
-6. **Learn four keys.** Everything else is typing.
+6. **Learn five keys.** Everything else is typing.
 
 | Key | Does |
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
-| Tab | accept the candidate; in continue, take the rest of the sentence (with nothing offered, Tab is the app's) |
-| Enter | the app's in continue; send, then insert (instruct); keep your wording (rewrite) |
-| Esc | keep what you typed |
+| Tab | continue: take the rest of the sentence (with nothing offered, Tab is the app's); compose: rewrite in place, Tab again keeps it |
+| Enter | compose: send your words as an instruction, Enter again inserts the first draft; with nothing composed, the app's |
+| Shift+Enter | compose: keep your words as typed |
+| Esc | one step back: the rewrite or the drafts → your words → dropped |
 | F8 | in compose, with an instruction: also send a picture of the window you are typing in |
 | 1–3 | when an instruction comes back as a numbered list, insert that reading; when an agent asks, answer |
 
@@ -198,8 +199,8 @@ Use a macOS llama.cpp build; Apple Silicon builds can use Metal. Mac inference
 performance has not been measured. Alternatively, forward the Spark's service
 to the Mac's `127.0.0.1:18765` over SSH and leave inference running on the Spark.
 
-The candidate panel refreshes automatically; Tab accepts, Enter/Escape keeps
-your wording, and F6 reopens a ready candidate. Navigation keys and Command or
+The candidate panel refreshes automatically, and the keys are the same as on the
+other platforms (above). Navigation keys and Command or
 Control shortcuts commit the current wording before being passed through.
 Characters typed with Option, such as — and €, stay in the composition.
 Composition edits currently work at the end of the buffer. Secure fields and

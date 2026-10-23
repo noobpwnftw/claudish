@@ -82,7 +82,8 @@ def main():
     # SIGTERM (kill, service managers) must stop the model too, not orphan it.
     signal.signal(signal.SIGTERM, interrupt)
     # Bind the service first, so port conflicts do not leave an orphan model.
-    server = make_server(rewriter)
+    from claudish.client import write_token
+    server = make_server(rewriter, token=write_token())
     process = None
     try:
         process = subprocess.Popen(cmd)
