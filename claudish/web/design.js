@@ -11,98 +11,32 @@ const SKINS = {
   gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel and the suggestion, on X11 and Wayland alike.", app: "Text Editor"},
 };
 
-// Each state: the text box around the caret, what cd_AI draws there, and the panel. The footer's
-// grammar is one everywhere: each key with its verb, in the order Enter, numbers, Tab, Esc, then
-// "or type a reply". The highlighted row carries its own Enter. In an approval or a handoff the
-// safe choice is 1 (a pinyin hand presses 1 by reflex) and nothing is highlighted (Enter never
-// approves); what is approved is the body, in full contrast.
+// Each state: the text box around the caret (before it, your composition, the grey suggestion)
+// and a note. What cd_AI draws there is generated: lab-states.js holds the panel of every state,
+// made by driving claudish/composition.py into it (scripts/lab_states.py), so the lab draws what
+// the input method draws.
 const STATES = [
-  {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.",
-   before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The keys show from the first key: Enter sends your words away, so it must be known.",
-   before: "Team: ", comp: "running late, start without me",
-   panel: {foot: ["Tab: rewrite", "Enter: ask", "Shift+Enter: keep"]}},
-  {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
-   before: "Team: ", comp: "running late, start without me",
-   panel: {status: "Rewriting", busy: true, foot: ["Esc: stop"]}},
-  {id: "converted", title: "Compose: a rewrite", note: "Your words stay in your text; the rewrite waits in the panel, and only Tab puts it in (a focus change never can).",
-   before: "Team: ", comp: "running late, start without me",
-   panel: {label: "Rewrite", body: "I'm running a little late — please start without me.", foot: ["Tab: insert", "Esc: dismiss"], take: "Tab"}},
-  // An instruction, once sent, stays the composition while its exchange is open (as a CJK input
-  // method's preedit: no choices without one; and macOS apps pass an input method Return, Tab and
-  // the arrows only while there is marked text). A reply you type takes its place, and only then
-  // does the panel say what you asked.
-  {id: "sent", title: "An instruction, sent", note: "Enter sent it: your words stay underlined at the caret while the model works; the panel says what is happening.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {status: "Working", busy: true, foot: ["Esc: stop"]}},
-  {id: "drafts", title: "An instruction's drafts", note: "Three readings, your instruction still underlined at the caret. The first is highlighted; ↓ moves; Tab inserts it (Tab takes the model's text, Enter talks to the model).",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {
-           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
-                  ["2", "I'd love to join, but I won't be able to attend the offsite."],
-                  ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab"}},
-  {id: "nudged", title: "Enter on a draft", note: "Enter talks to the model and never inserts its text, so here it lights the row's Tab, the key that does, until your next key (round 5: a key that does nothing must say why). The footer is not lit: it is three keys. No insert, no resend, no sound.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {
-           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
-                  ["2", "I'd love to join, but I won't be able to attend the offsite."],
-                  ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab", nudge: true}},
-  {id: "hosted", title: "A hosted model answered", note: "The same drafts, saying in words where they came from.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {
-           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
-                  ["2", "I'd love to join, but I won't be able to attend the offsite."],
-                  ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
-           on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab", mark: "from Claude · hosted"}},
-  {id: "ask", title: "The model asks", note: "Its question, your instruction still at the caret. Enter takes the highlighted choice, ↓ moves it; or just type.",
-   before: "", comp: "summarize this thread",
-   panel: {label: "The model asks", body: "The whole thread, or only the last reply?",
-           rows: [["1", "The whole thread"], ["2", "Only the last reply"]], on: 0,
-           foot: ["↑↓: choose", "Enter: confirm", "or type a reply"]}},
-  {id: "reply", title: "Typing a reply", note: "What you type takes your instruction's place at the caret: your reply. The panel now says what you asked; the choices fade.",
-   before: "", comp: "only the last two days",
-   panel: {thread: [["You asked", "summarize this thread"]], label: "The model asks", body: "The whole thread, or only the last reply?",
-           rows: [["1", "The whole thread"], ["2", "Only the last reply"]], on: -1, replying: true, anchor: "comp",
-           foot: ["Enter: send reply", "Esc: cancel reply"]}},
-  {id: "answered", title: "Answered", note: "Your instruction is the composition again, so the panel says only what you answered while the model works on (round 6).",
-   before: "", comp: "summarize this thread",
-   panel: {thread: [["You answered", "only the last two days"]],
-           status: "Working", busy: true, foot: ["Esc: stop"]}},
-  {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted; the first ↓ lands on Deny; Allow is ↓↓ Enter.",
-   before: "", comp: "push my branch",
-   panel: {label: "Claude Code wants to run", body: "git push origin parser-fix", code: true,
-           rows: [["1", "Deny"], ["2", "Allow"]], on: -1, foot: ["↑↓: choose", "or type why not"]}},
-  {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: the first ↓ keeps it here.",
-   before: "", comp: "have claude fix the failing parser test",
-   panel: {label: "Hand off to Claude Code", body: "Fix the failing parser test",
-           rows: [["1", "No", "answer it here"], ["2", "Yes", "it opens in a new window"]], on: -1,
-           foot: ["↑↓: choose", "Enter: confirm", "or type a reply"]}},
-  {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width. Tab puts it in your text, as Tab takes all the model's text.",
-   before: "", comp: "what does this error mean",
-   panel: {label: "The model says",
-           body: "The parser reached the end of the file while a string was still open. The quote on line 12 is never closed, so everything after it was read as part of the string.",
-           foot: ["Tab: insert", "Esc: dismiss", "or type to ask more"]}},
-  {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.",
-   before: "", comp: "fix the failing parser test",
-   panel: {status: "Reading tests/test_parser.py", busy: true, foot: ["Esc: stop"]}},
-  {id: "failed", title: "A failed request", note: "The panel says why; Enter sends it again, Esc brings your instruction back to the caret.",
-   before: "Hi Sam, ", comp: "decline the offsite politely",
-   panel: {failed: "The model is offline", foot: ["Enter: retry", "Esc: edit"]}},
-  {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.",
-   terminal: true, before: "~/claudish $ ", comp: "undo my last commit but keep the changes",
-   panel: {
-           rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
-           foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab"}},
-  {id: "dropped", title: "Esc dropped something", note: "Never silently: a drop or a clear says so, briefly, with the key that brings it back.",
-   before: "Hi Sam, ", toast: "dropped"},
-  {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: your instruction went in as you typed it (as a CJK preedit does) and the exchange was held. A pill says what waits; it takes no keys until Shift+Esc opens it.",
-   before: "Hi Sam, decline the offsite politely", toast: "returned"},
-  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.",
-   before: "Thanks for the review — I'll", toast: "compose"},
-  {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.",
-   before: "Thanks for the review — I'll", toast: "continue"},
+  {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.", before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
+  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The keys show from the first key: Enter sends your words away, so it must be known.", before: "Team: ", comp: "running late, start without me"},
+  {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.", before: "Team: ", comp: "running late, start without me"},
+  {id: "converted", title: "Compose: a rewrite", note: "Your words stay in your text; the rewrite waits in the panel, and only Tab puts it in (a focus change never can).", before: "Team: ", comp: "running late, start without me"},
+  {id: "sent", title: "An instruction, sent", note: "Enter sent it: your words stay underlined at the caret while the model works; the panel says what is happening.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "drafts", title: "An instruction's drafts", note: "Three readings, your instruction still underlined at the caret. The first is highlighted; ↓ moves; Tab inserts it (Tab takes the model's text, Enter talks to the model).", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "nudged", title: "Enter on a draft", note: "Enter talks to the model and never inserts its text, so on a draft it lights the row's Tab, the key that does, until your next key. The footer is never lit. No insert, no resend, no sound.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "hosted", title: "A hosted model answered", note: "The same drafts, saying in words where they came from.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "ask", title: "The model asks", note: "Its question, your instruction still at the caret. Enter takes the highlighted choice, ↓ moves it; or just type.", before: "", comp: "summarize this thread"},
+  {id: "reply", title: "Typing a reply", note: "What you type takes your instruction's place at the caret: your reply. The panel now says what you asked; the choices fade.", before: "", comp: "only the last two days", anchor: "comp"},
+  {id: "answered", title: "Answered", note: "Your instruction is the composition again, so the panel says only what you answered while the model works on.", before: "", comp: "summarize this thread"},
+  {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted; the first ↓ lands on Deny; Allow is ↓↓ Enter.", before: "", comp: "push my branch"},
+  {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: the first ↓ keeps it here.", before: "", comp: "have claude fix the failing parser test"},
+  {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width. Tab puts it in your text, as Tab takes all the model's text.", before: "", comp: "what does this error mean"},
+  {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.", before: "", comp: "fix the failing parser test"},
+  {id: "failed", title: "A failed request", note: "The panel says why; Enter sends it again, Esc brings your instruction back to the caret.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.", before: "~/claudish $ ", comp: "undo my last commit but keep the changes", terminal: true},
+  {id: "dropped", title: "Esc dropped something", note: "Never silently: a drop or a clear says so, briefly, with the key that brings it back.", before: "Hi Sam, ", toast: true},
+  {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: your instruction went in as you typed it (as a CJK preedit does) and the exchange was held. A pill says what waits; it takes no keys until Shift+Esc opens it.", before: "Hi Sam, decline the offsite politely", toast: true},
+  {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.", before: "Thanks for the review — I'll", toast: true},
+  {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.", before: "Thanks for the review — I'll", toast: true},
 ];
 
 // Key names: the platform's own (a skin token). macOS menus show glyphs, without boxes.
@@ -116,27 +50,10 @@ const el = (tag, className, text) => {
   return node;
 };
 
-// A state's panel, in the shape of Composition.panel() (claudish/composition.py), which kit.js
-// draws for the lab, the demo, and (natively) every platform. "Tab: keep" is a key and its verb;
-// any other footer words are the free words after the keys.
-function described(spec) {
-  const foot = [], tail = [];
-  for (const words of spec.foot || []) {
-    const match = /^([^:]+): (.+)$/.exec(words);
-    if (match) foot.push([match[1], match[2]]); else tail.push(words);
-  }
-  return {thread: (spec.thread || []).map(([label, body]) => ({label, body})),
-          label: spec.label || null, body: spec.body || null, code: Boolean(spec.code), mono: Boolean(spec.mono),
-          rows: (spec.rows || []).map(([key, text, legend]) => ({key: "", text, legend: legend || null})),
-          on: spec.on === undefined ? -1 : spec.on, replying: Boolean(spec.replying), take: spec.take || "Enter", nudge: Boolean(spec.nudge), foot, tail: tail.join(" ") || null,
-          tile: spec.failed ? "warn" : "ai", status: spec.status || null, busy: Boolean(spec.busy),
-          failed: spec.failed || null, mark: spec.mark || null};
-}
-
 // The host: a window of the platform's own kind with a text box, the caret in it.
 function frame(skin, state) {
   const host = el("div", `host ${skin}` + (state.terminal ? " terminal" : ""));
-  if (state.panel && state.panel.anchor) host.dataset.anchor = state.panel.anchor;
+  if (state.anchor) host.dataset.anchor = state.anchor;
   const bar = el("div", "host-bar");
   const app = state.terminal ? {windows: "Terminal", macos: "Terminal", gnome: "Console", reference: "TERMINAL"}[skin]
     : SKINS[skin].app || "NOTES";
@@ -155,16 +72,9 @@ function frame(skin, state) {
     line.append(lead, el("span", "k-ghost", state.ghost.slice(lead.length)));
   }
   text.append(line);
-  if (state.panel) text.append(Kit.panel(described(state.panel), KEYS[skin] || {}));
-  if (state.toast) {  // a panel with only a footer: Composition.toast(), dropped_toast(), returned()
-    const toasts = {
-      compose: {tile: "ai", status: "Compose", foot: [["Shift", "continue"]]},
-      continue: {tile: "cd", status: "Continue", foot: [["Shift", "compose"]]},
-      dropped: {tile: "ai", status: "Dropped", foot: [["Shift+Esc", "restore"]]},
-      returned: {tile: "ai", status: "3 drafts ready", foot: [["Shift+Esc", "open"]]},
-    };
-    text.append(Kit.toast(toasts[state.toast], KEYS[skin] || {}));
-  }
+  // What cd_AI draws: the panel (or, for a toast, a panel with only a footer) composition.py made.
+  const spec = (window.LAB_STATES || {})[state.id];
+  if (spec) text.append(state.toast ? Kit.toast(spec, KEYS[skin] || {}) : Kit.panel(spec, KEYS[skin] || {}));
   host.append(bar, text);
   return host;
 }

@@ -26,7 +26,7 @@ CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-uns
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
 REPO = "https://github.com/noobpwnftw/claudish"
 FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png",
-         "kit.css", "kit.js", "design.html", "design.css", "design.js"]
+         "kit.css", "kit.js", "design.html", "design.css", "design.js", "lab-states.js"]
 
 
 def build(out):

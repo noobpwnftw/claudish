@@ -180,7 +180,8 @@ def make_server(rewriter, port=18765, token=None):
                       "/kit.js": ("kit.js", "text/javascript; charset=utf-8"),
                       "/design.html": ("design.html", "text/html; charset=utf-8"),
                       "/design.css": ("design.css", "text/css; charset=utf-8"),
-                      "/design.js": ("design.js", "text/javascript; charset=utf-8")}
+                      "/design.js": ("design.js", "text/javascript; charset=utf-8"),
+                      "/lab-states.js": ("lab-states.js", "text/javascript; charset=utf-8")}
             if self.path in assets:
                 filename, content_type = assets[self.path]
                 body = files("claudish").joinpath("web", filename).read_bytes()

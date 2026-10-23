@@ -34,38 +34,34 @@ def main():
         driver.front()
         driver.type_text("Thanks for the review ")
         time.sleep(2.5)  # the suggestion is cd_AI's own overlay, not marked text: give it time
-        show("01-continue-suggestion")
+        show("continue")
         driver.key("Escape")
         driver.fresh_document()
         driver.shift_tap()  # compose
         driver.type_text("this is very important")
         time.sleep(0.5)
-        show("02-compose-typing")
+        show("compose")
         driver.key("Tab")  # the rewrite in place
         time.sleep(1.2)
-        show("03-rewrite-in-place")
+        show("converted")
         driver.key("Escape")
         driver.key("Escape")
         driver.fresh_document()
         driver.type_text("say hi")
         driver.key("Return")  # an instruction's drafts
         time.sleep(1.5)
-        show("04-instruct-drafts")
+        show("drafts")
         driver.key("Return")  # Enter on a draft: nothing inserted, the row's Tab lit
         time.sleep(0.4)
-        show("04b-enter-on-drafts")
+        show("nudged")
         driver.key("Escape")
         driver.key("Escape")
         driver.fresh_document()
-        # A long instruction: the panel opens at its end; when Enter sends it, it moves to the caret.
-        driver.type_text("write a short note to the whole team thanking them for shipping on time")
-        time.sleep(1.0)
-        show("05-long-instruction")
-        driver.key("Return")
-        time.sleep(1.5)
-        show("06-long-instruction-sent")
+        driver.type_text("never mind")  # Esc steps back, then drops: it says so
+        time.sleep(0.3)
         driver.key("Escape")
-        driver.key("Escape")
+        time.sleep(0.4)
+        show("dropped")
     finally:
         STATE.write_text("done")
         app.terminate()

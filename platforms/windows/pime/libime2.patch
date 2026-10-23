@@ -400,10 +400,10 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..af9b903
+index 0000000..5f8a858
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,546 @@
+@@ -0,0 +1,532 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -421,7 +421,7 @@ index 0000000..af9b903
 +namespace Ime {
 +
 +// The skin's geometry in pixels at 96 DPI (design.css, .host.windows).
-+static const float PAD = 4, ROW_X = 10, ROW_Y = 5, NUMBER = 12, NUMBER_GAP = 10, TAKE = 48, HEAD_GAP = 2;
++static const float PAD = 4, ROW_X = 10, ROW_Y = 5, TAKE = 48, HEAD_GAP = 2;
 +static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
 +static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
 +// The panel's corners and shadow (the lab's Windows skin: --k-radius 8px; --k-shadow 0 8px 16px,
@@ -516,13 +516,10 @@ index 0000000..af9b903
 +    turns_.clear();
 +    for (auto& line : rows_)
 +        releaseOne(line.layout);
-+    for (auto& line : numbers_)
-+        releaseOne(line.layout);
 +    for (auto& item : foot_)
 +        releaseOne(item.layout);
 +    releaseOne(take_);
 +    rows_.clear();
-+    numbers_.clear();
 +    rowTop_.clear();
 +    rowHeight_.clear();
 +    foot_.clear();
@@ -588,32 +585,23 @@ index 0000000..af9b903
 +        y += body_.h + px(ROW_Y);
 +        widest = (std::max)(widest, body_.w + 2 * (px(PAD) + px(ROW_X)));
 +    }
-+    // The rows: a number, the text (its legend muted); a list with a highlight keeps a trailing
-+    // column on every row for the highlighted row's Enter, so every row wraps alike.
++    // The rows: the text (its legend muted); a list with a highlight keeps a trailing column on
++    // every row for the key that takes the highlighted one, so every row wraps alike.
 +    const bool takes = spec.on >= 0 && spec.on < (int)spec.rows.size();
-+    bool numbered = false;  // choices are not numbered (digits are text), so no number column
-+    for (const auto& row : spec.rows)
-+        numbered = numbered || !row.key.empty();
-+    const float keys = numbered ? px(NUMBER) + px(NUMBER_GAP) : 0;
-+    const float textX = px(PAD) + px(ROW_X) + keys;
-+    const float textMax = inner - keys - (takes ? px(TAKE) : 0);
++    const float textX = px(PAD) + px(ROW_X);
++    const float textMax = inner - (takes ? px(TAKE) : 0);
 +    for (size_t i = 0; i < spec.rows.size(); ++i) {
 +        const PanelRow& row = spec.rows[i];
 +        std::wstring words = row.text + (row.legend.empty() ? L"" : L" — " + row.legend);
-+        Line line, number;
++        Line line;
 +        line.layout = makeLayout(words, text_, textMax);
 +        measure(line.layout, &line.w, &line.h);
-+        number.layout = makeLayout(row.key, text_, px(NUMBER) + 4);
-+        measure(number.layout, &number.w, &number.h);
 +        float h = (std::max)(line.h, px(18)) + 2 * px(ROW_Y);
 +        rowTop_.push_back(y);
 +        rowHeight_.push_back(h);
 +        line.x = textX;
 +        line.y = y + px(ROW_Y);
-+        number.x = px(PAD) + px(ROW_X);
-+        number.y = y + px(ROW_Y);
 +        rows_.push_back(line);
-+        numbers_.push_back(number);
 +        widest = (std::max)(widest, textX + line.w + (takes ? px(TAKE) : 0) + px(ROW_X) + px(PAD));
 +        y += h;
 +    }
@@ -766,8 +754,6 @@ index 0000000..af9b903
 +            target->CreateSolidColorBrush(color(colors.accent), &inverse);
 +            ink = inverse;
 +        }
-+        if (!spec_.replying)  // typing a reply: the choices take no number
-+            text(numbers_[i].layout, numbers_[i].x, numbers_[i].y, on ? ink : muted);
 +        const PanelRow& row = spec_.rows[i];
 +        if (!row.legend.empty() && rows_[i].layout) {  // the legend in the muted colour
 +            DWRITE_TEXT_RANGE range = { (UINT32)row.text.size(), (UINT32)(row.legend.size() + 3) };
@@ -952,10 +938,10 @@ index 0000000..af9b903
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..7853e7a
+index 0000000..647d1ff
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,161 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -979,7 +965,6 @@ index 0000000..7853e7a
 +
 +// What the panel shows: Claudish's Composition.panel(), sent by the input method as JSON.
 +struct PanelRow {
-+    std::wstring key;
 +    std::wstring text;
 +    std::wstring legend;
 +};
@@ -1051,7 +1036,6 @@ index 0000000..7853e7a
 +    Line label_, body_;
 +    std::vector<Line> turns_;     // the thread, one line each
 +    std::vector<Line> rows_;      // the rows' text
-+    std::vector<Line> numbers_;
 +    std::vector<float> rowTop_, rowHeight_;
 +    std::vector<FootItem> foot_;
 +    float footTop_ = 0, footHeight_ = 0;
@@ -1121,10 +1105,10 @@ index 0000000..7853e7a
 +#endif
 diff --git a/src/Style.h b/src/Style.h
 new file mode 100644
-index 0000000..fda5323
+index 0000000..dadfca2
 --- /dev/null
 +++ b/src/Style.h
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,97 @@
 +//
 +//    Claudish: the look of the candidate and message windows, after Windows 11's own popups
 +//    (a rounded corner, the system shadow, the app theme's colours). Header-only, LGPL like
@@ -1213,45 +1197,10 @@ index 0000000..fda5323
 +    return ::MulDiv(pixels, dpi, 96);
 +}
 +
-+// A font like `base`, `percent` of its size, in the given weight.
-+inline HFONT derivedFont(HFONT base, int percent, int weight) {
-+    LOGFONTW lf;
-+    if (!base || !::GetObjectW(base, sizeof(lf), &lf))
-+        return NULL;
-+    lf.lfHeight = ::MulDiv(lf.lfHeight, percent, 100);
-+    lf.lfWeight = weight;
-+    lf.lfQuality = CLEARTYPE_QUALITY;
-+    return ::CreateFontIndirectW(&lf);
-+}
-+
 +inline void fillRect(HDC dc, const RECT& rc, COLORREF color) {
 +    HBRUSH brush = ::CreateSolidBrush(color);
 +    ::FillRect(dc, &rc, brush);
 +    ::DeleteObject(brush);
-+}
-+
-+inline void fillRoundRect(HDC dc, const RECT& rc, int radius, COLORREF color) {
-+    HBRUSH brush = ::CreateSolidBrush(color);
-+    HGDIOBJ oldBrush = ::SelectObject(dc, brush);
-+    HGDIOBJ oldPen = ::SelectObject(dc, ::GetStockObject(NULL_PEN));
-+    ::RoundRect(dc, rc.left, rc.top, rc.right + 1, rc.bottom + 1, radius * 2, radius * 2);
-+    ::SelectObject(dc, oldPen);
-+    ::SelectObject(dc, oldBrush);
-+    ::DeleteObject(brush);
-+}
-+
-+// The height of `text` wrapped to `width` in the font selected into `dc`.
-+inline int wrappedHeight(HDC dc, const std::wstring& text, int width, int* used = NULL) {
-+    RECT rc = { 0, 0, width, 0 };
-+    ::DrawTextW(dc, text.c_str(), (int)text.length(), &rc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
-+    if (used)
-+        *used = rc.right;
-+    return rc.bottom;
-+}
-+
-+inline void drawWrapped(HDC dc, const std::wstring& text, RECT rc, COLORREF color) {
-+    ::SetTextColor(dc, color);
-+    ::DrawTextW(dc, text.c_str(), (int)text.length(), &rc, DT_WORDBREAK | DT_NOPREFIX);
 +}
 +
 +} // namespace Ime

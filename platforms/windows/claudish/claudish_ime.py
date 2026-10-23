@@ -2,7 +2,7 @@
 from textService import TextService
 import time
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, blank
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -287,7 +287,7 @@ class ClaudishTextService(TextService):
                 self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "done" in data:
                 if self.state.done(revision):
-                    self.showMessage("cd_AI: " + data["done"], 3)  # a helper took the task
+                    self.setToast(blank(status=data["done"]), 3)  # a helper took the task: said briefly at the caret
             elif "error" in data:
                 self.state.fail(revision, data["error"])  # the panel says why: Enter retries
 

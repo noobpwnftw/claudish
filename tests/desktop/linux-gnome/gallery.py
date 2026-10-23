@@ -64,29 +64,36 @@ def main():
         driver.focus("view")
         keys.type("Thanks for the review ")  # continue: the rest of the sentence after the caret
         time.sleep(1.2)
-        shot("01-continue-suggestion")
+        shot("continue")
         keys.press("ctrl+a", "BackSpace", "Shift_L")  # compose
         keys.type("this is very important")
-        shot("02-compose-typing")
-        keys.press("Tab")  # the rewrite in place
+        shot("compose")
+        keys.press("Tab")  # the rewrite, waiting in the panel
         time.sleep(0.8)
-        shot("03-rewrite-in-place")
+        shot("converted")
         keys.press("Escape", "Escape")
         keys.type("say hi")
         keys.press("Return")  # an instruction's drafts
         time.sleep(1.0)
-        shot("04-instruct-drafts")
+        shot("drafts")
+        keys.press("Return")  # Enter on a draft: nothing inserted, the row's Tab lit
+        time.sleep(0.4)
+        shot("nudged")
         keys.press("Escape", "Escape")
+        keys.type("never mind")  # Esc steps back, then drops: it says so
+        keys.press("Escape")
+        time.sleep(0.4)
+        shot("dropped")
         service.terminate()
         service.wait(5)
         service = serve("agent")
         keys.type("is my branch clean?")
         keys.press("Return")  # an agent: progress, then a permission question
         time.sleep(0.5)
-        shot("05-agent-progress")
+        shot("progress")
         driver.wait_for(lambda: True, timeout=2)
         time.sleep(1.5)
-        shot("06-agent-question")
+        shot("permission")
         keys.press("Escape", "Escape")
     finally:
         app.terminate()

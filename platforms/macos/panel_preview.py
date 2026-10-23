@@ -1,78 +1,51 @@
-"""Draw cd_AI's macOS panel in every state of the design lab at once (docs/design/design.md), from
-real Composition states, for comparing with claudish/web/design.html#macos: run it on a Mac
-(python3 panel_preview.py [seconds]) and screenshot it. Not part of the input method."""
+"""Draw every design-lab state with cd_AI's macOS panel, one at a time, from the same panel
+descriptions the lab draws (claudish/web/lab-states.js, generated from composition.py), for
+comparing the native renderer with design.html#macos state by state. Not part of the input method.
+
+  python3 panel_preview.py [seconds per state]       # on a Mac: watch, or screenshot each
+  tests/desktop/macos/gallery.sh OUT preview          # the host captures each over VNC
+
+Each state is announced in /tmp/claudish-gallery-state (the gallery protocol); with an answer in
+/tmp/claudish-gallery-ack it moves on at once."""
 import os
 import sys
+import time
+from pathlib import Path
 
-from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSScreen, NSTimer
+from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSDate, NSRunLoop, NSScreen
 
 here = os.path.dirname(os.path.abspath(__file__))
-sys.path[:0] = [here, os.path.join(here, "..", "..")]
-from claudish.composition import Composition  # noqa: E402
-from panel import Overlay, Panel  # noqa: E402
+root = os.path.join(here, "..", "..")
+sys.path[:0] = [here, os.path.join(root, "scripts")]
+import lab_states  # noqa: E402
+from panel import Panel  # noqa: E402
 
-DRAFTS = ["Thank you for the invitation — I'm afraid I can't make the offsite this time.",
-          "I'd love to join, but I won't be able to attend the offsite.",
-          "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]
-
-
-def composed(text):
-    state = Composition()
-    state.mode = "compose"
-    state.change(text)
-    return state
+STATE, ACK = Path("/tmp/claudish-gallery-state"), Path("/tmp/claudish-gallery-ack")
 
 
-def states():
-    """(name, spec) for each state the lab shows, built the way the input method builds them."""
-    typing = composed("running late, start without me")
-    yield "compose", typing.panel(typing.typed_at + 2)
-    rewriting = composed("running late, start without me")
-    rewriting.tab()
-    yield "rewriting", rewriting.panel()
-    rewriting.offer(rewriting.revision, "I'm running a little late — please start without me.")
-    yield "converted", rewriting.panel()
-    drafts = composed("decline the offsite politely")
-    drafts.submit()
-    drafts.offer(drafts.revision, DRAFTS[0], DRAFTS[1:])
-    yield "drafts", drafts.panel()
-    drafts.hosted = "Claude"
-    yield "hosted", drafts.panel()
-    asked = composed("summarize this thread")
-    asked.submit()
-    asked.ask(asked.revision, {"id": "a", "label": "The model asks", "body": "The whole thread, or only the last reply?",
-                               "choices": [{"label": "The whole thread"}, {"label": "Only the last reply"}]}, "s")
-    yield "ask", asked.panel()
-    asked.ask(asked.revision, {"id": "p", "permission": True, "label": "Claude Code wants to run",
-                               "body": "git push origin parser-fix", "code": True,
-                               "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
-    yield "permission", asked.panel()
-    asked.ask(asked.revision, {"id": "r", "label": "The model says", "read": True, "body": (
-        "The parser reached the end of the file while a string was still open. The quote on line 12 is never "
-        "closed, so everything after it was read as part of the string."),
-        "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
-    yield "answer", asked.panel()
-    working = composed("fix the failing parser test")
-    working.submit()
-    working.note(working.revision, "Reading tests/test_parser.py")
-    yield "progress", working.panel()
-    working.fail(working.revision, "Connection refused")
-    yield "failed", working.panel()
+def pump(seconds):
+    """Let AppKit draw while waiting."""
+    NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(seconds))
 
 
-app = NSApplication.sharedApplication()
-app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
-screen = NSScreen.mainScreen().visibleFrame()
-left, top = screen.origin.x + 40, screen.origin.y + screen.size.height - 40
-keep = []
-for index, (name, spec) in enumerate(states()):
+def main():
+    app = NSApplication.sharedApplication()
+    app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+    screen = NSScreen.mainScreen().visibleFrame()
+    caret = ((screen.origin.x + 200, screen.origin.y + screen.size.height - 220), (2, 18))
+    wait = float(sys.argv[1]) if len(sys.argv) > 1 else 3.0
     panel = Panel()
-    column, row = index % 3, index // 3
-    panel.show(((left + column * 470, top - row * 230), (2, 18)), spec)
-    keep.append(panel)
-overlay = Overlay()
-overlay.show(((left + 470 * 2, top - 3 * 230), (2, 18)), "send the revised draft by Friday.")
-keep.append(overlay)
-NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-    float(sys.argv[1]) if len(sys.argv) > 1 else 30, app, "terminate:", None, False)
-app.run()
+    for name, spec in lab_states.load(os.path.join(root, "claudish/web/lab-states.js")).items():
+        panel.show(caret, spec)
+        pump(0.3)
+        ACK.unlink(missing_ok=True)
+        STATE.write_text(name)
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline and not ACK.exists():
+            pump(0.1)
+        panel.hide()
+    STATE.write_text("done")
+
+
+if __name__ == "__main__":
+    main()
