@@ -37,7 +37,7 @@ def resolve(path=None, profile=None, overrides=None):
     """Return (profile name, settings, prompt, context) from the file, then non-None overrides.
 
     settings["modes"] becomes name -> {"system", "examples", "max_tokens"} overrides for Rewriter."""
-    settings, name, base, servers = dict(DEFAULTS), None, Path.cwd(), {}
+    settings, name, base, servers, known = dict(DEFAULTS), None, Path.cwd(), {}, set()
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
         try:
@@ -47,6 +47,7 @@ def resolve(path=None, profile=None, overrides=None):
         profiles = data.get("profiles") if isinstance(data, dict) else None
         if not isinstance(profiles, dict) or not profiles:
             raise ValueError('%s needs a "profiles" object' % path)
+        known = set(profiles)
         name = profile or data.get("profile") or next(iter(profiles))
         if name not in profiles:
             raise ValueError("profile %r is not in %s (have: %s)" % (name, path, ", ".join(profiles)))
@@ -110,6 +111,10 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError("profile %r: context must be a list of objects" % name)
         context = Context(settings["context"], base, settings["max_context_chars"], servers)
     settings["bindings"] = [Binding(spec, base, servers) for spec in settings["bindings"] or []]
+    for binding in settings["bindings"]:
+        if binding.profile and binding.profile not in known:
+            raise ValueError("profile %r: binding for %r names profile %r, which is not in the config"
+                             % (name, binding.pattern, binding.profile))
     settings["mcp_servers"] = servers
     return name, settings, prompt, context
 

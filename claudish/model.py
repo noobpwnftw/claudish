@@ -144,6 +144,8 @@ class Rewriter:
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
         self.helper = None  # profile "helper": an agent an instruction may hand the task to (G39)
+        self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
+        self.routed = {}
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         custom = prompt is not None  # a --prompt rewrite template wins over a tone
         self.modes = invocation.defaults((self.system, self.examples) if custom or not tone else None, tone)
@@ -163,6 +165,19 @@ class Rewriter:
             self.command = command
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
+
+    def route(self, app):
+        """The profile that answers in this app: a binding's "profile" (which AI answers where),
+        else this one. Routed profiles share this service's sessions and conversations."""
+        for binding in self.bindings:
+            if binding.profile and binding.matches(app) and self.loader is not None:
+                if binding.profile not in self.routed:
+                    other = self.loader(binding.profile)
+                    other.sessions, other.conversations = self.sessions, self.conversations
+                    other.url = getattr(self, "url", None)
+                    self.routed[binding.profile] = other
+                return self.routed[binding.profile]
+        return self
 
     def sections(self, app=None):
         """The profile's context and the focused app's bindings (a supported text box): [(name, text)]."""

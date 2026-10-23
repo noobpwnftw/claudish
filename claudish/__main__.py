@@ -119,6 +119,11 @@ def main():
             parser.error(str(exc))
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
+        def load(name):
+            """Another profile of this config, for an app a binding routes to it."""
+            _, routed, routed_prompt, routed_context = config.resolve(args.config, name)
+            return Rewriter.from_settings(routed, routed_prompt, routed_context, name)
+        rewriter.loader = load
         from .client import write_token
         server = make_server(rewriter, args.port, write_token())
         if rewriter.hosted:

@@ -224,3 +224,65 @@ class MCPContextTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RoutingTests(unittest.TestCase):
+    """Which AI answers where: a binding's "profile" routes an app's requests to that profile."""
+
+    def config(self, folder, bindings):
+        path = Path(folder) / "config.json"
+        path.write_text(json.dumps({"profile": "main", "profiles": {
+            "main": {"backend": "rules", "bindings": bindings},
+            "plain": {"backend": "rules", "tone": "plain"}}}))
+        return path
+
+    def test_a_binding_routes_an_app_to_its_profile(self):
+        import tempfile
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            path = self.config(folder, [{"app": "slack*", "profile": "plain"}])
+            name, settings, prompt, context = config.resolve(path)
+            main = Rewriter.from_settings(settings, prompt, context, name)
+            loaded = []
+
+            def load(profile):
+                loaded.append(profile)
+                _, routed, routed_prompt, routed_context = config.resolve(path, profile)
+                return Rewriter.from_settings(routed, routed_prompt, routed_context, profile)
+            main.loader = load
+            slack = main.route("slack")
+            self.assertEqual(slack.profile, "plain")
+            self.assertIn("plain, natural", slack.modes["rewrite"]["system"])  # its tone, not main's
+            self.assertIs(main.route("gedit"), main)
+            self.assertIs(main.route("slack"), slack)  # built once
+            self.assertEqual(loaded, ["plain"])
+            self.assertIs(slack.sessions, main.sessions)  # one service: shared sessions and conversations
+            server = make_server(main, 0)
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            try:
+                url = "http://127.0.0.1:%d/suggest" % server.server_port
+                for app, token, expected in (("slack", True, "plain"), ("gedit", True, "main"),
+                                             ("slack", False, "main")):
+                    headers = {"Content-Type": "application/json"}
+                    body = {"text": "very good", "app": app}
+                    if token:
+                        headers["X-Claudish-Token"] = server.token
+                    else:
+                        body.pop("app")  # the demo's request: no app, the default profile
+                    with patch.object(Rewriter, "rewrite", autospec=True,
+                                      side_effect=lambda self, *a, **k: {"text": self.profile}) as rewrite:
+                        with urlopen(Request(url, json.dumps(body).encode(), headers)) as reply:
+                            self.assertEqual(json.load(reply)["text"], expected, (app, token))
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
+    def test_an_unknown_profile_in_a_binding_is_refused(self):
+        import tempfile
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            path = self.config(folder, [{"app": "slack*", "profile": "nope"}])
+            with self.assertRaisesRegex(ValueError, "names profile 'nope'"):
+                config.resolve(path)

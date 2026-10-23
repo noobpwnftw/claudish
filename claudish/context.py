@@ -246,12 +246,15 @@ class Context:
 
 
 class Binding:
-    """Context for one kind of text box: an app pattern, such as "firefox*" or "com.apple.Terminal"."""
+    """A kind of text box, by app pattern ("firefox*", "com.apple.Terminal"): the context it adds,
+    and the profile that answers there (which AI: its backend, tone, tools, and helper)."""
 
     def __init__(self, spec, base=Path.cwd(), servers=None):
-        if not isinstance(spec, dict) or not isinstance(spec.get("app"), str) or set(spec) - {"app", "context"}:
-            raise ValueError('a binding is {"app": "pattern", "context": [providers]}')
+        if (not isinstance(spec, dict) or not isinstance(spec.get("app"), str) or set(spec) - {"app", "context", "profile"}
+                or not isinstance(spec.get("profile", ""), str)):
+            raise ValueError('a binding is {"app": "pattern", "context": [providers], "profile": "name"}')
         self.pattern = spec["app"]
+        self.profile = spec.get("profile")
         self.providers = [Provider(item, base, servers) for item in spec.get("context") or []]
 
     def matches(self, app):

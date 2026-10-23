@@ -63,6 +63,24 @@ globs. Every response lists what was `consulted`, so it is always visible what
 the AI read. Support grows by adding context providers per app, not by
 installing another app.
 
+A binding can also say **which AI answers** there, by naming another profile of
+the same file: its backend, tone, tools, and helper answer for that app.
+
+```json
+{"profile": "local", "profiles": {
+  "local": {"backend": "llama", "bindings": [
+    {"app": "slack*", "profile": "plain"},
+    {"app": "firefox*", "profile": "claude"},
+    {"app": "gnome-terminal-server", "profile": "agent"}]},
+  "plain": {"backend": "llama", "tone": "plain"},
+  "claude": {"backend": "claude"},
+  "agent": {"backend": "llama", "helper": ["claude", "{prompt}"]}}}
+```
+
+The service's own profile (`claudish serve --profile`, or the file's
+`"profile"`) holds the bindings; other profiles are loaded when an app first
+needs them.
+
 ### An agent CLI as the backend
 
 An agent CLI is a text box and Enter, and an input method is a text box in every
