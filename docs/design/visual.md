@@ -100,8 +100,8 @@ an anti-AI writer, an accessibility consultant and an office manager
   without a composition. macOS apps pass an input method Return, Tab and the arrows only while
   there is marked text, and not reliably (Terminal never, a Notes title sometimes); so on every
   platform. A reply you type takes its place; a focus change commits what it shows (your own
-  words) and holds the exchange. "You asked" shows in the panel only once the composition no
-  longer says it (a reply, an answer): to be polled.
+  words) and holds the exchange. The panel says only what the composition does not (round 6, 7/7):
+  "You asked" while a reply takes the instruction's place, "You answered" after an answer.
 - **The panel is the exchange, not a chat:** your earlier turns ("You asked", "You answered") as
   context, one line each, muted, at full size, with a neutral rule beside them; the current turn
   (a question, a command to approve, the drafts, an answer) at full contrast. Only the first "You

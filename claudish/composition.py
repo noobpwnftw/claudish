@@ -142,11 +142,10 @@ class Composition:
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
                  "replying": False, "take": "Enter", "nudge": False}
         question = self.question
-        if self.sent and (self.reply or self.answers):
-            # The exchange so far, once the composition no longer shows your instruction (you type
-            # a reply, or answered): your instruction, then your latest answer. While it shows it,
-            # the composition at the caret says what you asked.
-            shown["thread"] = [{"label": "You asked", "body": self.text}] + (
+        if self.sent:
+            # What the composition does not say (round 6): "You asked" only while a reply takes the
+            # instruction's place at the caret; your latest answer once you answered.
+            shown["thread"] = ([{"label": "You asked", "body": self.text}] if self.reply else []) + (
                 [{"label": "You answered", "body": self.answers[-1]}] if self.answers else [])
         if question:
             choices = question.get("choices") or []

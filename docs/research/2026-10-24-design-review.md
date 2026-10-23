@@ -68,3 +68,24 @@ rewrite contradictory: now "Tab insert · Esc dismiss". The accessibility consul
 keycap borders under 3:1: raised. Raised and open: the panel crossing the app window's edge,
 truncated "You asked", rebindable keys (Rime), screen-reader announcements, and drafts in the
 rigs echoing the instruction (the rigs' scripted backend, not a model).
+
+## Round 6: the instruction stays at the caret (2026-10-24)
+
+macOS apps pass an input method Return, Tab and the arrows only while there is marked text, and
+not reliably (the trace showed the owner's Enter in a Notes title never reached cd_AI), so the
+owner chose CJK-style composition everywhere: a sent instruction stays underlined while its
+exchange is open, a reply takes its place, and "You asked" left the panel (remove, then poll).
+The same seven reviewers, all: ship with changes.
+
+- Keeping it underlined: 7/7 right ("the underline tells the truth: it isn't committed").
+- "You asked" removed while the underline says it: 7/7. They caught the answered state still
+  showing it beside the underline: now "You asked" shows only while a reply takes its place, and
+  "You answered" after an answer.
+- A focus change committing it: 7/7 acceptable, as every CJK preedit. They caught the lab's
+  returned card drawing the instruction gone: now it shows it in the text.
+- Asked, and not built: a sent underline unlike a typing one (6/7: dotted, thicker, dimmed); GNOME
+  on Wayland cannot style a preedit at all, so the spinner and "Working" carry it everywhere.
+  Taking a draft after coming back should replace the instruction left in the text (5/7): G51.
+  Spoken status ("Sent, working"; "Instruction left in text") for screen readers: with G45's
+  accessibility pass. An approval highlighting Deny by default (2/7): round 4's deliberate ↓↓ Enter
+  stands.
