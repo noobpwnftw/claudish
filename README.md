@@ -56,7 +56,7 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 | --- | --- |
 | Linux (IBus) | real IBus and GTK typing in containers: X11 (26 scenarios), GNOME on Wayland (10) |
 | Windows (PIME/TSF) | Windows 11 ARM64 in a VM: Notepad and Edge |
-| macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, instruct (7 scenarios); the suggestion is underlined rather than grey |
+| macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, focus changes, instruct (8 scenarios); the suggestion is underlined rather than grey |
 
 Claudish is an experiment; the [roadmap](ROADMAP.md) says what is next.
 
