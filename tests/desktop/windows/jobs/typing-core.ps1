@@ -101,15 +101,21 @@ function Invoke-Scenarios {
   $dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
   Check 'Enter commits your wording, dash substituted' (Get-Text) "hello${dash}world"
   Reset-Target
-  [Keys]::Type('very important'); Start-Sleep -Milliseconds 800
-  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
-  Check 'Tab accepts the rewrite' (Get-Text) 'particularly crucial'
+  [Keys]::Type('very important'); Start-Sleep -Milliseconds 300
+  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab asks; the rewrite takes your words' place
+  Check 'Tab rewrites in place, nothing committed yet' (Get-Text) ''
+  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab again keeps it
+  Check 'Tab again keeps the rewrite' (Get-Text) 'particularly crucial'
   Reset-Target
   [Keys]::Type('very'); Start-Sleep -Milliseconds 800
-  [Keys]::Type(' good'); [Keys]::Press(0x09); Start-Sleep -Milliseconds 300
-  Check 'Tab right after an edit commits nothing stale' (Get-Text) ''
-  Start-Sleep -Milliseconds 800; [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
-  Check 'fresh candidate after the edit' (Get-Text) 'particularly good'
+  Check 'rewrite sends nothing while you type' (Get-Text) ''
+  [Keys]::Type(' good'); [Keys]::Press(0x09); Start-Sleep -Milliseconds 800
+  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
+  Check 'the rewrite is of the whole phrase' (Get-Text) 'particularly good'
+  Reset-Target
+  [Keys]::Type(' hi'); Start-Sleep -Milliseconds 300  # a leading space is the app's, not the phrase's
+  [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc keeps your words
+  Check 'a leading space goes straight to the app' (Get-Text) ' hi'
   Reset-Target
   [Keys]::Press(0x76)  # continue: typing goes straight into the app
   [Keys]::Type('Only my words '); Start-Sleep -Milliseconds 300  # a pause after a word: continue asks
@@ -124,6 +130,11 @@ function Invoke-Scenarios {
   Check 'instruct holds the text until it is inserted' (Get-Text) ''
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
   Check 'F7 to instruct, Enter sends, Enter inserts' (Get-Text) "As requested${dash}say hi."
+  Reset-Target
+  [Keys]::Type('never mind'); [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800
+  [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc: the draft closes, the instruction stays
+  [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc again: it is dropped
+  Check 'Esc twice drops an instruction, nothing inserted' (Get-Text) ''
   Reset-Target
   [Keys]::Type('draft'); Start-Sleep -Milliseconds 300
   [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 400  # Ctrl+A mid-composition
