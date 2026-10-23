@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-23 (late), `main` at `8fc0332`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-23 (later), `main` at `18e9877`. An interactive session on the Spark; no 24/7 runner.
 
 ## Where things stand
 
@@ -20,6 +20,20 @@ Checkpoint 2026-10-23 (late), `main` at `8fc0332`. An interactive session on the
 - **Mode indicators:** IBus InputMode property (GNOME top bar C/AI, verified); PIME C/AI icon
   (taskbar screenshot verified); macOS one input source "cd_AI" with a template cd.tiff icon
   (multi-mode sources didn't show for an unsigned bundle; reverted on the owner's suggestion).
+
+## Since the last checkpoint
+
+- G35 (terminals): the service reads a focused terminal through AT-SPI / UI Automation (ctypes) / AX
+  on Tab or Enter in compose; continue is quiet in terminals; never at a password prompt. Linux rig
+  40/40 (GNOME Terminal), Windows VM 4/4 (Windows Terminal portable zip in the VM share's wt/, the
+  classic console), Mac by hand (the rig's Terminal step fails only after its earlier scenarios: open).
+  `claudish fix` and its hooks are retired; benchmarks/evaluate_terminal.py: Qwen3 30B 20/23.
+- G36: per-run service token (~/.config/claudish/service-token, 0600) sent by the adapters.
+  **The Mac VM's installed cd_AI predates it**: rebuild + relogin with the owner before running the
+  rig against a current service (the VM's service is still an older checkout).
+- Persona poll (docs/research/2026-10-23-persona-poll.md) produced G36–G41; owner decisions pending:
+  Space picks draft 1, Enter's meaning in compose, a plain register by default, releases/signing.
+- Next: G38 per-app routing.
 
 ## Verified
 
