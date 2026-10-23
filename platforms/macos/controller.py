@@ -240,14 +240,15 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def font(self, client):
-        """The app's font at the caret, so the suggestion reads as the same text."""
+        """The app's font just before the caret (from its own text), so the suggestion reads as the
+        same text; None when the app does not say."""
         try:
             selected = client.selectedRange()
             location = selected.location if hasattr(selected, "location") else selected[0]
-            found = client.attributesForCharacterIndex_lineHeightRectangle_(max(0, location - 1), None)
-            attributes = found[0] if isinstance(found, tuple) else found
-            trace("font", type(found).__name__, sorted(attributes.keys()) if attributes else None)
-            return attributes.get("NSFont") if attributes else None
+            if location < 1:
+                return None
+            found = client.attributedSubstringFromRange_((location - 1, 1))
+            return found.attribute_atIndex_effectiveRange_("NSFont", 0, None)[0] if found is not None else None
         except Exception:
             trace("font failed", traceback.format_exc().splitlines()[-1])
             return None
