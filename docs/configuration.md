@@ -333,6 +333,15 @@ never goes on a command line. Not offered when the program is not installed or
 the command skips the helper's own permission prompts. Needs a backend with
 tool calls (llama.cpp, any OpenAI-compatible server, or Claude).
 
+With `{session}` in Claude Code's command, Claudish starts it on a session id it
+chose and keeps that in the text box's conversation, so a later "is it done?" in
+the same box can read the helper's latest messages from its own transcript
+(nothing is sent to it):
+
+```json
+{"profiles": {"local": {"helper": ["claude", "--session-id", "{session}", "{prompt}"]}}}
+```
+
 Several helpers can be named, each its own tool behind its own question, and a
 `"launcher"` says how they open (`{command}` is the helper's command):
 

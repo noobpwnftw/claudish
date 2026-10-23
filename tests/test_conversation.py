@@ -214,8 +214,9 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
-        template, note, launcher = launch.call_args.args
+        template, note, launcher, session = launch.call_args.args
         self.assertIsNone(launcher)
+        self.assertEqual(session, "")  # no {session} in the template: nothing to follow up on
         self.assertEqual(template, ["claude", "{prompt}"])
         self.assertTrue(note.startswith(folder))
         if os.name == "posix":
@@ -351,3 +352,46 @@ class FollowUpTests(unittest.TestCase):
         self.assertIn("what does this error mean", later)
         self.assertIn("The linker cannot find tokenize.", later)  # what was shown, though dismissed
         self.assertEqual(session.events[-1]["text"], "cc -o app main.o parse.o tokenize.o")
+
+
+class HandleTests(unittest.TestCase):
+    """G44: after a handoff, "is it done?" in the same box reads the helper's own transcript."""
+
+    def test_is_it_done_reads_the_helpers_session(self):
+        import os
+        import tempfile
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        rewriter.helper = ["claude", "--session-id", "{session}", "{prompt}"]
+        conversation = rewriter.conversations.get("term")
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "XDG_RUNTIME_DIR": home}), \
+                patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
+                patch("claudish.handoff.launch", return_value=True) as launch:
+            model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the link error"})]), answer("OK"))
+            with patch.object(rewriter, "chat", model):
+                session, thread = run(ModelDriver(rewriter, conversation), "have claude fix the build")
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                    time.sleep(0.01)
+                session.answer(next(e for e in session.events if e["type"] == "question")["id"], 0)
+                thread.join(5)
+            helper_session = launch.call_args.args[3]
+            self.assertTrue(helper_session)  # Claude Code is started with an id Claudish chose
+            # Claude Code writes its transcript under ~/.claude/projects/<cwd as dashes>/<session>.jsonl.
+            folder = os.path.join(home, ".claude", "projects", "".join(c if c.isalnum() else "-" for c in home))
+            os.makedirs(folder)
+            with open(os.path.join(folder, helper_session + ".jsonl"), "w") as out:
+                out.write(json.dumps({"type": "assistant", "timestamp": "2026-10-23T12:00:00Z", "message": {
+                    "content": [{"type": "tool_use", "name": "Edit"}]}}) + "\n")
+                out.write(json.dumps({"type": "assistant", "timestamp": "2026-10-23T12:01:00Z", "message": {
+                    "content": [{"type": "text", "text": "Added tokenize.o to the Makefile; the build passes."}]}}) + "\n")
+            model = Scripted(answer(calls=[("helper__check", {})]), answer("Yes: the build passes now."))
+            with patch.object(rewriter, "chat", model):
+                session, thread = run(ModelDriver(rewriter, conversation), "is it done?")
+                thread.join(5)
+        offered = [tool["function"]["name"] for tool in model.sent[0]["tools"]]
+        self.assertIn("helper__check", offered)
+        checked = model.sent[1]["messages"][-1]["content"]
+        self.assertIn("Added tokenize.o to the Makefile; the build passes.", checked)
+        self.assertIn("(used Edit)", checked)
+        self.assertEqual(session.events[-1]["text"], "Yes: the build passes now.")

@@ -30,6 +30,7 @@ class Conversation:
         self.approved = set()  # (server, tool) allowed for this conversation
         self.agent = None  # the agent process, when the profile uses one (session_command)
         self.textbox = Textbox()  # the text box as of the latest instruction (retrieval reads it)
+        self.handoffs = []  # tasks handed to helpers from this text box: {helper, task, session, cwd, started}
         self.token = secrets.token_hex(16)  # lets this conversation's agent read its text box
         self.used = time.monotonic()
 
@@ -139,12 +140,24 @@ class ModelDriver:
             {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
             lambda arguments: self.show(session, arguments, box))
         from . import handoff
+        if self.conversation.handoffs:
+            tools["helper__check"] = (
+                "What the helper you handed a task to from this text box is doing now: its latest messages "
+                "(read only; nothing is sent to it). Use it when the user asks about that task (\"is it done?\").",
+                {"type": "object", "properties": {}},
+                lambda arguments: "\n\n".join(handoff.progress(h) for h in self.conversation.handoffs[-3:]))
         for title, helper in handoff.helpers(self.rewriter.helper).items():
             def hand_over(arguments, title=title, helper=helper):
+                import os
+                import uuid
                 task = str(arguments.get("task") or "").strip()[:500]
                 note = handoff.write_note(task, box.observations)
-                if not handoff.launch(helper, note, getattr(self.rewriter, "launcher", None)):
+                session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
+                if not handoff.launch(helper, note, getattr(self.rewriter, "launcher", None), session):
                     return "No terminal window could be opened for %s: answer the instruction yourself." % title
+                # A handle, so a later "is it done?" in this text box can look (G44).
+                self.conversation.handoffs.append({"helper": title, "task": task, "session": session,
+                                                   "cwd": os.path.expanduser("~"), "started": time.time()})
                 self.handed = "%s opened in a new window" % title
                 return "Handed over. Reply with just: OK"
             tools["helper__" + title] = (

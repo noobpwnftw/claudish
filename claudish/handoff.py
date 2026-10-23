@@ -89,33 +89,74 @@ def write_note(task, observed):
     return path
 
 
-def arguments(template, note):
+def arguments(template, note, session=""):
     prompt = "Read the handoff note at %s and work on the task in it." % note
-    return [a.replace("{note}", note).replace("{prompt}", prompt) for a in template]
+    return [a.replace("{note}", note).replace("{prompt}", prompt).replace("{session}", session or "")
+            for a in template]
 
 
-def line(template, note):
+def progress(handle, entries=4):
+    """What a helper is doing now, for "is it done?" in the same text box (G44): its latest messages,
+    read from Claude Code's transcript of the session Claudish started (~/.claude/projects/<the
+    working directory, non-alphanumerics as "-">/<session>.jsonl). Nothing is sent to it."""
+    import json
+    if not handle.get("session"):
+        return ("%s was opened %s ago; it was started without a session id ({session} in the helper's "
+                "command), so its progress cannot be read." % (handle["helper"], ago(handle["started"])))
+    folder = re.sub(r"[^A-Za-z0-9]", "-", handle["cwd"])
+    path = os.path.join(os.path.expanduser("~"), ".claude", "projects", folder, handle["session"] + ".jsonl")
+    try:
+        with open(path, encoding="utf-8") as source:
+            lines = source.readlines()[-400:]
+    except OSError:
+        return "%s was opened %s ago and has written nothing yet." % (handle["helper"], ago(handle["started"]))
+    said, last = [], None
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        last = entry.get("timestamp") or last
+        for block in (entry.get("message") or {}).get("content") or []:
+            if block.get("type") == "text" and block.get("text", "").strip():
+                said.append(block["text"].strip()[:400])
+            elif block.get("type") == "tool_use":
+                said.append("(used %s)" % block.get("name", "a tool"))
+    if not said:
+        return "%s was opened %s ago and has not answered yet." % (handle["helper"], ago(handle["started"]))
+    return "%s, on the task \"%s\", last wrote at %s:\n%s" % (handle["helper"], handle["task"], last,
+                                                          "\n".join(said[-entries:]))
+
+
+def ago(started):
+    minutes = int((time.time() - started) // 60)
+    return "%d min" % minutes if minutes else "under a minute"
+
+
+def line(template, note, session=""):
     """The helper's command as one double-quoted line, or None when it cannot be written safely."""
     words = []
-    for argument in arguments(template, note):
+    for argument in arguments(template, note, session):
         if UNSAFE.search(argument):
             return None
         words.append('"%s"' % argument if " " in argument else argument)
     return " ".join(words)
 
 
-def launch(template, note, launcher=None):
+def launch(template, note, launcher=None, session=""):
     """Open the helper on the note in a new terminal window; True when one opened. The arguments go
     as a list (no shell parses them), except on macOS, where Terminal runs a checked line. A
     profile's launcher says how instead (["tmux", "new-window", "{command}"], ["ghostty", "-e",
     "{command}"]): {command} becomes the helper's arguments."""
     import platform
     import subprocess
-    argv, home, system = arguments(template, note), os.path.expanduser("~"), platform.system()
+    argv, home, system = arguments(template, note, session), os.path.expanduser("~"), platform.system()
     if launcher:
         commands = [[part for item in launcher for part in (argv if item == "{command}" else [item])]]
     elif system == "Darwin":
-        text = line(template, note)
+        text = line(template, note, session)
         if text is None:
             return False
         commands = [["osascript", "-e", 'tell application "Terminal" to do script "cd ~ && %s"'
