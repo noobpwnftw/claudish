@@ -96,26 +96,32 @@ def arguments(template, note, session=""):
 
 
 def progress(handle, entries=4):
-    """What a helper is doing now, for "is it done?" in the same text box (G44): its latest messages,
-    read from Claude Code's transcript of the session Claudish started (~/.claude/projects/<the
-    working directory, non-alphanumerics as "-">/<session>.jsonl). Nothing is sent to it."""
-    import json
-    if not handle.get("session"):
-        return ("%s was opened %s ago; it was started without a session id ({session} in the helper's "
-                "command), so its progress cannot be read." % (handle["helper"], ago(handle["started"])))
+    """What a helper is doing now, for "is it done?" in the same text box (G44), read without
+    sending it anything: Claude Code's transcript of the session Claudish started it on, Codex's
+    session that mentions the handoff note, or else the tmux window it was opened in."""
+    said, last = [], None
+    if handle["helper"] == "claude" and handle.get("session"):
+        said, last = claude_said(handle)
+    elif handle["helper"] == "codex" and handle.get("note"):
+        said, last = codex_said(handle)
+    if not said and handle.get("tmux"):
+        pane = tmux_pane(handle["tmux"])
+        if pane:
+            from .screen import redact, tail
+            return "%s's window (%s), last lines:\n%s" % (handle["helper"], handle["tmux"], redact(tail(pane))[0])
+    if said:
+        return "%s, on the task \"%s\", last wrote at %s:\n%s" % (handle["helper"], handle["task"], last,
+                                                              "\n".join(said[-entries:]))
+    return ("%s was opened %s ago; nothing it wrote can be read yet (Claude Code started with {session}, "
+            "Codex, or a tmux launcher with {name} can be followed)." % (handle["helper"], ago(handle["started"])))
+
+
+def claude_said(handle):
+    """Claude Code: ~/.claude/projects/<the working directory, non-alphanumerics as "-">/<session>.jsonl."""
     folder = re.sub(r"[^A-Za-z0-9]", "-", handle["cwd"])
     path = os.path.join(os.path.expanduser("~"), ".claude", "projects", folder, handle["session"] + ".jsonl")
-    try:
-        with open(path, encoding="utf-8") as source:
-            lines = source.readlines()[-400:]
-    except OSError:
-        return "%s was opened %s ago and has written nothing yet." % (handle["helper"], ago(handle["started"]))
     said, last = [], None
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
+    for entry in jsonl(path):
         if entry.get("type") != "assistant":
             continue
         last = entry.get("timestamp") or last
@@ -124,10 +130,59 @@ def progress(handle, entries=4):
                 said.append(block["text"].strip()[:400])
             elif block.get("type") == "tool_use":
                 said.append("(used %s)" % block.get("name", "a tool"))
-    if not said:
-        return "%s was opened %s ago and has not answered yet." % (handle["helper"], ago(handle["started"]))
-    return "%s, on the task \"%s\", last wrote at %s:\n%s" % (handle["helper"], handle["task"], last,
-                                                          "\n".join(said[-entries:]))
+    return said, last
+
+
+def codex_said(handle):
+    """Codex: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl, the one written since the handoff whose
+    messages mention the note (its id is Codex's own)."""
+    import glob
+    root = os.path.join(os.path.expanduser("~"), ".codex", "sessions")
+    for path in sorted(glob.glob(os.path.join(root, "*", "*", "*", "rollout-*.jsonl")), key=os.path.getmtime,
+                       reverse=True)[:20]:
+        if os.path.getmtime(path) < handle["started"] - 60:
+            break
+        try:
+            with open(path, encoding="utf-8") as source:
+                if handle["note"] not in source.read(200000):
+                    continue
+        except OSError:
+            continue
+        said, last = [], None
+        for entry in jsonl(path):
+            payload = entry.get("payload") or {}
+            if entry.get("type") == "response_item" and payload.get("type") == "message" \
+                    and payload.get("role") == "assistant":
+                last = entry.get("timestamp") or last
+                said += [part["text"].strip()[:400] for part in payload.get("content") or []
+                         if part.get("type") == "output_text" and part.get("text", "").strip()]
+        return said, last
+    return [], None
+
+
+def tmux_pane(name):
+    import subprocess
+    try:
+        done = subprocess.run(["tmux", "capture-pane", "-p", "-t", name], capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout if done.returncode == 0 else ""
+
+
+def jsonl(path, lines=400):
+    import json
+    try:
+        with open(path, encoding="utf-8") as source:
+            tail_lines = source.readlines()[-lines:]
+    except OSError:
+        return []
+    entries = []
+    for line in tail_lines:
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            pass
+    return entries
 
 
 def ago(started):
@@ -145,7 +200,7 @@ def line(template, note, session=""):
     return " ".join(words)
 
 
-def launch(template, note, launcher=None, session=""):
+def launch(template, note, launcher=None, session="", name=""):
     """Open the helper on the note in a new terminal window; True when one opened. The arguments go
     as a list (no shell parses them), except on macOS, where Terminal runs a checked line. A
     profile's launcher says how instead (["tmux", "new-window", "{command}"], ["ghostty", "-e",
@@ -154,7 +209,8 @@ def launch(template, note, launcher=None, session=""):
     import subprocess
     argv, home, system = arguments(template, note, session), os.path.expanduser("~"), platform.system()
     if launcher:
-        commands = [[part for item in launcher for part in (argv if item == "{command}" else [item])]]
+        commands = [[part for item in launcher
+                     for part in (argv if item == "{command}" else [item.replace("{name}", name)])]]
     elif system == "Darwin":
         text = line(template, note, session)
         if text is None:

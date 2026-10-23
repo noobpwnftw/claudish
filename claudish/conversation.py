@@ -153,10 +153,13 @@ class ModelDriver:
                 task = str(arguments.get("task") or "").strip()[:500]
                 note = handoff.write_note(task, box.observations)
                 session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
-                if not handoff.launch(helper, note, getattr(self.rewriter, "launcher", None), session):
+                launcher = getattr(self.rewriter, "launcher", None)
+                window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
+                if not handoff.launch(helper, note, launcher, session, window):
                     return "No terminal window could be opened for %s: answer the instruction yourself." % title
                 # A handle, so a later "is it done?" in this text box can look (G44).
-                self.conversation.handoffs.append({"helper": title, "task": task, "session": session,
+                self.conversation.handoffs.append({"helper": title, "task": task, "session": session, "note": note,
+                                                   "tmux": window if launcher and launcher[0] == "tmux" else "",
                                                    "cwd": os.path.expanduser("~"), "started": time.time()})
                 self.handed = "%s opened in a new window" % title
                 return "Handed over. Reply with just: OK"

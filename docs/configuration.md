@@ -342,6 +342,11 @@ the same box can read the helper's latest messages from its own transcript
 {"profiles": {"local": {"helper": ["claude", "--session-id", "{session}", "{prompt}"]}}}
 ```
 
+Codex is followed the same way, through the session that mentions the handoff
+note; any other helper can be followed when a tmux launcher names its window
+(`["tmux", "new-window", "-n", "{name}", "{command}"]`): Claudish reads the
+window's last lines, redacted like a terminal screen.
+
 Several helpers can be named, each its own tool behind its own question, and a
 `"launcher"` says how they open (`{command}` is the helper's command):
 

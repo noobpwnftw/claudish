@@ -214,7 +214,7 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
-        template, note, launcher, session = launch.call_args.args
+        template, note, launcher, session, window = launch.call_args.args
         self.assertIsNone(launcher)
         self.assertEqual(session, "")  # no {session} in the template: nothing to follow up on
         self.assertEqual(template, ["claude", "{prompt}"])
@@ -395,3 +395,22 @@ class HandleTests(unittest.TestCase):
         self.assertIn("Added tokenize.o to the Makefile; the build passes.", checked)
         self.assertIn("(used Edit)", checked)
         self.assertEqual(session.events[-1]["text"], "Yes: the build passes now.")
+
+
+class TmuxHandleTests(unittest.TestCase):
+    def test_a_named_tmux_window_is_read_for_any_helper(self):
+        import shutil
+        import subprocess
+        from claudish import handoff
+        if not shutil.which("tmux"):
+            self.skipTest("no tmux")
+        name = "claudish-test-%d" % (time.time() * 1000 % 100000)
+        subprocess.run(["tmux", "new-session", "-d", "-s", name, "printf 'building\\nAPI_KEY=sk-abcdefghijklmnopqrstuvwxyz123456\\nall tests pass\\n'; sleep 30"],
+                       check=True)
+        try:
+            time.sleep(0.5)
+            text = handoff.progress({"helper": "aider", "task": "fix it", "tmux": name, "started": time.time(), "cwd": "/"})
+        finally:
+            subprocess.run(["tmux", "kill-session", "-t", name])
+        self.assertIn("all tests pass", text)
+        self.assertNotIn("sk-abc", text)  # redacted, like a terminal screen
