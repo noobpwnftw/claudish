@@ -93,9 +93,14 @@ try:
     engine.render()
     assert engine.do_process_key_event(IBus.KEY_2, 0, 0)
     assert commits[-1] == "Hi there." and not engine.composition.text
+    # The indicator's menu picks a mode, as F7 does.
+    engine.do_property_activate("mode.rewrite", IBus.PropState.CHECKED)
+    assert engine.composition.mode == "rewrite"
+    engine.do_property_activate("mode.continue", IBus.PropState.UNCHECKED)  # a radio item turning off: nothing
+    assert engine.composition.mode == "rewrite"
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, candidate, modes, live continue, F8, candidate list, password bypass")
+    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, candidate, modes, live continue, F8, candidate list, mode menu, password bypass")
 finally:
     engine.destroy()

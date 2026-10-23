@@ -105,6 +105,18 @@ def shell_eval(code):
         return None
 
 
+def indicator():
+    """The text GNOME Shell's input source indicator shows (an engine's InputMode symbol)."""
+    found = shell_eval("""(() => { const out = [];
+        const walk = a => { if (a.visible && typeof a.text === 'string' && a.text) out.push(a.text);
+                            (a.get_children ? a.get_children() : []).forEach(walk); };
+        walk(Main.panel.statusArea.keyboard); return JSON.stringify(out); })()""")
+    if isinstance(found, str):  # Eval hands back the JSON text
+        found = json.loads(found)
+    shown = set(found or [])
+    return shown.pop() if len(shown) == 1 else sorted(shown)
+
+
 def focus(name):
     COMMANDS.write_text(name)
     try:
@@ -125,8 +137,14 @@ def scenarios(keys):
     keys.type("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
     time.sleep(0.4)
     check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
+    check("the top bar shows the mode: continue", indicator(), "C")
     keys.press("ctrl+a", "BackSpace")
-    keys.press("F7", "F7")  # continue -> instruct -> rewrite
+    keys.press("F7")
+    time.sleep(0.4)
+    check("F7: the top bar shows instruct", indicator(), "I")
+    keys.press("F7")  # -> rewrite
+    time.sleep(0.4)
+    check("F7: the top bar shows rewrite", indicator(), "R")
     keys.type("hello-world")
     settle()
     check("composition is not committed while typing", state()["entry"], "")
@@ -136,10 +154,11 @@ def scenarios(keys):
 
     focus("other")
     keys.type("very important")
+    keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
     settle()
-    keys.press("Tab")
+    keys.press("Tab")  # keeps it
     wait_for(lambda: state()["other"], what="candidate commit")
-    check("Tab accepts the rewrite", state()["other"], "particularly crucial")
+    check("Tab rewrites, Tab keeps it", state()["other"], "particularly crucial")
 
     focus("view")
     keys.press("ctrl+a", "BackSpace")

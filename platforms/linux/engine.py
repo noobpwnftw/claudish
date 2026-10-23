@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
-from claudish.composition import LABELS, MAX_COMPOSITION, Composition
+from claudish.composition import LABELS, MAX_COMPOSITION, MODES, Composition
 from claudish.client import Suggestions
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
@@ -29,6 +29,9 @@ def trace(*fields):
         with open(TRACE, "a") as out:
             out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
 
+
+# The mode, as the input source indicator shows it.
+SYMBOLS = {"continue": "C", "instruct": "I", "rewrite": "R"}
 
 # The field kinds IBus reports, by the names the service understands.
 PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "email", IBus.InputPurpose.URL: "url",
@@ -228,13 +231,7 @@ class ClaudishEngine(IBus.Engine):
             self.render()
             return True
         if keyval == IBus.KEY_F7:  # the input method's key while it is active, composing or not
-            entering_live = self.composition.mode == "rewrite"  # rewrite -> continue
-            self.composition.next_mode()
-            if entering_live:  # the composed words go into the app; they stay as context
-                self.commit_text(IBus.Text.new_from_string(self.composition.text))
-            self.changed()
-            if not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
-                self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
+            self.next_mode()
             return True
         if self.composition.live:
             return self.live_key(keyval)
@@ -323,10 +320,53 @@ class ClaudishEngine(IBus.Engine):
         if self.sensitive:
             self.do_reset()
 
+    def next_mode(self):
+        """F7, or a pick from the indicator's menu: continue -> instruct -> rewrite."""
+        entering_live = self.composition.mode == "rewrite"  # rewrite -> continue
+        self.composition.next_mode()
+        if entering_live:  # the composed words go into the app; they stay as context
+            self.commit_text(IBus.Text.new_from_string(self.composition.text))
+        self.changed()
+        self.show_mode()
+        if not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
+            self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
+
+    def show_mode(self, register=False):
+        """The mode in the desktop's input source indicator (GNOME shows an engine's InputMode
+        property as the indicator's text), with a menu to pick one. The list is registered when a
+        text box gets focus; a mode change updates the properties in it."""
+        mode = self.composition.mode
+        choices = [IBus.Property(key="mode." + name, prop_type=IBus.PropType.RADIO,
+                                 label=IBus.Text.new_from_string(name), sensitive=True, visible=True,
+                                 state=IBus.PropState.CHECKED if name == mode else IBus.PropState.UNCHECKED)
+                   for name in MODES]
+        menu = IBus.PropList()
+        for choice in choices:
+            menu.append(choice)
+        current = IBus.Property(key="InputMode", prop_type=IBus.PropType.MENU,
+                                label=IBus.Text.new_from_string("cd_AI · " + mode),
+                                symbol=IBus.Text.new_from_string(SYMBOLS[mode]),
+                                tooltip=IBus.Text.new_from_string("F7 switches mode"),
+                                sensitive=True, visible=True, sub_props=menu)
+        if register:
+            properties = IBus.PropList()
+            properties.append(current)
+            self.register_properties(properties)
+            return
+        self.update_property(current)
+        for choice in choices:
+            self.update_property(choice)
+
+    def do_property_activate(self, name, state):
+        if name.startswith("mode.") and state == IBus.PropState.CHECKED and name[5:] in MODES:
+            while self.composition.mode != name[5:]:
+                self.next_mode()
+
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
         self.refresh_surrounding()
+        self.show_mode(register=True)
 
     def do_focus_out(self):
         trace("focus-out")
