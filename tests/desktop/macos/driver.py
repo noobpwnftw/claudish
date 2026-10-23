@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from Quartz import (CGEventCreateKeyboardEvent, CGEventKeyboardSetUnicodeString, CGEventPost,
-                    kCGHIDEventTap)
+                    CGEventSetFlags, kCGEventFlagMaskShift, kCGHIDEventTap)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -29,9 +29,21 @@ def sh(*command, check=True):
     return done.stdout.strip()
 
 
-def post(code, text=None):
+# US ANSI key codes: a key event with a real key code goes through the input method, like a key
+# press; an event carrying only a Unicode string reaches the app as inserted text.
+US = dict(zip("asdfhgzxcv bqweryt123465=97-80]ou[ip lj'k;\\,/nm. `",
+              [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, None, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+               24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, None, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+               46, 47, None, 50]))
+US[" "] = 49
+SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`"))
+
+
+def post(code, text=None, shift=False):
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, code, down)
+        if shift:
+            CGEventSetFlags(event, kCGEventFlagMaskShift)
         if text is not None:
             CGEventKeyboardSetUnicodeString(event, len(text.encode("utf-16-le")) // 2, text)
         CGEventPost(kCGHIDEventTap, event)
@@ -41,7 +53,8 @@ def post(code, text=None):
 
 def type_text(text):
     for char in text:
-        post(49 if char == " " else 0, char)
+        base = SHIFTED.get(char, char.lower())
+        post(US[base], shift=char.isupper() or char in SHIFTED)
 
 
 KEYS = {"Tab": 48, "Return": 36, "Escape": 53, "F7": 98, "Down": 125}
