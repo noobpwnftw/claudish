@@ -76,10 +76,10 @@ an anti-AI writer, an accessibility consultant and an office manager
   regular weight ("The model is offline").
 - **Busy:** a small spinner (the platform's own where it has one), what is happening, Esc: stop.
 - **Hosted:** plain words at the footer's end ("from Claude · hosted").
-- **The compose hints show when you pause** (about a second without a key), not while you type:
-  a fluent typist sees only the composition, a hesitant one always sees the keys, with no
-  counters and nothing learned. States that need a decision (questions, approvals, failures)
-  always show their keys.
+- **The compose hints show from the first key** (round 4, the CJK users: what Enter does must be
+  visible before you press it; round 2 had them wait for a pause). States that need a decision
+  (questions, approvals, failures) always show their keys. Whether hints fade as you learn the
+  keys was settled for the hints alone; learning your habits is a separate goal (G49).
 - **Mode switch:** the mode's tile, its name, and the key back ("Compose · Shift back"); continue's
   tile is neutral. The taskbar, menu bar or top bar shows the mode all along.
 - **Space** in compose types a space; it never picks a candidate.
