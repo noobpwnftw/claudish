@@ -365,10 +365,12 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def changed(self, client):
         self.state.quiet = is_terminal(self.app(client))  # a terminal's command line is not prose
+        after = self.around_caret(client)[1] if self.state.live else ""
+        self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and self.state.automatic:  # continue: what follows the caret too
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client),
-                                 after=self.around_caret(client)[1][:500])
+                                 after=after[:500])
         elif self.worker is not None and not self.state.text:
             self.worker.schedule(self.state.revision, "")
         if self.state.live:  # the only thing shown is the suggestion, with the caret before it

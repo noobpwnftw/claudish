@@ -157,6 +157,15 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.enter(), "wait")  # an approval needs a number
         self.assertEqual(state.tab(), "wait")
 
+    def test_continue_waits_for_the_end_of_a_line(self):
+        state = Composition()
+        state.change("Thanks for the review ")
+        self.assertTrue(state.automatic)
+        state.inside = True  # text follows the caret on its line
+        self.assertFalse(state.automatic)
+        state.inside, state.quiet = False, True  # a number field
+        self.assertFalse(state.automatic)
+
     def test_hints_are_short_and_only_when_a_key_needs_saying(self):
         state = Composition()
         self.assertEqual(state.hint(), "")  # continue: quiet

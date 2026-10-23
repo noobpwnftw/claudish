@@ -208,11 +208,13 @@ class ClaudishTextService(TextService):
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
         self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits") or is_terminal(focused_app())
+        after = self.around()[1] if self.state.live else ""
+        self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
             # ready by the time the key is released, and onKeyUp can show it.
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
-                                 immediate=self.state.live, after=self.around()[1][:500], purpose=self.field())
+                                 immediate=self.state.live, after=after[:500], purpose=self.field())
             self.await_result()
         elif self.worker and not self.state.text:
             self.worker.schedule(self.state.revision, "")

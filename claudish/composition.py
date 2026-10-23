@@ -29,6 +29,7 @@ class Composition:
         self.converted = False  # compose: the rewrite shows in place of your words
         self.adopted = False  # the composition is text taken from the app (a selection): never dropped
         self.quiet = False  # the field is not prose (a URL, an email address, a number): nothing unasked
+        self.inside = False  # text follows the caret on its line: continue waits for the end of a line
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.reply = ""  # your own words in answer to it, typed instead of a number
         self.status = ""  # what the agent is doing, or its draft so far
@@ -56,10 +57,12 @@ class Composition:
 
     @property
     def automatic(self):
-        """Ask on this pause? Only in continue, and only at a word boundary (after a space or
-        punctuation), so a pause mid-word never splits it ("rev" + " iew"). A rewrite is asked
-        for with Tab and an instruction with Enter: nothing is sent while you compose."""
-        if self.mode == "continue" and not self.quiet:
+        """Ask on this pause? Only in continue, only at a word boundary (after a space or
+        punctuation), so a pause mid-word never splits it ("rev" + " iew"), and only at the end of
+        a line: in the middle of text a suggestion would push or cover what follows (adapters set
+        inside). A rewrite is asked for with Tab and an instruction with Enter: nothing is sent
+        while you compose."""
+        if self.mode == "continue" and not self.quiet and not self.inside:
             return bool(self.text) and not self.text[-1].isalnum() and not self.taken
         return False
 

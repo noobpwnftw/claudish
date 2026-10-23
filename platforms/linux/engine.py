@@ -103,9 +103,11 @@ class ClaudishEngine(IBus.Engine):
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
 
     def changed(self):
+        after = self.around_caret()[1] if self.composition.live else ""
+        self.composition.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         if self.composition.automatic:  # continue: the text so far is the context; what follows the caret too
             self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode,
-                                      app=self.app, after=self.around_caret()[1][:500], purpose=self.purpose)
+                                      app=self.app, after=after[:500], purpose=self.purpose)
         elif not self.composition.text:
             self.suggestions.schedule(self.composition.revision, "")
         self.render()
