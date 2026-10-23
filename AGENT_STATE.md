@@ -37,7 +37,7 @@ Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on t
   launcher; Claude backend in the same tool loop (stand-in SDK only, no key); `user__show` (an
   answer to read). Codex reads a Claudish note fine (via stdin: its bwrap sandbox cannot start on
   the Spark). Merges only after a clean gate summary (one slip on b40121f, fixed in 7e199dd).
-- Mac VM: its installed cd_AI predates the service token; rebuild + relogin with the owner.
+- Mac VM: rebuilt on a50c06e (token, trace file) after the owner relogged; rig 10/10 incl. Terminal (the rig's focus guard was pulling the test window forward).
 
 ## Since the last checkpoint
 
