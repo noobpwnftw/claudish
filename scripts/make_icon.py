@@ -30,18 +30,30 @@ def text_box(draw, text, font):
     return left, top, right - left, bottom - top
 
 
-def tile(text, font_path, fill, background, scale=0.62):
-    """A rounded square with the text centred on its ink (not its line box), and a faint rim in the
-    opposite tone, so a cream tile holds its edge on a light taskbar and a dark one on a dark taskbar."""
-    image = Image.new("RGBA", (BIG, BIG), (0, 0, 0, 0))
+def tile(text, font_path, fill, background, scale=0.62, size=BIG):
+    """A tile that fills the whole icon square in its background colour (a small corner radius, so it
+    reads as full size next to the tray's other icons), the text centred on its ink at the given
+    proportion, drawn at 4x the target size and reduced once, so each size is crisp."""
+    work = size * 4
+    image = Image.new("RGBA", (work, work), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    rim = (0, 0, 0, 40) if background == PAPER else (255, 255, 255, 60) if background == INK else None
-    draw.rounded_rectangle((0, 0, BIG - 1, BIG - 1), radius=int(BIG * 0.22), fill=background,
-                           outline=rim, width=int(BIG * 0.03) if rim else 0)
-    font = ImageFont.truetype(font_path, int(BIG * scale))
+    draw.rounded_rectangle((0, 0, work - 1, work - 1), radius=int(work * 0.14), fill=background)
+    font = ImageFont.truetype(font_path, int(work * scale))
     left, top, width, height = text_box(draw, text, font)
-    draw.text(((BIG - width) / 2 - left, (BIG - height) / 2 - top), text, font=font, fill=fill)
-    return image
+    draw.text(((work - width) / 2 - left, (work - height) / 2 - top), text, font=font, fill=fill)
+    return image.resize((size, size), Image.LANCZOS)
+
+
+def ico(text, font_path, fill, background, scale):
+    """Every size drawn at that size (not one big render shrunk), into one .ico."""
+    sizes = (16, 20, 24, 32, 40, 48, 64, 128, 256)
+    frames = [tile(text, font_path, fill, background, scale, size) for size in sizes]
+    return frames
+
+
+def save_frames(frames, path):
+    largest = frames[-1]
+    largest.save(path, format="ICO", sizes=[f.size for f in frames], append_images=frames[:-1])
 
 
 def template(text, font_path, size):
@@ -55,25 +67,18 @@ def template(text, font_path, size):
     return image.resize((max(1, round(image.width * ratio)), size), Image.LANCZOS)
 
 
-def save_ico(image, path):
-    image.save(path, format="ICO", sizes=[(s, s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)])
-
-
 def main():
     windows = ROOT / "platforms/windows/claudish"
-    # Cream, the site's light look (owner's pick), and inverted for dark taskbars; the letters fill
-    # the tile, so it is as big as the icons around it.
-    brand = tile("cd", SERIF, INK, PAPER, scale=0.84)
-    dark = tile("cd", SERIF, PAPER, INK, scale=0.84)
-    save_ico(brand, windows / "icon.ico")
-    save_ico(brand, windows / "mode-continue.ico")
-    save_ico(dark, windows / "mode-continue-dark.ico")
-    save_ico(tile("AI", MONO, (255, 255, 255, 255), ACCENT, scale=0.66), windows / "mode-compose.ico")
+    # The compare's design (owner's pick): cream "cd", and inverted on a dark taskbar; "AI" on the accent.
+    save_frames(ico("cd", SERIF, INK, PAPER, 0.62), windows / "icon.ico")
+    save_frames(ico("cd", SERIF, INK, PAPER, 0.62), windows / "mode-continue.ico")
+    save_frames(ico("cd", SERIF, PAPER, INK, 0.62), windows / "mode-continue-dark.ico")
+    save_frames(ico("AI", MONO, (255, 255, 255, 255), ACCENT, 0.54), windows / "mode-compose.ico")
     template("cd", SERIF, 16).save(ROOT / "platforms/macos/cd.png")
     template("cd", SERIF, 32).save(ROOT / "platforms/macos/cd@2x.png")
     for folder in (ROOT / "site", ROOT / "claudish/web"):
-        brand.resize((64, 64), Image.LANCZOS).save(folder / "favicon.png")
-        dark.resize((64, 64), Image.LANCZOS).save(folder / "favicon-dark.png")
+        tile("cd", SERIF, INK, PAPER, 0.62, 64).save(folder / "favicon.png")
+        tile("cd", SERIF, PAPER, INK, 0.62, 64).save(folder / "favicon-dark.png")
     print("icons written")
 
 
