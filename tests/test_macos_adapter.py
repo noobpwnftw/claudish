@@ -101,22 +101,29 @@ class BaseController:
 
 
 class Panel:
-    @classmethod
-    def alloc(cls):
-        return cls()
+    """cd_AI's panel (platforms/macos/panel.py): records what it shows."""
 
-    def initWithServer_panelType_(self, server, panel_type):
-        self.visible = False
-        return self
+    def __init__(self):
+        self.visible, self.shown = False, {}
 
-    def updateCandidates(self):
-        pass
-
-    def show_(self, hint):  # PyObjC's name for -show:; a plain show() does not exist on a real panel
-        self.visible = True
+    def show(self, rect, title=None, items=(), selected=0, hint=""):
+        self.visible, self.shown = True, {"title": title, "items": list(items), "hint": hint}
 
     def hide(self):
         self.visible = False
+
+
+class Overlay:
+    """The suggestion overlay: records the text it draws after the caret."""
+
+    def __init__(self):
+        self.text = ""
+
+    def show(self, rect, text, font=None):
+        self.text = text
+
+    def hide(self):
+        self.text = ""
 
 
 class Timer:
@@ -176,12 +183,12 @@ def load_adapter():
     foundation.NSTimer = Timer
     imk = types.ModuleType("InputMethodKit")
     imk.IMKInputController = BaseController
-    imk.IMKCandidates = Panel
-    imk.kIMKSingleColumnScrollingCandidatePanel = 1
     imk.kIMKLocateCandidatesBelowHint = 2
+    panel = types.ModuleType("panel")
+    panel.Panel, panel.Overlay = Panel, Overlay
     spec = importlib.util.spec_from_file_location("claudish_macos_test", ROOT / "platforms/macos/controller.py")
     module = importlib.util.module_from_spec(spec)
-    with patch.dict("sys.modules", {"objc": objc, "AppKit": appkit,
+    with patch.dict("sys.modules", {"objc": objc, "AppKit": appkit, "panel": panel,
                                      "Foundation": foundation, "InputMethodKit": imk}):
         spec.loader.exec_module(module)
     module.Suggestions = Worker
@@ -267,7 +274,8 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((self.controller.worker.modes[-1], self.controller.worker.immediate), ("rewrite", True))
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
         self.controller.pollSuggestions_(None)  # it arrives: in place of your words, no list
-        self.assertFalse(self.controller.panel.visible)
+        self.assertEqual(self.module.PANEL.shown["items"], [])  # only the hint
+        self.assertEqual(self.module.PANEL.shown["hint"], "Tab: keep · Esc: undo")
         self.assertEqual((self.client.marked, self.client.commits), ("A considered draft.", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")
@@ -283,9 +291,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(36)  # send
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
-        self.assertTrue(self.controller.panel.visible)
+        self.assertEqual(self.module.PANEL.shown["items"], ["Hello.", "Hi there."])
         self.assertTrue(self.key(53))  # Esc: the drafts close, the instruction stays to refine
-        self.assertEqual((state.text, state.candidates, self.controller.panel.visible), ("say hi", [], False))
+        self.assertEqual((state.text, state.candidates, self.module.PANEL.shown["items"]), ("say hi", [], []))
         self.assertEqual(self.client.marked, "say hi")
         self.type_text(", warmly")  # refine and send again: a follow-up in the same conversation
         self.key(36)
@@ -439,6 +447,12 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.state.change("Thanks for the review ")
             fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
             fresh.changed(client)
+            # Nothing follows on the line: our overlay draws it grey after the caret, nothing is marked.
+            self.assertEqual((self.module.OVERLAY.text, client.marked), ("on the parser.", ""))
+            # Text after the caret (an overlay would cover it): grey marked text instead.
+            client.text, client.mark_at = "Thanks for the review  today.", len("Thanks for the review ")
+            fresh.changed(client)
+            self.assertEqual(self.module.OVERLAY.text, "")
             self.assertEqual((client.marked.text, client.marked.attributes),
                              ("on the parser.", {"NSColor": "secondaryLabelColor"}))
         finally:

@@ -223,11 +223,14 @@ def scenarios():
     type_text("Thanks for the review ")
     # The first answer after a new build can take longer: macOS checks a newly installed app on its
     # first launch (likely why the first suggestion was missed after reinstalls).
-    wait_for(lambda: state().get("marked"), timeout=20)
-    check("continue: the suggestion waits as marked text", state().get("marked"), "and then some—naturally.")
-    # KNOWN (ROADMAP G01): IMK drops the marked text's color on its way to the app, so the suggestion
-    # is drawn underlined in the text color (accepted for now).
-    print("KNOWN continue: the suggestion is drawn in %s, not grey" % state().get("marked_color"))
+    expected = "and then some—naturally."
+    trace = Path.home() / "Library/Logs/cd_AI-trace.log"
+
+    def overlaid():  # nothing follows the caret: cd_AI draws the suggestion grey in its own overlay
+        return trace.exists() and ("ghost overlay %d" % len(expected)) in trace.read_text()
+    wait_for(lambda: state().get("marked") or overlaid(), timeout=20)
+    check("continue: the suggestion is drawn grey after the caret, nothing typed",
+          (state().get("marked"), overlaid()), ("", True))
     # A focus change while the suggestion shows must leave only your words: the suggestion is
     # marked text, which an app could commit as if it were typed.
     COMMANDS.write_text("other")
@@ -238,9 +241,10 @@ def scenarios():
     wait_for(lambda: not COMMANDS.read_text())
     time.sleep(0.3)
     key("Down")  # back in the field: the caret is at the end; the next word asks again
+    shown = trace.read_text().count("ghost overlay") if trace.exists() else 0
     post(US["s"])
     post(US[" "])
-    wait_for(lambda: state().get("marked"))
+    wait_for(lambda: state().get("marked") or (trace.exists() and trace.read_text().count("ghost overlay") > shown))
     key("Tab")
     wait_for(lambda: document().endswith("naturally."))
     check("continue: Tab takes the suggestion", document(), "Thanks for the review s and then some—naturally.")

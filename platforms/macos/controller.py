@@ -8,12 +8,12 @@ from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlags
 from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
 from AppKit import NSAttributedString, NSColor, NSForegroundColorAttributeName
 from Foundation import NSNotFound, NSTimer
-from InputMethodKit import IMKInputController, IMKCandidates
-from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCandidatesBelowHint
+from InputMethodKit import IMKInputController, kIMKLocateCandidatesBelowHint
 
 from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
+from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
 
 # A file path: event kinds and errors, never typed text. An input method started by macOS (or with
 # open -g) does not see launchctl setenv, so an existing ~/Library/Logs/cd_AI-trace.log turns it on too.
@@ -31,7 +31,24 @@ SURROUNDING = 8000
 # One candidate panel for the server, as in Apple's sample: a panel per controller registers with
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
-PANEL = None  # characters each side of the caret an instruction takes along (as on Linux)
+PANEL = OVERLAY = None  # one panel and one overlay for the server, shared by its controllers
+
+
+class Shown:
+    """The panel as the controller's call sites use it (they were written for IMKCandidates): show
+    and update draw cd_AI's own panel from the state; hide hides it."""
+
+    def __init__(self, controller):
+        self.controller = controller
+
+    def show_(self, where=None):
+        self.controller.show_panel()
+
+    def updateCandidates(self):
+        pass
+
+    def hide(self):
+        PANEL.hide()
 
 
 class ClaudishInputController(IMKInputController):
@@ -45,10 +62,10 @@ class ClaudishInputController(IMKInputController):
         self.worker = None
         self.timer = None
         self.active = False
-        global PANEL
+        global PANEL, OVERLAY
         if PANEL is None:
-            PANEL = IMKCandidates.alloc().initWithServer_panelType_(server, kIMKSingleColumnScrollingCandidatePanel)
-        self.panel = PANEL
+            PANEL, OVERLAY = Panel(), Overlay()
+        self.panel = Shown(self)
         return self
 
     def activateServer_(self, sender):
@@ -82,6 +99,7 @@ class ClaudishInputController(IMKInputController):
             self.worker = None
         self.state.change("")
         self.panel.hide()
+        OVERLAY.hide()
 
     def recognizedEvents_(self, sender):
         return NSEventMaskKeyDown | NSEventMaskFlagsChanged  # flags: a Shift tap switches mode
@@ -109,11 +127,10 @@ class ClaudishInputController(IMKInputController):
                     if client is not None:
                         self.changed(client)
                     return
-                if self.state.live:  # continue: the rest of the sentence, as marked text after the caret
+                if self.state.live:  # continue: the rest of the sentence, in grey after the caret
                     client = self.client()
                     if client is not None:
-                        client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost),
-                                                                              (0, 0), (NSNotFound, 0))
+                        self.show_ghost(client)
                     return
                 if self.state.choosing:  # an instruction's drafts; rewrite converts in place on Tab
                     self.panel.updateCandidates()
@@ -174,6 +191,72 @@ class ClaudishInputController(IMKInputController):
             return str(client.bundleIdentifier()) if client is not None else None
         except Exception:  # Not every client implements it.
             return None
+
+    @objc.python_method
+    def caret(self, client):
+        """The caret's line in screen coordinates, ((x, y), (w, h)), for the panel and the overlay."""
+        try:
+            selected = client.selectedRange()
+            location = selected.location if hasattr(selected, "location") else selected[0]
+            found = client.firstRectForCharacterRange_actualRange_((location, 0), None)
+            rect = found[0] if isinstance(found, tuple) and len(found) == 2 and not hasattr(found, "origin") else found
+            origin, size = (rect.origin, rect.size) if hasattr(rect, "origin") else rect
+            x, y = (origin.x, origin.y) if hasattr(origin, "x") else origin
+            w, h = (size.width, size.height) if hasattr(size, "width") else size
+            if h > 0:
+                return (x, y), (w, h)
+        except Exception:
+            trace("caret failed", traceback.format_exc().splitlines()[-1])
+        return (200, 400), (0, 18)
+
+    @objc.python_method
+    def font(self, client):
+        """The app's font at the caret, so the suggestion reads as the same text."""
+        try:
+            selected = client.selectedRange()
+            location = selected.location if hasattr(selected, "location") else selected[0]
+            found = client.attributesForCharacterIndex_lineHeightRectangle_(max(0, location - 1), None)
+            attributes = found[0] if isinstance(found, tuple) else found
+            return attributes.get("NSFont") if attributes else None
+        except Exception:
+            return None
+
+    @objc.python_method
+    def show_ghost(self, client):
+        """Continue's suggestion: grey, after the caret, never looking typed. Drawn by our overlay
+        when nothing follows on the line (IMK drops marked text's colour); with text after the caret
+        an overlay would cover it, so there it stays marked text."""
+        ghost = self.state.ghost
+        after = self.around_caret(client)[1] if ghost else ""
+        if ghost and not after.split("\n", 1)[0].strip():
+            client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+            OVERLAY.show(self.caret(client), ghost, self.font(client))
+            trace("ghost overlay", len(ghost))
+            return
+        OVERLAY.hide()
+        client.setMarkedText_selectionRange_replacementRange_(self.grey(ghost), (0, 0), (NSNotFound, 0))
+
+    @objc.python_method
+    def show_panel(self, client=None):
+        """The panel at the caret: a question with its choices, an instruction's drafts, or the one
+        short hint while composing (docs/design/visual.md); nothing in continue."""
+        state = self.state
+        client = client if client is not None else self.client()
+        if state.live or not state.text or client is None:
+            PANEL.hide()
+            return
+        rect = self.caret(client)
+        if state.question and not state.reply:
+            choices = state.question.get("choices") or []
+            PANEL.show(rect, title=state.question.get("text", ""),
+                       items=[c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "") for c in choices],
+                       hint="1–%d · or type a reply" % len(choices))
+        elif state.choosing:
+            PANEL.show(rect, items=list(state.candidates), hint=state.hint())
+        elif state.hint():
+            PANEL.show(rect, hint=state.hint())
+        else:
+            PANEL.hide()
 
     @objc.python_method
     def grey(self, text):
@@ -254,19 +337,16 @@ class ClaudishInputController(IMKInputController):
                                  after=self.around_caret(client)[1][:500])
         elif self.worker is not None and not self.state.text:
             self.worker.schedule(self.state.revision, "")
-        if self.state.question and not self.state.reply:  # the agent's choices, while you have not typed
-            self.panel.updateCandidates()
-            self.panel.show_(kIMKLocateCandidatesBelowHint)
-        else:
+        if self.state.live:  # the only thing shown is the suggestion, with the caret before it
             self.panel.hide()
-        if self.state.live:  # the only marked text is the suggestion, with the caret before it
-            client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost), (0, 0),
-                                                                  (NSNotFound, 0))
+            self.show_ghost(client)
             return
+        OVERLAY.hide()
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(shown.encode("utf-16-le")) // 2
         client.setMarkedText_selectionRange_replacementRange_(shown, (length, 0), (NSNotFound, 0))
+        self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method
     def live_key(self, client, key, chars):
@@ -307,6 +387,7 @@ class ClaudishInputController(IMKInputController):
             if self.worker is not None:
                 self.worker.schedule(self.state.revision, "")
             self.panel.hide()
+            OVERLAY.hide()
             if client is not None:
                 client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             return
