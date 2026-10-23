@@ -169,7 +169,7 @@ async def check(args):
             await keys.type("Keep this thought intact.", delay=10)
             await keys.press("Tab")  # asks: the service fails
             await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
-            await expect(window).to_contain_text("The request failed")  # the panel says why; Enter retries
+            await expect(window).to_contain_text("the request failed")  # the panel says why; Enter retries
             await keys.press("Escape")  # past the failure: your words, still composing
             await keys.press("Shift+Enter")  # kept
             await expect(committed).to_have_attribute("data-text", "Keep this thought intact.")

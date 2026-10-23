@@ -150,8 +150,8 @@ async function ask(revision) {
     state.working = false;
     if (mode === "continue") return;  // continue stays quiet: no suggestion is a fine answer
     state.failed = true;  // the panel says why; your words stay
-    state.error = error.name === "AbortError" ? "The model took too long"
-      : error instanceof TypeError ? "The model is offline" : "The request failed";
+    state.error = error.name === "AbortError" ? "the model took too long"
+      : error instanceof TypeError ? "the model is offline" : "the request failed";
     setStatus("");
   } finally {
     clearTimeout(limit);
@@ -173,9 +173,9 @@ function panel() {
   // Once the composition no longer shows your instruction (you type a reply), the panel says it.
   if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
   const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
-  if (state.working) return {...shown, status: state.asked === "rewrite" ? "Rewriting" : "Working", busy: true,
+  if (state.working) return {...shown, status: state.asked === "rewrite" ? "rewriting" : "working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
-  if (state.failed) return {...shown, tile: "warn", failed: state.error || "The request failed",  // Tab retries a rewrite
+  if (state.failed) return {...shown, tile: "warn", failed: state.error || "the request failed",  // Tab retries a rewrite
                             foot: [[state.asked === "rewrite" ? "Tab" : "Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
@@ -196,7 +196,7 @@ function pickRow(number) {
 }
 
 // Never silently: a drop says so, briefly, with the key that brings it back.
-const dropped = () => toast({tile: "ai", status: "Dropped", foot: [["Shift+Esc", "restore"]]});
+const dropped = () => toast({tile: "ai", status: "dropped", foot: [["Shift+Esc", "restore"]]});
 
 // A Shift tap (or a click on the input source): continue <-> compose. Leaving compose keeps what
 // you see, as it is.
@@ -218,14 +218,14 @@ function switchMode() {
 // dropped, with the key that brings it back (composition.py's toast and dropped_toast).
 function toast(spec = null) {
   const compose = state.mode === "compose";
-  const node = Kit.toast(spec || {tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
+  const node = Kit.toast(spec || {tile: compose ? "ai" : "cd", status: compose ? "compose" : "continue",
                                   foot: [["Shift", compose ? "continue" : "compose"]]});
   const editor = $("editor").getBoundingClientRect(), caret = CARET.getBoundingClientRect();
   node.style.left = `${Math.max(12, caret.left - editor.left - 14)}px`;
   node.style.top = `${caret.bottom - editor.top + 6}px`;
   document.querySelectorAll("#editor > .k-toast").forEach((old) => old.remove());
   $("editor").append(node);
-  setTimeout(() => node.remove(), 1600);
+  setTimeout(() => node.remove(), 2000);  // as long as every platform shows a toast
 }
 
 // Keys, as an input method sees them. Returns true when the key was taken.
@@ -413,12 +413,14 @@ function placeCandidateWindow() {
   const window = $("candidates");
   const editor = $("editor").getBoundingClientRect();
   const caret = CARET.getBoundingClientRect();
-  // As on every platform: under the caret's line, the panel's content starting at the caret.
+  // As on every platform: under the line, the panel's content starting where the composition
+  // starts (what IMK, TSF and IBus report while something is composed), or at the caret.
+  const start = PREEDIT.textContent ? PREEDIT.getClientRects()[0] || caret : caret;
   const inset = 14;  // the panel's border, padding, and row inset (kit.css)
-  let left = Math.max(12, Math.min(caret.right - editor.left - inset, editor.width - window.offsetWidth - 12));
-  // It opens under the caret and stays where it opened while it shows on that line and the caret
-  // is at or right of it: it never slides while you type (a reply, more words), and when the text
-  // leaves (sent) or you delete back past it, it moves to the caret.
+  const from = PREEDIT.textContent ? start.left : caret.right;
+  let left = Math.max(12, Math.min(from - editor.left - inset, editor.width - window.offsetWidth - 12));
+  // It opens there and stays where it opened while it shows on that line and its anchor is at or
+  // right of it: it never slides while you type; if you delete back past it, it moves.
   const line = Math.round(caret.bottom - editor.top), opened = placeCandidateWindow.opened;
   if (!window.hidden && opened && opened.line === line && left >= opened.left) left = opened.left;
   placeCandidateWindow.opened = window.hidden ? null : {left, line};

@@ -79,18 +79,17 @@ function frame(skin, state) {
   return host;
 }
 
-// Under the caret's line, the panel's content starting at the caret: every platform knows the
-// caret (GNOME knows nothing else, so no platform anchors to the composition's start).
+// Under the line, the panel's content starting at the composition's start, or at the caret.
 function place(host) {
   const text = host.querySelector(".host-text");
   const anchor = host.querySelector(".anchor");
   const caret = host.querySelector(".host-caret");
   const box = text.getBoundingClientRect();
   const line = caret.getBoundingClientRect();
-  // A panel opens under the caret and stays where it opened while it is open: for a reply, where
-  // the caret was when the instruction left (the reply's composition starts there).
-  const opened = host.dataset.anchor === "comp" && anchor.firstChild ? anchor.firstChild.getClientRects()[0] : null;
-  const start = opened ? {left: opened.left, right: opened.left} : line;
+  // A panel's content starts where the composition starts (what IMK, TSF and IBus report while
+  // something is composed), else at the caret; it stays where it opened while it is open.
+  const opened = anchor.firstChild ? anchor.firstChild.getClientRects()[0] : null;
+  const start = opened ? {left: opened.left, right: opened.left} : {left: line.right, right: line.right};
   const lineBottom = line.bottom;
   for (const floating of host.querySelectorAll(".k-panel, .k-toast")) {
     const style = getComputedStyle(floating);

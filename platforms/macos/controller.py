@@ -5,7 +5,7 @@ import traceback
 
 import objc
 from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlagsChanged, NSEventTypeKeyDown
-from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
+from AppKit import NSAttributedString, NSColor, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
@@ -45,6 +45,13 @@ def unpack(rect):
 # PyObjC needs to be told, or it passes NULL and only the attributes come back.
 objc.registerMetaDataForSelector(b"NSObject", b"attributesForCharacterIndex:lineHeightRectangle:",
                                  {"arguments": {3: {"type_modifier": objc._C_OUT}}})
+
+
+def marked(text):
+    """The composition as the design draws it: one plain underline in the text colour (apps
+    otherwise draw marked text their own way, an accent-coloured thick line in a text view)."""
+    return NSAttributedString.alloc().initWithString_attributes_(
+        text, {"NSUnderline": 1, "NSUnderlineColor": NSColor.textColor()})
 
 
 class ClaudishInputController(IMKInputController):
@@ -292,7 +299,7 @@ class ClaudishInputController(IMKInputController):
             return False
         self.state.adopt(text)
         units = len(text.encode("utf-16-le")) // 2
-        client.setMarkedText_selectionRange_replacementRange_(text, (units, 0), (location, length))
+        client.setMarkedText_selectionRange_replacementRange_(marked(text), (units, 0), (location, length))
         return True
 
     @objc.python_method
@@ -342,7 +349,7 @@ class ClaudishInputController(IMKInputController):
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(shown.encode("utf-16-le")) // 2
-        client.setMarkedText_selectionRange_replacementRange_(shown, (length, 0), (NSNotFound, 0))
+        client.setMarkedText_selectionRange_replacementRange_(marked(shown), (length, 0), (NSNotFound, 0))
         self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method

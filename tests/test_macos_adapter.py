@@ -17,7 +17,8 @@ class Client:
         self.commits = []
 
     def setMarkedText_selectionRange_replacementRange_(self, text, selection, replacement):
-        self.marked = text
+        self.marked = getattr(text, "text", text)  # the words of an attributed string
+        self.attributes = getattr(text, "attributes", None)
         self.selection = selection
 
     def insertText_replacementRange_(self, text, replacement):
@@ -178,7 +179,7 @@ def load_adapter():
     objc._C_OUT = b"o"
     appkit = types.ModuleType("AppKit")
     appkit.NSAttributedString = Grey
-    appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor")
+    appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor", textColor=lambda: "textColor")
     appkit.NSForegroundColorAttributeName = "NSColor"
     for name, value in {"NSEventMaskKeyDown": 1024, "NSEventTypeKeyDown": 10,
                         "NSEventMaskFlagsChanged": 4096, "NSEventTypeFlagsChanged": 12,
@@ -373,6 +374,7 @@ class MacOSAdapterTests(unittest.TestCase):
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
         self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "x")  # it stays marked: the keys keep coming
+        self.assertEqual(self.client.attributes, {"NSUnderline": 1, "NSUnderlineColor": "textColor"})  # one plain underline
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])

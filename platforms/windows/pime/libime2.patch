@@ -400,10 +400,10 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..5f8a858
+index 0000000..6d4c02d
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,532 @@
+@@ -0,0 +1,536 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -424,6 +424,8 @@ index 0000000..5f8a858
 +static const float PAD = 4, ROW_X = 10, ROW_Y = 5, TAKE = 48, HEAD_GAP = 2;
 +static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
 +static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
++// A toast (a panel with only a footer: the mode switch, a drop, the pill): one line, as .k-toast.
++static const float TOAST_LEFT = 6, TOAST_RIGHT = 10, TOAST_Y = 5, TOAST_GAP = 7;
 +// The panel's corners and shadow (the lab's Windows skin: --k-radius 8px; --k-shadow 0 8px 16px,
 +// 14% black in light, 0 8px 20px, 50% in dark).
 +static const float RADIUS = 8, SHADOW_Y = 8, SHADOW_BLUR = 16, SHADOW_BLUR_DARK = 20;
@@ -525,8 +527,8 @@ index 0000000..5f8a858
 +    foot_.clear();
 +}
 +
-+int PanelPainter::textInset() const {
-+    return (int)(std::ceil(shadowSide_) + px(PAD) + px(ROW_X));  // the content's left edge goes under the caret
++int PanelPainter::textInset() const {  // the content's left edge (a toast's tile) goes under the caret
++    return (int)(std::ceil(shadowSide_) + (bare_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X)));
 +}
 +
 +SIZE PanelPainter::layout(const PanelSpec& spec) {
@@ -536,8 +538,9 @@ index 0000000..5f8a858
 +    if (spec.empty() || !ensureFactories())
 +        return none;
 +    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
-+    float widest = (spec.rows.empty() && spec.body.empty() && spec.thread.empty()) ? 0 : px(MIN_WIDTH);
-+    float y = px(PAD);
++    bare_ = spec.rows.empty() && spec.body.empty() && spec.thread.empty();
++    float widest = bare_ ? 0 : px(MIN_WIDTH);
++    float y = bare_ ? px(TOAST_Y) : px(PAD);
 +    // The exchange so far: your earlier turns as context, one line each (cut with an ellipsis),
 +    // muted, at full size, a neutral rule beside each.
 +    for (const auto& turn : spec.thread) {
@@ -612,8 +615,9 @@ index 0000000..5f8a858
 +    if (!spec.rows.empty() || !spec.body.empty())
 +        y += px(2);
 +    footTop_ = y;
-+    footHeight_ = px(20) + 2 * px(ROW_Y) - 1;
-+    float x = px(PAD) + px(ROW_X);
++    footHeight_ = bare_ ? px(TILE) : px(20) + 2 * px(ROW_Y) - 1;
++    float x = bare_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X);
++    const float gap = bare_ ? px(TOAST_GAP) : px(ITEM_GAP);  // between items (.k-toast, .k-foot)
 +    auto add = [&](FootItem::Kind kind, const std::wstring& text, IDWriteTextFormat* format, float gap) {
 +        FootItem item;
 +        item.kind = kind;
@@ -632,24 +636,24 @@ index 0000000..5f8a858
 +        x += item.w + gap;
 +        foot_.push_back(item);
 +    };
-+    add(spec.tile == L"warn" ? FootItem::Warn : FootItem::Tile, spec.tile == L"cd" ? L"cd" : L"AI", nullptr, px(8));
++    add(spec.tile == L"warn" ? FootItem::Warn : FootItem::Tile, spec.tile == L"cd" ? L"cd" : L"AI", nullptr, gap);
 +    if (!spec.status.empty()) {
 +        if (spec.busy)
 +            add(FootItem::Spinner, L"", nullptr, px(6));
-+        add(FootItem::Text, spec.status, small_, px(ITEM_GAP));
++        add(FootItem::Text, spec.status, small_, gap);
 +    }
 +    if (!spec.failed.empty())
-+        add(FootItem::Error, spec.failed, small_, px(ITEM_GAP));
++        add(FootItem::Error, spec.failed, small_, gap);
 +    for (const auto& key : spec.foot) {
 +        add(FootItem::Cap, key.first, small_, px(KEY_GAP));
-+        add(FootItem::Verb, key.second, small_, px(ITEM_GAP));
++        add(FootItem::Verb, key.second, small_, gap);
 +    }
 +    if (!spec.tail.empty())
-+        add(FootItem::Verb, spec.tail, small_, px(ITEM_GAP));
++        add(FootItem::Verb, spec.tail, small_, gap);
 +    if (!spec.mark.empty())
 +        add(FootItem::Mark, spec.mark, small_, 0);
-+    widest = (std::max)(widest, x - px(ITEM_GAP) + px(ROW_X) + px(PAD));
-+    y += footHeight_ + px(PAD);
++    widest = (std::max)(widest, x - gap + (bare_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)));
++    y += footHeight_ + (bare_ ? px(TOAST_Y) : px(PAD));
 +    width_ = (std::min)(px(MAX_WIDTH), widest);
 +    height_ = y;
 +    if (!foot_.empty() && foot_.back().kind == FootItem::Mark)  // the hosted mark, at the end
@@ -938,10 +942,10 @@ index 0000000..5f8a858
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..647d1ff
+index 0000000..37d05cf
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,162 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1040,6 +1044,7 @@ index 0000000..647d1ff
 +    std::vector<FootItem> foot_;
 +    float footTop_ = 0, footHeight_ = 0;
 +    float shadowSide_ = 0, shadowTop_ = 0, shadowBottom_ = 0;  // the shadow's margin around the panel
++    bool bare_ = false;  // a toast: only a footer, on one line
 +    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Enter"
 +
 +    IDWriteTextFormat* text_ = nullptr;

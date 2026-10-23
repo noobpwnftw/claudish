@@ -21,10 +21,10 @@ def failure(error):
     """Why a request failed, in a few plain words for the panel."""
     error = str(error or "").lower()
     if any(word in error for word in ("refused", "unreachable", "offline", "connect", "not running")):
-        return "The model is offline"
+        return "the model is offline"
     if "timed out" in error or "timeout" in error:
-        return "The model took too long"
-    return "The request failed"
+        return "the model took too long"
+    return "the request failed"
 
 
 def split_title(text):
@@ -166,13 +166,13 @@ class Composition:
         elif self.working and not self.reply:
             status = " ".join((self.status or "").split())
             shown.update(status=(status[:77] + "…" if len(status) > 80 else status)
-                         or ("Rewriting" if self.asked == "rewrite" else "Working"),
+                         or ("rewriting" if self.asked == "rewrite" else "working"),
                          busy=True, foot=[("Esc", "stop")])
         elif self.working:  # typing while it works: your next words, sent when you press Enter
-            shown["status"], shown["busy"] = "Working", True
+            shown["status"], shown["busy"] = "working", True
         elif self.failed:  # Tab retries a rewrite, Enter an instruction: each key asks again
             retry = "Tab" if self.asked == "rewrite" else "Enter"
-            shown.update(tile="warn", failed=self.error or "The request failed", foot=[(retry, "retry"), ("Esc", "edit")])
+            shown.update(tile="warn", failed=self.error or "the request failed", foot=[(retry, "retry"), ("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
             readings = self.candidates or [self.candidate]
             shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
@@ -198,12 +198,12 @@ class Composition:
         """The mode switch, briefly at the caret: the mode's tile, its name, and the key back (a
         panel with only a footer)."""
         compose = self.mode == "compose"
-        return blank(tile="ai" if compose else "cd", status="Compose" if compose else "Continue",
+        return blank(tile="ai" if compose else "cd", status="compose" if compose else "continue",
                      foot=[("Shift", "continue" if compose else "compose")])
 
     def dropped_toast(self):
         """After Esc discarded words: say so, briefly, with the key that brings them back."""
-        return blank(status="Dropped", foot=[("Shift+Esc", "restore")])
+        return blank(status="dropped", foot=[("Shift+Esc", "restore")])
 
     def hint(self):
         """The panel as one line of plain words, for a window that can only show text (IBus's
@@ -604,10 +604,10 @@ class Composition:
             return None
         if app != self.held_app or self.text:
             return None
-        status = ("The model asks" if held.question else
+        status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
-                  "A draft is ready" if held.candidate else
-                  "The request failed" if held.failed else "Working on what you asked")
+                  "a draft is ready" if held.candidate else
+                  "the request failed" if held.failed else "working on what you asked")
         return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
 
     def route(self, revision):

@@ -12,8 +12,15 @@ from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsM
                     NSFontWeightMedium, NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
                     NSMutableParagraphStyle, NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
-PAD, ROW_X, ROW_Y, KEY_GAP, RADIUS, ROW_RADIUS = 5, 9, 4, 6, 12, 7
-SIZE, SMALL, MIN_WIDTH, MAX_WIDTH, TAKE = 14, 12, 240, 440, 30
+# Every metric is the lab's macOS skin (claudish/web/design.css .host.macos) and kit.css's box model;
+# change them there first. INSET: an NSTextField label's own padding on each side, subtracted so a
+# gap between two labels is the lab's gap.
+SIZE, SMALL, LINE = 14, 12, 1.38                      # --k-size, --k-small, --k-line
+PAD, ROW_X, ROW_Y, RADIUS, ROW_RADIUS = 5, 9, 4, 12, 7  # --k-pad, --k-row-x, --k-row-y, --k-radius, --k-row-radius
+MIN_WIDTH, MAX_WIDTH, TAKE = 240, 440, round(3.6 * SIZE)  # --k-min, --k-max, --k-take-w (3.6em)
+FOOT_GAP, CAP_GAP, TILE = 12, 5, 18                   # .k-foot gap, .k-cap margin-right, .k-tile
+TOAST_LEFT, TOAST_RIGHT, TOAST_Y, TOAST_GAP = 6, 10, 5, 7  # .k-toast padding and gap
+INSET = 2
 BORDERLESS, NONACTIVATING = 0, 1 << 7  # NSWindowStyleMask values
 POPUP_LEVEL = 101  # NSPopUpMenuWindowLevel: above the app's own windows
 MATERIAL_MENU, BLENDING_BEHIND, STATE_ACTIVE = 5, 0, 1
@@ -41,6 +48,7 @@ def rounded_mask(radius):
 
 
 def label(text, size=SIZE, weight=NSFontWeightRegular, color=None, mono=False, width=None):
+    """A label; wrapped to `width`, its lines at the lab's line height (--k-line)."""
     field = NSTextField.labelWithString_(text)
     field.setFont_(NSFont.monospacedSystemFontOfSize_weight_(size, weight) if mono
                    else NSFont.systemFontOfSize_weight_(size, weight))
@@ -49,7 +57,25 @@ def label(text, size=SIZE, weight=NSFontWeightRegular, color=None, mono=False, w
         field.setPreferredMaxLayoutWidth_(width)
         field.cell().setWraps_(True)
         field.setLineBreakMode_(0)  # NSLineBreakByWordWrapping
+        lines = NSMutableParagraphStyle.alloc().init()
+        lines.setMinimumLineHeight_(round(size * LINE))
+        lines.setMaximumLineHeight_(round(size * LINE))
+        words = field.attributedStringValue().mutableCopy()
+        words.addAttribute_value_range_("NSParagraphStyle", lines, (0, words.length()))
+        field.setAttributedStringValue_(words)
     return field
+
+
+def symbols(field):
+    """A key drawn as symbols only (↩ ⇥ ↑↓ ⇧), not letters (esc): its glyphs carry their ink at
+    their own height, so it is centred by its ink, where letters sit on the baseline."""
+    return not any(ch.isalpha() for ch in str(field.stringValue()))
+
+
+def ink_middle(field):
+    """How far above its baseline a label's glyphs are centred (device metrics)."""
+    ink = field.attributedStringValue().boundingRectWithSize_options_((1000, 100), 1 << 3)
+    return ink.origin.y + ink.size.height / 2
 
 
 class Box(NSView):
@@ -67,12 +93,12 @@ def box(color, radius):
 
 
 def tile(text, background, foreground, round_=False):
-    """The footer's mark: the AI tile, or a warning mark when a request failed."""
+    """The footer's mark: the AI tile, continue's neutral "cd" tile, or a warning mark."""
     view = box(background, 9 if round_ else 4)
-    view.setFrame_(NSMakeRect(0, 0, 18, 18))
+    view.setFrame_(NSMakeRect(0, 0, TILE, TILE))
     glyph = label(text, 12 if round_ else 10, NSFontWeightBold, foreground, mono=not round_)
     size = glyph.fittingSize()
-    glyph.setFrame_(NSMakeRect((18 - size.width) / 2, (18 - size.height) / 2, size.width, size.height))
+    glyph.setFrame_(NSMakeRect((TILE - size.width) / 2, (TILE - size.height) / 2, size.width, size.height))
     view.addSubview_(glyph)
     return view
 
@@ -150,7 +176,8 @@ class Panel:
         inner = MAX_WIDTH - 2 * PAD - 2 * ROW_X
         secondary = NSColor.secondaryLabelColor()
         blocks = []  # (kind, views, height), laid out top to bottom
-        widest = MIN_WIDTH if spec["rows"] or spec["body"] or spec.get("thread") else 0
+        bare = not (spec["rows"] or spec["body"] or spec.get("thread"))  # a toast: one line (.k-toast)
+        widest = 0 if bare else MIN_WIDTH
         for turn in spec.get("thread") or []:
             # Your earlier turns: one line, your words at full size and colour, underlined as they
             # were at the caret; the label is the muted part.
@@ -173,7 +200,9 @@ class Panel:
                 views.append(label(spec["label"], SMALL, NSFontWeightSemibold, secondary, width=inner))
             views.append(label(spec["body"], SIZE - 1 if spec["code"] else SIZE, mono=spec["code"], width=inner))
             widest = max([widest] + [v.fittingSize().width + 2 * (PAD + ROW_X) for v in views])
-            blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1) + 2 * ROW_Y + 1))
+            after_turn = 4 if blocks else 0  # .k-turn + .k-head: the thread and the question apart
+            blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1)
+                           + 2 * ROW_Y + 1 + after_turn))
         takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's key
         text_width = inner - (TAKE if takes else 0)
         replying = spec.get("replying")  # you are typing a reply at the caret: the choices fade
@@ -188,23 +217,27 @@ class Panel:
             size = text.fittingSize()
             widest = max(widest, size.width + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
             blocks.append(("row", (text, on, index + 1), max(size.height, 18) + 2 * ROW_Y))
-        foot = self.footer(spec, secondary)
-        widest = max(widest, sum(self.size(v).width + gap for v, gap in foot) + 2 * (PAD + ROW_X))
-        blocks.append(("foot", foot, 20 + 2 * ROW_Y - 1))
-        width = min(MAX_WIDTH, widest)
-        height = 2 * PAD + sum(h for _, _, h in blocks) + (2 if len(blocks) > 1 else 0)
-        y = height - PAD
-        for kind, views, h in blocks:
-            if kind == "foot" and len(blocks) > 1:
-                y -= 2
-            y -= h
-            getattr(self, "place_" + kind)(views, y, h, width, pick)
+        foot = self.footer(spec, secondary, TOAST_GAP if bare else FOOT_GAP)
+        if bare:  # a toast: the tile, the words and the key on one line, padded as .k-toast
+            width = TOAST_LEFT + self.span(foot) + TOAST_RIGHT
+            height = TILE + 2 * TOAST_Y
+            self.place_foot(foot, TOAST_Y, TILE, width, pick, left=TOAST_LEFT)
+        else:
+            widest = max(widest, self.span(foot) + 2 * (PAD + ROW_X))
+            blocks.append(("foot", foot, TILE + 2 * ROW_Y - 1))
+            width = min(MAX_WIDTH, widest)
+            height = 2 * PAD + sum(h for _, _, h in blocks) + (2 if len(blocks) > 1 else 0)
+            y = height - PAD
+            for kind, views, h in blocks:
+                if kind == "foot" and len(blocks) > 1:
+                    y -= 2
+                y -= h
+                getattr(self, "place_" + kind)(views, y, h, width, pick)
         (cx, cy), (cw, ch) = rect
-        # Under the caret's line, the content starting at the caret (as on every platform: GNOME
-        # knows only the caret). It opens there and stays while it is open on that line and the caret
-        # is at or right of it: it never slides while you type (a reply, or more words), and when the
-        # text leaves (sent) it moves to the caret.
-        x = cx + cw - PAD - ROW_X
+        # Under the line, the content starting where IMK says the composition starts (or the caret).
+        # It opens there and stays while it is open on that line and its anchor is at or right of
+        # it: it never slides while you type.
+        x = cx + cw - (TOAST_LEFT if bare else PAD + ROW_X)  # the content (a toast's tile) at the anchor
         if self.window.isVisible() and self.opened and abs(self.opened[1] - cy) < 2 and x >= self.opened[0]:
             x = self.opened[0]
         self.opened = (x, cy)
@@ -221,14 +254,26 @@ class Panel:
     def size(view):
         return view.frame().size if isinstance(view, (NSProgressIndicator, Box)) else view.fittingSize()
 
-    def footer(self, spec, secondary):
+    def drawn(self, view):
+        """A view's width as drawn: a label without its own padding."""
+        return self.size(view).width - (2 * INSET if isinstance(view, NSTextField) else 0)
+
+    def span(self, items):
+        """The footer's width: every item as drawn, and the gaps between them."""
+        return sum(self.drawn(view) for view, _ in items) + sum(gap for _, gap in items[:-1])
+
+    def footer(self, spec, secondary, gap):
         """[(view, gap after)]: the mark, what is happening, each key with its verb, the tail, and a
-        hosted model's name at the end."""
+        hosted model's name at the end; `gap` between items (.k-foot or .k-toast), CAP_GAP between
+        a key and its verb."""
         items = []
+        self.keys = []
         if spec["tile"] == "warn":  # a failure reads without colour: a mark, then why
-            items.append((tile("!", NSColor.systemRedColor(), NSColor.whiteColor(), round_=True), 8))
+            items.append((tile("!", NSColor.systemRedColor(), NSColor.whiteColor(), round_=True), gap))
+        elif spec["tile"] == "cd":  # continue: a neutral tile, so only compose wears the accent
+            items.append((tile("cd", NSColor.labelColor().colorWithAlphaComponent_(0.12), NSColor.labelColor()), gap))
         else:
-            items.append((tile("AI", NSColor.colorWithSRGBRed_green_blue_alpha_(*ACCENT, 1), NSColor.whiteColor()), 8))
+            items.append((tile("AI", NSColor.colorWithSRGBRed_green_blue_alpha_(*ACCENT, 1), NSColor.whiteColor()), gap))
         if spec["status"]:
             if spec["busy"]:
                 spinner = NSProgressIndicator.alloc().initWithFrame_(NSMakeRect(0, 0, 12, 12))
@@ -237,14 +282,16 @@ class Panel:
                 spinner.setIndeterminate_(True)
                 spinner.startAnimation_(None)
                 items.append((spinner, 6))
-            items.append((label(spec["status"], SMALL), 12))
+            items.append((label(spec["status"], SMALL), gap))
         if spec["failed"]:
-            items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), 12))
+            items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), gap))
         for key, verb in spec["foot"]:
-            items.append((key_label(key), KEY_GAP - 2))
-            items.append((label(verb, SMALL, color=secondary), 12))
+            glyph = key_label(key)
+            self.keys.append(glyph)
+            items.append((glyph, CAP_GAP))
+            items.append((label(verb, SMALL, color=secondary), gap))
         if spec["tail"]:
-            items.append((label(spec["tail"], SMALL, color=secondary), 12))
+            items.append((label(spec["tail"], SMALL, color=secondary), gap))
         if spec["mark"]:
             items.append((label(spec["mark"], SMALL, color=secondary), 0))
         return items
@@ -277,31 +324,41 @@ class Panel:
             row.addSubview_(bar)
             key = spec_take(self.spec)  # Tab takes a draft; Enter confirms a choice
             take = key_label(key, bool(self.spec.get("nudge")))
-            size = take.frame().size if self.spec.get("nudge") else take.fittingSize()
-            take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
+            if self.spec.get("nudge"):  # the lit keycap: centred in the row, at its right edge
+                size = take.frame().size
+                take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
+            else:  # the glyph, centred in the row by its ink (↩ and ⇥ sit at their own height)
+                size = take.fittingSize()
+                bottom = h / 2 - ink_middle(take) + take.font().descender()
+                take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width + INSET, round(bottom * 2) / 2, size.width, size.height))
             row.addSubview_(take)
         text.setFrame_(NSMakeRect(ROW_X, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
         row.addSubview_(text)
         self.effect.addSubview_(row)
 
-    def place_foot(self, items, y, h, width, pick):
-        # One line through the footer's middle: every key and word in one size on one baseline,
-        # their lowercase centred on it (as a menu's shortcuts sit with its titles), the tile and
-        # the spinner centred on it. Keys in a larger size never lined up with their words.
+    def place_foot(self, items, y, h, width, pick, left=PAD + ROW_X):
+        # One line through the footer's middle: the words on one baseline, their lowercase centred
+        # on it (as a menu's shortcuts sit with its titles); a key of letters (esc) on that
+        # baseline too, a key of symbols (↩ ⇥ ↑↓ ⇧, whose ink sits at its own height) centred on
+        # the line by its ink; the tile and the spinner centred on it.
         middle = y + h / 2
         baseline = middle - NSFont.systemFontOfSize_(SMALL).xHeight() / 2
-        x = PAD + ROW_X
+        x = left
         for index, (view, gap) in enumerate(items):
             size = self.size(view)
+            drawn = self.drawn(view)
             if index == len(items) - 1 and gap == 0 and index:  # the hosted mark, at the end
-                x = max(x, width - PAD - ROW_X - size.width)
-            if isinstance(view, NSTextField):
-                bottom = baseline + view.font().descender()  # descender is negative
+                x = max(x, width - PAD - ROW_X - drawn)
+            if any(view is key for key in getattr(self, "keys", [])) and symbols(view):
+                bottom = middle - ink_middle(view) + view.font().descender()  # descender is negative
+            elif isinstance(view, NSTextField):
+                bottom = baseline + view.font().descender()
             else:
                 bottom = middle - size.height / 2
-            view.setFrame_(NSMakeRect(x, round(bottom), size.width, size.height))
+            inset = INSET if isinstance(view, NSTextField) else 0
+            view.setFrame_(NSMakeRect(x - inset, round(bottom * 2) / 2, size.width, size.height))  # to the device pixel
             self.effect.addSubview_(view)
-            x += size.width + gap
+            x += drawn + gap
 
     def hide(self):
         if self.window is not None:
@@ -329,7 +386,7 @@ class Overlay:
         (cx, cy), (cw, ch) = rect
         self.field.setStringValue_(text)
         self.field.setFont_(NSFont.systemFontOfSize_(max(11.0, round(ch / 1.25))))
-        self.field.setTextColor_(NSColor.placeholderTextColor())
+        self.field.setTextColor_(NSColor.systemGrayColor())  # the lab's --k-ghost (#8e8e93): 3:1 on white
         size = self.field.fittingSize()
         self.window.setFrame_display_(NSMakeRect(cx + cw, cy + (ch - size.height) / 2, size.width, size.height), True)
         self.window.orderFrontRegardless()

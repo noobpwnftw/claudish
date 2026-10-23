@@ -121,7 +121,7 @@ def main():
             for char in "say hi":
                 key(ord(char.upper()), ord(char))
             reply = shift_tap()
-            assert service.state.mode == "continue" and said(reply, "Continue"), reply
+            assert service.state.mode == "continue" and said(reply, "continue"), reply
             assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
             last = worker_class.return_value.schedule.call_args.args
             assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
@@ -152,7 +152,7 @@ def main():
             reply = key(0x77)  # F8: send a picture of the window too
             assert service.state.look and said(reply, "window"), reply
             reply = key(0x0D)
-            assert service.state.working and said(reply, "Working"), reply
+            assert service.state.working and said(reply, "working"), reply
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working

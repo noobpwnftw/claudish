@@ -284,8 +284,21 @@ index feb9813..12eb1d5 100644
  	bool isActivated_;
  	State state_;
  };
+diff --git a/PIMETextService/PIMEImeModule.cpp b/PIMETextService/PIMEImeModule.cpp
+index 3e09587..ecd1639 100644
+--- a/PIMETextService/PIMEImeModule.cpp
++++ b/PIMETextService/PIMEImeModule.cpp
+@@ -46,7 +46,7 @@ static const GUID g_inputDisplayAttributeGuid =
+ 
+ static std::vector<Ime::ComPtr<Ime::DisplayAttributeInfo>> createDisplayAttrInfos() {
+     auto inputAttrib = Ime::ComPtr<Ime::DisplayAttributeInfo>::make(g_inputDisplayAttributeGuid);
+-    inputAttrib->setLineStyle(TF_LS_DOT);
++    inputAttrib->setLineStyle(TF_LS_SOLID);  // Claudish: the composition is one plain underline (docs/design/design.md)
+ 	return {std::move(inputAttrib)};
+ }
+ 
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..2b4da3c 100644
+index 28d8286..bb82190 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -268,6 +268,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
@@ -359,7 +372,7 @@ index 28d8286..2b4da3c 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,11 +400,24 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -369,14 +400,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -381,11 +394,16 @@ index 28d8286..2b4da3c 100644
          RECT textRect;
          // get the position of composition area from TSF
 -        if (selectionRect(session, &textRect)) {
-+        if (caretRect(session, &textRect)) {
-             // FIXME: where should we put the message window?
-             messageWindow_->move(textRect.left, textRect.bottom);
-         }
-@@ -429,6 +473,7 @@ void TextService::closeClient() {
+-            // FIXME: where should we put the message window?
+-            messageWindow_->move(textRect.left, textRect.bottom);
+-        }
++        if (caretRect(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
++            messageWindow_->move(textRect.left - messageWindow_->textInset(),
++                                 textRect.bottom + Ime::scaled(6) - messageWindow_->topInset());
+     }
+ }
+ 
+@@ -429,6 +472,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();

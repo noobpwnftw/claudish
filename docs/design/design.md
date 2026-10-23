@@ -24,7 +24,7 @@ new work: does it make one turn at the caret better?
 
 A Shift tap (Shift pressed and released alone, not right after another key) switches mode, as
 Shift switches English and pinyin. The taskbar, menu bar or top bar shows the mode all along; a
-switch shows the mode's tile and name briefly at the caret ("Compose · Shift continue").
+switch shows the mode's tile and name briefly at the caret ("compose · Shift continue").
 
 - **Continue** (where cd_AI starts): keys go straight into the app. At a word boundary at the end
   of a line, the rest of the sentence shows in grey after the caret. Tab takes it; typing ignores
@@ -52,7 +52,7 @@ be known before it is pressed).
 1. **Enter sends** your words. They stay underlined at the caret while the exchange is open (as a
    CJK preedit: choices never show without a composition; macOS apps give an input method Return,
    Tab and the arrows only while there is marked text). The panel says what is happening
-   ("Working", with a spinner; Esc stop).
+   ("working", with a spinner; Esc stop).
 2. **The model answers** with drafts (rows; the first highlighted; Tab inserts the highlighted
    one), an answer to read (a paragraph; Tab insert, Esc dismiss, or type to ask more), or a
    question (its choices as rows; Enter answers with the highlighted one, or type a reply).
@@ -67,7 +67,7 @@ be known before it is pressed).
    never sends or approves; the exchange is held for that text box (its work goes on) and a passive
    pill shows on return ("3 drafts ready · Shift+Esc open"); it expires after ten minutes. A result
    never goes into another box.
-6. **Nothing is lost silently:** a drop says "Dropped · Shift+Esc restore".
+6. **Nothing is lost silently:** a drop says "dropped · Shift+Esc restore".
 
 A rewrite waits in the panel ("Rewrite"; Tab insert, Esc dismiss): the composition only ever
 holds your own words, because apps commit a visible composition themselves (a click, a focus
@@ -85,25 +85,29 @@ reply"; "from Claude · hosted" at the end when a hosted model answered).
   it (Tab for a draft, Enter for a choice) in a trailing column every row keeps. Enter on a draft
   lights that key (the accent at 20% behind it, an accent outline) until a key changes the panel;
   the footer is never lit.
-- **Failure:** the warning mark and the reason in plain words ("The model is offline"), regular
+- **Failure:** the warning mark and the reason in plain words ("the model is offline"), regular
   weight; Tab retries a rewrite, Enter an instruction; Esc edit.
 - **Colour:** Claudish orange means only AI (the tile); the highlight and the lit key use the
   platform's accent. Muted text 4.5:1 or more, the suggestion and keycap borders 3:1 or more; a
   forced-colors rendering keeps the bar and the key.
-- **Placement:** under the caret's line, its content starting at the caret, clamped to the
-  screen, above the line when there is no room below. It stays where it opened while it is open;
-  it moves only if the caret leaves that line or lands left of it. It never slides while you type.
-  It fits its editor or screen. Panels follow the system theme, not the app's.
+- **Placement:** under the line, its content starting where the composition starts (what IMK,
+  TSF and IBus report while something is composed, as CJK candidate windows sit), or at the caret
+  when nothing is composed; clamped to the screen, above the line when there is no room below. It
+  stays where it opened while it is open (a sent instruction stays, and a reply takes its place,
+  so it never jumps); it moves only if its anchor leaves that line or lands left of it. It never
+  slides while you type. It fits its editor or screen. Panels follow the system theme, not the
+  app's: on GNOME 46 that is the Shell's, which is always dark (the light GNOME skin is GNOME 47+).
 - **Shape:** each platform draws the panel's own corners, border and shadow from its skin's tokens
   (no reliance on a compositor that may not draw them).
 
 ## What each platform cannot draw, and the design that follows
 
 - The composition is the platform's plain underline (macOS cannot colour it; Wayland cannot style
-  it), so a sent instruction looks like one being typed; the panel's "Working" says it was sent.
+  it), so a sent instruction looks like one being typed; the panel's "working" says it was sent.
 - The suggestion is cd_AI's own grey text after the caret, in its UI font at the caret's height
   (only macOS reports the app's font), and only at the end of a line, so it never covers your text.
-- GNOME reports only the caret, so no platform anchors the panel to the composition's start.
+- Each platform reports where a composition starts (and the caret without one), so the panel
+  anchors there everywhere.
 
 ## Sign-off checks the lab cannot make
 

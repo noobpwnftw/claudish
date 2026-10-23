@@ -189,7 +189,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.hint(), "Tab rewrite · Enter ask · Shift+Enter keep")
         state.submit()
         working = state.panel()
-        self.assertEqual((working["status"], working["busy"], working["foot"]), ("Working", True, [("Esc", "stop")]))
+        self.assertEqual((working["status"], working["busy"], working["foot"]), ("working", True, [("Esc", "stop")]))
         state.offer(state.revision, "Hi!", ["Hello!", "Hey!"], hosted="Claude")
         drafts = state.panel()
         self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
@@ -206,7 +206,7 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         state.fail(state.revision, "Connection refused")
         failed = state.panel()
-        self.assertEqual((failed["tile"], failed["failed"]), ("warn", "The model is offline"))
+        self.assertEqual((failed["tile"], failed["failed"]), ("warn", "the model is offline"))
         state.change("y")
         state.submit()
         state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
@@ -359,7 +359,7 @@ class ModeFeelTests(unittest.TestCase):
         state.insert("n")
         self.assertEqual(state.leave("app"), "on")  # what the composition shows goes in, as a CJK preedit
         self.assertIsNone(state.returned("other app"))  # never offered in another app
-        self.assertEqual(state.returned("app")["status"], "The model asks")  # a pill, taking no keys
+        self.assertEqual(state.returned("app")["status"], "the model asks")  # a pill, taking no keys
         self.assertEqual((state.text, state.panel()), ("", None))
         state.note(sent, "Reading")  # results for the exchange you left go to it
         self.assertEqual(state.restore(), "on")  # Shift+Esc: it is back, your unsent reply at the caret
