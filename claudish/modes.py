@@ -19,8 +19,9 @@ CONTINUE_EXAMPLES = [
 INSTRUCT_SYSTEM = (
     "The user typed an instruction for text they want to write. Write that text, ready to send, "
     "in polished and slightly verbose English with a fondness for em dashes. Use the reference "
-    "context for names, terms, and facts. Refer to people by name, or as they/them unless their "
-    "pronouns are given. Output only the text itself, with no preamble or notes."
+    "context for names, terms, and facts, and add no facts, promises, or commitments the user did "
+    "not give. Refer to people by name, or as they/them unless their pronouns are given. Output "
+    "only the text itself, with no preamble or notes."
 )
 # An instruction typed at a terminal prompt (G35): the screen comes with it, and the answer goes
 # where commands are typed. The prose template's voice and examples do not apply there.
@@ -36,20 +37,35 @@ INSTRUCT_EXAMPLES = [
 ]
 
 
+# Named tones: "plain" for everyday writing, and "fix" for correcting without rewriting (for
+# dyslexia, a phone keyboard, or a second language: your words stay yours).
+PRESETS = {"plain": "plain, natural", "fix": "plain, natural"}
+FIX_SYSTEM = (
+    "Correct the spelling, typos, grammar, punctuation, and capitalisation of the user's text. "
+    "Keep their words, word order, meaning, and voice; add nothing and leave out nothing. If it is "
+    "already correct, return it unchanged. Output only the corrected text."
+)
+
+
 def toned(tone):
-    """The templates in another voice (a profile's "tone", such as "plain and concise"), for
-    rewrite, continue, and instruct. Claudish's voice (polished, slightly verbose, em dashes) is
-    the default and the identity; the examples teach that voice, so a tone goes without them."""
-    return {
+    """The templates in another voice (a profile's "tone", such as "plain and concise", or a preset:
+    "plain", "fix"), for rewrite, continue, and instruct. Claudish's voice (polished, slightly
+    verbose, em dashes) is the default and the identity; the examples teach that voice, so a tone
+    goes without them. "fix" corrects instead of rewriting."""
+    words = PRESETS.get(tone, tone)
+    voices = {
         "rewrite": ("Rewrite the user's text in %s English. Keep its meaning, names, numbers and language. "
-                    "Output only the rewritten text, no explanation." % tone, []),
+                    "Output only the rewritten text, no explanation." % words, []),
         "continue": ("Continue the user's unfinished text with the next few words, in the same language, "
-                     "%s. Output only the words that come next, not the text itself." % tone, []),
+                     "%s. Output only the words that come next, not the text itself." % words, []),
         "instruct": ("The user typed an instruction for text they want to write. Write that text, ready to "
-                     "send, in %s English. Use the reference context for names, terms, and facts. Refer to "
-                     "people by name, or as they/them unless their pronouns are given. Output only the text "
-                     "itself, with no preamble or notes." % tone, []),
+                     "send, in %s English. Use the reference context for names, terms, and facts, and add no "
+                     "facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text "
+                     "itself, with no preamble or notes." % words, []),
     }
+    if tone == "fix":
+        voices["rewrite"] = (FIX_SYSTEM, [])
+    return voices
 
 
 def defaults(rewrite_prompt=None, tone=None):

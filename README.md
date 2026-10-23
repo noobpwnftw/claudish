@@ -55,11 +55,16 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 
 | Platform | Tested |
 | --- | --- |
-| Linux (IBus) | real IBus and GTK typing in containers: X11 (26 scenarios), GNOME on Wayland (10) |
-| Windows (PIME/TSF) | Windows 11 ARM64 in a VM: Notepad and Edge, on released and on Claudish's patched PIME |
+| Linux (IBus) | real typing in containers: GTK, Qt, and GNOME Terminal on X11 (40 scenarios), GNOME on Wayland (12) |
+| Windows (PIME/TSF) | Windows 11 ARM64 in a VM: Notepad, Edge, Windows Terminal, the classic console, on Claudish's patched PIME |
 | macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, focus changes, instruct (9 scenarios); the suggestion is underlined rather than grey |
 
-Claudish is an experiment; the [roadmap](ROADMAP.md) says what is next.
+Claudish is an experiment in internal beta; the [roadmap](ROADMAP.md) says what
+is next. It is maintained by an AI agent (Claude Code) working under its
+owner's direction and the rules in [AGENT.md](AGENT.md); commits it makes carry a
+`Co-Authored-By: Claude` trailer. Design reviews in
+[docs/research](docs/research/) are synthetic: agents playing user personas, not
+real users.
 
 ## More
 

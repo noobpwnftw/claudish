@@ -41,6 +41,8 @@ def main():
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "local")')
     setup.add_argument("--yes", action="store_true", help="Do every step without asking")
+    setup.add_argument("--tone", help='The voice: "plain", "fix" (correct, keep your words), or your own words '
+                       "(default: Claudish's, polished with em dashes)")
     setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
     setup.add_argument("--variant", choices=["cpu", "vulkan"], default="cpu", help="llama.cpp build to download")
     setup.add_argument("--skip", action="append", default=[], metavar="STEP",
@@ -76,7 +78,7 @@ def main():
         return textbox_mcp()
     if args.command == "setup":
         from . import setup as wizard
-        sys.exit(wizard.run(args.profile, args.yes, args.dry_run, args.variant, args.skip))
+        sys.exit(wizard.run(args.profile, args.yes, args.dry_run, args.variant, args.skip, args.tone))
     if args.command == "doctor":
         from . import doctor as checkup
         sys.exit(checkup.main(args.json))

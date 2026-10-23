@@ -84,6 +84,9 @@ class ModeTests(unittest.TestCase):
             self.assertIn("plain and concise", plain.modes[mode]["system"])
             self.assertNotIn("em dash", plain.modes[mode]["system"])
             self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its voice
+        fix = Rewriter(max_tokens=64, tone="fix")  # corrects, keeps your words
+        self.assertIn("Keep their words", fix.modes["rewrite"]["system"])
+        self.assertIn("plain, natural", fix.modes["instruct"]["system"])
         custom = Rewriter(max_tokens=64, prompt=("Translate to French.", []), tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # --prompt wins
         with tempfile.TemporaryDirectory() as folder:
@@ -99,6 +102,15 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(screen.tail("\n".join(str(n) for n in range(100))).split("\n")[0], "60")
         self.assertTrue(screen.is_terminal("WindowsTerminal.exe") and screen.is_terminal("com.apple.Terminal"))
         self.assertFalse(screen.is_terminal("notepad.exe") or screen.is_terminal(None))
+        # Secrets already on screen are replaced before the screen goes anywhere.
+        shown = ("$ export API_KEY=sk-abcdefghijklmnopqrstuvwxyz123456\nAKIAABCDEFGHIJKLMNOP\n"
+                 "DB_PASSWORD=s3cret\n$ git commit -m 'fix token refresh'")
+        text, count = screen.redact(shown)
+        self.assertEqual(count, 3)
+        self.assertNotIn("sk-abc", text)
+        self.assertNotIn("s3cret", text)
+        self.assertIn("DB_PASSWORD=[redacted]", text)
+        self.assertIn("fix token refresh", text)  # words about tokens are not tokens
         # At a password prompt the screen is not sent (what you compose there would be the secret).
         with patch.object(screen, "read_atspi", return_value="$ sudo apt update\n[sudo] password for ana: "), \
                 patch.object(screen.sys, "platform", "linux"):

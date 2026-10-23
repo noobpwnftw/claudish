@@ -294,9 +294,13 @@ and the point. A profile can speak in another one:
 {"profiles": {"work": {"backend": "llama", "tone": "plain and concise"}}}
 ```
 
-The tone replaces the voice in the rewrite, continue, and instruct templates
-(any words work: "warm and friendly", "formal British"), and Claudish's own
-examples, which teach its voice, are left out. A rewrite template from
+Two tones are named: `"plain"` (plain, natural English) and `"fix"`, where Tab
+corrects spelling, typos, grammar, and capitals and keeps your words, their
+order, and your voice (for dyslexia, a second language, or a phone keyboard);
+continue and instruct are plain then. Any other words work too ("warm and
+friendly", "formal British"). The tone replaces the voice in the rewrite,
+continue, and instruct templates, and Claudish's own examples, which teach its
+voice, are left out. `claudish setup --tone fix` sets it for you. A rewrite template from
 `--prompt` or the profile's `"prompt"` wins over it. Instructions typed in a
 terminal always get a command line.
 

@@ -52,6 +52,22 @@ def step_config():
     return "todo", "write %s with profiles: %s" % (path, ", ".join(config.STARTER["profiles"])), config.write_starter
 
 
+def step_tone(name, settings, tone):
+    """The voice: Claudish's by default (polished, em dashes); "plain", "fix" (correct spelling and
+    grammar, keep your words), or any words, with --tone."""
+    current = settings.get("tone")
+    if not tone or tone == current:
+        return "done", "%s (change with --tone plain, --tone fix, or your own words)" % (
+            "Claudish's voice: polished, with em dashes" if not current else repr(current)), None
+
+    def write():
+        path = config.default_path()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.setdefault("profiles", {}).setdefault(name, {})["tone"] = tone
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return "todo", "set the %s profile's tone to %r" % (name, tone), write
+
+
 def step_mcp():
     found = mcp_setup.discover()
     if not found:
@@ -132,11 +148,11 @@ def step_service(name, settings):
     return "todo", "start %s at every login" % what, lambda: service.run("install", serve=not local, extra=extra)
 
 
-def plan(profile=None, variant="cpu", skip=()):
+def plan(profile=None, variant="cpu", skip=(), tone=None):
     """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
     name, settings = chosen_profile(profile)
     local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
-    steps = [("Config", step_config), ("MCP servers", step_mcp)]
+    steps = [("Config", step_config), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
     if local:
         steps += [("llama.cpp", lambda: step_llama(settings, variant)), ("Model", step_model)]
     steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(name, settings))]
@@ -166,9 +182,9 @@ def ask(question):
         return False
 
 
-def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=()):
+def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=None):
     try:
-        name, steps = plan(profile, variant, skip)
+        name, steps = plan(profile, variant, skip, tone)
     except ValueError as exc:
         print("setup: %s" % exc)
         return 2

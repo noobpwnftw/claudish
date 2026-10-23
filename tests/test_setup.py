@@ -57,8 +57,15 @@ class SetupTests(unittest.TestCase):
         return status, out.getvalue()
 
     def test_fresh_machine_plans_everything(self):
-        self.assertEqual(self.states(), {"Config": "todo", "MCP servers": "skip", "llama.cpp": "todo",
+        self.assertEqual(self.states(), {"Config": "todo", "Tone": "done", "MCP servers": "skip", "llama.cpp": "todo",
                                          "Model": "todo", "Input method": "todo", "Starts at login": "todo"})
+
+    def test_tone_is_set_for_the_profile(self):
+        status, out = self.quiet(yes=True, tone="fix")
+        self.assertEqual(status, 0, out)
+        _, settings, _, _ = config.resolve()
+        self.assertEqual(settings["tone"], "fix")
+        self.assertEqual(self.states()["Tone"], "done")  # the default profile keeps it
 
     def test_dry_run_changes_nothing(self):
         status, out = self.quiet(dry_run=True)

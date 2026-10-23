@@ -34,6 +34,31 @@ TERMINALS = {
 SECRET_PROMPT = re.compile(r"(password|passphrase|passcode|\bpin\b|verification code|otp)[^\n]{0,60}:\s*$", re.I)
 
 
+# Secrets that are already on screen (an exported token, a key printed by a tool): replaced before
+# the screen goes anywhere. A best effort for well-known shapes, not a guarantee. (pattern, whether
+# its first group, a name such as "DB_PASSWORD=", stays.)
+SECRETS = [(re.compile(pattern), keeps_name) for pattern, keeps_name in (
+    (r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)", False),
+    (r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", False),                        # AWS access key ids
+    (r"\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}", False),          # GitHub tokens
+    (r"\b(?:sk|rk|pk)-[A-Za-z0-9_-]{20,}", False),                     # API keys (OpenAI, Anthropic, Stripe)
+    (r"\bxox[abposr]-[A-Za-z0-9-]{10,}", False),                       # Slack tokens
+    (r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", False),  # JWTs
+    (r"(?i)\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16,}", False),
+    (r"(?i)\b([a-z_]*(?:password|passwd|secret|token|api_?key|access_?key)[a-z_]*\s*[=:]\s*)"
+     r"(?!\[redacted\])(?:\"[^\"]*\"|'[^']*'|\S+)", True),
+)]
+
+
+def redact(text):
+    """(text with secrets replaced, how many)."""
+    count = 0
+    for pattern, keeps_name in SECRETS:
+        text, found = pattern.subn(lambda match: (match.group(1) if keeps_name else "") + "[redacted]", text)
+        count += found
+    return text, count
+
+
 def is_terminal(app):
     """Whether the focused app (as an adapter names it) is a terminal."""
     return bool(app) and app.lower() in TERMINALS
@@ -74,7 +99,9 @@ def read(app=None):
     if not text or not text.strip():
         return None
     screen = tail(text)
-    return None if SECRET_PROMPT.search(screen.rsplit("\n", 1)[-1]) else screen
+    if SECRET_PROMPT.search(screen.rsplit("\n", 1)[-1]):
+        return None
+    return redact(screen)[0]
 
 
 def read_atspi(app):
