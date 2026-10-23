@@ -1,4 +1,5 @@
 """Platform-neutral IME state. Keep compatible with PIME's Python 3.6+."""
+import copy
 import time
 
 MAX_COMPOSITION = 512
@@ -16,6 +17,7 @@ SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a cl
 # typist sees only the composition; a hesitant one always sees the keys.
 HINT_PAUSE_SECONDS = 0.0  # CJK reviewers: what Enter does must show from the first key (2026-10-24)
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
+HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
 
 
 def failure(error):
@@ -63,6 +65,8 @@ class Composition:
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
         self.dropped_reply = False
         self.highlight = 0  # the highlighted row (↑ and ↓ move it; Enter takes it)
+        self.held = None  # a sent instruction's exchange, held when focus left the text box
+        self.held_app, self.held_at = None, 0.0
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Enter answer it
         self.status = ""  # what the agent is doing, or its draft so far
         self.offered_at = 0.0  # when the latest result arrived (time.monotonic)
@@ -119,7 +123,7 @@ class Composition:
         instruction is sent, nothing, or what you type next (a reply)."""
         if self.sent:
             return self.reply
-        return self.candidate if self.converted else self.text
+        return self.text  # a rewrite shows in the panel, never in your text: only Tab puts it there
 
     def panel(self, now=None):
         """What the panel next to the caret shows, the same for every adapter and the demo
@@ -164,8 +168,8 @@ class Composition:
             shown.update(rows=[{"key": "", "text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Enter", "insert"), ("Esc", "edit")],
                          mark=self.hosted and "from %s · hosted" % self.hosted)
-        elif self.converted:
-            shown.update(label="Your words", body=self.text, foot=[("Tab", "keep"), ("Esc", "undo")],
+        elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
+            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "keep"), ("Esc", "undo")],
                          mark=self.hosted and "from %s · hosted" % self.hosted)
         elif self.look or self.editing or self.hint_due(now) == 0:  # after F8 or Esc: said at once
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
@@ -277,6 +281,11 @@ class Composition:
     def restore(self):
         """Shift+Esc with nothing composed: the instruction Esc dropped comes back to edit; "" when
         there is none (the key is the app's)."""
+        if self.held is not None and not self.text and not self.live:
+            held, self.held = self.held, None  # the exchange you left, back as it was
+            self.__dict__.update({k: v for k, v in held.__dict__.items() if k != "held"})
+            self.held = None
+            return self.reply or self.text
         if self.live or not self.dropped:
             return ""
         if self.dropped_reply and self.sent and not self.reply:  # a reply you cleared, back at the caret
@@ -322,6 +331,10 @@ class Composition:
         self.asked, self.working, self.failed = "instruct", True, False
 
     def fail(self, revision, error=None):
+        held = self.route(revision)
+        if held is not None:  # the exchange you left: it goes on, out of sight
+            held.fail(revision, error)
+            return
         if revision == self.revision and self.working:
             self.working, self.failed = False, True
             self.question, self.status = None, ""
@@ -330,6 +343,10 @@ class Composition:
     def done(self, revision):
         """The instruction was carried out elsewhere (a helper took the task): nothing is inserted,
         and the instruction is finished."""
+        held = self.route(revision)
+        if held is not None:  # the exchange you left: it goes on, out of sight
+            held.done(revision)
+            return False
         if revision != self.revision or not self.working:
             return False
         self.change("")
@@ -337,6 +354,10 @@ class Composition:
 
     def ask(self, revision, question, session):
         """An agent asks something while working on this instruction: its choices become the list."""
+        held = self.route(revision)
+        if held is not None:  # the exchange you left: it goes on, out of sight
+            held.ask(revision, question, session)
+            return False
         if revision != self.revision or not self.working:
             return False
         self.question = dict(question, session=session)
@@ -347,6 +368,10 @@ class Composition:
 
     def note(self, revision, text):
         """Progress or a partial draft from the agent, for the status line."""
+        held = self.route(revision)
+        if held is not None:  # the exchange you left: it goes on, out of sight
+            held.note(revision, text)
+            return False
         if revision != self.revision or not self.working:
             return False
         self.status = text
@@ -412,8 +437,9 @@ class Composition:
             if len(self.reply) < MAX_COMPOSITION:
                 self.reply += char
             return True
-        if len(self.text) >= MAX_COMPOSITION or self.converted:
+        if len(self.text) >= MAX_COMPOSITION:
             return False
+        # A rewrite showing in the panel: typing on goes on with your words (the rewrite goes).
         self.change(self.text + char)  # as typed: em dashes come from the model, never from a key
         return True
 
@@ -452,6 +478,10 @@ class Composition:
 
     def offer(self, revision, text, alternatives=(), hosted=""):
         """A result arrived. hosted: the hosted model that wrote it ("Claude"), said in the panel."""
+        held = self.route(revision)
+        if held is not None:  # the exchange you left: it goes on, out of sight
+            held.offer(revision, text, alternatives, hosted)
+            return False
         if revision != self.revision or not self.text:
             return False
         self.hosted = hosted or ""
@@ -515,9 +545,50 @@ class Composition:
 
     def commit(self, suggested=False):
         """The text to insert: the candidate if asked for or already shown in place, else your words."""
-        text = (self.candidate if suggested or self.converted else "") or self.text
+        text = (self.candidate if suggested else "") or self.text  # the model's words only when asked for
         self.change("")
         return text
+
+    def leave(self, app=None):
+        """Focus left the text box: what the app may keep. Your own words for the document go in;
+        the model's words never (a rewrite is not taken); words for the model never (a reply);
+        nothing is sent or approved. A sent instruction's exchange is held (its work goes on) and
+        offered again on return (returned)."""
+        if self.live:
+            self.change("")
+            return ""
+        if self.sent:
+            held = copy.copy(self)
+            held.held = None
+            self.held, self.held_app, self.held_at = held, app, time.monotonic()
+            self.change("")
+            return ""
+        words = self.text
+        self.change("")
+        return words
+
+    def returned(self, app=None):
+        """Focus came back: a passive pill if an exchange is held for this app ("3 drafts ready ·
+        Shift+Esc open"); it takes no keys. None otherwise; a held exchange expires."""
+        held = self.held
+        if held is None:
+            return None
+        if time.monotonic() - self.held_at > HELD_SECONDS:
+            self.held = None
+            return None
+        if app != self.held_app or self.text:
+            return None
+        status = ("The model asks" if held.question else
+                  "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
+                  "A draft is ready" if held.candidate else
+                  "The request failed" if held.failed else "Working on what you asked")
+        return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None, "tile": "ai",
+                "status": status, "busy": held.working, "foot": [("Shift+Esc", "open")], "failed": None,
+                "mark": None, "thread": [], "replying": False}
+
+    def route(self, revision):
+        """A result for the held exchange (its revision): applied there, not to what is on screen."""
+        return self.held if self.held is not None and revision == self.held.revision else None
 
 
 class ShiftTap:

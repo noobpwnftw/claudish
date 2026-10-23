@@ -62,12 +62,18 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.tab(), "wait")  # asked already
         state.offer(state.revision, "Exceptionally good.")
         self.assertFalse(state.choosing)  # no list for a rewrite
-        self.assertEqual(state.shown, "Exceptionally good.")  # in place as it arrives: you asked
-        self.assertEqual((state.escape(), state.shown), ("back", "very good"))  # your words again
+        # Your words stay the composition; the rewrite shows in the panel, and only Tab takes it
+        # (a focus change, which apps turn into a commit, can never insert the model's words).
+        self.assertEqual(state.shown, "very good")
+        self.assertEqual((state.panel()["label"], state.panel()["body"]), ("Rewrite", "Exceptionally good."))
+        self.assertEqual((state.escape(), state.shown, state.panel()["label"]), ("back", "very good", None))
         self.assertEqual(state.tab(), "convert")  # the rewrite again, without asking again
-        self.assertEqual(state.enter(), "accept")  # Enter keeps the rewrite shown
-        self.assertFalse(state.insert("x"))  # typing on keeps it too (the adapter commits first)
-        self.assertEqual(state.commit(), "Exceptionally good.")
+        self.assertEqual(state.enter(), "accept")  # Enter keeps it too
+        self.assertEqual(state.commit(True), "Exceptionally good.")
+        state.change("very good")
+        state.tab()
+        state.offer(state.revision, "Exceptionally good.")
+        self.assertEqual(state.commit(), "very good")  # a commit without Tab (a focus change): your words
 
     def test_esc_steps_back_until_what_you_composed_is_dropped(self):
         state = Composition()
@@ -86,7 +92,7 @@ class ModeFeelTests(unittest.TestCase):
         state.change("hi")
         state.tab()
         state.offer(state.revision, "Hello.")
-        self.assertEqual(state.toggle(), "Hello.")  # the rewrite shown is what you see
+        self.assertEqual(state.toggle(), "hi")  # your words: a rewrite in the panel goes in only with Tab
 
     def test_a_selection_taken_from_the_app_is_never_dropped(self):
         state = Composition()
@@ -195,7 +201,7 @@ class ModeFeelTests(unittest.TestCase):
         state.tab()
         state.offer(state.revision, "This is crucial.")
         rewritten = state.panel()  # your words, as large, until you keep it
-        self.assertEqual((rewritten["label"], rewritten["body"], rewritten["mark"]), ("Your words", "this is important", ""))
+        self.assertEqual((rewritten["label"], rewritten["body"], rewritten["mark"]), ("Rewrite", "This is crucial.", ""))
         state.change("x")
         state.submit()
         state.fail(state.revision, "Connection refused")
@@ -271,6 +277,29 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.escape(), "drop")
         self.assertEqual((state.text, state.restore()), ("", "summarize this thread"))  # Shift+Esc
         self.assertEqual(state.shown, "summarize this thread")
+
+    def test_a_focus_change_commits_only_your_own_words(self):
+        """Seven reviewers, unanimous: a focus change may commit your own words, never the model's,
+        never words meant for the model, and it never sends or approves."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("very good")
+        state.tab()
+        state.offer(state.revision, "Exceptionally good.")
+        self.assertEqual(state.leave("app"), "very good")  # your words, not the rewrite
+        state.change("summarize this")
+        state.submit()
+        sent = state.revision
+        state.ask(sent, {"id": "q", "label": "The model asks", "body": "All?", "choices": [{"label": "Yes"}]}, "s")
+        state.insert("o")
+        state.insert("n")
+        self.assertEqual(state.leave("app"), "")  # nothing: the reply was for the model
+        self.assertIsNone(state.returned("other app"))  # never offered in another app
+        self.assertEqual(state.returned("app")["status"], "The model asks")  # a pill, taking no keys
+        self.assertEqual((state.text, state.panel()), ("", None))
+        state.note(sent, "Reading")  # results for the exchange you left go to it
+        self.assertEqual(state.restore(), "on")  # Shift+Esc: it is back, your unsent reply at the caret
+        self.assertEqual((state.shown, state.question["id"], state.status), ("on", "q", "Reading"))
 
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()

@@ -61,7 +61,10 @@ try:
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab asks for the rewrite
     assert engine.composition.working and engine.composition.request_mode == "rewrite"
     engine.composition.offer(engine.composition.revision, "A considered draft.")  # in place as it arrives
-    assert engine.composition.shown == "A considered draft." and commits[-1] == "hello-world"
+    # Your words stay the preedit; the rewrite waits in the panel for Tab (IBus commits the preedit on
+    # focus-out, so it must only ever hold your words).
+    assert engine.composition.shown == "draft" and engine.composition.panel()["body"] == "A considered draft."
+    assert commits[-1] == "hello-world"
     engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab again keeps it
     assert commits[-1] == "A considered draft."
     # Continue types into the app; the context follows; Tab takes a suggestion.

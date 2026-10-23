@@ -120,7 +120,7 @@ function Invoke-Scenarios {
   Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue, typing goes straight in
   [Keys]::Type('Only my words '); Start-Sleep -Milliseconds 300  # a pause after a word: continue asks
   Check 'continue: typing goes straight into the app' (Get-Text) 'Only my words '
-  Start-Sleep -Milliseconds 800; [Keys]::Press(0x75)  # F6 shows the suggestion (PIME redraws on keys)
+  Start-Sleep -Milliseconds 800  # the suggestion shows as it arrives (Claudish's PIME calls back)
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
   Check 'continue: Tab takes the rest of the sentence' (Get-Text) "Only my words and then some${dash}naturally."
   Reset-Target

@@ -400,10 +400,10 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..4391040
+index 0000000..2318242
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,478 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -866,7 +866,9 @@ index 0000000..4391040
 +        grey->Release();
 +    }
 +    releaseOne(target);
-+    POINT at = { caret.right, caret.top + ((caret.bottom - caret.top) - height) / 2 }, origin = { 0, 0 };
++    // From the caret's own x (an empty selection's rectangle can be a character wide): the space
++    // you typed is the only gap before the suggestion.
++    POINT at = { caret.left + scaled(2), caret.top + ((caret.bottom - caret.top) - height) / 2 }, origin = { 0, 0 };
 +    SIZE extent = { width, height };
 +    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
 +    UpdateLayeredWindow(hwnd, screen, &at, &extent, memory, &origin, 0, &blend, ULW_ALPHA);

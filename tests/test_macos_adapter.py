@@ -282,10 +282,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
         self.controller.pollSuggestions_(None)  # it arrives: in place of your words, no list
         # In place of your words; the panel keeps yours, as large, until you keep it.
+        # Your words stay the marked text; the rewrite waits in the panel for Tab (a click or a focus
+        # change, which apps turn into a commit, can never insert the model's words).
         self.assertEqual((self.module.PANEL.rows, self.module.PANEL.spec["label"], self.module.PANEL.spec["body"]),
-                         ([], "Your words", "draft!"))
+                         ([], "Rewrite", "A considered draft."))
         self.assertEqual(self.module.PANEL.spec["foot"], [("Tab", "keep"), ("Esc", "undo")])
-        self.assertEqual((self.client.marked, self.client.commits), ("A considered draft.", []))
+        self.assertEqual((self.client.marked, self.client.commits), ("draft!", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")
         self.key(48)
@@ -529,7 +531,9 @@ class MacOSAdapterTests(unittest.TestCase):
                              ("this is important.", "Dear Ana, ", " Thanks.")))
             fresh.worker.result = (fresh.state.revision, {"text": "This is of utmost significance."})
             fresh.pollSuggestions_(None)
-            self.assertEqual(client.whole(), "Dear Ana, This is of utmost significance. Thanks.")
+            # The selection stays as it was (your words, marked); the rewrite waits in the panel for Tab.
+            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
+            self.assertEqual(self.module.PANEL.spec["body"], "This is of utmost significance.")
             esc = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: 0, characters=lambda: "\x1b")
             fresh.handleEvent_client_(esc, client)
             fresh.handleEvent_client_(esc, client)  # your words, as they were

@@ -112,7 +112,9 @@ def main():
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A nuanced draft."})
             reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # it arrives: in place of your words, no list
             worker_class.return_value.poll.return_value = None
-            assert reply["candidateList"] == [] and reply["compositionString"] == "A nuanced draft.", reply
+            # Your words stay the composition; the rewrite waits in the panel for Tab.
+            assert reply["candidateList"] == [] and reply["compositionString"] == "draft", reply
+            assert reply["panel"]["body"] == "A nuanced draft.", reply
             reply = key(0x1B)  # Esc: your words again
             assert "commitString" not in reply and reply["compositionString"] == "draft", reply
             key(9)  # the rewrite again, without asking again
@@ -216,7 +218,7 @@ def main():
                 worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
                 reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
                 worker_class.return_value.poll.return_value = None
-                assert reply.get("compositionString") == "Thank you so much." and "timer" not in reply, reply
+                assert reply.get("panel", {}).get("body") == "Thank you so much." and "timer" not in reply, reply
                 key(9)  # keep it
                 # An email field (IS_EMAIL_SMTPEMAILADDRESS) is not prose: nothing unasked, and named.
                 service.state.mode = "continue"
