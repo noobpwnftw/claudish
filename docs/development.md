@@ -132,7 +132,9 @@ python3 -m claudish serve --backend rules &
 an input method at login and does not restart it after an update or a crash, so
 the rig starts it (`open -g`) when it is not running.
 
-For debugging, `launchctl setenv CLAUDISH_TRACE /tmp/claudish-trace.log` before
-cd_AI starts makes it log event kinds and errors (never typed text). Exceptions
+For debugging, `touch ~/Library/Logs/cd_AI-trace.log` before cd_AI starts makes
+it log event kinds and errors there (never typed text); remove the file to stop.
+(`launchctl setenv CLAUDISH_TRACE` does not reach an input method that macOS or
+`open -g` starts.) Exceptions
 in an input method otherwise vanish into the host app's run loop. Crash reports
 are in `~/Library/Logs/DiagnosticReports/Claudish-*.ips`.

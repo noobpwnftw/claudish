@@ -15,7 +15,10 @@ from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
-TRACE = os.environ.get("CLAUDISH_TRACE")  # a file path: event kinds and errors, never typed text
+# A file path: event kinds and errors, never typed text. An input method started by macOS (or with
+# open -g) does not see launchctl setenv, so an existing ~/Library/Logs/cd_AI-trace.log turns it on too.
+TRACE = os.environ.get("CLAUDISH_TRACE") or next(
+    (path for path in [os.path.expanduser("~/Library/Logs/cd_AI-trace.log")] if os.path.exists(path)), None)
 
 
 def trace(*fields):

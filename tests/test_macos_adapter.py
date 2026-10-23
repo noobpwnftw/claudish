@@ -194,8 +194,8 @@ class MacOSAdapterTests(unittest.TestCase):
         cls.module = load_adapter()
         # These tests press Enter the moment a result arrives; the double-Enter guard is tested in
         # test_candidates.
-        import claudish.composition
-        cls.guard = patch.object(claudish.composition, "ENTER_GUARD_SECONDS", 0)
+        # (through the adapter's own module: loading it under patched sys.modules can leave a copy)
+        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ENTER_GUARD_SECONDS": 0})
         cls.guard.start()
 
     @classmethod

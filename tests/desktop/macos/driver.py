@@ -168,7 +168,9 @@ def main():
 
 
 def scenarios():
-    Path("/tmp/claudish-trace.log").unlink(missing_ok=True)
+    trace = Path.home() / "Library/Logs/cd_AI-trace.log"
+    if trace.exists():
+        trace.write_text("")  # this run's events only (the file's presence keeps tracing on)
     # 1. Without the input method: can this session post keys to the app?
     print(sh(sys.executable, str(HERE / "input_source.py"), "--select", "com.apple.keylayout.US", check=False))
     fresh_document()
@@ -274,7 +276,6 @@ def scenarios():
 
     # Errors inside an input method never reach the screen: with CLAUDISH_TRACE set (launchctl
     # setenv) cd_AI logs them, and any is a failure.
-    trace = Path("/tmp/claudish-trace.log")
     if trace.exists():
         failures = [line for line in trace.read_text().splitlines() if " failed" in line]
         check("cd_AI raised no errors (trace)", failures, [])
