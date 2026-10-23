@@ -207,7 +207,11 @@ class ClaudishInputController(IMKInputController):
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and (self.state.automatic or not self.state.text):
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
-        self.panel.hide()
+        if self.state.question and not self.state.reply:  # the agent's choices, while you have not typed
+            self.panel.updateCandidates()
+            self.panel.show_(kIMKLocateCandidatesBelowHint)
+        else:
+            self.panel.hide()
         if self.state.live:  # the only marked text is the suggestion, with the caret before it
             client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost), (0, 0),
                                                                   (NSNotFound, 0))
@@ -292,13 +296,13 @@ class ClaudishInputController(IMKInputController):
         self.pollSuggestions_(None)
         key = event.keyCode()
         chars = event.characters() or ""
-        if self.state.question and len(chars) == 1 and "1" <= chars <= "9":  # the answer to the agent
+        if self.state.question and not self.state.reply and len(chars) == 1 and "1" <= chars <= "9":  # the answer to the agent
             chosen = self.state.answer_choice(int(chars))
             if chosen and self.worker is not None:
                 self.worker.answer(*chosen)
                 self.panel.hide()
             return True
-        if self.state.choosing and len(chars) == 1 and "1" <= chars <= "9":
+        if self.state.choosing and not self.state.question and len(chars) == 1 and "1" <= chars <= "9":
             self.commit_pick(client, int(chars))
             return True
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
@@ -321,6 +325,13 @@ class ClaudishInputController(IMKInputController):
         if key in (36, 76):  # Return, keypad Enter
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
+            if action == "reply":  # your own words, in answer to the agent's question
+                session, question, words = self.state.answer_text()
+                if self.worker is not None:
+                    self.worker.answer(session, question, text=words)
+                self.panel.hide()
+                self.changed(client)
+                return True
             if action == "submit":
                 self.state.submit()
                 if self.worker is not None:
@@ -343,7 +354,9 @@ class ClaudishInputController(IMKInputController):
             return action != "pass"
         if key == 53:  # Escape: one step back
             action = self.state.escape()
-            if action == "keep":
+            if action == "clear":  # the reply goes; the question stays
+                self.changed(client)
+            elif action == "keep":
                 self.finish(client)
             elif action in ("back", "drop"):
                 if self.worker is not None:

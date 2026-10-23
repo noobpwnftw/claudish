@@ -124,6 +124,7 @@ class Worker:
 
     def answer(self, session, question, choice=None, text=None):
         self.answered = (session, question, choice)
+        self.answered_text = (session, question, text)
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after=""):
         self.result = None
@@ -336,6 +337,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(worker.answered, ("s1", "perm-1", 1))
         self.assertIsNone(state.question)
         self.assertEqual(self.client.commits, [])  # an answer is not text
+        worker.result = (state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
+        self.controller.pollSuggestions_(None)
+        self.type_text("not 2")  # words instead of a number, digits included
+        self.assertEqual(self.client.marked, "not 2")
+        self.assertTrue(self.key(36))
+        self.assertEqual(worker.answered_text, ("s1", "perm-2", "not 2"))
 
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
         self.key(98)

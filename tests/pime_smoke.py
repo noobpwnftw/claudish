@@ -145,6 +145,15 @@ def main():
             reply = key(0x31)
             assert "commitString" not in reply, reply
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
+            # Another question: typed words answer it instead of a number.
+            worker_class.return_value.poll.return_value = (service.state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
+            key(0x10)
+            worker_class.return_value.poll.return_value = None
+            for char in "no 2":
+                key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
+            assert service.state.reply == "no 2" and not worker_class.return_value.answer.call_args.kwargs
+            key(0x0D)
+            assert worker_class.return_value.answer.call_args.kwargs == {"text": "no 2"}, worker_class.return_value.answer.call_args
             # Esc stops the session and goes back to the instruction; Esc again drops it unsent.
             reply = key(0x1B)
             assert "commitString" not in reply and service.state.text == "check", reply

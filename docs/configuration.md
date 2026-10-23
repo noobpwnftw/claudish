@@ -249,10 +249,12 @@ candidate like any other. For Claude Code:
 ```
 
 - *"is my branch clean?"* → `Allow — Bash: git status` / `Deny`: **1** allows that one
-  call, **2** denies it (the agent carries on without it). Nothing runs without
+  call, **2** denies it (the agent carries on without it), or type a reply and
+  press Enter: it denies the call with your words as the reason ("use git diff
+  instead"), so the agent can adjust. Nothing runs without
   your choice unless your own Claude Code settings already allow it.
-- **Esc** at any point stops the agent and keeps your words. Editing the
-  instruction stops it too.
+- **Esc** at any point stops the agent's turn and gives you back the instruction to
+  refine; Esc again drops it. Editing the instruction stops the turn too.
 - **Follow-ups continue the same agent.** Each text box has its own agent
   process, started at the first instruction and kept between them, so "now
   shorten it" or "and the other branch?" builds on the files it read, its plan,

@@ -15,6 +15,7 @@ Typing in detail, the browser demos, and `claudish fix`.
 | Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result |
 | Esc (instruct) | One step back: with drafts showing (or an answer pending), close them and keep the instruction to refine and send again, as a follow-up in the same conversation; with just the instruction, drop it (nothing is inserted) |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
+| Typing while an agent asks | Composes a reply instead of a number; Enter sends it (the agent hears it as your reason), Backspace edits it, Esc clears it, and digits in it are text |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
 | Tab (rewrite) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. Rewrite has no list |
 | Enter / Escape (rewrite) | Commit your wording, including the em-dash substitution |

@@ -107,6 +107,30 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.escape(), "pass")  # with nothing composed, Esc is the app's
 
 
+class AgentReplyTests(unittest.TestCase):
+    def test_typing_while_an_agent_asks_composes_a_reply(self):
+        state = Composition()
+        state.mode = "instruct"
+        state.change("is my branch clean")
+        state.submit()
+        revision = state.revision
+        state.ask(revision, {"id": "q1", "text": "Allow Bash?", "choices": [{"label": "Allow"}, {"label": "Deny"}]}, "s1")
+        self.assertEqual(state.enter(), "wait")  # nothing typed yet: Enter waits
+        for char in "use 2 diffs":
+            state.insert(char)
+        self.assertEqual((state.text, state.shown, state.revision), ("is my branch clean", "use 2 diffs", revision))
+        self.assertIsNone(state.answer_choice(2))  # a digit inside a reply is text
+        state.backspace()
+        self.assertEqual(state.escape(), "clear")  # Esc clears the reply; the question stays
+        self.assertTrue(state.question and not state.reply)
+        for char in "use git diff":
+            state.insert(char)
+        self.assertEqual(state.enter(), "reply")
+        self.assertEqual(state.answer_text(), ("s1", "q1", "use git diff"))
+        self.assertIsNone(state.question)
+        self.assertTrue(state.working)  # the agent carries on with your words
+
+
 class ContinueTests(unittest.TestCase):
     def test_continue_asks_only_at_a_word_boundary(self):
         state = Composition()

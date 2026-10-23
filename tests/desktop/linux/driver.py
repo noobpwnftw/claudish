@@ -238,6 +238,20 @@ def agent_session(service):
     key("Return")  # insert the result
     wait_for(lambda: state()["view"], what="agent result")
     check("agent session: 1 allows the tool, Enter inserts", state()["view"], "The branch is clean—nothing to commit.")
+    # Words instead of a number: the agent hears them as a refusal with your reason.
+    key("ctrl+a", "BackSpace")
+    type_text("is my branch clean")
+    key("Return")
+    time.sleep(2.0)
+    type_text("use git diff")  # typed while the question shows: the reply, not the instruction
+    time.sleep(0.3)
+    check("typing while the agent asks composes a reply", (state().get("preedit"), state()["view"]),
+          ("use git diff", ""))
+    key("Return")  # sends the reply
+    time.sleep(1.0)
+    key("Return")  # inserts the result
+    wait_for(lambda: state()["view"], what="agent result after a typed reply")
+    check("a typed reply reaches the agent", state()["view"], "Understood—I left it alone. (use git diff)")
     return service
 
 

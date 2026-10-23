@@ -179,6 +179,13 @@ class ClaudishTextService(TextService):
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
+            if action == "reply":  # your own words, in answer to the agent's question
+                session, question, words = self.state.answer_text()
+                if self.worker:
+                    self.worker.answer(session, question, text=words)
+                self.showMessage("cd_AI: " + self.state.status, 2)
+                self.publish()
+                return True
             if action == "submit":
                 self.state.submit()
                 if self.worker:
@@ -190,14 +197,14 @@ class ClaudishTextService(TextService):
             if action == "wait":
                 self.showMessage("cd_AI: still working…", 2)
                 return True
-        if self.state.question and 0x31 <= key <= 0x39:  # an agent's question: the digit is the answer
+        if self.state.question and not self.state.reply and 0x31 <= key <= 0x39:  # an agent's question: the digit is the answer
             chosen = self.state.answer_choice(key - 0x30)
             if chosen and self.worker:
                 self.worker.answer(*chosen)
                 self.showMessage("cd_AI: " + self.state.status, 2)
             self.publish()
             return True
-        if self.state.choosing and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
+        if self.state.choosing and not self.state.question and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
             text = self.state.pick(key - 0x30)
             if text is not None:
                 self.setCommitString(text)
@@ -234,6 +241,9 @@ class ClaudishTextService(TextService):
             self.setCommitString(self.state.commit(True))
         elif key == 0x1B:
             action = self.state.escape()
+            if action == "clear":  # the reply goes; the question stays
+                self.publish()
+                return True
             if action != "keep":  # back: still composing; drop: nothing is inserted
                 if self.worker:
                     self.worker.schedule(self.state.revision, "")  # stop a pending answer

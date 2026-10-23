@@ -73,8 +73,10 @@ class ClaudishEngine(IBus.Engine):
         else:
             self.hide_lookup_table()
         if state.question:
-            hint = "agent asks: %s · 1–%d: choose · Esc: stop" % (state.question.get("text", ""),
-                                                                  len(state.question["choices"]))
+            hint = ("agent asks: %s · Enter: send your reply · Esc: clear it" % state.question.get("text", "")
+                    if state.reply else
+                    "agent asks: %s · 1–%d: choose, or type a reply · Esc: stop" % (state.question.get("text", ""),
+                                                                                    len(state.question["choices"])))
         elif state.working and state.status:
             hint = "instruct · %s · Esc: stop" % " ".join(state.status.split())[-90:]
         elif state.choosing:
@@ -192,13 +194,13 @@ class ClaudishEngine(IBus.Engine):
             return True
         if self.composition.live:
             return self.live_key(keyval)
-        if self.composition.question and IBus.KEY_1 <= keyval <= IBus.KEY_9:
+        if self.composition.question and not self.composition.reply and IBus.KEY_1 <= keyval <= IBus.KEY_9:
             chosen = self.composition.answer_choice(keyval - IBus.KEY_0)
             if chosen:
                 self.suggestions.answer(*chosen)
                 self.render()
             return True
-        if self.composition.choosing and IBus.KEY_1 <= keyval <= IBus.KEY_9:
+        if self.composition.choosing and not self.composition.question and IBus.KEY_1 <= keyval <= IBus.KEY_9:
             text = self.composition.pick(keyval - IBus.KEY_0)
             if text is None:
                 return True  # no such candidate: ignore the key rather than type it
@@ -207,6 +209,11 @@ class ClaudishEngine(IBus.Engine):
             return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
+            if action == "reply":  # your own words, in answer to the agent's question
+                session, question, words = self.composition.answer_text()
+                self.suggestions.answer(session, question, text=words)
+                self.render()
+                return True
             if action == "submit":  # Instruct: Enter sends the held text now.
                 self.composition.submit()
                 before, after = self.around_caret()  # the text box, for this turn of its conversation
@@ -232,6 +239,8 @@ class ClaudishEngine(IBus.Engine):
             action = self.composition.escape()
             if action == "keep":
                 self.finish()
+            elif action == "clear":
+                self.render()
             elif action in ("back", "drop"):
                 # A pending answer or agent turn is for the old revision: stop it.
                 self.suggestions.schedule(self.composition.revision, "")

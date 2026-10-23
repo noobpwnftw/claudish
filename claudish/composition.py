@@ -23,9 +23,11 @@ class Composition:
         self.taken = False  # continue: a suggestion was just taken; wait for the next key
         self.converted = False  # rewrite: Tab showed the rewrite in place of your words
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
+        self.reply = ""  # your own words in answer to it, typed instead of a number
         self.status = ""  # what the agent is doing, or its draft so far
 
     def change(self, text):
+        self.reply = ""
         self.text = text
         self.candidate = ""
         self.candidates = []
@@ -50,6 +52,8 @@ class Composition:
     def shown(self):
         """What the composition shows: your words, or, in rewrite after Tab, the rewrite in their
         place (like a CJK input method converting what you typed)."""
+        if self.question and self.reply:
+            return self.reply
         return self.candidate if self.converted else self.text
 
     def tab(self):
@@ -69,12 +73,16 @@ class Composition:
         return "accept" if self.candidate else "wait"
 
     def escape(self):
-        """Esc, one step back: "pass" (the app's); "back" (still composing: your words again in
+        """Esc, one step back: "pass" (the app's); "clear" (a reply you were typing to an agent goes;
+        its question stays); "back" (still composing: your words again in
         rewrite, or the instruction again with its drafts closed and a pending answer dropped);
         "drop" (an instruction you no longer want: nothing is inserted, as it is not text you
         meant to write); or "keep" (rewrite: your words as typed)."""
         if not self.text:
             return "pass"
+        if self.question and self.reply:
+            self.reply = ""  # your reply goes; the question stays open
+            return "clear"
         if self.converted:
             self.converted = False
             return "back"
@@ -90,9 +98,12 @@ class Composition:
         return "keep"
 
     def enter(self):
-        """What Enter does now: "pass", "submit", "wait", "accept" (the candidate), or "keep" (your wording)."""
+        """What Enter does now: "pass", "submit", "wait", "accept" (the candidate), "keep" (your
+        wording), or "reply" (an agent asked, and you typed your answer)."""
         if not self.text:
             return "pass"
+        if self.question:
+            return "reply" if self.reply.strip() else "wait"
         if self.mode != "instruct":
             return "accept" if self.converted else "keep"
         if self.candidate:
@@ -112,6 +123,7 @@ class Composition:
         if revision != self.revision or not self.working:
             return False
         self.question = dict(question, session=session)
+        self.reply = ""
         return True
 
     def note(self, revision, text):
@@ -124,7 +136,7 @@ class Composition:
     def answer_choice(self, number):
         """(session, question id, choice index) for the numbered choice, or None."""
         question = self.question
-        if not question or not 1 <= number <= len(question.get("choices") or []):
+        if not question or self.reply or not 1 <= number <= len(question.get("choices") or []):
             return None
         self.question, self.status = None, "answered: " + question["choices"][number - 1].get("label", "")
         return question["session"], question["id"], number - 1
@@ -134,15 +146,31 @@ class Composition:
         nothing composed (the space after the previous word is not part of what you rewrite or ask)."""
         return not self.live and not self.text and char.isspace()
 
+    def answer_text(self):
+        """(session, question id, your words) for a typed reply, or None. The agent hears it as a
+        refusal carrying your words, so it can adjust ("not that repo, use the fork")."""
+        question, words = self.question, self.reply.strip()
+        if not question or not words:
+            return None
+        self.question, self.reply, self.status = None, "", "answered: " + words
+        return question["session"], question["id"], words
+
     def insert(self, char):
         """Add a typed character; False when the adapter should commit first (the composition is
         full, or a converted rewrite: typing on keeps it and starts afresh)."""
+        if self.question:  # typing answers the agent; the instruction it is working on stays as sent
+            if len(self.reply) < MAX_COMPOSITION:
+                self.reply += char
+            return True
         if len(self.text) >= MAX_COMPOSITION or self.converted:
             return False
         self.change(self.text + ("—" if char == "-" else char))
         return True
 
     def backspace(self):
+        if self.question:
+            self.reply = self.reply[:-1]
+            return
         if self.converted:  # back to your words, as Esc
             self.converted = False
             return
