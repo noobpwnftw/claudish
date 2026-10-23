@@ -133,10 +133,6 @@ class ClaudishTextService(TextService):
             elif event.keyCode not in (0x10, 0x14, 0x75, 0x77):
                 self.drop_live()
             return False
-        if event.keyCode == 0x09 and self.state.mode == "rewrite" and not self.state.text:
-            # Perhaps a selection to rewrite: only onKeyDown can see it (in its edit session); it
-            # hands Tab back to the app when there is none.
-            return True
         return event.isPrintableChar() or bool(self.state.text)
 
     def drop_live(self):
@@ -311,12 +307,6 @@ class ClaudishTextService(TextService):
         if key == 0x76:  # F7 switches mode: continue, instruct, rewrite.
             self.next_mode()
             return True
-        if key == 0x09 and self.state.mode == "rewrite" and not self.state.text:
-            selected = getattr(self, "textSelected", None) or ""
-            if not selected or len(selected) > MAX_COMPOSITION:
-                return False  # no selection: Tab is the app's
-            # Rewrite the selection (reconversion): the composition starts over the selected text.
-            self.state.change(selected)
         if key == 0x09:
             action = self.state.tab()
             if action == "request":  # rewrite: ask now; it converts in place when it arrives

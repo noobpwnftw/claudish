@@ -190,12 +190,6 @@ def main():
                 worker_class.return_value.poll.return_value = None
                 assert reply.get("compositionString") == "Thank you so much." and "timer" not in reply, reply
                 key(9)  # keep it
-                # Tab with nothing composed: a selection is rewritten in place; without one, Tab is the app's.
-                assert key(9, method="filterKeyDown")["return"] is True
-                assert key(9, textSelected="")["return"] is False
-                reply = key(9, textSelected="very important", textBefore="", textAfter="")
-                assert reply["return"] and service.state.text == "very important" and service.state.working, reply
-                assert reply.get("compositionString") == "very important"  # over the selection
                 # An email field (IS_EMAIL_SMTPEMAILADDRESS) is not prose: nothing unasked, and named.
                 service.state.mode = "continue"
                 service.state.change("")
@@ -204,7 +198,7 @@ def main():
                 key(0x20, ord(" "), inputScopes=[5])
                 assert all(len(c.args) < 3 or c.args[2] != "continue"
                            for c in worker_class.return_value.schedule.call_args_list[calls:])
-                print("patched PIME: text around the caret, answers shown on a timer, a selection, input scopes")
+                print("patched PIME: text around the caret, answers shown on a timer, input scopes")
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)

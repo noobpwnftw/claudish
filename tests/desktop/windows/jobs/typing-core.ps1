@@ -113,15 +113,6 @@ function Invoke-Scenarios {
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
   Check 'the rewrite is of the whole phrase' (Get-Text) 'particularly good'
   Reset-Target
-  [Keys]::Press(0x09); Start-Sleep -Milliseconds 300  # nothing composed, nothing selected
-  Check 'rewrite: Tab with nothing to rewrite is the app''s' (Get-Text) "`t"
-  Reset-Target
-  [Keys]::Type('very important'); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # kept as typed
-  [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300  # Ctrl+A: selected
-  [Keys]::Press(0x09); Start-Sleep -Milliseconds 800  # Tab: the selection is rewritten in place
-  [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab keeps it
-  Check 'rewrite: Tab rewrites a selection in place' (Get-Text) 'particularly crucial'
-  Reset-Target
   [Keys]::Type(' hi'); Start-Sleep -Milliseconds 300  # a leading space is the app's, not the phrase's
   [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc keeps your words
   Check 'a leading space goes straight to the app' (Get-Text) ' hi'
