@@ -178,27 +178,47 @@ class Rewriter:
             from .textbox import Textbox
             kept = self.conversations.get(conversation)
             kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
-            kept.agent = kept.agent or AgentProcess(self.session_command, self.textbox_config(kept))
-            place = window(before, after, tools=bool(kept.agent.mcp_config))
-            context = describe(app, purpose) + place
+            textbox = getattr(self, "url", None) and "textbox" in ((self.agent_mcp_config(kept) or {}).get("mcpServers") or {})
+            kept.agent = kept.agent or AgentProcess(self.session_command + self.agent_arguments(),
+                                                    self.agent_mcp_config(kept))
+            block, _ = self.gather(app, before, after)  # the profile's context and the app's bindings
+            place = window(before, after, tools=bool(textbox))
+            context = block + describe(app, purpose) + place
             if place:
-                context += AGENT_NOTE + (" The textbox tools (read, search) see all of it."
-                                         if kept.agent.mcp_config else "")
-            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context)
+                context += AGENT_NOTE + (" The textbox tools (read, search) see all of it." if textbox else "")
+            policy = self.toolbox.policy() if self.toolbox else {}
+            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy)
         from .conversation import ModelDriver
         return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose)
 
-    def textbox_config(self, conversation):
-        """--mcp-config for an agent: Claudish's textbox server, when the MCP SDK is here to run it."""
+    def gather(self, app=None, before="", after=""):
+        """(context block, what was consulted): the profile's context, plus the bindings for the
+        focused app (a supported text box). The same for every mode and both drivers."""
+        extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
+        if not (self.context or extra):
+            return "", []
+        from .context import Context
+        return (self.context or Context()).gather(before, after, extra)
+
+    def agent_mcp_config(self, conversation):
+        """--mcp-config for an agent: the profile's tool servers (as configured for Claudish, not the
+        agent's own), and Claudish's textbox server when the MCP SDK is here to run it."""
         import importlib.util
+        servers = dict(self.toolbox.configs) if self.toolbox else {}
         url = getattr(self, "url", None)
-        if not url or importlib.util.find_spec("mcp") is None:
-            return None
-        package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return {"mcpServers": {"textbox": {
-            "command": sys.executable, "args": ["-m", "claudish", "textbox-mcp"],
-            "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
-                    "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}}}
+        if url and importlib.util.find_spec("mcp") is not None:
+            package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            servers["textbox"] = {
+                "command": sys.executable, "args": ["-m", "claudish", "textbox-mcp"],
+                "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
+                        "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}
+        return {"mcpServers": servers} if servers else None
+
+    def agent_arguments(self):
+        """Extra agent CLI arguments from the policy: denied tools are never offered."""
+        denied = ["mcp__%s__%s" % (server, tool) for server, (_, deny) in (self.toolbox.policy().items()
+                                                                          if self.toolbox else ()) for tool in sorted(deny)]
+        return ["--disallowedTools", ",".join(denied)] if denied else []
 
     def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None):
         return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose), text)
@@ -242,13 +262,7 @@ class Rewriter:
             from .capture import capture
             image, width, height = capture(self.look_command)
         spec = self.modes[mode]
-        # A supported text box: bindings for the focused app add their context providers.
-        extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
-        if self.context or extra:
-            from .context import Context
-            block, consulted = (self.context or Context()).gather(before, after, extra)
-        else:
-            block, consulted = "", []
+        block, consulted = self.gather(app, before, after)
         if image is not None:
             consulted = consulted + ["window picture (%d×%d)" % (width, height)]
         # The text box, described the same way for every mode: its kind and app, and the text around

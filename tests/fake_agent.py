@@ -57,6 +57,19 @@ while True:
             out({"type": "result", "subtype": "success", "is_error": False,
                  "result": "turn %d of this process (%s)" % (turns, session)})
             continue
+        if "policy" in text:  # what Claudish wired for this agent, and how it answers MCP permission requests
+            config = {}
+            if "--mcp-config" in sys.argv:
+                config = json.load(open(sys.argv[sys.argv.index("--mcp-config") + 1]))["mcpServers"]
+            disallowed = sys.argv[sys.argv.index("--disallowedTools") + 1] if "--disallowedTools" in sys.argv else ""
+            answers = []
+            for name in ("mcp__notes__ci_status", "mcp__notes__delete_branch"):
+                out({"type": "control_request", "request_id": name, "request": {
+                    "subtype": "can_use_tool", "tool_name": name, "input": {"branch": "main"}}})
+                answers.append(read()["response"]["response"]["behavior"])
+            out({"type": "result", "subtype": "success", "is_error": False, "result": "servers=%s disallowed=%s answers=%s context=%s" % (
+                ",".join(sorted(config)), disallowed, ",".join(answers), "PROJECT-NOTES" in text)})
+            continue
         if "textbox" in text:  # call Claudish's textbox MCP server, as Claude Code would
             import asyncio
             config = json.load(open(sys.argv[sys.argv.index("--mcp-config") + 1]))["mcpServers"]["textbox"]

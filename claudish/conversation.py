@@ -134,11 +134,7 @@ class ModelDriver:
             return
         from .model import user_content
         spec = rewriter.modes["instruct"]
-        extra = [p for binding in rewriter.bindings if binding.matches(self.app) for p in binding.providers]
-        block, consulted = "", []
-        if rewriter.context or extra:
-            from .context import Context
-            block, consulted = (rewriter.context or Context()).gather("", "", extra)
+        block, consulted = rewriter.gather(self.app)
         image = None
         if self.look:
             from .capture import capture

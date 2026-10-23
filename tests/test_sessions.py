@@ -143,6 +143,21 @@ class ServiceTests(unittest.TestCase):
         self.call("/conversations/box/end", {})
         self.assertFalse(Path(config).exists())  # the token's file goes with the conversation
 
+    def test_an_agent_gets_the_profiles_servers_context_and_policy(self):
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        from claudish.context import Context
+        from claudish.tools import Toolbox
+        servers = {"notes": {"command": sys.executable, "args": [str(Path(__file__).with_name("mcp_server.py"))]}}
+        self.rewriter.toolbox = Toolbox([{"server": "notes", "trust": ["ci_status"], "deny": ["delete_branch"]}], servers)
+        self.rewriter.context = Context([{"type": "command", "name": "notes", "command": ["echo", "PROJECT-NOTES"]}])
+        result = self.until(self.turn("policy"), "result", timeout=30)["text"]
+        # The profile's servers as configured for Claudish, plus the text box; a denied tool is never
+        # offered, a trusted one runs unasked, and the profile's context goes with the turn.
+        self.assertEqual(result, "servers=notes,textbox disallowed=mcp__notes__delete_branch answers=allow,deny context=True")
+
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)
         self.assertEqual(self.call("/sessions/nope?after=0")[0], 404)

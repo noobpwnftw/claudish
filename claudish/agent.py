@@ -132,11 +132,12 @@ class AgentProcess:
 class ClaudeCodeDriver:
     """One turn: the conversation's agent process, its events, and its permission questions."""
 
-    def __init__(self, command, timeout=300, agent=None, context=""):
+    def __init__(self, command, timeout=300, agent=None, context="", policy=None):
         self.agent = agent or AgentProcess(command)
         self.own = agent is None  # a process of its own (no conversation): closed after the turn
         self.timeout = timeout
         self.context = context  # the text box around the caret, sent with the instruction
+        self.policy = policy or {}  # profile tool servers: name -> (trusted tools, denied tools)
         self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
         self.cancelled = False
         self.ran = None  # the process this turn ran in
@@ -221,8 +222,15 @@ class ClaudeCodeDriver:
             self.send({"type": "control_response", "response": {
                 "subtype": "error", "request_id": request_id, "error": "not supported by this host"}})
             return
-        if (body.get("tool_name") or "").startswith("mcp__textbox__"):
-            # Claudish's own read-only tools: the policy runs reads without asking.
+        server, _, tool = (body.get("tool_name") or "").partition("__")[2].partition("__")
+        trust, deny = self.policy.get(server, ((), ()))
+        if (body.get("tool_name") or "").startswith("mcp__") and tool in deny:
+            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
+                       "response": {"behavior": "deny", "message": "The user's profile denies this tool."}}})
+            return
+        if (body.get("tool_name") or "").startswith("mcp__textbox__") or \
+                ((body.get("tool_name") or "").startswith("mcp__") and tool in trust):
+            # Claudish's own read-only tools, and the ones the profile trusts: run without asking.
             self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
                        "response": {"behavior": "allow", "updatedInput": body.get("input") or {}}}})
             return

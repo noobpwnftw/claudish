@@ -46,6 +46,7 @@ class Toolbox:
     def __init__(self, specs, servers, timeout=60):
         self.timeout = timeout
         self.servers = []
+        self.configs = {}  # name -> the config's own (Claude-style) entry, for an agent's --mcp-config
         for spec in specs:
             name, trust, deny = parse(spec)
             if name not in (servers or {}):
@@ -56,6 +57,11 @@ class Toolbox:
             provider.listing = True  # connection settings only; tools are chosen per call
             Provider.__init__(provider, {"type": "mcp", "server": name, "timeout": timeout}, None, servers)
             self.servers.append((name, trust, deny, provider))
+            self.configs[name] = dict(servers[name])
+
+    def policy(self):
+        """name -> (trusted tools, denied tools): the same rule for an agent's permission requests."""
+        return {name: (trust, deny) for name, trust, deny, _ in self.servers}
 
     def run(self, ask, messages, approve=None, progress=None, local=None):
         """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).

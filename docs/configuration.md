@@ -263,6 +263,12 @@ candidate like any other. For Claude Code:
   exits when the text box goes away, after 30 idle minutes, or when the service
   stops. Claudish adds `--session-id` and `--permission-prompt-tool stdio` itself
   (without the latter, Claude Code denies by itself instead of asking you).
+- **The agent gets your Claudish setup, not just its own.** The servers named in
+  the profile's `tools` are passed to it (`--mcp-config`, with your config's own
+  `${VAR}` references, so no secret is written out), under the same policy as the
+  model: `deny` tools are never offered (`--disallowedTools`), `trust` tools run
+  without asking, the rest ask. The profile's `context` and the app's bindings go
+  with each instruction, as they do for the model.
 - **The agent sees your text box.** The text around the caret goes with each
   instruction, and with the `[mcp]` extra installed, Claudish gives the agent a
   `textbox` MCP server (read, search) for the rest, so "fix the second paragraph"
