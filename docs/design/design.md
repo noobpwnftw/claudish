@@ -118,7 +118,7 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals). The galleri
 
 ## Open
 
-The summon key (Enter or Shift+Enter, G47); how much context continue gets (G48); per-app input
+The summon key (Enter or Shift+Enter, a toggle in a native settings UI: G47, G52); how much context continue gets (G48); per-app input
 profiles (G50: continue's Tab in macOS Terminal); replacing an instruction a focus change left in
 the text when a draft is taken on return (G51);
 screen-reader announcements.
