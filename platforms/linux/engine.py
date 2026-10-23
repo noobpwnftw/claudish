@@ -324,6 +324,8 @@ class ClaudishEngine(IBus.Engine):
                                           look=self.composition.look, before=before[-8000:], after=after[:8000],
                                           purpose=self.purpose)
                 self.render()
+            elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
+                self.render()
             elif action in ("accept", "keep"):
                 self.finish(action == "accept")
             return action != "pass"

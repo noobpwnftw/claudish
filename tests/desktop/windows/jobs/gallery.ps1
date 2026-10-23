@@ -25,6 +25,8 @@ Show-State '03-rewrite-in-place'
 [Keys]::Press(0x1B); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300
 [Keys]::Type('say hi'); [Keys]::Press(0x0D); Start-Sleep -Milliseconds 1500  # drafts
 Show-State '04-instruct-drafts'
+[Keys]::Press(0x0D); Start-Sleep -Milliseconds 400  # Enter on a draft: nothing inserted, Tab lit
+Show-State '04b-enter-on-drafts'
 [Keys]::Press(0x1B); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300
 # A long instruction: the panel opens at the end of it, and when Enter sends it (the text leaves),
 # the panel moves back to the caret.

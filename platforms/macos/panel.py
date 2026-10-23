@@ -77,6 +77,24 @@ def tile(text, background, foreground, round_=False):
     return view
 
 
+def key_label(key, lit=False):
+    """A key's glyph, at the text's size and colour (round 5: the hint's size was too faint to
+    read); lit after Enter on the model's text: the accent, tinted, behind it (kit.css .k-cap.lit)."""
+    glyph = label(KEYS.get(key, key), SIZE, NSFontWeightMedium)
+    if not lit:
+        return glyph
+    size = glyph.fittingSize()
+    accent = NSColor.controlAccentColor()
+    outer = box(accent, 4)
+    outer.setFrame_(NSMakeRect(0, 0, size.width + 10, size.height + 2))
+    inner = box(accent.blendedColorWithFraction_ofColor_(0.8, NSColor.windowBackgroundColor()), 3)
+    inner.setFrame_(NSMakeRect(1, 1, size.width + 8, size.height))
+    outer.addSubview_(inner)
+    glyph.setFrame_(NSMakeRect(5, 1, size.width, size.height))
+    outer.addSubview_(glyph)
+    return outer
+
+
 class Row(NSView):
     """A row the mouse can pick: a click calls back with its number."""
 
@@ -222,7 +240,8 @@ class Panel:
         if spec["failed"]:
             items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), 12))
         for key, verb in spec["foot"]:
-            items.append((label(KEYS.get(key, key), SMALL + 1, NSFontWeightMedium, secondary), KEY_GAP - 2))
+            lit = bool(spec.get("nudge")) and key == spec_take(spec)  # Enter on the model's text: the key that takes it
+            items.append((key_label(key, lit), KEY_GAP - 2))
             items.append((label(verb, SMALL, color=secondary), 12))
         if spec["tail"]:
             items.append((label(spec["tail"], SMALL, color=secondary), 12))
@@ -257,8 +276,8 @@ class Panel:
             bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
             row.addSubview_(bar)
             key = spec_take(self.spec)  # Tab takes a draft; Enter confirms a choice
-            take = label(KEYS.get(key, key), SMALL + 1, NSFontWeightMedium, NSColor.secondaryLabelColor())
-            size = take.fittingSize()
+            take = key_label(key, bool(self.spec.get("nudge")))
+            size = take.frame().size if self.spec.get("nudge") else take.fittingSize()
             take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
             row.addSubview_(take)
         size = number.fittingSize()

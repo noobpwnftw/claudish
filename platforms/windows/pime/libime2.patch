@@ -400,10 +400,10 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..1cbff77
+index 0000000..d44915b
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,478 @@
+@@ -0,0 +1,485 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -713,7 +713,9 @@ index 0000000..1cbff77
 +                measure(take_, &w, &th);
 +                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;
 +                ID2D1SolidColorBrush* edge = nullptr;
-+                target->CreateSolidColorBrush(color(colors.contrast ? colors.accent : colors.cap), &edge);
++                if (spec_.nudge && !colors.contrast)  // lit: the accent, tinted, behind the key (kit.css .k-cap.lit)
++                    fill(D2D1::RectF(x, y, x + capW, y + px(CAP_H)), px(4), mix(colors.surface, colors.accent, 20));
++                target->CreateSolidColorBrush(color(colors.contrast || spec_.nudge ? colors.accent : colors.cap), &edge);
 +                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
 +                                                                           y + px(CAP_H) - 0.5f), px(4), px(4)), edge);
 +                edge->Release();
@@ -792,10 +794,15 @@ index 0000000..1cbff77
 +            break;
 +        }
 +        case FootItem::Cap: {
++            // Lit after Enter on the model's text: the key that takes it (the accent, tinted, behind it).
++            const bool lit = spec_.nudge && item.text == spec_.take;
 +            ID2D1SolidColorBrush* edge = nullptr;
-+            target->CreateSolidColorBrush(color(colors.cap), &edge);
++            target->CreateSolidColorBrush(color(lit ? colors.accent : colors.cap), &edge);
 +            D2D1_RECT_F r = D2D1::RectF(item.x + 0.5f, mid - px(CAP_H) / 2 + 0.5f, item.x + item.w - 0.5f,
 +                                        mid + px(CAP_H) / 2 - 0.5f);
++            if (lit && !colors.contrast)
++                fill(D2D1::RectF(item.x, mid - px(CAP_H) / 2, item.x + item.w, mid + px(CAP_H) / 2), px(4),
++                     mix(colors.surface, colors.accent, 20));
 +            target->DrawRoundedRectangle(D2D1::RoundedRect(r, px(4), px(4)), edge);
 +            edge->Release();
 +            text(item.layout, item.x + px(CAP_X), mid - item.h / 2, brush);
@@ -884,10 +891,10 @@ index 0000000..1cbff77
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..f1ae753
+index 0000000..8ef8111
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,154 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -931,6 +938,7 @@ index 0000000..f1ae753
 +    std::wstring failed;  // why a request failed
 +    std::wstring mark;    // a hosted model's name, at the footer's end
 +    std::wstring take = L"Enter";  // the highlighted row's key: Tab takes a draft, Enter confirms a choice
++    bool nudge = false;   // Enter on the model's text: the key that takes it (take) is lit
 +
 +    bool empty() const {
 +        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
@@ -1043,7 +1051,7 @@ index 0000000..f1ae753
 +#endif
 diff --git a/src/Style.h b/src/Style.h
 new file mode 100644
-index 0000000..71b8a55
+index 0000000..0fa6e38
 --- /dev/null
 +++ b/src/Style.h
 @@ -0,0 +1,147 @@
@@ -1117,10 +1125,10 @@ index 0000000..71b8a55
 +    if (appsUseDarkTheme())
 +        return { RGB(44, 44, 44), RGB(255, 255, 255), RGB(197, 197, 197), RGB(139, 139, 139),
 +                 mix(RGB(44, 44, 44), RGB(255, 255, 255), 11), systemAccent(true), RGB(255, 153, 164),
-+                 RGB(106, 106, 106), tile, false };
++                 RGB(143, 143, 143), tile, false };  // keycap borders 3:1 or more (round 5)
 +    return { RGB(249, 249, 249), RGB(26, 26, 26), RGB(92, 92, 92), RGB(134, 134, 134),
 +             mix(RGB(249, 249, 249), RGB(26, 26, 26), 7), systemAccent(false), RGB(196, 43, 28),
-+             RGB(184, 184, 184), tile, false };
++             RGB(138, 138, 138), tile, false };
 +}
 +
 +// Pixels at 96 DPI to device pixels (the system DPI, as the candidate font's size is computed).

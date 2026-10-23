@@ -27,7 +27,7 @@ const STATES = [
    panel: {status: "Rewriting", busy: true, foot: ["Esc: stop"]}},
   {id: "converted", title: "Compose: a rewrite", note: "Your words stay in your text; the rewrite waits in the panel, and only Tab puts it in (a focus change never can).",
    before: "Team: ", comp: "running late, start without me",
-   panel: {label: "Rewrite", body: "I'm running a little late — please start without me.", foot: ["Tab: keep", "Esc: undo"]}},
+   panel: {label: "Rewrite", body: "I'm running a little late — please start without me.", foot: ["Tab: insert", "Esc: dismiss"], take: "Tab"}},
   // An instruction, once sent, leaves your text: the panel carries the exchange as a thread of
   // labelled turns ("You asked", the model's question, "You answered"), and the caret is free, so
   // whatever you type next is at the caret, where typing goes.
@@ -41,6 +41,13 @@ const STATES = [
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
            on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab"}},
+  {id: "nudged", title: "Enter on a draft", note: "Enter talks to the model and never inserts its text, so here it lights Tab, the key that does, until your next key (round 5: a key that does nothing must say why). No insert, no resend, no sound.",
+   before: "Hi Sam, ",
+   panel: {thread: [["You asked", "decline the offsite politely"]],
+           rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
+                  ["2", "I'd love to join, but I won't be able to attend the offsite."],
+                  ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
+           on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab", nudge: true}},
   {id: "hosted", title: "A hosted model answered", note: "The same drafts, saying in words where they came from.",
    before: "Hi Sam, ",
    panel: {thread: [["You asked", "decline the offsite politely"]],
@@ -120,7 +127,7 @@ function described(spec) {
   return {thread: (spec.thread || []).map(([label, body]) => ({label, body})),
           label: spec.label || null, body: spec.body || null, code: Boolean(spec.code), mono: Boolean(spec.mono),
           rows: (spec.rows || []).map(([key, text, legend]) => ({key: "", text, legend: legend || null})),
-          on: spec.on === undefined ? -1 : spec.on, replying: Boolean(spec.replying), take: spec.take || "Enter", foot, tail: tail.join(" ") || null,
+          on: spec.on === undefined ? -1 : spec.on, replying: Boolean(spec.replying), take: spec.take || "Enter", nudge: Boolean(spec.nudge), foot, tail: tail.join(" ") || null,
           tile: spec.failed ? "warn" : "ai", status: spec.status || null, busy: Boolean(spec.busy),
           failed: spec.failed || null, mark: spec.mark || null};
 }

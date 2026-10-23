@@ -12,9 +12,9 @@
   };
 
   // A key and its verb: a keycap ("Tab"; a platform may name it, as macOS's ⇥) and the word.
-  function hint(key, verb, keys) {
+  function hint(key, verb, keys, lit = false) {
     const span = el("span", "k-hint");
-    span.append(el("span", "k-cap", keys[key] || key), verb);
+    span.append(el("span", "k-cap" + (lit ? " lit" : ""), keys[key] || key), verb);
     return span;
   }
 
@@ -31,7 +31,8 @@
       foot.append(status);
     }
     if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
-    for (const [key, verb] of spec.foot || []) foot.append(hint(key, verb, keys));
+    // After Enter on the model's text, the key that takes it is lit (spec.nudge).
+    for (const [key, verb] of spec.foot || []) foot.append(hint(key, verb, keys, Boolean(spec.nudge) && key === spec.take));
     if (spec.tail) foot.append(el("span", "k-hint", spec.tail));
     if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
     return foot;
@@ -66,7 +67,7 @@
       if (index === spec.on) {
         const take = el("span", "k-take");
         const key = spec.take || "Enter";  // Tab takes a draft; Enter confirms a choice
-        take.append(el("span", "k-cap", keys[key] || key));
+        take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys[key] || key));
         line.append(take);
       }
       if (pick) line.addEventListener("mousedown", (event) => { event.preventDefault(); pick(index + 1); });

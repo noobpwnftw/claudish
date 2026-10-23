@@ -64,7 +64,8 @@ class Composition:
         self.editing = False  # the instruction came back to the caret (Esc edit): the next Esc drops it
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
         self.dropped_reply = False
-        self.highlight = 0  # the highlighted row (↑ and ↓ move it; Enter takes it)
+        self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
+        self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes a draft, Enter an answer)
         self.held = None  # a sent instruction's exchange, held when focus left the text box
         self.held_app, self.held_at = None, 0.0
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Enter answer it
@@ -137,7 +138,7 @@ class Composition:
             return None
         shown = {"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
-                 "replying": False, "take": "Enter"}
+                 "replying": False, "take": "Enter", "nudge": False}
         question = self.question
         if self.sent:  # the exchange so far: your instruction, then your answers (the latest)
             shown["thread"] = [{"label": "You asked", "body": self.text}] + (
@@ -150,7 +151,7 @@ class Composition:
             approval = bool(question.get("permission"))
             if self.reading:  # an answer to read: Tab puts it in, Esc dismisses it
                 shown.update(label=label, body=body, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                             tail="or type to ask more")
+                             tail="or type to ask more", take="Tab", nudge=self.nudge)
                 return shown if not self.reply else dict(shown, replying=True, tail=None,
                                                           foot=[("Enter", "send reply"), ("Esc", "cancel reply")])
             shown.update(label=label, body=body, code=bool(question.get("code")),
@@ -171,10 +172,12 @@ class Composition:
             readings = self.candidates or [self.candidate]
             shown.update(rows=[{"key": "", "text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
-                         take="Tab",
+                         take="Tab", nudge=self.nudge,
                          mark=self.hosted and "from %s · hosted" % self.hosted)
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
-            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "keep"), ("Esc", "undo")],
+            # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
+            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
+                         take="Tab", nudge=self.nudge,
                          mark=self.hosted and "from %s · hosted" % self.hosted)
         elif self.look or self.editing or self.hint_due(now) == 0:  # after F8 or Esc: said at once
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
@@ -201,7 +204,7 @@ class Composition:
         """After Esc discarded words: say so, briefly, with the key that brings them back."""
         return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None, "tile": "ai",
                 "status": "Dropped", "busy": False, "foot": [("Shift+Esc", "restore")], "failed": None,
-                "mark": None, "thread": [], "replying": False, "take": "Enter"}
+                "mark": None, "thread": [], "replying": False, "take": "Enter", "nudge": False}
 
     def hint_due(self, now=None):
         """Seconds until compose's keys show (0: now), or None when they are not waiting: they show
@@ -223,6 +226,16 @@ class Composition:
                              shown["failed"]) if w]
         words += ["%s %s" % key for key in shown["foot"]] + [w for w in (shown["tail"], shown["mark"]) if w]
         return " · ".join(words)
+
+    def _showing(self):
+        return (self.text, self.reply, self.highlight, self.candidate, self.converted, id(self.question))
+
+    @property
+    def nudge(self):
+        """Enter was pressed on the model's text (a draft, a rewrite, an answer to read), which only
+        Tab takes: the panel lights its Tab key (round 5: a key that does nothing must say why).
+        It lasts while the panel shows what it showed then; any key that changes it ends it."""
+        return self.nudged is not None and self.nudged == self._showing()
 
     @property
     def reading(self):
@@ -319,6 +332,7 @@ class Composition:
             if self.reply.strip():
                 return "reply"
             if self.reading:
+                self.nudged = self._showing()
                 return "wait"  # an answer to read goes in with Tab, never with Enter
             return "choose" if self.asks or self.selected else "wait"
         if self.sent and self.reply.strip():
@@ -326,8 +340,11 @@ class Composition:
             # instruction in the same conversation.
             self.change(self.reply.strip())
             return "submit"
-        if self.converted or (self.asked == "instruct" and self.candidate) or self.working:
-            return "wait"  # the model's text goes in with Tab
+        if self.converted or (self.asked == "instruct" and self.candidate):
+            self.nudged = self._showing()
+            return "wait"  # the model's text goes in with Tab: the panel lights it
+        if self.working:
+            return "wait"
         return "submit"
 
     def keep(self):

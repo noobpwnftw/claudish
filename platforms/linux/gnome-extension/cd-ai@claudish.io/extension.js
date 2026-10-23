@@ -140,7 +140,8 @@ export default class CdAiExtension extends Extension {
             text.x_expand = true;
             line.add_child(text);
             if (takes) {  // the trailing column: the highlighted row's Enter
-                const take = label(on ? panel.take || 'Enter' : '', on ? 'cd-cap' : 'cd-take');  // Tab takes a draft
+                // Tab takes a draft; lit after Enter on the model's text (panel.nudge)
+                const take = label(on ? panel.take || 'Enter' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
                 line.add_child(take);
             }
             box.add_child(line);
@@ -163,7 +164,7 @@ export default class CdAiExtension extends Extension {
             foot.add_child(label(panel.failed, 'cd-failed'));
         for (const [key, verb] of panel.foot) {
             const hint = new St.BoxLayout({style_class: 'cd-hint'});
-            hint.add_child(label(key, 'cd-cap'));
+            hint.add_child(label(key, panel.nudge && key === (panel.take || 'Enter') ? 'cd-cap cd-lit' : 'cd-cap'));
             hint.add_child(label(verb, 'cd-verb'));
             foot.add_child(hint);
         }

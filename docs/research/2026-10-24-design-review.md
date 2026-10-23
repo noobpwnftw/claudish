@@ -51,3 +51,17 @@ Raised, outside the caret UI (for the settings and onboarding work): a per-app o
 "never suggest here" switch for continue (already possible with bindings; needs to be findable);
 saying beforehand when a profile sends text to a hosted model; a first-run explanation and an
 obvious way to pause; plain-language approvals for people who do not read commands.
+
+## Round 5: Tab takes the model's text (2026-10-24)
+
+The owner's split (Tab takes the model's text, Enter talks to the model) went to five CJK
+input-method users (pinyin, Japanese, zhuyin, Wubi/Rime, Korean), the accessibility consultant and
+the office manager, with the lab in every skin and the built Windows panel before and after a long
+instruction. All seven: ship with changes. All seven expect to press Enter on drafts out of habit
+(confirm in a Japanese IME, Hanja selection in Korean, OK in Office) for a week or two, and all
+seven preferred a safe Enter to the old timing guard ("timing rules make an IME feel haunted"),
+provided Enter is not silent: adopted as the lit Tab key. Six found "Tab keep · Esc undo" on the
+rewrite contradictory: now "Tab insert · Esc dismiss". The accessibility consultant measured
+keycap borders under 3:1: raised. Raised and open: the panel crossing the app window's edge,
+truncated "You asked", rebindable keys (Rime), screen-reader announcements, and drafts in the
+rigs echoing the instruction (the rigs' scripted backend, not a model).

@@ -462,6 +462,8 @@ class ClaudishInputController(IMKInputController):
                     before, after = self.around_caret(client)  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=self.app(client), look=self.state.look, before=before, after=after)
+            elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
+                self.show_panel(client)
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"

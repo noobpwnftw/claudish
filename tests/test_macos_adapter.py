@@ -285,7 +285,7 @@ class MacOSAdapterTests(unittest.TestCase):
         # change, which apps turn into a commit, can never insert the model's words).
         self.assertEqual((self.module.PANEL.rows, self.module.PANEL.spec["label"], self.module.PANEL.spec["body"]),
                          ([], "Rewrite", "A considered draft."))
-        self.assertEqual(self.module.PANEL.spec["foot"], [("Tab", "keep"), ("Esc", "undo")])
+        self.assertEqual(self.module.PANEL.spec["foot"], [("Tab", "insert"), ("Esc", "dismiss")])
         self.assertEqual((self.client.marked, self.client.commits), ("draft!", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")

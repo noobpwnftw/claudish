@@ -136,6 +136,16 @@ an anti-AI writer, an accessibility consultant and an office manager
   suggestion, a rewrite, the highlighted draft, an answer to read. Enter: send an instruction, a
   reply, the answer to a question. Enter never inserts the model's words, so a reflexive second
   Enter after sending inserts nothing (the double-Enter guard is gone).
+- **Round 5 (seven reviewers: five CJK input-method users, accessibility, an office manager;
+  2026-10-24)** agreed with the split; every one asked that Enter on the model's text not be a
+  silent dead key. **Enter on a draft, a rewrite or an answer lights Tab**, the key that takes it
+  (on the highlighted row and in the footer: the accent at 20% behind it, an accent border, the
+  text at full contrast), until a key changes the panel. No insert, no resend, no sound, no
+  animation. The rewrite's keys are **Tab insert · Esc dismiss** ("keep" meant your own words on
+  Shift+Enter; "undo" undid nothing). Keycap borders are 3:1 or more on every skin; macOS draws its
+  key glyphs at the text's size and colour. Open: keeping the panel inside the app's window
+  (all seven noticed it crossing Notepad's edge), the full instruction instead of one line, and
+  rebindable keys.
 - **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
   ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark

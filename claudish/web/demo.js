@@ -56,6 +56,7 @@ const state = {
   highlight: 0,  // the highlighted draft (↑ and ↓ move it)
   editing: false,  // the instruction came back to the caret (Esc edit): the next Esc drops it
   dropped: "",   // the last instruction Esc dropped: Shift+Esc brings it back
+  nudged: null,  // Enter on the model's text: what the panel showed then (Tab's key lights while it lasts)
   revision: 0,
 };
 const HINT_PAUSE_MS = 1000;  // as claudish/composition.py's HINT_PAUSE_SECONDS
@@ -160,6 +161,10 @@ async function ask(revision) {
 
 // What the panel shows: the same description as claudish/composition.py's panel(), so the demo
 // looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
+// Enter on the model's text lights Tab, the key that takes it, until a key changes the panel.
+const showing = () => JSON.stringify([state.text, state.reply, state.highlight, state.candidate, state.converted]);
+const nudge = () => state.nudged !== null && state.nudged === showing();
+
 function panel() {
   if (live() || !state.text) return null;
   const shown = {thread: [], label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
@@ -173,12 +178,14 @@ function panel() {
                             foot: [["Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
-    return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: state.highlight, mark,
-            foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab", ...typing};
+    return {...shown, rows: readings.map((text) => ({key: "", text, legend: null})), on: state.highlight, mark,
+            foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab",
+            nudge: nudge(), ...typing};
   }
-  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
+  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark,
+                               foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab", nudge: nudge()};
   if (state.editing || hintDue() === 0)
-    return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], ...(state.editing ? [["Esc", "drop"]] : [])]};
+    return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
   return null;
 }
 // A click on a draft: it goes in at the caret (choices are not numbered; the mouse picks directly).
@@ -261,7 +268,7 @@ function key(name, shift = false) {
     }
     // Enter talks to the model: it never inserts the model's text (Tab does), so a reflexive second
     // Enter after sending inserts nothing.
-    if (state.converted || (state.asked === "instruct" && state.candidate)) return true;
+    if (state.converted || (state.asked === "instruct" && state.candidate)) { state.nudged = showing(); render(); return true; }
     if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
       state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
     }

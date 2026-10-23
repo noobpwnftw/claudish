@@ -339,7 +339,7 @@ class ClaudishTextService(TextService):
                     self.await_result(60)
                 self.publish()
                 return True
-            if action == "wait":  # the footer says it is still working
+            if action == "wait":  # still working, or the model's text: the panel lights Tab, which takes it
                 self.publish()
                 return True
         # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).

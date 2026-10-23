@@ -234,6 +234,43 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.enter(), state.tab(), state.chosen), ("wait", "choose", 1))  # Tab: Insert it
         self.assertEqual(state.escape(), "dismiss")
 
+    def test_enter_on_the_models_text_lights_tab_until_the_next_key(self):
+        """Round 5 (seven reviewers): Enter never inserts the model's text, but a key that does
+        nothing must say why. Enter on drafts, a rewrite, or an answer lights Tab, the key that
+        takes it; any key that changes the panel ends it; nothing is inserted or sent again."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("decline politely")
+        state.submit()
+        state.offer(state.revision, "No, thank you.", ["I can't, sorry."])
+        self.assertFalse(state.panel()["nudge"])
+        self.assertEqual(state.enter(), "wait")
+        self.assertEqual((state.panel()["nudge"], state.panel()["take"]), (True, "Tab"))
+        self.assertEqual(state.enter(), "wait")  # again: still lit, still nothing inserted
+        self.assertTrue(state.panel()["nudge"])
+        state.move(1)  # ↓: the panel changed, so the light ends
+        self.assertFalse(state.panel()["nudge"])
+
+        rewrite = Composition()
+        rewrite.mode = "compose"
+        rewrite.change("this is very important")
+        rewrite.tab()
+        rewrite.offer(rewrite.revision, "This is crucial.")
+        self.assertEqual(rewrite.panel()["foot"], [("Tab", "insert"), ("Esc", "dismiss")])  # not "keep" / "undo"
+        self.assertEqual(rewrite.enter(), "wait")
+        self.assertTrue(rewrite.panel()["nudge"])
+        rewrite.insert("!")  # typing on keeps your words and ends it
+        self.assertFalse((rewrite.panel() or {}).get("nudge"))
+
+        answer = Composition()
+        answer.mode = "compose"
+        answer.change("what does this mean")
+        answer.submit()
+        answer.ask(answer.revision, {"id": "r", "read": True, "label": "The model says", "body": "A quote is open.",
+                                     "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
+        self.assertEqual(answer.enter(), "wait")
+        self.assertTrue(answer.panel()["nudge"])
+
     def test_choices_are_not_numbered_and_an_approval_starts_unhighlighted(self):
         """Owner: digits are text in English, as Space is; "2 + Enter" and "↓ + Enter" are both two
         strokes. Choices are chosen with ↑/↓ and Enter; an approval starts with nothing
