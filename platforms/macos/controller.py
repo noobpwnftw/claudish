@@ -98,6 +98,7 @@ class ClaudishInputController(IMKInputController):
             self.worker = None
         self.state.change("")
         self.hide_panel()
+        TOAST.hide()  # a toast belongs to the text box it was shown at, which is gone
         OVERLAY.hide()
 
     def recognizedEvents_(self, sender):
@@ -462,6 +463,7 @@ class ClaudishInputController(IMKInputController):
                     before, after = self.around_caret(client)  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=self.app(client), look=self.state.look, before=before, after=after)
+                self.changed(client)  # it leaves your text: the panel says what you asked
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.show_panel(client)
             elif action in ("accept", "keep"):

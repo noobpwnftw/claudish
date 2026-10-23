@@ -346,6 +346,8 @@ class Composition:
         if self.converted:
             return "wait"  # the rewrite goes in with Tab, as its footer says
         if self.working:
+            if self.asked == "instruct":
+                self.nudged = ("pending", self.text, self.reply)  # a reflexive Enter: Tab lights when they come
             return "wait"
         return "submit"
 
@@ -360,6 +362,7 @@ class Composition:
 
     def submit(self):
         self.asked, self.working, self.failed = "instruct", True, False
+        self.nudged = None
 
     def fail(self, revision, error=None):
         held = self.route(revision)
@@ -524,6 +527,8 @@ class Composition:
             self.converted = True  # you asked with Tab: it takes your words' place as it arrives
         self.working = False
         self.question, self.status = None, ""
+        if self.nudged == ("pending", self.text, self.reply) and self.asked == "instruct":
+            self.nudged = self._showing()  # Enter was pressed while they came, and nothing since
         return True
 
     @property

@@ -252,6 +252,22 @@ class ModeFeelTests(unittest.TestCase):
         state.move(1)  # ↓: the panel changed, so the light ends
         self.assertFalse(state.panel()["nudge"])
 
+        early = Composition()  # a reflexive Enter before the drafts arrive: Tab lights when they do
+        early.mode = "compose"
+        early.change("say hi")
+        early.submit()
+        self.assertEqual(early.enter(), "wait")
+        early.offer(early.revision, "Hi!", ["Hello!"])
+        self.assertTrue(early.panel()["nudge"])
+        typed = Composition()  # but not once you typed on
+        typed.mode = "compose"
+        typed.change("say hi")
+        typed.submit()
+        typed.enter()
+        typed.insert("x")
+        typed.offer(typed.revision, "Hi!")
+        self.assertFalse((typed.panel() or {}).get("nudge"))
+
         rewrite = Composition()
         rewrite.mode = "compose"
         rewrite.change("this is very important")

@@ -141,6 +141,8 @@ async function ask(revision) {
     state.hosted = hosted && data.backend !== "browser" ? (data.backend === "claude" ? "Claude" : "a hosted model") : "";
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
+    if (mode === "instruct" && state.nudged === JSON.stringify(["pending", state.text, state.reply]))
+      state.nudged = showing();  // Enter was pressed while they came, and nothing since
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
       : `${elapsed} ms · ${data.backend === "rules" ? "rules, no model" : hosted ? "hosted model" : "local model"}`;
@@ -270,8 +272,10 @@ function key(name, shift = false) {
     // Enter after sending inserts nothing.
     if (state.asked === "instruct" && state.candidate) { state.nudged = showing(); render(); return true; }  // the row lights Tab
     if (state.converted) return true;  // the rewrite goes in with Tab, as its footer says
-    if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
-      state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
+    if (!state.working) {  // the first Enter sends it as an instruction
+      state.asked = "instruct"; state.working = true; state.failed = false; state.nudged = null; render(); ask(state.revision);
+    } else if (state.asked === "instruct") {
+      state.nudged = JSON.stringify(["pending", state.text, state.reply]);  // a reflexive Enter: Tab lights when they come
     }
     return true;
   }

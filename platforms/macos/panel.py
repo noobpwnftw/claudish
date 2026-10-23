@@ -10,7 +10,7 @@ height. Non-activating panels: the app keeps the keyboard; a click on a row pick
 import objc
 from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsMake, NSFont, NSFontWeightBold,
                     NSFontWeightMedium, NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
-                    NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
+                    NSMutableParagraphStyle, NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
 PAD, ROW_X, ROW_Y, KEY_GAP, RADIUS, ROW_RADIUS = 5, 9, 4, 6, 12, 7
 SIZE, SMALL, MIN_WIDTH, MAX_WIDTH, TAKE = 14, 12, 240, 440, 30
@@ -158,8 +158,11 @@ class Panel:
                                             (0, len(turn["label"])))
             words.addAttribute_value_range_("NSColor", secondary, (0, len(turn["label"])))
             words.addAttribute_value_range_("NSUnderline", 1, (len(turn["label"]) + 2, len(turn["body"])))
+            one_line = NSMutableParagraphStyle.alloc().init()
+            one_line.setLineBreakMode_(4)  # NSLineBreakByTruncatingTail: "thanking them fo…", as the lab does
+            words.addAttribute_value_range_("NSParagraphStyle", one_line, (0, words.length()))
             line.setAttributedStringValue_(words)
-            line.setLineBreakMode_(5)  # NSLineBreakByTruncatingMiddle
+            line.setLineBreakMode_(4)
             widest = max(widest, min(inner, line.fittingSize().width) + 2 * (PAD + ROW_X))
             blocks.append(("turn", line, line.fittingSize().height + ROW_Y + 2))
         if spec["body"]:
@@ -287,12 +290,21 @@ class Panel:
         self.effect.addSubview_(row)
 
     def place_foot(self, items, y, h, width, pick):
+        # One line: every word (a key, its verb, the status) on one baseline, whose capitals are
+        # centred in the footer; the tile, the spinner and a lit key centred on those capitals.
+        # (Centring each frame put text of different sizes at different heights.)
+        middle = y + h / 2
+        baseline = middle - NSFont.systemFontOfSize_(SMALL).capHeight() / 2
         x = PAD + ROW_X
         for index, (view, gap) in enumerate(items):
             size = self.size(view)
             if index == len(items) - 1 and gap == 0 and index:  # the hosted mark, at the end
                 x = max(x, width - PAD - ROW_X - size.width)
-            view.setFrame_(NSMakeRect(x, y + (h - size.height) / 2, size.width, size.height))
+            if isinstance(view, NSTextField):
+                bottom = baseline + view.font().descender()  # descender is negative
+            else:
+                bottom = middle - size.height / 2
+            view.setFrame_(NSMakeRect(x, round(bottom), size.width, size.height))
             self.effect.addSubview_(view)
             x += size.width + gap
 

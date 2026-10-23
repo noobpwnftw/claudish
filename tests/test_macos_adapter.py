@@ -370,6 +370,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
+        self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "")  # it left your text
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])

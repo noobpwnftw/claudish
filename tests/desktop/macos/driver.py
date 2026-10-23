@@ -153,7 +153,7 @@ def fresh_document():
 def check(name, actual, expected):
     ok = actual == expected
     results.append(ok)
-    print("%s %-46s %r" % ("PASS" if ok else "FAIL", name, actual) + ("" if ok else " (expected %r)" % expected),
+    print("%s %-46s %r" % ("PASS" if ok else "FAIL", name, actual) + ("" if ok else " (expected %r)" % (expected,)),
           flush=True)
 
 
@@ -280,25 +280,23 @@ def scenarios():
         shift_tap()  # compose
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
-        # Tab takes the draft once it is there (while it is pending, Tab waits); after that Tab
-        # would be the shell's, so stop as soon as the draft shows.
-        for _ in range(10):
-            time.sleep(1)
-            key("Tab")
-            if wait_for(lambda: "having read the terminal" in screen(), timeout=1):
-                break
-        if "having read the terminal" not in screen():
-            from AppKit import NSWorkspace
-            front = NSWorkspace.sharedWorkspace().frontmostApplication()
-            print("--- front app: %s" % (front.bundleIdentifier() if front else None), flush=True)
-            print("--- Terminal's last lines\n" + "\n".join(screen().splitlines()[-4:]), flush=True)
-            # What the service received and answered (claudish recent): did it read the screen?
-            from claudish.client import call
-            for item in call("http://127.0.0.1:18765", "/recent")["recent"][-2:]:
-                print("--- recent: %s %s %s consulted=%s -> %s" % (item["mode"], item.get("app"), item.get("kind"),
-                      item.get("consulted"), item.get("candidates")), flush=True)
-        check("terminal: fix sees the screen, the draft lands at the prompt",
-              screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)
+        # Terminal gives an input method Tab, the arrows and Esc only while there is marked text,
+        # and a sent instruction leaves the text: so here Tab is the shell's (a known macOS
+        # Terminal gap, owner 2026-10-24, until per-app profiles; G50). What must hold: the
+        # instruction saw the screen and its drafts came back.
+        from claudish.client import call
+
+        def answered():
+            recent = [item for item in call("http://127.0.0.1:18765", "/recent")["recent"]
+                      if item.get("app") == "com.apple.Terminal" and item["mode"] == "instruct"]
+            return recent[-1] if recent else None
+        wait_for(answered, timeout=10)
+        item = answered() or {}
+        check("terminal: fix sees the screen and its drafts come back",
+              (any("terminal screen" in c for c in item.get("consulted") or []),
+               any("having read the terminal" in c for c in item.get("candidates") or [])), (True, True))
+        key("Escape")
+        key("Escape")
     else:
         check("terminal: the screen is readable (Accessibility for the service's Python)", screen(), "")
     TYPING_INTO = None

@@ -124,6 +124,12 @@ the Accessibility permission; on Linux the desktop's accessibility bus must run
 Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
 Terminal.app.
 
+**Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
+Esc only while there is marked text. A sent instruction leaves your text, so its
+drafts cannot be taken there with Tab (Tab completes in the shell); continue's
+suggestion cannot be taken with Tab either. Instructions still see the screen and
+their drafts come back. Per-app profiles will close this (ROADMAP G50).
+
 On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
 cases (23 need a fix, 7 are legitimate commands that failed for environmental
 reasons and should be left alone), "fix" at a terminal showing the failed

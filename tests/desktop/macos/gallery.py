@@ -33,8 +33,7 @@ def main():
         driver.select_input_method()
         driver.front()
         driver.type_text("Thanks for the review ")
-        driver.wait_for(lambda: driver.state().get("marked"), timeout=20)
-        time.sleep(0.5)
+        time.sleep(2.5)  # the suggestion is cd_AI's own overlay, not marked text: give it time
         show("01-continue-suggestion")
         driver.key("Escape")
         driver.fresh_document()
@@ -52,6 +51,19 @@ def main():
         driver.key("Return")  # an instruction's drafts
         time.sleep(1.5)
         show("04-instruct-drafts")
+        driver.key("Return")  # Enter on a draft: nothing inserted, the row's Tab lit
+        time.sleep(0.4)
+        show("04b-enter-on-drafts")
+        driver.key("Escape")
+        driver.key("Escape")
+        driver.fresh_document()
+        # A long instruction: the panel opens at its end; when Enter sends it, it moves to the caret.
+        driver.type_text("write a short note to the whole team thanking them for shipping on time")
+        time.sleep(1.0)
+        show("05-long-instruction")
+        driver.key("Return")
+        time.sleep(1.5)
+        show("06-long-instruction-sent")
         driver.key("Escape")
         driver.key("Escape")
     finally:
