@@ -58,6 +58,16 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
   the VM's launchd for cd_AI traces.
 - Still open: Claude API tool loop (needs credentials), selection from the adapters, VS Code +
   Claude Code chat box on the Mac VM.
+- G34 (functionality before visuals), b0978b2: typed agent replies; one text box description
+  for every mode (app, field kind, text around the caret); quiet in URL/email/number fields;
+  agents get the profile's MCP servers, policy, context (checked live); rewrite on Tab and of
+  a selection (macOS, demo; GTK reports no selection; Edge ends compositions over text);
+  native mode indicators (GNOME verified; Windows icon seen; macOS input modes built, VM run
+  pending); Claudish's patched PIME in platforms/windows/pime (timer redraw, text around the
+  caret, selection, input scopes, document id; built in the VM with VS 2022 Build Tools,
+  jobs/buildtools.ps1 + build-pime.ps1; Notepad 15/15, Edge 14/14 + 1 known).
+- Waiting on the owner: Mac VM run of the input modes (rebuild = one Allow click); whether F7
+  should be configurable; Claude API tool loop needs a key.
 - The demo's continue sample must differ from the continue example's input (f5f7ac3):
   otherwise parroted() drops the answer and the demo shows nothing.
 - Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
