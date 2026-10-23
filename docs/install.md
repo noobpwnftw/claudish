@@ -21,7 +21,7 @@ end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-sy
 
 Or step by step:
 
-1. **Try the three layers in your browser.** With Python 3.10+:
+1. **Try it in your browser.** With Python 3.10+:
 
    ```sh
    python scripts/download_llama.py
@@ -58,7 +58,7 @@ Or step by step:
 | Tab | accept the candidate; in continue, take the rest of the sentence (with nothing offered, Tab is the app's) |
 | Enter | the app's in continue; send, then insert (instruct); keep your wording (rewrite) |
 | Esc | keep what you typed |
-| F8 | in instruct, also send a picture of the window you are typing in |
+| F8 | in compose, with an instruction: also send a picture of the window you are typing in |
 | 1–3 | when an instruction comes back as a numbered list, insert that reading; when an agent asks, answer |
 
 ## Start the model and service

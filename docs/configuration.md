@@ -114,7 +114,7 @@ and wrong types are rejected at startup. `/health` reports the active profile.
 ### Window pictures
 
 For apps that publish nothing Claudish can read, an instruction can carry a
-picture of the window you are typing in. In instruct mode, press **F8** before
+picture of the window you are typing in. In compose, press **F8** before
 Enter: the hint shows "instruct + window picture", and the service captures the
 focused window once, sends it with that one instruction, and lists it in
 "consulted". Nothing is captured without F8, F8 never carries over to the next
@@ -235,7 +235,7 @@ profile:
 
 ### Agent sessions: an agent at the caret
 
-With `"session_command"` in a profile, a sent instruction (instruct mode, Enter)
+With `"session_command"` in a profile, a sent instruction (Enter in compose)
 runs an agent instead of a single model call. Claudish is the agent's host: its
 progress and partial draft show in the input method's status line, its
 permission questions become the candidate list, and its final answer is a

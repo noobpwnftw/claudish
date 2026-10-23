@@ -110,13 +110,16 @@ agent finds a destructive or outgoing step halfway through, that step comes back
 as a new choice (see Safety under G18). Rewrite and continue benefit too: two or
 three readings, with 1–3 to pick and Tab for the first (G27).
 
-## Three layers, one key grammar
+## Three layers, two modes, one key grammar
 
 | Layer | Mode | You type | Requests | You get |
 | --- | --- | --- | --- | --- |
-| 1. Translation | `rewrite` | a phrase | on every pause | the phrase in Claudish |
-| 2. Autocomplete | `continue` | the start of a sentence | on every pause | your text plus the next words |
-| 3. Instruction | `instruct` | a command | on Enter only | the result, at the caret |
+| 1. Autocomplete | continue | the start of a sentence | at a pause after a word | the rest of the sentence, after the caret |
+| 2. Translation | compose, Tab | a phrase | on Tab | the phrase in Claudish, in place |
+| 3. Instruction | compose, Enter | a command | on Enter | drafts to pick, at the caret |
+
+A Shift tap switches the two modes (the service still names the requests continue,
+rewrite, and instruct).
 
 The keys are the same everywhere, on every platform:
 
@@ -320,7 +323,7 @@ key it does not need, and never asks for attention.
 People already know how to use this: you type. Onboarding should take three
 minutes, in this order:
 
-1. **Try the three layers in the browser.** `python scripts/start.py` and open
+1. **Try it in the browser.** `python scripts/start.py` and open
    the demo. Each mode has its own sample phrases, and a one-line explanation of
    what Enter and Tab do in it.
 2. **Pick a brain.** `claudish init` writes a starter config with commented
