@@ -215,6 +215,22 @@ async def check(args):
             await expect(page.locator("#preedit")).to_have_text("")
             await expect(committed).to_have_attribute("data-text", "")
 
+            # Rewrite a selection: Tab takes it into the composition and rewrites it in place; Esc twice
+            # puts the original back where it was.
+            await page.locator("#clear").click() if await page.locator("#clear").is_enabled() else None
+            await keys.press("F7")  # instruct -> rewrite
+            await keys.type("plain words", delay=5)
+            await keys.press("Escape")  # kept as typed
+            await keys.press("Control+A")
+            await keys.press("Tab")
+            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
+            await expect(committed).to_have_attribute("data-text", "")  # out of the text while it is rewritten
+            await keys.press("Escape")
+            await keys.press("Escape")
+            await expect(committed).to_have_attribute("data-text", "plain words")
+            await keys.press("F7")
+            await keys.press("F7")  # back to instruct for what follows
+
             # A sample over a selection replaces it, with no empty line left behind.
             await page.locator("#clear").click() if await page.locator("#clear").is_enabled() else None
             await keys.press("F7")  # instruct -> rewrite

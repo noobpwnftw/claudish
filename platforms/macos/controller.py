@@ -175,6 +175,27 @@ class ClaudishInputController(IMKInputController):
             text, {NSForegroundColorAttributeName: NSColor.secondaryLabelColor()})
 
     @objc.python_method
+    def take_selection(self, client):
+        """Rewrite with nothing composed: the app's selection becomes the composition (CJK input
+        methods call it reconversion), replaced by marked text until you keep the rewrite or your
+        words."""
+        try:
+            selected = client.selectedRange()
+            location, length = (selected.location, selected.length) if hasattr(selected, "location") else selected
+            if location == NSNotFound or not 0 < length <= MAX_COMPOSITION:
+                return False
+            found = client.attributedSubstringFromRange_((location, length))
+            text = str(found.string()) if found is not None else ""
+        except Exception:
+            return False
+        if not text:
+            return False
+        self.state.change(text)
+        units = len(text.encode("utf-16-le")) // 2
+        client.setMarkedText_selectionRange_replacementRange_(text, (units, 0), (location, length))
+        return True
+
+    @objc.python_method
     def around_caret(self, client):
         """(before, after): the client's text around the caret (IMKTextInput), or empty when it does
         not share it. Chromium-based apps (VS Code, browsers) answer only about 100 characters
@@ -345,6 +366,8 @@ class ClaudishInputController(IMKInputController):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"
         if key == 48:  # Tab
+            if self.state.mode == "rewrite" and not self.state.text:
+                self.take_selection(client)  # a selection: rewrite it in place
             action = self.state.tab()
             if action == "accept":
                 self.finish(client, suggested=True)

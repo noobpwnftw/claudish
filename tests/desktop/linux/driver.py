@@ -117,6 +117,9 @@ def scenarios():
     wait_for(lambda: state()["view"], what="the rewrite kept")
     check("the rewrite is of everything typed", state()["view"], "particularly good")
 
+    # Rewriting a selection needs the toolkit to report it: GTK3 and GTK4 (IBus 1.5.29) report the
+    # anchor at the cursor, so Tab with a selection is the app's there (see ROADMAP G34).
+
     focus("entry")
     key("ctrl+a", "BackSpace")
     type_text("keep me")

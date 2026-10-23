@@ -12,7 +12,7 @@ const MODES = ["continue", "instruct", "rewrite"];  // F7 order, as in every ada
 const HINTS = {
   continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey. Tab takes it.",
   instruct: "Type what you want, then Enter. Pick a draft with 1–3.",
-  rewrite: "Type something ordinary. Tab rewrites it in place; Tab again keeps it, Esc brings your words back.",
+  rewrite: "Type something ordinary, or select some text. Tab rewrites it in place; Tab again keeps it, Esc brings your words back.",
 };
 const SAMPLES = [
   ["rewrite", "This is very important."],
@@ -183,6 +183,13 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Tab") {
+    if (!state.text && state.mode === "rewrite" && selected()) {
+      // A selection: it becomes the composition (CJK input methods call it reconversion), out of
+      // the text until you keep the rewrite or your words.
+      const [start, end] = selection();
+      const words = doc.text.slice(start, end);
+      if (words.length <= MAX) { removeSelection(); change(words); }
+    }
     if (!state.text) return false;
     // Rewrite: the first Tab converts your words in place, the second keeps it. A pending
     // candidate is not stale text, so Tab waits for it.

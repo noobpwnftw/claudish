@@ -29,30 +29,41 @@ class Client:
 
 
 class TextClient(Client):
-    """A client that shares its text, like NSTextView: the committed text plus the marked text."""
+    """A client that shares its text, like NSTextView: the app's text with the marked text at the
+    caret (mark_at), which a replacement range can move into the middle of it."""
 
     def __init__(self, text):
         super().__init__()
-        self.text = text
+        self.text, self.mark_at, self.chosen = text, len(text), None
+
+    def marked_text(self):
+        return getattr(self.marked, "text", self.marked)
 
     def insertText_replacementRange_(self, text, replacement):
         super().insertText_replacementRange_(text, replacement)
-        self.text += text
+        self.text = self.text[:self.mark_at] + text + self.text[self.mark_at:]
+        self.mark_at += len(text)
+
+    def setMarkedText_selectionRange_replacementRange_(self, text, selection, replacement):
+        if replacement[0] != 2**63 - 1:  # replaces part of the app's text (the selection)
+            start, length = replacement
+            self.text, self.mark_at, self.chosen = self.text[:start] + self.text[start + length:], start, None
+        super().setMarkedText_selectionRange_replacementRange_(text, selection, replacement)
 
     def whole(self):
-        marked = getattr(self.marked, "text", self.marked)
-        return self.text + marked
+        return self.text[:self.mark_at] + self.marked_text() + self.text[self.mark_at:]
 
     def length(self):
         return len(self.whole())
 
     def selectedRange(self):
-        marked = getattr(self.marked, "text", self.marked)
-        return (len(self.text) + (self.selection or (len(marked), 0))[0], 0)
+        if self.chosen:  # a selection in the app's own text
+            return self.chosen
+        return (self.mark_at + (self.selection or (len(self.marked_text()), 0))[0], 0)
 
     def markedRange(self):
-        marked = getattr(self.marked, "text", self.marked)
-        return (len(self.text), len(marked)) if marked else (2**63 - 1, 0)
+        marked = self.marked_text()
+        return (self.mark_at, len(marked)) if marked else (2**63 - 1, 0)
 
     def attributedSubstringFromRange_(self, span):
         return types.SimpleNamespace(string=lambda: self.whole()[span[0]:span[0] + span[1]])
@@ -440,6 +451,27 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48,
                                       modifierFlags=lambda: 0, characters=lambda: "\t"), client)
             self.assertEqual(fresh.worker.sent, ("thanks", "Dear Ana,\n\n", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_tab_in_rewrite_rewrites_a_selection_in_place(self):
+        client = TextClient("Dear Ana, this is important. Thanks.")
+        client.chosen = (10, 18)  # "this is important."
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "rewrite"
+            tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
+            self.assertTrue(fresh.handleEvent_client_(tab, client))
+            self.assertEqual((client.whole(), fresh.worker.sent), ("Dear Ana, this is important. Thanks.",
+                             ("this is important.", "Dear Ana, ", " Thanks.")))
+            fresh.worker.result = (fresh.state.revision, {"text": "This is of utmost significance."})
+            fresh.pollSuggestions_(None)
+            self.assertEqual(client.whole(), "Dear Ana, This is of utmost significance. Thanks.")
+            esc = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: 0, characters=lambda: "\x1b")
+            fresh.handleEvent_client_(esc, client)
+            fresh.handleEvent_client_(esc, client)  # your words, as they were
+            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
         finally:
             fresh.inputControllerWillClose()
 

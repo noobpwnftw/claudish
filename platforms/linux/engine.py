@@ -140,6 +140,25 @@ class ClaudishEngine(IBus.Engine):
         value = text.get_text() if text else ""
         return value[:cursor], value[cursor:]
 
+    def take_selection(self):
+        """Rewrite with nothing composed: the app's selection becomes the composition (CJK input
+        methods call it reconversion), removed from the app until you keep the rewrite or your
+        words. Returns (before, after) around it, or None when there is no selection to take."""
+        if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
+            return None
+        try:
+            text, cursor, anchor = self.get_surrounding_text()
+        except Exception:
+            return None
+        value = text.get_text() if text else ""
+        trace("selection", "cursor", cursor, "anchor", anchor, "length", len(value))
+        start, end = min(cursor, anchor), max(cursor, anchor)
+        if start == end or end - start > MAX_COMPOSITION:
+            return None
+        self.delete_surrounding_text(start - cursor, end - start)
+        self.composition.change(value[start:end])
+        return value[:start], value[end:]
+
     def before_caret(self):
         return self.around_caret()[0][-MAX_COMPOSITION:]
 
@@ -251,11 +270,14 @@ class ClaudishEngine(IBus.Engine):
                 self.finish(action == "accept")
             return action != "pass"
         if keyval == IBus.KEY_Tab:
+            around = None
+            if self.composition.mode == "rewrite" and not self.composition.text:
+                around = self.take_selection()  # a selection: rewrite it in place
             action = self.composition.tab()
             if action == "accept":
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it converts in place when it arrives
-                before, after = self.around_caret()  # where the rewrite goes
+                before, after = around or self.around_caret()  # where the rewrite goes
                 self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
                                           immediate=True, app=self.app, before=before[-1500:], after=after[:500],
                                           purpose=self.purpose)

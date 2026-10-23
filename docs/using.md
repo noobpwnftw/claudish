@@ -18,6 +18,7 @@ Typing in detail, the browser demos, and `claudish fix`.
 | Typing while an agent asks | Composes a reply instead of a number; Enter sends it (the agent hears it as your reason), Backspace edits it, Esc clears it, and digits in it are text |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
 | Tab (rewrite) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. Rewrite has no list |
+| Tab with a selection (rewrite) | With nothing composed, rewrite the selected text in place (CJK input methods call this reconversion): it leaves the text while it is rewritten, Tab keeps the rewrite, Esc twice puts your words back. macOS and the demo; on Linux only where the toolkit reports selections (GTK3 and GTK4 do not, in our tests) |
 | Enter / Escape (rewrite) | Commit your wording, including the em-dash substitution |
 | Backspace | Edit the composition and invalidate its candidate |
 
