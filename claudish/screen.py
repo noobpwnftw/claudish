@@ -42,6 +42,17 @@ def tail(text):
     return "\n".join(lines[-MAX_LINES:])[-MAX_CHARS:]
 
 
+def warm():
+    """Load macOS's accessibility modules ahead of the first terminal instruction (importing them
+    takes about a second). Called on a background thread when the service starts."""
+    if sys.platform == "darwin":
+        try:
+            import AppKit  # noqa: F401
+            import ApplicationServices  # noqa: F401
+        except ImportError:
+            pass
+
+
 def read(app=None):
     """The focused terminal's last lines, or None (not a terminal, nothing readable, no permission)."""
     try:

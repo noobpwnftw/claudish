@@ -257,9 +257,14 @@ def scenarios():
         shift_tap()  # compose
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
-        time.sleep(1.5)
-        key("Return")  # the draft, at the prompt; running it would be the user's Enter
-        if not wait_for(lambda: "having read the terminal" in screen(), timeout=10):
+        # Enter again takes the draft once it is there (while it is pending, Enter waits); after
+        # that Enter would be the shell's, so stop as soon as the draft shows.
+        for _ in range(10):
+            time.sleep(1)
+            key("Return")
+            if wait_for(lambda: "having read the terminal" in screen(), timeout=1):
+                break
+        if "having read the terminal" not in screen():
             print("--- Terminal's last lines\n" + "\n".join(screen().splitlines()[-4:]), flush=True)
         check("terminal: fix sees the screen, the draft lands at the prompt",
               screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)

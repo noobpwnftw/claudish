@@ -145,6 +145,10 @@ def main():
             print("Typed text will be sent to %s." % target, flush=True)
         print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
             server.server_port, settings["backend"], ", profile " + profile if profile else ""), flush=True)
+        if rewriter.read_terminal:
+            import threading
+            from .screen import warm
+            threading.Thread(target=warm, daemon=True).start()
         try:
             server.serve_forever()
         except KeyboardInterrupt:
