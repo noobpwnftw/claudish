@@ -13,8 +13,8 @@ from claudish.composition import Composition
 
 
 def to_mode(state, mode):
-    while state.mode != mode:
-        state.next_mode()
+    if state.mode != mode:
+        state.toggle()
 from claudish.model import Rewriter, user_content
 from claudish.server import make_server
 
@@ -25,9 +25,9 @@ class CompositionTests(unittest.TestCase):
     def test_f8_is_for_instructions_only_and_never_carries_over(self):
         state = Composition()
         state.insert("x")
-        self.assertFalse(state.toggle_look())  # rewrite mode
+        self.assertFalse(state.toggle_look())  # continue: nothing is sent as an instruction
         state.commit()
-        to_mode(state, "instruct")
+        to_mode(state, "compose")
         state.insert("x")
         revision = state.revision
         self.assertTrue(state.toggle_look() and state.look)
@@ -36,7 +36,7 @@ class CompositionTests(unittest.TestCase):
         self.assertTrue(state.look)  # editing the instruction keeps the choice
         state.commit()
         self.assertFalse(state.look)  # the next instruction starts without a picture
-        state.insert("z"), state.toggle_look(), state.next_mode()
+        state.insert("z"), state.toggle_look(), state.toggle()
         self.assertFalse(state.look)
 
 

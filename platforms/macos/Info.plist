@@ -20,75 +20,25 @@
 	<dict>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>org.claudish.inputmethod.Claudish.Continue</key>
+			<key>org.claudish.inputmethod.Claudish.English</key>
 			<dict>
-				<key>TISIconIsTemplate</key>
-				<true/>
 				<key>TISInputSourceID</key>
-				<string>org.claudish.inputmethod.Claudish.Continue</string>
+				<string>org.claudish.inputmethod.Claudish.English</string>
 				<key>TISIntendedLanguage</key>
 				<string>en</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>mode-continue.png</string>
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
-				<key>tsInputModeMenuIconFileKey</key>
-				<string>mode-continue.png</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
-				<key>tsInputModeScriptKey</key>
-				<string>smRoman</string>
-			</dict>
-			<key>org.claudish.inputmethod.Claudish.Instruct</key>
-			<dict>
-				<key>TISIconIsTemplate</key>
-				<true/>
-				<key>TISInputSourceID</key>
-				<string>org.claudish.inputmethod.Claudish.Instruct</string>
-				<key>TISIntendedLanguage</key>
-				<string>en</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>mode-instruct.png</string>
-				<key>tsInputModeDefaultStateKey</key>
-				<false/>
-				<key>tsInputModeIsVisibleKey</key>
-				<true/>
-				<key>tsInputModeMenuIconFileKey</key>
-				<string>mode-instruct.png</string>
-				<key>tsInputModePrimaryInScriptKey</key>
-				<false/>
-				<key>tsInputModeScriptKey</key>
-				<string>smRoman</string>
-			</dict>
-			<key>org.claudish.inputmethod.Claudish.Rewrite</key>
-			<dict>
-				<key>TISIconIsTemplate</key>
-				<true/>
-				<key>TISInputSourceID</key>
-				<string>org.claudish.inputmethod.Claudish.Rewrite</string>
-				<key>TISIntendedLanguage</key>
-				<string>en</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>mode-rewrite.png</string>
-				<key>tsInputModeDefaultStateKey</key>
-				<false/>
-				<key>tsInputModeIsVisibleKey</key>
-				<true/>
-				<key>tsInputModeMenuIconFileKey</key>
-				<string>mode-rewrite.png</string>
-				<key>tsInputModePrimaryInScriptKey</key>
-				<false/>
 				<key>tsInputModeScriptKey</key>
 				<string>smRoman</string>
 			</dict>
 		</dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>org.claudish.inputmethod.Claudish.Continue</string>
-			<string>org.claudish.inputmethod.Claudish.Instruct</string>
-			<string>org.claudish.inputmethod.Claudish.Rewrite</string>
+			<string>org.claudish.inputmethod.Claudish.English</string>
 		</array>
 	</dict>
 	<key>InputMethodConnectionName</key>
@@ -99,15 +49,11 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
-	<key>TISIconIsTemplate</key>
-	<true/>
 	<key>TISIntendedLanguage</key>
 	<string>en</string>
 	<key>tsInputMethodCharacterRepertoireKey</key>
 	<array>
 		<string>Latn</string>
 	</array>
-	<key>tsInputMethodIconFileKey</key>
-	<string>mode-continue.png</string>
 </dict>
 </plist>

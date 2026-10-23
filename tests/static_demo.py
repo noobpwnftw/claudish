@@ -42,7 +42,7 @@ async def check(url, executable, screenshots=None):
             await page.screenshot(path=str(screenshots / "static-ready.png"))
         committed, window, keys = page.locator("#page"), page.locator("#candidates"), page.keyboard
         await page.locator("#editor").click()
-        await keys.press("F7")  # the demo opens in rewrite; continue: keys straight in, the rest waits in grey
+        await keys.press("Shift")  # the demo opens in compose; a Shift tap: continue, keys straight in
         sample = "Thanks for the quick review on "  # the demo's own continue sample (demo.js SAMPLES)
         await keys.type(sample, delay=20)
         await expect(page.locator("#ghost")).not_to_be_empty(timeout=60000)
@@ -62,8 +62,7 @@ async def check(url, executable, screenshots=None):
             if offered:
                 await keys.press("Tab")
         await keys.press("Enter")
-        await keys.press("F7")
-        await keys.press("F7")  # rewrite
+        await keys.press("Shift")  # compose
         before = await committed.get_attribute("data-text")
         await keys.type("This is very important.", delay=20)
         await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
@@ -72,8 +71,7 @@ async def check(url, executable, screenshots=None):
         assert rewrite.strip(), "empty rewrite"
         await keys.press("Tab")  # keeps it
         await expect(committed).to_have_attribute("data-text", before + rewrite)
-        await keys.press("F7")
-        await keys.press("F7")  # instruct
+        # still compose: Enter does it as an instruction
         await keys.type("thank the team for shipping the release", delay=10)
         await keys.press("Enter")  # sends
         await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=60000)

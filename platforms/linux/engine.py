@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
-from claudish.composition import LABELS, MAX_COMPOSITION, MODES, Composition
+from claudish.composition import LABELS, MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
@@ -31,7 +31,7 @@ def trace(*fields):
 
 
 # The mode, as the input source indicator shows it.
-SYMBOLS = {"continue": "C", "instruct": "I", "rewrite": "R"}
+SYMBOLS = {"continue": "C", "compose": "AI"}
 
 # The field kinds IBus reports, by the names the service understands.
 PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "email", IBus.InputPurpose.URL: "url",
@@ -42,6 +42,7 @@ class ClaudishEngine(IBus.Engine):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.composition = Composition()
+        self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
         self.suggestions = Suggestions()
         self.sensitive = False
         self.app = None  # The focused program, for bindings ("supported text boxes").
@@ -100,27 +101,24 @@ class ClaudishEngine(IBus.Engine):
                     "agent asks: %s · 1–%d: choose, or type a reply · Esc: stop" % (state.question.get("text", ""),
                                                                                     len(state.question["choices"])))
         elif state.working and state.status:
-            hint = "instruct · %s · Esc: stop" % " ".join(state.status.split())[-90:]
+            hint = "compose · %s · Esc: stop" % " ".join(state.status.split())[-90:]
         elif state.choosing:
-            hint = ("instruct · 1–%d: pick one · Enter: the first · Esc: back to the instruction"
+            hint = ("compose · 1–%d: pick one · Enter: the first · Esc: back to the instruction"
                     % len(state.candidates))
         elif state.converted:
-            hint = "rewrite · Tab: keep it · Esc: your words"
-        elif state.mode == "rewrite":
-            hint = ("rewrite · rewriting… · Esc: your words" if state.working else
-                    "rewrite · the rewrite failed · Tab: try again · Enter/Esc: keep your words" if state.failed else
-                    "rewrite · Tab: rewrite it · Enter/Esc: keep your words")
+            hint = "compose · Tab: keep it · Esc: your words"
         elif state.candidate:
-            hint = LABELS[state.mode] + state.candidate
+            hint = LABELS.get(state.asked or state.mode, "") + state.candidate
         elif state.working:
-            hint = "instruct · %s… · Esc: stop" % ("looking and working" if state.look else "working")
+            hint = ("compose · rewriting… · Esc: your words" if state.asked == "rewrite" else
+                    "compose · %s… · Esc: stop" % ("looking and working" if state.look else "working"))
         elif state.failed:
-            hint = "instruct · the request failed · Enter: send it again · Esc: back"
-        elif state.mode == "instruct":
-            hint = ("instruct + window picture · Enter: send it · F8: no picture" if state.look else
-                    "instruct · Enter: send it · F8: look at the window · F7: mode · Esc: drop it")
+            hint = "compose · the request failed · Tab or Enter: try again · Esc: back"
+        elif state.look:
+            hint = "compose + window picture · Enter: send it as an instruction · F8: no picture"
         else:
-            hint = "%s · F7: mode · Enter/Esc: keep wording" % state.mode
+            hint = ("compose · Tab: rewrite it · Enter: send it as an instruction · Shift+Enter: keep it"
+                    " · Esc: drop it")
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
 
     def changed(self):
@@ -159,7 +157,7 @@ class ClaudishEngine(IBus.Engine):
         if start == end or end - start > MAX_COMPOSITION:
             return None
         self.delete_surrounding_text(start - cursor, end - start)
-        self.composition.change(value[start:end])
+        self.composition.adopt(value[start:end])
         return value[:start], value[end:]
 
     def before_caret(self):
@@ -210,6 +208,15 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(text))
 
     def do_process_key_event(self, keyval, keycode, state):
+        # A Shift tap switches mode (continue <-> compose), as Shift switches English and pinyin.
+        if keyval in (IBus.KEY_Shift_L, IBus.KEY_Shift_R) and not self.sensitive:
+            if not state & IBus.ModifierType.RELEASE_MASK:
+                self.shift.press(time.monotonic())
+            elif self.shift.release(time.monotonic()):
+                self.switch_mode()
+            return False
+        if not state & IBus.ModifierType.RELEASE_MASK:
+            self.shift.other()
         if not state & IBus.ModifierType.RELEASE_MASK:
             name = IBus.keyval_name(keyval) or ""
             trace("key", name if len(name) > 1 else "char", self.composition.mode,
@@ -230,9 +237,6 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F8 and self.composition.toggle_look():
             self.render()
             return True
-        if keyval == IBus.KEY_F7:  # the input method's key while it is active, composing or not
-            self.next_mode()
-            return True
         if self.composition.live:
             return self.live_key(keyval)
         if self.composition.question and not self.composition.reply and IBus.KEY_1 <= keyval <= IBus.KEY_9:
@@ -248,6 +252,13 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             self.commit_text(IBus.Text.new_from_string(text))
             return True
+        if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and state & IBus.ModifierType.SHIFT_MASK:
+            kept = self.composition.keep()  # Shift+Enter: as it is, and keep composing
+            if not kept:
+                return False
+            self.changed()
+            self.commit_text(IBus.Text.new_from_string(kept))
+            return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
             if action == "reply":  # your own words, in answer to the agent's question
@@ -259,7 +270,7 @@ class ClaudishEngine(IBus.Engine):
                 self.composition.submit()
                 before, after = self.around_caret()  # the text box, for this turn of its conversation
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
-                                          self.composition.mode, immediate=True, app=self.app,
+                                          "instruct", immediate=True, app=self.app,
                                           look=self.composition.look, before=before[-8000:], after=after[:8000],
                                           purpose=self.purpose)
                 self.render()
@@ -268,7 +279,7 @@ class ClaudishEngine(IBus.Engine):
             return action != "pass"
         if keyval == IBus.KEY_Tab:
             around = None
-            if self.composition.mode == "rewrite" and not self.composition.text:
+            if not self.composition.live and not self.composition.text:
                 around = self.take_selection()  # a selection: rewrite it in place
             action = self.composition.tab()
             if action == "accept":
@@ -320,12 +331,13 @@ class ClaudishEngine(IBus.Engine):
         if self.sensitive:
             self.do_reset()
 
-    def next_mode(self):
-        """F7, or a pick from the indicator's menu: continue -> instruct -> rewrite."""
-        entering_live = self.composition.mode == "rewrite"  # rewrite -> continue
-        self.composition.next_mode()
-        if entering_live:  # the composed words go into the app; they stay as context
-            self.commit_text(IBus.Text.new_from_string(self.composition.text))
+    def switch_mode(self):
+        """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose
+        keeps what you see, as typed."""
+        kept = self.composition.toggle()
+        self.suggestions.schedule(self.composition.revision, "")  # what was asked belongs to the old mode
+        if kept:
+            self.commit_text(IBus.Text.new_from_string(kept))
         self.changed()
         self.show_mode()
         if not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
@@ -359,8 +371,8 @@ class ClaudishEngine(IBus.Engine):
 
     def do_property_activate(self, name, state):
         if name.startswith("mode.") and state == IBus.PropState.CHECKED and name[5:] in MODES:
-            while self.composition.mode != name[5:]:
-                self.next_mode()
+            if self.composition.mode != name[5:]:
+                self.switch_mode()
 
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".

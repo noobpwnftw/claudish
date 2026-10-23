@@ -39,11 +39,11 @@ async def check(args):
             assert {first, flipped} == {"light", "dark"}, (first, flipped)
             await page.locator("#theme-toggle").click()
 
-            # The demo opens in rewrite (the pitch); F7 reaches continue, where the installed input
-            # method starts: keys go straight in, and a pause after a word offers the rest.
+            # The demo opens in compose (the pitch); a Shift tap reaches continue, where the installed
+            # input method starts: keys go straight in, and a pause after a word offers the rest.
             await page.locator("#editor").click()
-            await expect(page.locator("#source-mode")).to_have_text("rewrite")
-            await keys.press("F7")
+            await expect(page.locator("#source-mode")).to_have_text("compose")
+            await keys.press("Shift")
             await expect(page.locator("#source-mode")).to_have_text("continue")
             await keys.type("Thanks for the review ", delay=20)
             await expect(committed).to_have_attribute("data-text", "Thanks for the review ")
@@ -73,11 +73,10 @@ async def check(args):
             await keys.press("Escape")  # dismiss it
             await keys.press("Enter")
 
-            # Rewrite (F7 twice): your words are a composition; when the rewrite is ready, Tab converts
-            # them in place (no list), Esc brings them back, and Tab again keeps the rewrite.
-            await keys.press("F7")
-            await keys.press("F7")
-            await expect(page.locator("#source-mode")).to_have_text("rewrite")
+            # Compose (a Shift tap): your words are a composition; Tab asks for the rewrite, which takes
+            # their place (no list), Esc brings them back, and Tab again keeps the rewrite.
+            await keys.press("Shift")
+            await expect(page.locator("#source-mode")).to_have_text("compose")
             before = await committed_text()
             await keys.type("This is very important.", delay=20)
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
@@ -94,22 +93,22 @@ async def check(args):
             await keys.press("Tab")
             await keys.press("Tab")  # converted, then kept
             await expect(committed).to_have_attribute("data-text", before + rewrite)
-            await keys.type("hello-world", delay=20)  # in rewrite, the dash is Claudish
+            await keys.type("hello-world", delay=20)  # in compose, the dash is Claudish
             await expect(page.locator("#preedit")).to_have_text("hello—world")
-            await keys.press("Enter")  # keeps your words
+            await keys.press("Shift+Enter")  # keeps your words as they are
             await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world")
-            # Paste in rewrite joins the composition, to be rewritten like typed words.
+            # Paste in compose joins the composition, to be rewritten like typed words.
             await page.evaluate("() => navigator.clipboard.writeText('a pasted phrase')")
             await keys.press("Control+V")
             await expect(page.locator("#preedit")).to_have_text("a pasted phrase")
-            await keys.press("Escape")  # kept as is
+            await keys.press("Shift+Enter")  # kept as it is
             await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world" + "a pasted phrase")
             await page.locator("#copy").click()
             assert await page.evaluate("() => navigator.clipboard.readText()") == await committed_text()
             # A text box: a right click keeps the keyboard; select, copy, and type over a selection.
             await page.locator("#editor").click(button="right")
             await keys.press("Escape")  # close the browser's context menu
-            await keys.press("F7")  # rewrite -> continue
+            await keys.press("Shift")  # compose -> continue
             await keys.press("End")
             await keys.type("!", delay=10)
             text = await committed_text()
@@ -122,8 +121,7 @@ async def check(args):
             await keys.press("Shift+Home")
             await keys.press("Delete")
             await expect(committed).to_have_attribute("data-text", "")
-            await keys.press("F7")
-            await keys.press("F7")  # back to rewrite
+            await keys.press("Shift")  # back to compose
             await expect(page.locator("#clear")).to_be_disabled()  # nothing left to clear
 
             # A stale answer must never appear: hold the first request, type on, then release it.
@@ -156,7 +154,7 @@ async def check(args):
             await expect(page.locator("#preedit")).to_have_text("Rewrite: an earlier thought now")
             await page.unroute("**/suggest", controlled)
             await keys.press("Escape")  # your words again
-            await keys.press("Escape")  # and kept
+            await keys.press("Shift+Enter")  # and kept
             await page.locator("#clear").click()
 
             async def unavailable(route):
@@ -171,18 +169,16 @@ async def check(args):
             await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
             await expect(window).to_contain_text("the rewrite failed")
             await keys.press("Escape")  # past the failure: your words, still composing
-            await keys.press("Escape")  # kept
+            await keys.press("Shift+Enter")  # kept
             await expect(committed).to_have_attribute("data-text", "Keep this thought intact.")
             await page.unroute("**/suggest", unavailable)
             await page.locator("#clear").click()
 
-            # Instruct (rewrite -> continue -> instruct): held until Enter; a digit picks.
+            # Instruct (Enter in compose): held until Enter; a digit picks.
             sent = []
             page.on("request", lambda request: sent.append(request.post_data_json)
                     if request.url.endswith("/suggest") else None)
-            await keys.press("F7")
-            await keys.press("F7")
-            await expect(page.locator("#source-mode")).to_have_text("instruct")
+            await expect(page.locator("#source-mode")).to_have_text("compose")
             await keys.type("thank the team for shipping the release", delay=10)
             await page.wait_for_timeout(600)
             assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
@@ -193,7 +189,7 @@ async def check(args):
             await keys.press("Escape")
             await expect(page.locator("#preedit")).to_have_text("thank the team for shipping the release")
             await expect(window.locator("button.candidate-row")).to_have_count(0)  # drafts closed
-            await expect(window).to_contain_text("send it")
+            await expect(window).to_contain_text("do it as an instruction")
             await keys.press("Enter")
             await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             choices = window.locator("button.candidate-row")
@@ -218,9 +214,8 @@ async def check(args):
             # Rewrite a selection: Tab takes it into the composition and rewrites it in place; Esc twice
             # puts the original back where it was.
             await page.locator("#clear").click() if await page.locator("#clear").is_enabled() else None
-            await keys.press("F7")  # instruct -> rewrite
             await keys.type("plain words", delay=5)
-            await keys.press("Escape")  # kept as typed
+            await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
             await keys.press("Tab")
             await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
@@ -228,26 +223,23 @@ async def check(args):
             await keys.press("Escape")
             await keys.press("Escape")
             await expect(committed).to_have_attribute("data-text", "plain words")
-            await keys.press("F7")
-            await keys.press("F7")  # back to instruct for what follows
 
             # A sample over a selection replaces it, with no empty line left behind.
             await page.locator("#clear").click() if await page.locator("#clear").is_enabled() else None
-            await keys.press("F7")  # instruct -> rewrite
             await keys.type("old words", delay=5)
-            await keys.press("Escape")  # kept as typed
+            await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
-            await page.locator("[data-mode=rewrite]").click()
-            await expect(page.locator("#preedit")).to_have_text("This is very important.", timeout=5000)
-            await expect(committed).to_have_attribute("data-text", "")
+            await page.locator("[data-label=rewrite]").click()  # types, then Tab rewrites it
+            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
+            await expect(committed).to_have_attribute("data-text", "")  # the selection went; no empty line
             await keys.press("Escape")
-            await page.locator("#clear").click()
+            await keys.press("Escape")  # the sample goes too
+            await expect(page.locator("#preedit")).to_have_text("")
 
             # A sample types itself, key by key, in its own mode.
-            await page.locator("[data-mode=rewrite]").click()
-            await expect(page.locator("#source-mode")).to_have_text("rewrite")
-            await expect(page.locator("#preedit")).to_have_text("This is very important.", timeout=5000)
-            await expect(window).to_be_visible(timeout=10000)
+            await page.locator("[data-label=rewrite]").click()
+            await expect(page.locator("#source-mode")).to_have_text("compose")
+            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)  # typed, then Tab
 
             await page.set_viewport_size({"width": 390, "height": 844})
             assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")

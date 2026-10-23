@@ -38,9 +38,9 @@ def main():
             button = [b for b in reply["addButton"] if b["id"] == "windows-mode-icon"][0]
             assert button["icon"].endswith("mode-continue.ico") and os.path.exists(button["icon"]), button
             reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
-            assert service.state.mode == "instruct" and reply["changeButton"][0]["icon"].endswith("mode-instruct.ico"), reply
+            assert service.state.mode == "compose" and reply["changeButton"][0]["icon"].endswith("mode-compose.ico"), reply
             menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
-            assert [(m["text"], m["checked"]) for m in menu] == [("continue", False), ("instruct", True), ("rewrite", False)], menu
+            assert [(m["text"], m["checked"]) for m in menu] == [("continue", False), ("compose", True)], menu
             service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
             assert service.state.mode == "continue"
 
@@ -52,13 +52,19 @@ def main():
                     "charCode": char, "keyCode": code, "repeatCount": 1,
                     "scanCode": 0, "isExtended": False, "keyStates": states}, **around))
 
+            def shift_tap():
+                """Shift pressed and released alone: its key-up is taken, and onKeyUp switches mode."""
+                assert key(0x10, method="filterKeyDown")["return"] is False  # the app sees Shift too
+                assert key(0x10, method="filterKeyUp")["return"] is True
+                return key(0x10, method="onKeyUp")
+
             # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
             assert service.state.mode == "continue"
             typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
             assert typed == "ls -la", typed
             assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
-            service.state.mode = "rewrite"  # the rest exercises rewrite
-            service.state.change("")
+            shift_tap()  # compose: what you type is held
+            assert service.state.mode == "compose"
             for char in "hello-world":
                 assert key(ord(char.upper()), ord(char), "filterKeyDown")["return"]
                 reply = key(ord(char.upper()), ord(char))
@@ -78,29 +84,31 @@ def main():
             assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello—world@"
             key(0x08)
             assert service.state.text == "hello—world"
-            # Pending Tab leaves the original available instead of committing it.
+            # Tab asks for the rewrite and commits nothing; a Shift tap keeps your words as typed.
             assert "commitString" not in key(9)
-            reply = key(13)
-            assert reply["commitString"] == "hello—world"
-            assert reply["compositionString"] == ""
+            reply = shift_tap()
+            assert reply["commitString"] == "hello—world" and service.state.mode == "continue", reply
+            assert key(0x10, method="filterKeyDown")["return"] is False  # Shift held for a capital: no tap
+            key(ord("A"), ord("A"), "filterKeyDown")  # every key reaches filterKeyDown first
+            key(ord("A"), ord("A"))
+            assert key(0x10, method="filterKeyUp")["return"] is False and service.state.mode == "continue"
+            shift_tap()
             for char in "draft":
                 key(ord(char.upper()), ord(char))
-            revision = service.state.revision
-            worker_class.return_value.poll.return_value = (revision, {"text": "A nuanced draft."})
-            assert key(0x75)["candidateList"] == []  # rewrite has no list: Tab converts in place
+            assert "commitString" not in key(9)  # Tab asks
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A nuanced draft."})
+            reply = key(0x75)  # it arrives: in place of your words, no list
             worker_class.return_value.poll.return_value = None
-            reply = key(9)
-            assert "commitString" not in reply and reply["compositionString"] == "A nuanced draft.", reply
+            assert reply["candidateList"] == [] and reply["compositionString"] == "A nuanced draft.", reply
             reply = key(0x1B)  # Esc: your words again
             assert "commitString" not in reply and reply["compositionString"] == "draft", reply
-            key(9)
+            key(9)  # the rewrite again, without asking again
             assert key(9)["commitString"] == "A nuanced draft."  # Tab again keeps it
             for char in "say hi":
                 key(ord(char.upper()), ord(char))
-            assert key(0x76, method="filterKeyDown")["return"]
-            reply = key(0x76)
+            reply = shift_tap()
             assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
-            assert reply["commitString"] == "say hi"  # continue types into the app: the held words go in
+            assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
             last = worker_class.return_value.schedule.call_args.args
             assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
             assert key(ord("!"), ord("!"))["commitString"] == "!"
@@ -115,9 +123,14 @@ def main():
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
             assert key(9)["commitString"] == " Hello—truly."
-            key(0x76)  # instruct, starting empty: the words are in the app already
-            assert service.state.mode == "instruct" and service.state.text == ""
-            # Instruct: no request while typing; Enter sends; the next Enter inserts.
+            assert key(0x76, method="filterKeyDown")["return"] is False  # F7 is the app's now
+            shift_tap()  # compose, starting empty: the words are in the app already
+            for char in "as is":
+                key(ord(char.upper()), ord(char))
+            assert key(0x0D, modifiers=(0x10,))["commitString"] == "as is"  # Shift+Enter keeps it as it is
+            assert service.state.mode == "compose" and service.state.text == ""
+            assert service.state.mode == "compose" and service.state.text == ""
+            # Compose: no request while typing; Enter sends it as an instruction; the next Enter inserts.
             calls = worker_class.return_value.schedule.call_count
             for char in "story":
                 key(ord(char.upper()), ord(char))
@@ -176,7 +189,7 @@ def main():
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
             if hasattr(service, "setTimer"):  # Claudish's PIME (platforms/windows/pime)
                 # Requests carry the text around the caret, and an answer shows when it arrives.
-                service.state.mode = "rewrite"
+                service.state.mode = "compose"
                 service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
                 for char in "thanks":
                     key(ord(char.upper()), ord(char))

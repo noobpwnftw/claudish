@@ -2,7 +2,7 @@
 from textService import TextService
 import time
 
-from .composition import MAX_COMPOSITION, MODES, Composition
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from .client import Suggestions
 
 
@@ -61,6 +61,7 @@ class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
         self.state = Composition()
+        self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
         self.worker = None
 
     def onActivate(self):
@@ -72,21 +73,23 @@ class ClaudishTextService(TextService):
         self.addButton("windows-mode-icon", icon=mode_icon(self.state.mode), commandId=MODE_COMMAND,
                        tooltip=mode_tooltip(self.state.mode))
 
-    def next_mode(self):
-        """F7, or a pick from the input indicator's menu."""
-        if self.state.mode == "rewrite" and self.state.text:
-            self.setCommitString(self.state.text)  # continue types into the app: the held words go in
-        self.state.next_mode()
+    def switch_mode(self):
+        """A Shift tap, or a click or pick on the input indicator: continue <-> compose. Leaving
+        compose keeps what you see, as typed."""
+        kept = self.state.toggle()
+        if self.worker:
+            self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
+        self.setCommitString(kept)  # ends the composition; "" inserts nothing
         self.showMessage("cd_AI: " + self.state.mode, 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
 
     def onCommand(self, commandId, commandType):
-        if commandId == MODE_COMMAND:  # a click on the indicator: the next mode, as F7
-            self.next_mode()
+        if commandId == MODE_COMMAND:  # a click on the indicator: the other mode, as a Shift tap
+            self.switch_mode()
         elif MODE_COMMAND < commandId <= MODE_COMMAND + len(MODES):  # a pick from its menu
-            while self.state.mode != MODES[commandId - MODE_COMMAND - 1]:
-                self.next_mode()
+            if self.state.mode != MODES[commandId - MODE_COMMAND - 1]:
+                self.switch_mode()
 
     def onMenu(self, buttonId):
         if buttonId != "windows-mode-icon":
@@ -116,7 +119,11 @@ class ClaudishTextService(TextService):
         keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
         if not self.keyboardOpen or self.sensitive():
             return False
-        if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
+        if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
+            self.shift.press(time.monotonic())
+            return False
+        self.shift.other()
+        if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
@@ -126,8 +133,6 @@ class ClaudishTextService(TextService):
             # Mid-composition, take the key so onKeyDown commits the wording. Left to TSF, the
             # composition was discarded (Ctrl+A lost the typed text).
             return bool(self.state.text)
-        if event.keyCode == 0x76:  # F7 is the input method's while it is active
-            return True
         if self.state.live:
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
             if event.keyCode == 0x75:  # F6 shows it (PIME cannot redraw without a key)
@@ -230,12 +235,21 @@ class ClaudishTextService(TextService):
         # key-downs of printable keys (it commits them itself), so it takes their key-ups too: the
         # onKeyUp reply carries an edit session, and with it the suggestion.
         # Likewise Tab's key-up while a rewrite it asked for is on its way: it often is by then.
+        # A Shift tap switches mode; its key-up is taken so onKeyUp, with an edit session, can commit
+        # what you composed.
+        if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
+            self.switching = self.shift.release(time.monotonic())
+            return self.switching
         return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
-                                           event.keyCode == 0x09 and self.state.mode == "rewrite"
+                                           event.keyCode == 0x09 and self.state.asked == "rewrite"
                                            and self.state.working))
 
     def onKeyUp(self, event):
         self.poll_results()
+        if getattr(self, "switching", False):
+            self.switching = False
+            self.switch_mode()
+            return True
         self.publish()
         return True
 
@@ -275,6 +289,10 @@ class ClaudishTextService(TextService):
             self.setCommitString(self.state.commit())
             self.changed()
             return True
+        if key == 0x0D and event.isKeyDown(0x10) and self.state.text and not self.state.live:
+            self.setCommitString(self.state.keep())  # Shift+Enter: as it is, and keep composing
+            self.changed()
+            return True
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
@@ -289,7 +307,7 @@ class ClaudishTextService(TextService):
                 self.state.submit()
                 if self.worker:
                     before, after = self.around()  # the text box, for this turn of its conversation
-                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                    self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=focused_app(), look=self.state.look, before=before, after=after,
                                          purpose=self.field())
                     self.await_result(60)
@@ -312,7 +330,7 @@ class ClaudishTextService(TextService):
                 self.setCommitString(text)
                 self.changed()
             return True
-        if self.state.live and key not in (0x76, 0x77):  # F7 and F8 are handled below
+        if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
         if key == 0x75:  # F6 previews the ready candidate without committing it.
             self.publish()
@@ -323,9 +341,6 @@ class ClaudishTextService(TextService):
                                               else "no window picture"), 2)
                 self.publish()
             return bool(self.state.text)
-        if key == 0x76:  # F7 switches mode: continue, instruct, rewrite.
-            self.next_mode()
-            return True
         if key == 0x09:
             action = self.state.tab()
             if action == "request":  # rewrite: ask now; it converts in place when it arrives
@@ -354,8 +369,8 @@ class ClaudishTextService(TextService):
                 return True
             self.setCommitString(self.state.commit())
         elif key == 0x0D:
-            # Enter reaches here in instruct mode only with a result ready (see above).
-            self.setCommitString(self.state.commit(self.state.mode == "instruct"))
+            # Enter reaches here only with a result to take (see above).
+            self.setCommitString(self.state.commit(True))
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):

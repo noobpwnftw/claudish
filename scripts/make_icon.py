@@ -1,5 +1,5 @@
-"""Generate the small code-drawn icons: cd (the input method), and C, I, R (its modes: the Windows
-input indicator, and the macOS menu bar as templates). No imaging dependencies."""
+"""Generate the small code-drawn icons: cd (the input method), and C, AI (its modes, continue and compose, for the
+Windows input indicator). No imaging dependencies."""
 import struct
 import zlib
 from pathlib import Path
@@ -8,8 +8,8 @@ GLYPHS = {
     "icon": ["00000000000", "01110000100", "10000000100", "10000011100",
              "10000100100", "10000100100", "01110011100"],
     "mode-continue": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
-    "mode-instruct": ["01110", "00100", "00100", "00100", "00100", "00100", "01110"],
-    "mode-rewrite": ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+    "mode-compose": ["01110011100", "10001001000", "10001001000", "11111001000",
+                     "10001001000", "10001001000", "10001011100"],
 }
 
 
@@ -42,8 +42,3 @@ def ico(glyph):
 directory = Path(__file__).resolve().parents[1] / "platforms/windows/claudish"
 for name, glyph in GLYPHS.items():
     (directory / (name + ".ico")).write_bytes(ico(glyph))
-# macOS menu-bar icons: templates (black on transparent; the system tints them).
-macos = Path(__file__).resolve().parents[1] / "platforms/macos"
-for name, glyph in GLYPHS.items():
-    if name.startswith("mode-"):
-        (macos / (name + ".png")).write_bytes(png(glyph, on=(0, 0, 0, 255), off=(0, 0, 0, 0)))

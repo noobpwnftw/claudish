@@ -15,7 +15,5 @@ setup(
     app=[{"script": "main.py", "dest_base": "Claudish"}],
     options={"py2app": {"plist": info, "packages": ["claudish"],
                         "includes": ["controller", "InputMethodKit", "AppKit", "Foundation"],
-                        "argv_emulation": False,
-                        # the modes' menu-bar icons and names (Info.plist's ComponentInputModeDict)
-                        "resources": ["mode-continue.png", "mode-instruct.png", "mode-rewrite.png", "en.lproj"]}},
+                        "argv_emulation": False}},
 )

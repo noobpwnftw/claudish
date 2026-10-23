@@ -1,23 +1,23 @@
 "use strict";
 // The demo is an input method, drawn: one editor, a composition at the caret, a candidate window,
-// and the same rules as claudish/composition.py (continue types straight in; rewrite and instruct
-// hold your words until you take something). Typed keys arrive through a hidden textarea, so phone
+// and the same rules as claudish/composition.py (continue types straight in; compose holds your
+// words: Tab rewrites them, Enter does them as an instruction; a Shift tap switches). Typed keys arrive through a hidden textarea, so phone
 // keyboards and the browser's own input methods still work.
 const $ = (id) => document.getElementById(id);
 const sink = $("input");
 // Rendered by moving these nodes around the text; held here so they are never lost from a render.
 const PREEDIT = $("preedit"), CARET = $("caret"), GHOST = $("ghost"), PLACEHOLDER = $("placeholder");
 const MAX = 512;
-const MODES = ["continue", "instruct", "rewrite"];  // F7 order, as in every adapter
 const HINTS = {
-  continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey. Tab takes it.",
-  instruct: "Type what you want, then Enter. Pick a draft with 1–3.",
-  rewrite: "Type something ordinary, or select some text. Tab rewrites it in place; Tab again keeps it, Esc brings your words back.",
+  continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey; Tab takes it. Tap Shift to compose.",
+  compose: "Type, or select some text. Tab rewrites it in place; Enter does it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
 };
+const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
+// [label, mode, text, the key that finishes it]
 const SAMPLES = [
-  ["rewrite", "This is very important."],
-  ["continue", "Thanks for the quick review on "],
-  ["instruct", "decline the meeting politely, propose Thursday"],
+  ["rewrite", "compose", "This is very important.", "Tab"],
+  ["continue", "continue", "Thanks for the quick review on ", ""],
+  ["instruct", "compose", "decline the meeting politely, propose Thursday", "Enter"],
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
@@ -41,10 +41,12 @@ function moveTo(index, extend) {
 
 const state = {
   text: "",          // continue: the model's context (already in the text box); else the composition
-  mode: "rewrite",   // the demo opens with the pitch; the installed input method starts in continue
+  mode: "compose",   // the demo opens with the pitch; the installed input method starts in continue
+  asked: null,       // compose: what the pending or shown result is ("rewrite" or "instruct")
   candidate: "",
   candidates: [],
-  converted: false,  // rewrite: Tab showed the rewrite in place of your words
+  converted: false,  // compose: the rewrite shows in place of your words
+  adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
   failed: false,
   revision: 0,
@@ -57,6 +59,8 @@ function change(text) {
   state.candidate = "";
   state.candidates = [];
   state.converted = false;
+  state.adopted = false;
+  state.asked = null;
   state.working = state.failed = false;
   state.revision++;
 }
@@ -65,7 +69,7 @@ const composing = () => !live() && Boolean(state.text);
 const shown = () => state.converted ? state.candidate : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
-const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
+const choosing = () => state.asked === "instruct" && state.candidates.length > 1;
 function automatic() {
   // Only continue asks on a pause, at a word boundary (not at the start of an empty line). Rewrite
   // asks on Tab and instruct on Enter: nothing is sent while you type.
@@ -99,7 +103,7 @@ function changed() {
 
 async function ask(revision) {
   if (revision !== state.revision) return;
-  const text = state.text, mode = state.mode, started = performance.now();
+  const text = state.text, mode = live() ? "continue" : state.asked, started = performance.now();
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
   setStatus(mode === "continue" ? "" : hosted ? "working remotely…" : "working…");
@@ -136,18 +140,24 @@ async function ask(revision) {
   }
 }
 
+// A Shift tap (or a click on the input source): continue <-> compose. Leaving compose keeps what
+// you see, as it is.
+function switchMode() {
+  flash("Shift");
+  if (live()) { state.mode = "compose"; change(""); }
+  else {
+    const kept = shown();
+    if (kept) commit(kept);
+    state.mode = "continue";
+    change(context());
+  }
+  showMode();
+  changed();
+}
+
 // Keys, as an input method sees them. Returns true when the key was taken.
 function key(name, shift = false) {
   flash(name);
-  if (name === "F7") {
-    if (state.mode === "rewrite" && state.text) commit(state.text);  // continue types into the box
-    const leavingLive = live();
-    state.mode = MODES[(MODES.indexOf(state.mode) + 1) % MODES.length];
-    change(live() ? context() : leavingLive ? "" : state.text);
-    showMode();
-    changed();
-    return true;
-  }
   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(name)) {
     settle();
     const lineStart = doc.text.lastIndexOf("\n", doc.caret - 1) + 1;
@@ -173,44 +183,43 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Enter") {
-    if (!state.text) { commit("\n"); render(); return true; }
-    if (state.mode === "instruct" && !state.candidate) {
-      if (!state.working) { state.working = true; state.failed = false; render(); ask(state.revision); }
-      return true;  // the first Enter sends; the next inserts the result
+    if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
+    if (shift) { commit(shown()); change(""); changed(); return true; }  // Shift+Enter: as it is
+    if (state.converted || (state.asked === "instruct" && state.candidate)) {
+      commit(state.candidate); change(""); changed(); return true;
     }
-    commit(state.mode === "instruct" || state.converted ? state.candidate : state.text);
-    change(""); changed();
+    if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
+      state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
+    }
     return true;
   }
   if (name === "Tab") {
-    if (!state.text && state.mode === "rewrite" && selected()) {
+    if (!state.text && selected()) {
       // A selection: it becomes the composition (CJK input methods call it reconversion), out of
       // the text until you keep the rewrite or your words.
       const [start, end] = selection();
       const words = doc.text.slice(start, end);
-      if (words.length <= MAX) { removeSelection(); change(words); }
+      if (words.length <= MAX) { removeSelection(); change(words); state.adopted = true; }
     }
     if (!state.text) return false;
-    // Rewrite: the first Tab converts your words in place, the second keeps it. A pending
-    // candidate is not stale text, so Tab waits for it.
-    if (state.mode === "rewrite" && !state.converted) {
-      if (state.candidate) { state.converted = true; render(); }
-      else if (!state.working) { state.working = true; state.failed = false; render(); ask(state.revision); }
-    } else if (state.candidate) { commit(state.candidate); change(""); changed(); }
+    // The first Tab asks for the rewrite, which takes your words' place as it arrives; the next
+    // keeps it (or an instruction's first draft). A pending answer is not stale text: Tab waits.
+    if (state.converted || (state.asked === "instruct" && state.candidate)) {
+      commit(state.candidate); change(""); changed();
+    } else if (state.asked === "rewrite" && state.candidate) { state.converted = true; render(); }
+    else if (!state.working) {
+      state.asked = "rewrite"; state.working = true; state.failed = false; render(); ask(state.revision);
+    }
     return true;
   }
   if (name === "Escape") {  // one step back
     if (!state.text) return false;
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
-    if (state.mode === "rewrite" && (state.working || state.failed)) { change(state.text); render(); return true; }
-    if (state.mode === "instruct") {
-      // Drafts showing or an answer pending: back to the instruction, to refine and send again.
-      // Otherwise the instruction is dropped: it is not text you meant to write.
-      change(state.candidates.length || state.working || state.failed ? state.text : "");
-      render();
-      return true;
-    }
-    commit(state.text); change(""); changed();
+    if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
+    // Drafts showing or an answer pending: back to your words, to refine and ask again. Otherwise
+    // what you composed goes (Shift+Enter would have kept it).
+    change((state.candidates.length && state.asked === "instruct") || state.working || state.failed ? state.text : "");
+    render();
     return true;
   }
   if (name === "Backspace") {
@@ -226,7 +235,7 @@ function key(name, shift = false) {
     if (!state.text && /\s/.test(name)) { commit(name); changed(); return true; }  // nothing composed: the app's
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
-    change(state.text + (name === "-" && state.mode === "rewrite" ? "—" : name));
+    change(state.text + (name === "-" ? "—" : name));
     changed();
     return true;
   }
@@ -293,17 +302,17 @@ function render() {
   const window = $("candidates");
   window.replaceChildren();
   const lines = [];
-  if (composing() && state.mode === "instruct") {
+  if (composing() && state.asked === "instruct") {
     if (state.working) lines.push(["", "working…"]);
     else if (state.failed) lines.push(["Enter", "the request failed: send it again"]);
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
-    else lines.push(["Enter", "send it"]);
   } else if (composing()) {
-    // Rewrite has no list: Tab asks, and the rewrite takes your words' place as it arrives.
+    // A rewrite has no list: Tab asks, and it takes your words' place as it arrives.
     if (state.working) lines.push(["", "rewriting…"]);
     else if (state.failed) lines.push(["Tab", "the rewrite failed: try again"]);
-    else lines.push(["Tab", state.converted ? "keep it" : "rewrite it"]);  // Enter keeps it too
+    else if (state.converted) lines.push(["Tab", "keep it"]);  // Enter keeps it too
+    else lines.push(["Tab", "rewrite it"], ["Enter", "do it as an instruction"]);
   }
   window.hidden = !lines.length;
   for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
@@ -323,9 +332,9 @@ function render() {
     const foot = document.createElement("div");
     foot.className = "candidate-foot";
     // One pattern everywhere: "Key: action".
-    foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to the instruction"
-      : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc: drop it")
-      : state.converted || state.working ? "Esc: your words" : "Enter or Esc: keep your words";
+    foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to your words"
+      : state.converted || state.working || state.failed || state.candidate ? "Esc: your words"
+      : "Shift+Enter: keep it as it is · Esc: drop it";
     window.append(foot);
   }
   placeCandidateWindow();
@@ -347,7 +356,7 @@ function placeCandidateWindow() {
 
 function showMode() {
   $("source-mode").textContent = state.mode;
-  $("source").setAttribute("aria-label", `Input source: cd_AI, ${state.mode}. Press F7 or click to switch.`);
+  $("source").setAttribute("aria-label", `Input source: cd_AI, ${state.mode}. Tap Shift or click to switch.`);
   $("hint").textContent = HINTS[state.mode];
 }
 function setStatus(text) { $("status").textContent = text; }
@@ -369,13 +378,23 @@ sink.addEventListener("keydown", (event) => {
     return;  // copy, cut, and paste arrive as events below
   }
   if (event.altKey) return;
-  const named = ["F7", "Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
+  if (event.key === "Shift") { if (!event.repeat) shiftDownAt = performance.now(); return; }
+  shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
+  const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
     .includes(event.key) || (choosing() && /^[1-9]$/.test(event.key));
   if (named) {
-    if (event.key === "Enter" && event.shiftKey) return;
+    if (event.key === "Enter" && event.shiftKey && !composing()) return;  // a newline, as the app's
     stopTyping();
     if (key(event.key, event.shiftKey)) event.preventDefault();
   }
+});
+// A Shift tap switches mode, as Shift switches English and pinyin in a Chinese input method.
+let shiftDownAt = null;
+sink.addEventListener("keyup", (event) => {
+  if (event.key !== "Shift") return;
+  const tapped = shiftDownAt !== null && performance.now() - shiftDownAt <= SHIFT_TAP_MS;
+  shiftDownAt = null;
+  if (tapped) { stopTyping(); switchMode(); }
 });
 sink.addEventListener("beforeinput", (event) => {
   if (event.isComposing) return;  // the browser's own IME composes; we take the result
@@ -474,7 +493,7 @@ document.addEventListener("mousemove", (event) => {
 document.addEventListener("mouseup", () => { dragging = false; });
 sink.addEventListener("focus", () => $("editor").classList.add("focused"));
 sink.addEventListener("blur", () => $("editor").classList.remove("focused"));
-$("source").addEventListener("click", () => { key("F7"); sink.focus(); });
+$("source").addEventListener("click", () => { switchMode(); sink.focus(); });
 
 // Samples type themselves, key by key, through the same path as your keys.
 function stopTyping() { if (typing) { clearInterval(typing); typing = null; } }
@@ -484,28 +503,30 @@ $("samples").addEventListener("click", (event) => {
   stopTyping();
   sink.focus();
   settle();
-  while (state.mode !== button.dataset.mode) key("F7");
+  if (state.mode !== button.dataset.mode) switchMode();
   if (selected()) removeSelection();  // a sample replaces the selection, as typing would
   if (doc.caret > 0 && doc.text[doc.caret - 1] !== "\n") commit("\n");  // its own line, unless at one already
   const chars = [...button.dataset.sample];
   typing = setInterval(() => {
     if (!chars.length) {
       stopTyping();
-      if (button.dataset.mode === "instruct") key("Enter");
+      if (button.dataset.then) key(button.dataset.then);
       return;
     }
     key(chars.shift());
   }, 45);
 });
 function renderSamples() {
-  const buttons = SAMPLES.map(([mode, sample]) => {
+  const buttons = SAMPLES.map(([label, mode, sample, then]) => {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.mode = mode;
     button.dataset.sample = sample;
+    button.dataset.then = then;
+    button.dataset.label = label;
     const tag = document.createElement("span");
     tag.className = "sample-mode";
-    tag.textContent = mode;
+    tag.textContent = label;
     button.append(tag, " " + sample.trim() + " ↗");
     return button;
   });

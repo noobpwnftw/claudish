@@ -4,14 +4,14 @@ import time
 import traceback
 
 import objc
-from AppKit import NSEventMaskKeyDown, NSEventTypeKeyDown
-from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl
+from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlagsChanged, NSEventTypeKeyDown
+from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
 from AppKit import NSAttributedString, NSColor, NSForegroundColorAttributeName
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController, IMKCandidates
 from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCandidatesBelowHint
 
-from claudish.composition import MAX_COMPOSITION, Composition
+from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
 
 TRACE = os.environ.get("CLAUDISH_TRACE")  # a file path: event kinds and errors, never typed text
@@ -24,11 +24,6 @@ def trace(*fields):
 
 
 SURROUNDING = 8000
-# Each mode is an input mode of the input source (Info.plist), shown in the menu bar.
-MODE_IDS = {"continue": "org.claudish.inputmethod.Claudish.Continue",
-            "instruct": "org.claudish.inputmethod.Claudish.Instruct",
-            "rewrite": "org.claudish.inputmethod.Claudish.Rewrite"}
-INPUT_MODE_TAG = int.from_bytes(b"imim", "big")  # kTSMDocumentInputModePropertyTag
 # One candidate panel for the server, as in Apple's sample: a panel per controller registers with
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
@@ -42,6 +37,7 @@ class ClaudishInputController(IMKInputController):
         if self is None:
             return None
         self.state = Composition()
+        self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
         self.worker = None
         self.timer = None
         self.active = False
@@ -84,7 +80,7 @@ class ClaudishInputController(IMKInputController):
         self.panel.hide()
 
     def recognizedEvents_(self, sender):
-        return NSEventMaskKeyDown
+        return NSEventMaskKeyDown | NSEventMaskFlagsChanged  # flags: a Shift tap switches mode
 
     @objc.signature(b"v@:@")
     def pollSuggestions_(self, timer):
@@ -180,30 +176,16 @@ class ClaudishInputController(IMKInputController):
             text, {NSForegroundColorAttributeName: NSColor.secondaryLabelColor()})
 
     @objc.python_method
-    def next_mode(self, client, tell=True):
-        """F7, or a pick from the input menu: continue -> instruct -> rewrite. tell: show the mode in
-        the menu bar (each mode is an input mode of cd_AI, with its own icon)."""
-        entering_live = self.state.mode == "rewrite" and self.state.text
-        self.state.next_mode()
-        if entering_live:  # continue types into the app: the held words go in, and stay as context
-            client.insertText_replacementRange_(self.state.text, (NSNotFound, 0))
+    def switch_mode(self, client):
+        """A Shift tap: continue <-> compose. Leaving compose keeps what you see, as typed. (One
+        input source: macOS did not present input modes of an unsigned bundle as modes, so the mode
+        is cd_AI's own, shown by cd_AI.)"""
+        kept = self.state.toggle()
+        if self.worker is not None:
+            self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
+        if kept:
+            client.insertText_replacementRange_(kept, (NSNotFound, 0))
         self.changed(client)
-        if tell:
-            try:
-                client.selectInputMode_(MODE_IDS[self.state.mode])
-            except Exception:  # not every client implements it
-                pass
-
-    def setValue_forTag_client_(self, value, tag, sender):
-        """A mode picked from the input menu (or cd_AI selected in a mode): switch to it as F7 does."""
-        modes = {mode_id: mode for mode, mode_id in MODE_IDS.items()}
-        if tag != INPUT_MODE_TAG or str(value) not in modes:
-            return
-        client = self.client()
-        for _ in MODE_IDS:
-            if self.state.mode == modes[str(value)] or client is None:
-                break
-            self.next_mode(client, tell=False)
 
     @objc.python_method
     def take_selection(self, client):
@@ -221,7 +203,7 @@ class ClaudishInputController(IMKInputController):
             return False
         if not text:
             return False
-        self.state.change(text)
+        self.state.adopt(text)
         units = len(text.encode("utf-16-le")) // 2
         client.setMarkedText_selectionRange_replacementRange_(text, (units, 0), (location, length))
         return True
@@ -332,7 +314,7 @@ class ClaudishInputController(IMKInputController):
     def handleEvent_client_(self, event, client):
         try:
             handled = self.handle(event, client)
-            special = {36: "Return", 48: "Tab", 51: "Backspace", 53: "Escape", 97: "F6", 98: "F7", 100: "F8"}
+            special = {36: "Return", 48: "Tab", 51: "Backspace", 53: "Escape", 56: "Shift", 60: "Shift", 97: "F6", 100: "F8"}
             trace("key", special.get(event.keyCode(), "char"), self.state.mode, "handled" if handled else "passed")
             return handled
         except Exception:
@@ -341,8 +323,18 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def handle(self, event, client):
+        if self.active and event.type() == NSEventTypeFlagsChanged:
+            if event.keyCode() in (56, 60):  # left or right Shift, pressed or released
+                if event.modifierFlags() & NSEventModifierFlagShift:
+                    self.shift.press(time.monotonic())
+                elif self.shift.release(time.monotonic()):
+                    self.switch_mode(client)
+            else:
+                self.shift.other()
+            return False  # the app still sees its modifiers
         if not self.active or event.type() != NSEventTypeKeyDown:
             return False
+        self.shift.other()
         flags = event.modifierFlags()
         # Option types characters such as — and €; it is not a shortcut by itself.
         if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl):
@@ -363,15 +355,17 @@ class ClaudishInputController(IMKInputController):
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True
-        if key == 98:  # F7 switches mode: continue, instruct, rewrite (the input method's key while active).
-            self.next_mode(client)
-            return True
         if self.state.live:
             return self.live_key(client, key, chars)
         if key == 97 and self.state.text:  # F6
             if self.state.choosing:
                 self.panel.updateCandidates()
                 self.panel.show_(kIMKLocateCandidatesBelowHint)
+            return True
+        if key in (36, 76) and flags & NSEventModifierFlagShift and self.state.text:
+            kept = self.state.keep()  # Shift+Enter: as it is, and keep composing
+            self.changed(client)
+            client.insertText_replacementRange_(kept, (NSNotFound, 0))
             return True
         if key in (36, 76):  # Return, keypad Enter
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
@@ -387,13 +381,13 @@ class ClaudishInputController(IMKInputController):
                 self.state.submit()
                 if self.worker is not None:
                     before, after = self.around_caret(client)  # the text box, for this turn of its conversation
-                    self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
+                    self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=self.app(client), look=self.state.look, before=before, after=after)
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"
         if key == 48:  # Tab
-            if self.state.mode == "rewrite" and not self.state.text:
+            if not self.state.live and not self.state.text:
                 self.take_selection(client)  # a selection: rewrite it in place
             action = self.state.tab()
             if action == "accept":

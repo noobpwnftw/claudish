@@ -7,8 +7,8 @@ from claudish.composition import Composition
 
 
 def to_mode(state, mode):
-    while state.mode != mode:
-        state.next_mode()
+    if state.mode != mode:
+        state.toggle()
 from claudish.model import Rewriter
 
 
@@ -19,8 +19,9 @@ def reply(text):
 class CompositionTests(unittest.TestCase):
     def instruct(self):
         state = Composition()
-        to_mode(state, "instruct")
+        to_mode(state, "compose")
         state.insert("x")
+        state.submit()  # Enter: an instruction
         return state
 
     def test_digits_pick_only_from_an_instructions_list(self):
@@ -48,25 +49,75 @@ class CompositionTests(unittest.TestCase):
 class ModeFeelTests(unittest.TestCase):
     """Each mode looks different at the caret: rewrite converts in place, instruct lists drafts."""
 
-    def test_rewrite_tab_converts_in_place_and_esc_brings_your_words_back(self):
+    def test_tab_rewrites_in_place_and_esc_steps_back(self):
         state = Composition()
-        state.mode = "rewrite"
+        state.mode = "compose"
         state.change("very good")
-        self.assertEqual(state.tab(), "request")  # Tab asks for it
+        self.assertEqual(state.tab(), "request")  # Tab asks for the rewrite
         self.assertEqual(state.tab(), "wait")  # asked already
         state.offer(state.revision, "Exceptionally good.")
         self.assertFalse(state.choosing)  # no list for a rewrite
         self.assertEqual(state.shown, "Exceptionally good.")  # in place as it arrives: you asked
-        self.assertEqual((state.escape(), state.shown), ("back", "very good"))
-        self.assertEqual(state.escape(), "keep")  # a second Esc: your words, as typed
+        self.assertEqual((state.escape(), state.shown), ("back", "very good"))  # your words again
         self.assertEqual(state.tab(), "convert")  # the rewrite again, without asking again
-        self.assertEqual(state.enter(), "accept")  # Enter keeps the converted text
+        self.assertEqual(state.enter(), "accept")  # Enter keeps the rewrite shown
         self.assertFalse(state.insert("x"))  # typing on keeps it too (the adapter commits first)
         self.assertEqual(state.commit(), "Exceptionally good.")
 
+    def test_esc_steps_back_until_what_you_composed_is_dropped(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("very good")
+        state.tab()
+        state.offer(state.revision, "Exceptionally good.")
+        self.assertEqual([state.escape() for _ in range(3)], ["back", "drop", "pass"])
+
+    def test_shift_keeps_what_you_see_and_goes_to_continue(self):
+        state = Composition()
+        self.assertEqual((state.toggle(), state.mode, state.text), ("", "compose", ""))
+        state.change("very good")
+        self.assertEqual((state.toggle(), state.mode, state.text), ("very good", "continue", "very good"))
+        state.toggle()
+        state.change("hi")
+        state.tab()
+        state.offer(state.revision, "Hello.")
+        self.assertEqual(state.toggle(), "Hello.")  # the rewrite shown is what you see
+
+    def test_a_selection_taken_from_the_app_is_never_dropped(self):
+        state = Composition()
+        state.mode = "compose"
+        state.adopt("their words")
+        state.tab()
+        state.offer(state.revision, "Their considered words.")
+        self.assertEqual(state.escape(), "back")  # your words again
+        self.assertEqual(state.escape(), "keep")  # and back into the app, as they were
+        state.adopt("their words")
+        self.assertEqual(state.escape(), "keep")  # even before any rewrite
+
+    def test_shift_enter_keeps_it_as_it_is_and_stays_in_compose(self):
+        state = Composition()
+        state.mode = "compose"
+        self.assertEqual(state.keep(), "")  # nothing composed: Shift+Enter is the app's
+        state.change("as typed")
+        self.assertEqual((state.keep(), state.mode, state.text), ("as typed", "compose", ""))
+
+    def test_enter_sends_an_instruction_and_tab_a_rewrite(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("decline politely")
+        self.assertEqual(state.enter(), "submit")
+        state.submit()
+        self.assertEqual(state.request_mode, "instruct")
+        state.offer(state.revision, "No, thank you.", ["Sadly, no."])
+        self.assertTrue(state.choosing)  # an instruction's drafts are a list
+        self.assertEqual(state.tab(), "accept")  # Tab takes the first draft, as Enter does
+        state.change("decline politely")
+        state.tab()
+        self.assertEqual(state.request_mode, "rewrite")
+
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()
-        state.mode = "rewrite"
+        state.mode = "compose"
         self.assertTrue(state.passes(" "))  # after the previous word: straight into the app
         state.insert("h")
         self.assertFalse(state.passes(" "))  # inside a phrase it is part of it
@@ -76,7 +127,7 @@ class ModeFeelTests(unittest.TestCase):
 
     def test_rewrite_esc_while_asking_stops_and_keeps_your_words(self):
         state = Composition()
-        state.mode = "rewrite"
+        state.mode = "compose"
         state.change("very good")
         state.tab()
         revision = state.revision
@@ -85,16 +136,16 @@ class ModeFeelTests(unittest.TestCase):
 
     def test_rewrite_backspace_after_converting_is_your_words_again(self):
         state = Composition()
-        state.mode = "rewrite"
+        state.mode = "compose"
         state.change("hi")
-        state.offer(state.revision, "Hello.")
         state.tab()
+        state.offer(state.revision, "Hello.")
         state.backspace()
         self.assertEqual((state.shown, state.text, state.candidate), ("hi", "hi", "Hello."))
 
     def test_instruct_esc_closes_the_drafts_then_drops_the_instruction(self):
         state = Composition()
-        state.mode = "instruct"
+        state.mode = "compose"
         state.change("say hi")
         state.submit()
         revision = state.revision
@@ -110,7 +161,7 @@ class ModeFeelTests(unittest.TestCase):
 class AgentReplyTests(unittest.TestCase):
     def test_typing_while_an_agent_asks_composes_a_reply(self):
         state = Composition()
-        state.mode = "instruct"
+        state.mode = "compose"
         state.change("is my branch clean")
         state.submit()
         revision = state.revision
@@ -145,7 +196,7 @@ class ContinueTests(unittest.TestCase):
         self.assertFalse(state.automatic)  # taking it is not a pause: nothing more until the next key
         state.change(state.text + " ")
         self.assertTrue(state.automatic)
-        state.next_mode(), state.next_mode()  # rewrite asks on Tab, not on pauses
+        state.toggle()  # compose asks on Tab or Enter, not on pauses
         state.change("very")
         self.assertFalse(state.automatic)
 

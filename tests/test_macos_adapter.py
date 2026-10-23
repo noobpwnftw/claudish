@@ -27,8 +27,6 @@ class Client:
     def bundleIdentifier(self):
         return "com.apple.TextEdit"
 
-    def selectInputMode_(self, mode):
-        self.input_mode = mode
 
 
 class TextClient(Client):
@@ -167,6 +165,8 @@ def load_adapter():
     appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor")
     appkit.NSForegroundColorAttributeName = "NSColor"
     for name, value in {"NSEventMaskKeyDown": 1024, "NSEventTypeKeyDown": 10,
+                        "NSEventMaskFlagsChanged": 4096, "NSEventTypeFlagsChanged": 12,
+                        "NSEventModifierFlagShift": 1 << 17,
                         "NSEventModifierFlagCommand": 1 << 20,
                         "NSEventModifierFlagControl": 1 << 18,
                         "NSEventModifierFlagOption": 1 << 19}.items():
@@ -198,7 +198,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller = self.module.ClaudishInputController().initWithServer_delegate_client_(
             object(), None, self.client)
         self.controller.activateServer_(None)
-        self.controller.state.mode = "rewrite"  # these tests exercise rewrite; a new session starts in continue
+        self.controller.state.mode = "compose"  # these tests exercise compose; a new session starts in continue
 
     def tearDown(self):
         self.controller.inputControllerWillClose()
@@ -217,6 +217,13 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
+    def shift_tap(self):
+        """Shift pressed and released alone: flagsChanged events, as macOS sends them."""
+        for flags in (1 << 17, 0):
+            event = types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda f=flags: f,
+                                          characters=lambda: "")
+            self.assertFalse(self.controller.handleEvent_client_(event, self.client))  # the app sees it too
+
     def key(self, code, text="", flags=0):
         event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: code,
                                       modifierFlags=lambda: flags, characters=lambda: text)
@@ -234,8 +241,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.client.commits)
         self.key(51)
         self.assertEqual(self.client.marked, "Hi—")
-        self.key(36)
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter keeps your words as they are
         self.assertEqual(self.client.commits, ["Hi—"])
+        self.assertEqual(self.controller.state.mode, "compose")
 
     def test_rewrite_converts_in_place_without_a_list(self):
         self.type_text("draft")
@@ -302,31 +310,36 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
         self.assertEqual(self.client.commits, ["Hi—€"])
 
-    def test_f7_switches_mode_and_drops_the_old_candidate(self):
+    def test_a_shift_tap_switches_mode_and_keeps_what_you_typed(self):
         self.type_text("thank the team")
         state = self.controller.state
-        state.offer(state.revision, "A rewrite.")
-        self.assertTrue(self.key(98))
-        # Continue types into the app: the held words go in, and stay as the model's context.
-        self.assertEqual((state.mode, state.candidate, state.text), ("continue", "", "thank the team"))
+        self.shift_tap()
+        # Continue types into the app: your words go in as typed, and stay as the model's context.
+        self.assertEqual((state.mode, state.text), ("continue", "thank the team"))
         self.assertEqual(self.client.commits, ["thank the team"])
         self.assertNotIn("continue", self.controller.worker.modes)  # mid-word: no suggestion yet
         self.key(49, " ")
         self.assertEqual(self.controller.worker.modes[-1], "continue")  # a word boundary asks
-        self.key(98)
-        self.assertEqual((state.mode, state.text), ("instruct", ""))  # the words are in the app already
+        self.shift_tap()
+        self.assertEqual((state.mode, state.text), ("compose", ""))  # the words are in the app already
         self.type_text("say thanks")
-        self.key(36)
+        self.key(36)  # Enter: an instruction
+        self.assertEqual(self.controller.worker.modes[-1], "instruct")
         self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
         self.controller.pollSuggestions_(None)
         self.key(48)
         self.assertEqual(self.client.commits, ["thank the team", " ", "Thank you, team—truly."])
-        self.assertTrue(self.key(98))  # F7 is the input method's while it is active
-        self.assertEqual(state.mode, "rewrite")
+        self.assertFalse(self.key(98))  # F7 is the app's
+        # Shift held for a capital is not a tap.
+        for flags in (1 << 17,):
+            self.controller.handleEvent_client_(types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56,
+                                                modifierFlags=lambda: flags, characters=lambda: ""), self.client)
+        self.key(0, "A", 1 << 17)
+        self.controller.handleEvent_client_(types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56,
+                                            modifierFlags=lambda: 0, characters=lambda: ""), self.client)
+        self.assertEqual(state.mode, "compose")
 
     def test_instruct_lists_several_readings_and_digits_pick(self):
-        self.key(98)
-        self.key(98)  # instruct
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
@@ -338,8 +351,6 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(state.text, "")
 
     def test_an_agents_question_is_answered_with_a_digit(self):
-        self.key(98)
-        self.key(98)  # instruct
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))  # send: the agent starts working
@@ -360,8 +371,6 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(worker.answered_text, ("s1", "perm-2", "not 2"))
 
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
-        self.key(98)
-        self.key(98)  # instruct
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         sent = len(worker.modes)
@@ -431,7 +440,7 @@ class MacOSAdapterTests(unittest.TestCase):
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
         fresh.activateServer_(None)
         try:
-            fresh.state.mode = "instruct"
+            fresh.state.mode = "compose"
             for char in "say hi":
                 fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
                                           modifierFlags=lambda: 0, characters=lambda c=char: c), client)
@@ -447,7 +456,7 @@ class MacOSAdapterTests(unittest.TestCase):
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
         fresh.activateServer_(None)
         try:
-            fresh.state.mode = "rewrite"
+            fresh.state.mode = "compose"
             for char in "thanks":
                 fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
                                           modifierFlags=lambda: 0, characters=lambda c=char: c), client)
@@ -463,7 +472,7 @@ class MacOSAdapterTests(unittest.TestCase):
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
         fresh.activateServer_(None)
         try:
-            fresh.state.mode = "rewrite"
+            fresh.state.mode = "compose"
             tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
             self.assertTrue(fresh.handleEvent_client_(tab, client))
             self.assertEqual((client.whole(), fresh.worker.sent), ("Dear Ana, this is important. Thanks.",
@@ -480,21 +489,6 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_a_client_without_text_access_gives_no_context(self):
         self.assertEqual(self.controller.around_caret(self.client), ("", ""))  # Client lacks selectedRange
-
-    def test_the_mode_is_an_input_mode_in_the_menu_bar(self):
-        self.controller.state.mode = "continue"
-        self.assertTrue(self.key(98))
-        self.assertEqual(self.client.input_mode, "org.claudish.inputmethod.Claudish.Instruct")
-        tag = int.from_bytes(b"imim", "big")
-        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.Rewrite", tag, self.client)
-        self.assertEqual(self.controller.state.mode, "rewrite")  # picked from the input menu
-        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.Rewrite", tag, self.client)
-        self.assertEqual(self.controller.state.mode, "rewrite")  # already there: nothing changes
-        with (ROOT / "platforms/macos/Info.plist").open("rb") as source:
-            listed = plistlib.load(source)["ComponentInputModeDict"]["tsVisibleInputModeOrderedArrayKey"]
-        self.assertEqual(listed, [self.module.MODE_IDS[m] for m in ("continue", "instruct", "rewrite")])
-        for mode in ("continue", "instruct", "rewrite"):
-            self.assertTrue((ROOT / "platforms/macos" / ("mode-%s.png" % mode)).exists())
 
     def test_bundle_registration_names_match_controller(self):
         with (ROOT / "platforms/macos/Info.plist").open("rb") as source:

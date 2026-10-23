@@ -67,11 +67,8 @@ def main():
     path, bundle_id = sys.argv[1], sys.argv[2]
     if not sources(bundle_id):
         print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
-    # Each mode is an input mode of cd_AI; the rig starts in continue, as a new text box does.
-    ordered = lambda: sorted(sources(bundle_id),
-                             key=lambda s: not str(prop(s, "kTISPropertyInputSourceID")).endswith(".Continue"))
     for _ in range(3):
-        for source in ordered():
+        for source in sources(bundle_id):
             if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
                 if carbon.TISSelectInputSource(source) == 0 and current().startswith(bundle_id):
                     print("current:", current())

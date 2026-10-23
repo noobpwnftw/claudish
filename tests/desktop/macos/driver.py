@@ -67,7 +67,17 @@ def type_text(text):
         post(US[base], shift=char.isupper() or char in SHIFTED)
 
 
-KEYS = {"Tab": 48, "Return": 36, "Escape": 53, "F7": 98, "Down": 125}
+KEYS = {"Tab": 48, "Return": 36, "Escape": 53, "Shift": 56, "Down": 125}
+
+
+def shift_tap():
+    """Shift pressed and released alone: the mode switch (macOS sends flagsChanged events)."""
+    for down in (True, False):
+        event = CGEventCreateKeyboardEvent(None, KEYS["Shift"], down)
+        CGEventSetFlags(event, kCGEventFlagMaskShift if down else 0)
+        CGEventPost(kCGHIDEventTap, event)
+        time.sleep(0.05)
+    time.sleep(0.2)
 
 
 def key(name):
@@ -221,9 +231,9 @@ def scenarios():
     wait_for(lambda: document().endswith("naturally."))
     check("continue: Tab takes the suggestion", document(), "Thanks for the review s and then some—naturally.")
 
-    # 4. Instruct: F7, type, Enter sends, Enter inserts.
+    # 4. Compose (a Shift tap), type, Enter sends it as an instruction, Enter inserts.
     key("Return")
-    key("F7")
+    shift_tap()
     type_text("say hi")
     key("Return")
     time.sleep(1.5)
