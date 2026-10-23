@@ -98,6 +98,13 @@ after `gti status` asked "Did you mean 'git status'?" and drafted it; "send it
 to the usual place" asked which place; "say thanks for the review" just wrote
 it.
 
+An agent (Claude Code over stream-json) is the same loop's other
+implementation: it gets the same text box description and observations; its
+permission prompts are **ask** (Allow / Deny); its own questions
+(`AskUserQuestion`) are **ask** too, shown as is with its options, the answers
+going back keyed by the question (checked live with Claude Code 2.1.308 on
+haiku); and in a terminal its answer is one line, like any insert.
+
 ## Order of work
 
 Each step keeps the gate green and the prompts measured (the fidelity eval and

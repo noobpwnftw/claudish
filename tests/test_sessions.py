@@ -69,6 +69,19 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(data["done"])
         self.assertIn("Bash: git status", [e["text"] for e in data["events"] if e["type"] == "progress"])
 
+    def test_the_agents_own_questions_are_shown_as_is(self):
+        """Claude Code's AskUserQuestion is the agent asking (ask), not a permission to grant:
+        each question is shown with its options, and the answers go back keyed by the question."""
+        _, data = self.call("/sessions", {"text": "pick a colour"})
+        first = self.until(data["id"], "question")
+        self.assertEqual(first["text"], "Which colour?")
+        self.assertEqual([(c["label"], c["legend"]) for c in first["choices"]], [("Red", "warm"), ("Blue", "cool")])
+        self.assertEqual(self.call("/sessions/%s/answer" % data["id"], {"question": first["id"], "choice": 1})[0], 200)
+        second = self.until(data["id"], "question", after=first["seq"] + 1)
+        self.assertEqual(second["text"], "Which shade?")
+        self.call("/sessions/%s/answer" % data["id"], {"question": second["id"], "text": "teal-ish"})  # your own words
+        self.assertEqual(self.until(data["id"], "result")["text"], "Blue, teal-ish")
+
     def test_free_text_is_a_denial_with_your_words(self):
         _, data = self.call("/sessions", {"text": "is my branch clean?"})
         question = self.until(data["id"], "question")

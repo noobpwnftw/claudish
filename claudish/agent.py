@@ -139,6 +139,8 @@ class ClaudeCodeDriver:
         self.context = context  # the text box around the caret, sent with the instruction
         self.policy = policy or {}  # profile tool servers: name -> (trusted tools, denied tools)
         self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
+        self.asks = {}  # request_id -> the agent's own questions (AskUserQuestion) and the answers so far
+        self.session = None
         self.cancelled = False
         self.ran = None  # the process this turn ran in
 
@@ -234,6 +236,11 @@ class ClaudeCodeDriver:
             self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
                        "response": {"behavior": "allow", "updatedInput": body.get("input") or {}}}})
             return
+        if body.get("tool_name") == "AskUserQuestion":
+            # The agent asks you something itself: shown as is, its options as the choices (ask).
+            self.asks[request_id] = {"input": body.get("input") or {}, "answers": {}}
+            self.session = session
+            return self.next_question(request_id)
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}
         session.emit("question", id=request_id, text=body.get("title") or "Allow %s?" % tool,
@@ -241,7 +248,33 @@ class ClaudeCodeDriver:
                                or summarize(body.get("tool_name", "tool"), body.get("input"))},
                               {"label": "Deny", "legend": "the agent continues without it"}])
 
+    def next_question(self, request_id):
+        """Show the agent's next unanswered question; when all are answered, send the answers."""
+        asked = self.asks[request_id]
+        questions = [q for q in asked["input"].get("questions") or [] if isinstance(q, dict)]
+        if len(asked["answers"]) < len(questions):
+            current = questions[len(asked["answers"])]
+            self.session.emit("question", id="%s#%d" % (request_id, len(asked["answers"])),
+                              text=str(current.get("question") or ""),
+                              choices=[{"label": str(option.get("label") or ""),
+                                        "legend": str(option.get("description") or "")}
+                                       for option in current.get("options") or [] if isinstance(option, dict)])
+            return
+        del self.asks[request_id]
+        self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
+                   "response": {"behavior": "allow",
+                                "updatedInput": dict(asked["input"], answers=asked["answers"])}}})
+
     def answer(self, question, choice=None, text=None):
+        request_id, _, index = str(question).rpartition("#")
+        if request_id in self.asks:
+            asked = self.asks[request_id]
+            current = (asked["input"].get("questions") or [])[int(index)]
+            options = [str(o.get("label") or "") for o in current.get("options") or [] if isinstance(o, dict)]
+            # Your pick, or your own words (the "Other" answer), keyed by the question's text.
+            asked["answers"][str(current.get("question") or "")] = text if text is not None else (
+                options[choice] if isinstance(choice, int) and 0 <= choice < len(options) else "")
+            return self.next_question(request_id)
         if question not in self.pending:
             return
         tool_input = self.pending.pop(question)
@@ -256,6 +289,10 @@ class ClaudeCodeDriver:
         self.cancelled = True
         for question in list(self.pending):  # a waiting permission request is denied
             self.answer(question, 1)
+        for request_id in list(self.asks):  # and the agent's own question goes unanswered
+            del self.asks[request_id]
+            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
+                       "response": {"behavior": "deny", "message": "The user cancelled."}}})
         if self.own:
             process = self.agent.process
             if process is not None and process.poll() is None:

@@ -91,6 +91,19 @@ while True:
             out({"type": "result", "subtype": "success", "is_error": False,
                  "result": "%s | %s | caret seen: %s" % (",".join(names), found, "▮" in text)})
             continue
+        if "colour" in text:  # the agent asks the user itself (AskUserQuestion), two questions
+            questions = [{"question": "Which colour?", "header": "Colour", "multiSelect": False,
+                          "options": [{"label": "Red", "description": "warm"}, {"label": "Blue", "description": "cool"}]},
+                         {"question": "Which shade?", "header": "Shade", "multiSelect": False,
+                          "options": [{"label": "Light", "description": ""}, {"label": "Dark", "description": ""}]}]
+            out({"type": "control_request", "request_id": "ask-%d" % turns, "request": {
+                "subtype": "can_use_tool", "tool_name": "AskUserQuestion", "input": {"questions": questions}}})
+            reply = read()["response"]["response"]
+            assert reply["behavior"] == "allow" and reply["updatedInput"]["questions"] == questions, reply
+            answers = reply["updatedInput"]["answers"]
+            out({"type": "result", "subtype": "success", "is_error": False,
+                 "result": "%s, %s" % (answers["Which colour?"], answers["Which shade?"])})
+            continue
         if "slow" in text:
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
