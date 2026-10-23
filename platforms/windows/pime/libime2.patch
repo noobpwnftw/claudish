@@ -400,10 +400,10 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..d27a364
+index 0000000..4391040
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,433 @@
+@@ -0,0 +1,476 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -508,6 +508,9 @@ index 0000000..d27a364
 +void PanelPainter::release() {
 +    releaseOne(label_.layout);
 +    releaseOne(body_.layout);
++    for (auto& line : turns_)
++        releaseOne(line.layout);
++    turns_.clear();
 +    for (auto& line : rows_)
 +        releaseOne(line.layout);
 +    for (auto& line : numbers_)
@@ -533,8 +536,37 @@ index 0000000..d27a364
 +    if (spec.empty() || !ensureFactories())
 +        return none;
 +    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
-+    float widest = (spec.rows.empty() && spec.body.empty()) ? 0 : px(MIN_WIDTH);
++    float widest = (spec.rows.empty() && spec.body.empty() && spec.thread.empty()) ? 0 : px(MIN_WIDTH);
 +    float y = px(PAD);
++    // The exchange so far: your earlier turns as context, one line each (cut with an ellipsis),
++    // muted, at full size, a neutral rule beside each.
++    for (const auto& turn : spec.thread) {
++        std::wstring words = turn.first + L"  " + turn.second;
++        Line line;
++        line.layout = makeLayout(words, text_, inner);
++        if (line.layout) {
++            DWRITE_TEXT_RANGE head = { 0, (UINT32)turn.first.size() };
++            line.layout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, head);
++            line.layout->SetFontSize(px(SMALL), head);
++            DWRITE_TEXT_RANGE yours = { (UINT32)turn.first.size() + 2, (UINT32)turn.second.size() };
++            line.layout->SetUnderline(TRUE, yours);  // your words, underlined as they were at the caret
++            line.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
++            DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
++            IDWriteInlineObject* ellipsis = nullptr;
++            if (SUCCEEDED(dwrite->CreateEllipsisTrimmingSign(text_, &ellipsis))) {
++                line.layout->SetTrimming(&trimming, ellipsis);
++                ellipsis->Release();
++            }
++        }
++        measure(line.layout, &line.w, &line.h);
++        line.x = px(PAD) + px(ROW_X);
++        line.y = y + px(ROW_Y) - 1;
++        y += line.h + px(ROW_Y) + 2;
++        widest = (std::max)(widest, (std::min)(line.w, inner) + 2 * (px(PAD) + px(ROW_X)));
++        turns_.push_back(line);
++    }
++    if (!spec.thread.empty() && !spec.body.empty())
++        y += px(3);
 +    // The header: a small label, then the content as is.
 +    if (!spec.body.empty()) {
 +        y += px(ROW_Y) + 1;
@@ -556,8 +588,12 @@ index 0000000..d27a364
 +    // The rows: a number, the text (its legend muted); a list with a highlight keeps a trailing
 +    // column on every row for the highlighted row's Enter, so every row wraps alike.
 +    const bool takes = spec.on >= 0 && spec.on < (int)spec.rows.size();
-+    const float textX = px(PAD) + px(ROW_X) + px(NUMBER) + px(NUMBER_GAP);
-+    const float textMax = inner - px(NUMBER) - px(NUMBER_GAP) - (takes ? px(TAKE) : 0);
++    bool numbered = false;  // choices are not numbered (digits are text), so no number column
++    for (const auto& row : spec.rows)
++        numbered = numbered || !row.key.empty();
++    const float keys = numbered ? px(NUMBER) + px(NUMBER_GAP) : 0;
++    const float textX = px(PAD) + px(ROW_X) + keys;
++    const float textMax = inner - keys - (takes ? px(TAKE) : 0);
 +    for (size_t i = 0; i < spec.rows.size(); ++i) {
 +        const PanelRow& row = spec.rows[i];
 +        std::wstring words = row.text + (row.legend.empty() ? L"" : L" — " + row.legend);
@@ -658,6 +694,12 @@ index 0000000..d27a364
 +
 +    target->BeginDraw();
 +    target->Clear(color(colors.surface));
++    for (size_t i = 0; i < turns_.size(); ++i) {  // the label muted, your words in the text colour
++        const Line& turn = turns_[i];
++        DWRITE_TEXT_RANGE head = { 0, (UINT32)spec_.thread[i].first.size() };
++        turn.layout->SetDrawingEffect(muted, head);
++        text(turn.layout, turn.x, turn.y, brush);
++    }
 +    text(label_.layout, label_.x, label_.y, muted);
 +    text(body_.layout, body_.x, body_.y, brush);
 +    for (size_t i = 0; i < rows_.size(); ++i) {
@@ -684,13 +726,14 @@ index 0000000..d27a364
 +            target->CreateSolidColorBrush(color(colors.accent), &inverse);
 +            ink = inverse;
 +        }
-+        text(numbers_[i].layout, numbers_[i].x, numbers_[i].y, on ? ink : muted);
++        if (!spec_.replying)  // typing a reply: the choices take no number
++            text(numbers_[i].layout, numbers_[i].x, numbers_[i].y, on ? ink : muted);
 +        const PanelRow& row = spec_.rows[i];
 +        if (!row.legend.empty() && rows_[i].layout) {  // the legend in the muted colour
 +            DWRITE_TEXT_RANGE range = { (UINT32)row.text.size(), (UINT32)(row.legend.size() + 3) };
 +            rows_[i].layout->SetDrawingEffect(on && colors.contrast ? (IUnknown*)ink : (IUnknown*)muted, range);
 +        }
-+        text(rows_[i].layout, rows_[i].x, rows_[i].y, ink);
++        text(rows_[i].layout, rows_[i].x, rows_[i].y, spec_.replying ? muted : ink);
 +        releaseOne(inverse);
 +    }
 +    // The footer.
@@ -839,10 +882,10 @@ index 0000000..d27a364
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..8eb55f4
+index 0000000..1ecc33d
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,128 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -871,6 +914,8 @@ index 0000000..8eb55f4
 +};
 +
 +struct PanelSpec {
++    std::vector<std::pair<std::wstring, std::wstring>> thread;  // earlier turns: (label, your words)
++    bool replying = false;  // you are typing at the caret: the choices take no number
 +    std::wstring label;   // the header: who asks or what this is (small)
 +    std::wstring body;    // then the content as is
 +    bool code = false;    // the body is a command (monospace)
@@ -885,7 +930,7 @@ index 0000000..8eb55f4
 +    std::wstring mark;    // a hosted model's name, at the footer's end
 +
 +    bool empty() const {
-+        return body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
++        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
 +    }
 +};
 +
@@ -924,6 +969,7 @@ index 0000000..8eb55f4
 +    float scale_ = 1.0f;
 +    float width_ = 0, height_ = 0;
 +    Line label_, body_;
++    std::vector<Line> turns_;     // the thread, one line each
 +    std::vector<Line> rows_;      // the rows' text
 +    std::vector<Line> numbers_;
 +    std::vector<float> rowTop_, rowHeight_;

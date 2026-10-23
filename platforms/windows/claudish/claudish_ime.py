@@ -154,7 +154,9 @@ class ClaudishTextService(TextService):
             elif event.keyCode not in (0x10, 0x14, 0x77):
                 self.drop_live()
             return False
-        return event.isPrintableChar() or bool(self.state.text)
+        # Shift+Esc with nothing composed: the instruction Esc dropped comes back.
+        restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped)
+        return event.isPrintableChar() or bool(self.state.text) or restoring
 
     def drop_live(self):
         self.state.change("")
@@ -311,7 +313,7 @@ class ClaudishTextService(TextService):
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
             if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.state.answer_choice(1)
+                chosen = self.state.answer_choice(self.state.chosen)
                 if chosen and self.worker:
                     self.worker.answer(*chosen)
                 self.publish()
@@ -335,18 +337,7 @@ class ClaudishTextService(TextService):
             if action == "wait":  # the footer says it is still working
                 self.publish()
                 return True
-        if self.state.question and not self.state.reply and 0x31 <= key <= 0x39:  # an agent's question: the digit is the answer
-            chosen = self.state.answer_choice(key - 0x30)
-            if chosen and self.worker:
-                self.worker.answer(*chosen)
-            self.publish()
-            return True
-        if self.state.choosing and not self.state.question and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
-            text = self.state.pick(key - 0x30)
-            if text is not None:
-                self.setCommitString(text)
-                self.changed()
-            return True
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
         if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
         if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.
@@ -356,7 +347,7 @@ class ClaudishTextService(TextService):
         if key == 0x09:
             action = self.state.tab()
             if action == "choose":
-                chosen = self.state.answer_choice(1)
+                chosen = self.state.answer_choice(self.state.chosen)
                 if chosen and self.worker:
                     self.worker.answer(*chosen)
                 self.publish()
@@ -372,8 +363,16 @@ class ClaudishTextService(TextService):
                 self.publish()
                 return True
             self.setCommitString(self.state.commit(True))
+        elif key in (0x26, 0x28) and self.state.move(-1 if key == 0x26 else 1):  # ↑ and ↓ move the highlight
+            self.publish()
+            return True
+        elif key == 0x1B and event.isKeyDown(0x10) and self.state.restore():  # Shift+Esc: the dropped one, back
+            self.publish()
+            return True
         elif key == 0x1B:
             action = self.state.escape()
+            if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
+                self.setToast(self.state.dropped_toast(), 2)
             if action == "clear":  # the reply goes; the question stays
                 self.publish()
                 return True

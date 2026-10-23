@@ -30,7 +30,7 @@ SURROUNDING = 8000
 # One candidate panel for the server, as in Apple's sample: a panel per controller registers with
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
-PANEL = OVERLAY = None  # one panel and one overlay for the server, shared by its controllers
+PANEL = OVERLAY = TOAST = None  # one panel, overlay and toast for the server, shared by its controllers
 
 
 def unpack(rect):
@@ -58,9 +58,9 @@ class ClaudishInputController(IMKInputController):
         self.worker = None
         self.timer = None
         self.active = False
-        global PANEL, OVERLAY
+        global PANEL, OVERLAY, TOAST
         if PANEL is None:
-            PANEL, OVERLAY = Panel(), Overlay()
+            PANEL, OVERLAY, TOAST = Panel(), Overlay(), Panel()
         self.drawn = None  # the panel as last drawn (Composition.panel()), redrawn when it changes
         return self
 
@@ -230,6 +230,19 @@ class ClaudishInputController(IMKInputController):
         self.drawn = spec
 
     @objc.python_method
+    def show_toast(self, spec, client=None):
+        """A panel shown briefly at the caret: the mode switch, or what Esc just dropped."""
+        client = client if client is not None else self.client()
+        if client is None:
+            return
+        TOAST.show(self.caret(client), spec)
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(2.0, self, "hideToast:", None, False)
+
+    @objc.signature(b"v@:@")
+    def hideToast_(self, timer):
+        TOAST.hide()
+
+    @objc.python_method
     def hide_panel(self):
         PANEL.hide()
         self.drawn = None
@@ -245,6 +258,7 @@ class ClaudishInputController(IMKInputController):
         if kept:
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
         self.changed(client)
+        self.show_toast(self.state.toast(), client)
 
     @objc.python_method
     def take_selection(self, client):
@@ -403,15 +417,7 @@ class ClaudishInputController(IMKInputController):
         self.pollSuggestions_(None)
         key = event.keyCode()
         chars = event.characters() or ""
-        if self.state.question and not self.state.reply and len(chars) == 1 and "1" <= chars <= "9":  # the answer to the agent
-            chosen = self.state.answer_choice(int(chars))
-            if chosen and self.worker is not None:
-                self.worker.answer(*chosen)
-            self.show_panel(client)
-            return True
-        if self.state.choosing and not self.state.question and len(chars) == 1 and "1" <= chars <= "9":
-            self.commit_pick(client, int(chars))
-            return True
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True
@@ -426,7 +432,7 @@ class ClaudishInputController(IMKInputController):
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
             if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.state.answer_choice(1)
+                chosen = self.state.answer_choice(self.state.chosen)
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
                 self.changed(client)
@@ -451,7 +457,7 @@ class ClaudishInputController(IMKInputController):
                 self.take_selection(client)  # a selection: rewrite it in place
             action = self.state.tab()
             if action == "choose":
-                chosen = self.state.answer_choice(1)
+                chosen = self.state.answer_choice(self.state.chosen)
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
                 self.changed(client)
@@ -466,8 +472,16 @@ class ClaudishInputController(IMKInputController):
             elif action == "convert":
                 self.changed(client)
             return action != "pass"
+        if key in (126, 125) and self.state.move(-1 if key == 126 else 1):  # ↑ and ↓ move the highlight
+            self.show_panel(client)
+            return True
+        if key == 53 and flags & NSEventModifierFlagShift and self.state.restore():  # Shift+Esc: the dropped one, back
+            self.changed(client)
+            return True
         if key == 53:  # Escape: one step back
             action = self.state.escape()
+            if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
+                self.show_toast(self.state.dropped_toast(), client)
             if action == "clear":  # the reply goes; the question stays
                 self.changed(client)
             elif action == "keep":

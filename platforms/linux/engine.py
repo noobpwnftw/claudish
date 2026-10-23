@@ -289,19 +289,7 @@ class ClaudishEngine(IBus.Engine):
             return True
         if self.composition.live:
             return self.live_key(keyval)
-        if self.composition.question and not self.composition.reply and IBus.KEY_1 <= keyval <= IBus.KEY_9:
-            chosen = self.composition.answer_choice(keyval - IBus.KEY_0)
-            if chosen:
-                self.suggestions.answer(*chosen)
-                self.render()
-            return True
-        if self.composition.choosing and not self.composition.question and IBus.KEY_1 <= keyval <= IBus.KEY_9:
-            text = self.composition.pick(keyval - IBus.KEY_0)
-            if text is None:
-                return True  # no such candidate: ignore the key rather than type it
-            self.changed()
-            self.commit_text(IBus.Text.new_from_string(text))
-            return True
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and state & IBus.ModifierType.SHIFT_MASK:
             kept = self.composition.keep()  # Shift+Enter: as it is, and keep composing
             if not kept:
@@ -312,7 +300,7 @@ class ClaudishEngine(IBus.Engine):
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
             if action == "choose":  # the first choice of a question that is not an approval
-                chosen = self.composition.answer_choice(1)
+                chosen = self.composition.answer_choice(self.composition.chosen)
                 if chosen:
                     self.suggestions.answer(*chosen)
                 self.render()
@@ -339,7 +327,7 @@ class ClaudishEngine(IBus.Engine):
                 around = self.take_selection()  # a selection: rewrite it in place
             action = self.composition.tab()
             if action == "choose":
-                chosen = self.composition.answer_choice(1)
+                chosen = self.composition.answer_choice(self.composition.chosen)
                 if chosen:
                     self.suggestions.answer(*chosen)
                 self.render()
@@ -355,8 +343,16 @@ class ClaudishEngine(IBus.Engine):
             elif action == "convert":
                 self.render()
             return action != "pass"
+        if keyval in (IBus.KEY_Up, IBus.KEY_Down) and self.composition.move(-1 if keyval == IBus.KEY_Up else 1):
+            self.render()  # ↑ and ↓ move the highlight
+            return True
+        if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK and self.composition.restore():
+            self.render()  # Shift+Esc: the instruction Esc dropped, back to edit
+            return True
         if keyval == IBus.KEY_Escape:
             action = self.composition.escape()
+            if action in ("clear", "drop") and screen().shell:  # said, with the key that brings it back
+                screen().publish(None, "", self.composition.dropped_toast())
             if action == "keep":
                 self.finish()
             elif action == "clear":

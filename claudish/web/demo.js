@@ -54,6 +54,10 @@ const state = {
   error: "",     // why the last request failed, in plain words
   hosted: "",    // the hosted model behind the shown answer, said in the panel
   typedAt: 0,    // compose's keys show after a pause (performance.now)
+  reply: "",     // what you type once an instruction has left your text: your next words
+  highlight: 0,  // the highlighted draft (↑ and ↓ move it)
+  editing: false,  // the instruction came back to the caret (Esc edit): the next Esc drops it
+  dropped: "",   // the last instruction Esc dropped: Shift+Esc brings it back
   revision: 0,
 };
 const HINT_PAUSE_MS = 1000;  // as claudish/composition.py's HINT_PAUSE_SECONDS
@@ -68,13 +72,18 @@ function change(text) {
   state.adopted = false;
   state.asked = null;
   state.working = state.failed = false;
-  state.error = state.hosted = "";
+  state.error = state.hosted = state.reply = "";
+  state.highlight = 0;
+  state.editing = false;
   state.typedAt = performance.now();
   state.revision++;
 }
 const live = () => state.mode === "continue";
 const composing = () => !live() && Boolean(state.text);
-const shown = () => state.converted ? state.candidate : state.text;
+// Sent: the instruction has left your text (docs/design/visual.md); the composition is only ever
+// what you are typing now.
+const sent = () => state.asked === "instruct" && (state.working || state.failed || Boolean(state.candidate));
+const shown = () => sent() ? state.reply : state.converted ? state.candidate : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.asked === "instruct" && state.candidates.length > 1;
@@ -155,20 +164,23 @@ async function ask(revision) {
 // looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
 function panel() {
   if (live() || !state.text) return null;
-  const shown = {label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
-                 status: null, busy: false, failed: null, mark: null};
+  const shown = {thread: [], label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
+                 status: null, busy: false, failed: null, mark: null, replying: false};
   const mark = state.hosted ? `from ${state.hosted} · hosted` : null;
+  if (sent()) shown.thread = [{label: "You asked", body: state.text}];  // it left your text
+  const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
   if (state.working) return {...shown, status: state.asked === "rewrite" ? "Rewriting" : "Working", busy: true,
-                             foot: [["Esc", "stop"]]};
+                             foot: [["Esc", "stop"]], ...typing};
   if (state.failed) return {...shown, tile: "warn", failed: state.error || "The request failed",
-                            foot: [["Enter", "retry"], ["Esc", "back"]]};
+                            foot: [["Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
-    return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: 0, mark,
-            foot: [...(readings.length > 1 ? [[`1–${readings.length}`, "pick"]] : []), ["Esc", "back"]]};
+    return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: state.highlight, mark,
+            foot: [...(readings.length > 1 ? [[`1–${readings.length}`, "pick"]] : []), ["Esc", "edit"]], ...typing};
   }
   if (state.converted) return {...shown, label: "Your words", body: state.text, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
-  if (hintDue() === 0) return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"]]};
+  if (state.editing || hintDue() === 0)
+    return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], ...(state.editing ? [["Esc", "drop"]] : [])]};
   return null;
 }
 // Milliseconds until compose's keys show (0: now); null when they are not waiting.
@@ -197,7 +209,7 @@ function switchMode() {
 function toast() {
   const compose = state.mode === "compose";
   const node = Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
-                          foot: [["Shift", compose ? "back" : "compose"]]});
+                          foot: [["Shift", compose ? "continue" : "compose"]]});
   const editor = $("editor").getBoundingClientRect(), caret = CARET.getBoundingClientRect();
   node.style.left = `${Math.max(12, caret.left - editor.left - 14)}px`;
   node.style.top = `${caret.bottom - editor.top + 6}px`;
@@ -228,18 +240,30 @@ function key(name, shift = false) {
     return true;
   }
   if (live()) return liveKey(name);
-  if (choosing() && /^[1-9]$/.test(name)) {
-    const picked = state.candidates[Number(name) - 1];
-    if (picked !== undefined) { commit(picked); change(""); changed(); }
+  // A digit picks only with nothing typed and in range; otherwise it is text.
+  if (choosing() && !state.reply && /^[1-9]$/.test(name) && Number(name) <= state.candidates.length) {
+    commit(state.candidates[Number(name) - 1]); change(""); changed();
+    return true;
+  }
+  if ((name === "ArrowUp" || name === "ArrowDown") && choosing() && !state.reply) {  // ↑ and ↓ move the highlight
+    const count = state.candidates.length;
+    state.highlight = (state.highlight + (name === "ArrowUp" ? count - 1 : 1)) % count;
+    render();
     return true;
   }
   if (name === "Enter") {
     if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
     if (shift) { commit(shown()); change(""); changed(); return true; }  // Shift+Enter: as it is
+    if (sent() && state.reply.trim()) {  // your next words: a follow-up instruction
+      change(state.reply.trim());
+      state.asked = "instruct"; state.working = true; render(); ask(state.revision);
+      return true;
+    }
     // Right after the drafts appear, Enter is a double-tapped Enter, not a choice.
     if (state.asked === "instruct" && state.candidate && performance.now() - state.offeredAt < ENTER_GUARD_MS) return true;
-    if (state.converted || (state.asked === "instruct" && state.candidate)) {
-      commit(state.candidate); change(""); changed(); return true;
+    if (state.converted) { commit(state.candidate); change(""); changed(); return true; }
+    if (state.asked === "instruct" && state.candidate) {  // the highlighted draft, at the caret
+      commit(state.candidates[state.highlight] || state.candidate); change(""); changed(); return true;
     }
     if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
       state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
@@ -265,19 +289,24 @@ function key(name, shift = false) {
     }
     return true;
   }
-  if (name === "Escape") {  // one step back
+  if (name === "Escape") {  // one step back: what you typed, then edit, then drop
+    if (shift && !state.text && state.dropped) {  // Shift+Esc: the dropped instruction, back to edit
+      change(state.dropped); state.dropped = ""; state.editing = true; render();
+      return true;
+    }
     if (!state.text) return false;
+    if (sent() && state.reply) { state.reply = ""; render(); return true; }
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
     if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
-    // Drafts showing or an answer pending: back to your words, to refine and ask again. Otherwise
-    // what you composed goes (Shift+Enter would have kept it).
-    change((state.candidates.length && state.asked === "instruct") || state.working || state.failed ? state.text : "");
+    if (sent()) { change(state.text); state.editing = true; render(); return true; }  // edit: back at the caret
+    state.dropped = state.text;
+    change("");
     render();
     return true;
   }
   if (name === "Backspace") {
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
-    if (state.asked === "instruct" && state.candidates.length && state.text.endsWith(" ")) { state.text = state.text.slice(0, -1); render(); return true; }  // a held space; the drafts stay
+    if (sent()) { state.reply = state.reply.slice(0, -1); render(); return true; }  // the instruction is in the panel
     if (state.text) change(state.text.slice(0, -1));
     else if (selected()) removeSelection();
     else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
@@ -290,8 +319,8 @@ function key(name, shift = false) {
     if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
-    // Drafts showing: a space (an IME user's reflex to take one) keeps them; a letter refines.
-    if (name === " " && state.asked === "instruct" && state.candidates.length) { state.text += name; render(); return true; }
+    // Sent: what you type is your next words, at the caret; a Space with nothing typed does nothing.
+    if (sent()) { if (name !== " " || state.reply) state.reply += name; render(); return true; }
     change(state.text + name);  // as typed: em dashes come from the model, never from a key
     changed();
     return true;
@@ -373,7 +402,12 @@ function placeCandidateWindow() {
   const caret = CARET.getBoundingClientRect();
   // As on every platform: under the caret's line, the panel's content starting at the caret.
   const inset = 14;  // the panel's border, padding, and row inset (kit.css)
-  const left = Math.max(12, Math.min(caret.right - editor.left - inset, editor.width - window.offsetWidth - 12));
+  let left = Math.max(12, Math.min(caret.right - editor.left - inset, editor.width - window.offsetWidth - 12));
+  // It opens under the caret and stays where it opened while it shows on that line: it never
+  // slides while you type (a reply, more words).
+  const line = Math.round(caret.bottom - editor.top);
+  if (!window.hidden && placeCandidateWindow.opened && placeCandidateWindow.opened.line === line) left = placeCandidateWindow.opened.left;
+  placeCandidateWindow.opened = window.hidden ? null : {left, line};
   window.style.left = `${left}px`;
   window.style.top = `${caret.bottom - editor.top + 6}px`;
   sink.style.left = `${caret.left - editor.left}px`;  // the browser's own IME window follows the caret too
@@ -407,7 +441,7 @@ sink.addEventListener("keydown", (event) => {
   if (event.key === "Shift") { if (!event.repeat) shiftDownAt = performance.now(); return; }
   shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
   const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
-    .includes(event.key) || (choosing() && /^[1-9]$/.test(event.key));
+    .includes(event.key) || (choosing() && (/^[1-9]$/.test(event.key) || event.key === "ArrowUp" || event.key === "ArrowDown"));
   if (named) {
     if (event.key === "Enter" && event.shiftKey && !composing()) return;  // a newline, as the app's
     stopTyping();

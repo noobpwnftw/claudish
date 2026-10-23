@@ -66,10 +66,9 @@ an anti-AI writer, an accessibility consultant and an office manager
   Enter key in a trailing column every row keeps (so rows wrap alike and the cue is not colour
   alone). Claudish orange means only AI: the tile.
 - **Approvals and handoffs:** the label says who asks ("Claude Code wants to run", "Hand off to
-  Claude Code"); what is approved is the body, at full contrast (a command in monospace);
-  **1 is the safe choice** (Deny, No), since a pinyin hand presses 1 by reflex; nothing is
-  highlighted, so Enter never approves; typed words are a refusal with a reason ("or type why
-  not").
+  Claude Code"); what is approved is the body, at full contrast (a command in monospace); the safe
+  choice is listed first (Deny, No); nothing is highlighted, so Enter alone never approves; typed
+  words are a refusal with a reason ("or type why not", then "Enter deny with reason").
 - **Your words are never smaller than the machine's:** after a rewrite the panel shows "Your
   words" at full size and contrast.
 - **Failure:** a warning mark instead of the AI tile, the reason in the platform's error colour,
@@ -101,12 +100,23 @@ an anti-AI writer, an accessibility consultant and an office manager
   asked" and the latest turn show; turns between fold into one line.
 - **Typing a reply goes where typing goes: the caret.** The reply is the composition; the
   choices keep their words and lose their numbers; the footer says Enter sends it.
-- **Keys:** a digit picks only with nothing composed and in range, otherwise it is text; ↑ and ↓
-  move the highlight; Space with nothing composed does nothing; Enter takes the highlight or
-  sends the reply. **Esc, one ladder:** a reply composed, Esc cancels it; else Esc edits (the
+- **Keys (round 4: five CJK input-method users, who weigh most on how an input method behaves;
+  owner, 2026-10-24):** **choices are not numbered.** In pinyin digits are free to be select keys;
+  in English they are text, as Space is, and "2 + Enter" is no shorter than "↓ + Enter". So ↑ and ↓
+  move the highlight (no wrap), Enter takes it, a click picks; digits are always text (a reply
+  that starts "2 tests are flaky" is a reply). An approval starts with nothing highlighted: the
+  first ↓ lands on its safe choice, Enter does nothing until a row is highlighted, so Allow is
+  always a deliberate ↓↓ Enter. Space while composing is text; with nothing typed while choices
+  show, it does nothing. Compose shows what Enter does from the first key ("Tab rewrite · Enter
+  ask · Shift+Enter keep"), since Enter sends your words away. A Shift pressed right after
+  another key (rolled typing, Korean ㅃ) is not a mode tap. **Esc, one ladder:** a reply composed, Esc cancels it; else Esc edits (the
   instruction comes back to the caret); in editing, Esc drops it; while working, Esc stops.
 - **Focus:** leaving the text box hides the panel; the work goes on; returning shows it again
   where it was, and Esc still brings the instruction back. A result never goes into another box.
+- **Nothing is lost silently:** a clear or a drop says "Dropped · Shift+Esc restore", and
+  Shift+Esc brings back a dropped instruction or a cleared reply. In the thread your words are in
+  the text colour, underlined as they were at the caret (your composition, moved into the panel);
+  the labels are the muted part. (A neutral rule beside them read as a second caret.)
 - **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
   ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark

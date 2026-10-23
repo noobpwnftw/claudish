@@ -37,12 +37,11 @@
    stay readable (muted, 4.5:1). */
 .k-panel.replying .k-row .k-key{visibility:hidden}
 .k-panel.replying .k-row .k-text{color:var(--k-muted)}
-/* The exchange so far: your earlier turns as context, one line each, muted, at full size, with a
-   neutral rule beside them (who said what, without relying on colour); the current turn below. */
-.k-turn{position:relative;padding-left:calc(var(--k-row-x) + 6px)}
-.k-turn::before{content:"";position:absolute;left:var(--k-row-x);top:calc(var(--k-row-y) + 2px);bottom:calc(var(--k-row-y) + 1px);width:2px;border-radius:1px;background:color-mix(in srgb,var(--k-text) 35%,var(--k-surface))}
+/* The exchange so far: your earlier turns, one line each. Your words at full size and colour,
+   underlined as they were at the caret (your composition, moved into the panel); the label is the
+   muted part. The current turn below. */
 .k-turn .k-label{display:inline;margin-right:6px}
-.k-turn .k-body{display:inline;color:var(--k-muted)}
+.k-turn .k-body{display:inline;color:var(--k-text);text-decoration:underline solid color-mix(in srgb,var(--k-text) 45%,transparent);text-decoration-thickness:1px;text-underline-offset:.2em}
 .k-turn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k-turn+.k-turn{padding-top:0}
 .k-turn+.k-head:not(.k-turn){padding-top:calc(var(--k-row-y) + 3px)}

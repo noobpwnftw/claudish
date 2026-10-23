@@ -103,7 +103,20 @@ export default class CdAiExtension extends Extension {
         box.visible = Boolean(panel);
         if (!panel)
             return;
-        box.style_class = 'cd-panel' + (panel.rows.length || panel.body ? '' : ' cd-bare');
+        const thread = panel.thread || [];
+        box.style_class = 'cd-panel' + (panel.rows.length || panel.body || thread.length ? '' : ' cd-bare')
+            + (panel.replying ? ' cd-replying' : '');
+        // The exchange so far: your earlier turns as context, one line each, muted, a rule beside.
+        for (const turn of thread) {
+            // Your words at full size and colour, underlined as at the caret; the label muted.
+            const line = new St.BoxLayout({style_class: 'cd-turn'});
+            const words = label('', 'cd-turn-text');
+            words.clutter_text.ellipsize = Pango.EllipsizeMode.MIDDLE;
+            words.clutter_text.set_markup(`<b><span size="smaller" fgalpha="70%">${GLib.markup_escape_text(turn.label, -1)}</span></b>  ` +
+                `<u>${GLib.markup_escape_text(turn.body, -1)}</u>`);
+            line.add_child(words);
+            box.add_child(line);
+        }
         if (panel.body) {
             const head = new St.BoxLayout({vertical: true, style_class: 'cd-head'});
             if (panel.label)
@@ -116,7 +129,8 @@ export default class CdAiExtension extends Extension {
             const on = index === panel.on;
             const line = new St.BoxLayout({style_class: on ? 'cd-row cd-on' : 'cd-row'});
             line.add_child(new St.Widget({style_class: on ? 'cd-bar' : 'cd-bar cd-off', y_expand: true}));
-            line.add_child(label(row.key, 'cd-key'));
+            if (row.key)  // choices are not numbered: digits are text, as Space is
+                line.add_child(label(row.key, 'cd-key'));
             const text = label('', 'cd-text', true);
             const words = GLib.markup_escape_text(row.text, -1);
             text.clutter_text.set_markup(row.legend
@@ -166,12 +180,18 @@ export default class CdAiExtension extends Extension {
         const {x, y, width, height} = this._cursor;
         const monitor = Main.layoutManager.findMonitorForActor(this._panel) || Main.layoutManager.primaryMonitor;
         for (const box of [this._panel, this._toast]) {
-            if (!box.visible)
+            if (!box.visible) {
+                box._opened = null;
                 continue;
+            }
             const [, natural] = box.get_preferred_width(-1);
             const [, tall] = box.get_preferred_height(natural);
             const inset = box.get_theme_node().get_padding(St.Side.LEFT) + 10;
             let left = Math.round(x + width - inset), top = Math.round(y + height + GAP);
+            // It opens under the caret and stays where it opened while it is open on that line.
+            if (box._opened && box._opened.line === y)
+                left = box._opened.left;
+            box._opened = {left, line: y};
             left = Math.max(monitor.x + 4, Math.min(left, monitor.x + monitor.width - natural - 4));
             if (top + tall > monitor.y + monitor.height)
                 top = Math.round(y - tall - GAP);  // no room below: above the line

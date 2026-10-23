@@ -208,7 +208,8 @@ class MacOSAdapterTests(unittest.TestCase):
         # These tests press Enter the moment a result arrives; the double-Enter guard is tested in
         # test_candidates.
         # (through the adapter's own module: loading it under patched sys.modules can leave a copy)
-        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ENTER_GUARD_SECONDS": 0})
+        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ENTER_GUARD_SECONDS": 0, "PICK_GUARD_SECONDS": 0,
+                                                                          "ROLLED_SHIFT_SECONDS": 0})
         cls.guard.start()
 
     @classmethod
@@ -371,7 +372,9 @@ class MacOSAdapterTests(unittest.TestCase):
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
-        self.assertTrue(self.key(19, "2"))
+        self.assertTrue(self.key(125))  # ↓ highlights the second
+        self.controller.state.offered_at = 0  # past the double-Enter guard
+        self.assertTrue(self.key(36))  # and Enter inserts it
         self.assertEqual(self.client.commits, ["Hi there."])
         self.assertEqual(state.text, "")
 
@@ -386,7 +389,8 @@ class MacOSAdapterTests(unittest.TestCase):
         spec = self.module.PANEL.spec  # what is approved in full; nothing highlighted
         self.assertEqual((spec["label"], spec["body"], self.module.PANEL.rows, spec["on"]),
                          ("Claude Code wants to run", "git status", ["Deny", "Allow"], -1))
-        self.assertTrue(self.key(19, "2"))
+        self.assertTrue(self.key(125) and self.key(125))  # ↓ Deny, ↓ Allow
+        self.assertTrue(self.key(36))  # and Enter confirms it
         self.assertEqual(worker.answered, ("s1", "perm-1", 1))
         self.assertIsNone(state.question)
         self.assertEqual(self.client.commits, [])  # an answer is not text

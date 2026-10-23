@@ -38,11 +38,16 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual(state.pick(2), "Two.")
         self.assertEqual((state.text, state.candidates), ("", []))
 
-    def test_a_stale_list_is_dropped(self):
+    def test_typing_while_it_works_keeps_the_work_and_a_stale_list_is_dropped(self):
         state = self.instruct()
         revision = state.revision
-        state.insert("y")
-        self.assertFalse(state.offer(revision, "One.", ["Two."]))
+        state.insert("y")  # your next words: the instruction has left your text, the work goes on
+        self.assertEqual((state.shown, state.reply), ("y", "y"))
+        self.assertTrue(state.offer(revision, "One.", ["Two."]))
+        self.assertTrue(state.choosing and state.panel()["replying"])  # the drafts, without numbers
+        self.assertEqual(state.escape(), "clear")  # Esc: your next words go
+        self.assertEqual(state.escape(), "back")  # Esc again: the instruction comes back to edit
+        self.assertFalse(state.offer(revision, "Late.", []))  # a late answer for it is dropped
         self.assertFalse(state.choosing)
 
 
@@ -124,20 +129,21 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         state.offer(state.revision, "No, thank you.", ["Sadly, no."])
         self.assertEqual(state.enter(), "wait")  # right after the drafts appear
+        self.assertEqual(state.shown, "")  # sent: the instruction has left your text
         state.insert(" ")
-        self.assertTrue(state.choosing)  # the space is held; the drafts stay
-        self.assertEqual(state.shown, "decline politely ")
-        state.backspace()
-        self.assertTrue(state.choosing and state.text == "decline politely")
-        state.insert(" ")
+        self.assertTrue(state.choosing)  # a Space with nothing typed does nothing; the drafts stay
+        self.assertEqual(state.shown, "")
         self.assertEqual(state.pick(2), "Sadly, no.")
         state.change("decline politely")
         state.submit()
         state.offer(state.revision, "No, thank you.", ["Sadly, no."])
-        state.insert(" ")
-        state.insert("t")  # a letter refines the instruction: the drafts close
-        self.assertFalse(state.choosing)
-        self.assertEqual(state.text, "decline politely t")
+        state.insert("m")
+        state.insert("o")  # letters are your next words, at the caret; the drafts stay, without numbers
+        self.assertTrue(state.choosing and state.panel()["replying"])
+        self.assertEqual((state.shown, state.text), ("mo", "decline politely"))
+        state.offered_at = 0
+        self.assertEqual(state.enter(), "submit")  # Enter asks it as a follow-up
+        self.assertEqual((state.text, state.reply, state.choosing), ("mo", "", False))
         state.submit()
         state.offer(state.revision, "No, thank you.")
         state.offered_at -= 1  # a moment later, Enter takes the first draft
@@ -173,18 +179,18 @@ class ModeFeelTests(unittest.TestCase):
         self.assertIsNone(state.panel())  # continue: no panel; the suggestion speaks for itself
         state.mode = "compose"
         state.change("say hi")
-        typed = state.typed_at
-        self.assertIsNone(state.panel(typed + 0.2))  # typing: only the composition
-        self.assertAlmostEqual(state.hint_due(typed + 0.2), 0.8)
-        self.assertEqual(state.panel(typed + 1.0)["foot"], [("Tab", "rewrite"), ("Enter", "ask")])  # a pause
-        self.assertEqual(state.hint(typed + 1.0), "Tab rewrite · Enter ask")
+        # What Enter does shows from the first key (CJK reviewers: Enter sends your words away).
+        self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Enter", "ask"), ("Shift+Enter", "keep")])
+        self.assertEqual(state.hint(), "Tab rewrite · Enter ask · Shift+Enter keep")
         state.submit()
         working = state.panel()
         self.assertEqual((working["status"], working["busy"], working["foot"]), ("Working", True, [("Esc", "stop")]))
         state.offer(state.revision, "Hi!", ["Hello!", "Hey!"], hosted="Claude")
         drafts = state.panel()
         self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
-        self.assertEqual((drafts["foot"], drafts["mark"]), ([("1–3", "pick"), ("Esc", "back")], "from Claude · hosted"))
+        self.assertEqual((drafts["foot"], drafts["mark"]),
+                         ([("↑↓", "choose"), ("Enter", "insert"), ("Esc", "edit")], "from Claude · hosted"))
+        self.assertEqual(drafts["thread"], [{"label": "You asked", "body": "say hi"}])  # the instruction left your text
         state.change("this is important")
         state.tab()
         state.offer(state.revision, "This is crucial.")
@@ -207,6 +213,64 @@ class ModeFeelTests(unittest.TestCase):
         approval = state.panel()  # nothing highlighted; typed words only refuse
         self.assertEqual((approval["body"], approval["code"], approval["on"], approval["tail"]),
                          ("git push", True, -1, "or type why not"))
+
+    def test_choices_are_not_numbered_and_an_approval_starts_unhighlighted(self):
+        """Owner: digits are text in English, as Space is; "2 + Enter" and "↓ + Enter" are both two
+        strokes. Choices are chosen with ↑/↓ and Enter; an approval starts with nothing
+        highlighted, the first ↓ lands on Deny, and a reply starting with a digit is just a reply."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("push my branch")
+        state.submit()
+        state.ask(state.revision, {"id": "p", "permission": True, "label": "Claude Code wants to run", "body": "git push",
+                                   "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
+        approval = state.panel()
+        self.assertEqual((approval["on"], [r["key"] for r in approval["rows"]], state.enter()), (-1, ["", ""], "wait"))
+        self.assertTrue(state.move(1))  # the first ↓: Deny
+        self.assertEqual((state.panel()["on"], state.chosen), (0, 1))
+        self.assertTrue(state.move(1))  # ↓ again: Allow, then Enter confirms
+        self.assertEqual((state.enter(), state.answer_choice(state.chosen)), ("choose", ("s", "p", 1)))
+        state.ask(state.revision, {"id": "q", "permission": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
+        state.insert("2")  # a digit is text: your reply ("2 tests are flaky"), never an approval
+        self.assertEqual((state.shown, state.panel()["foot"][0]), ("2", ("Enter", "deny with reason")))
+
+    def test_esc_says_what_it_dropped_and_shift_esc_restores_a_reply(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("summarize")
+        state.submit()
+        state.insert("o")
+        state.insert("k")
+        self.assertEqual(state.escape(), "clear")
+        self.assertEqual(state.dropped_toast()["foot"], [("Shift+Esc", "restore")])
+        self.assertEqual((state.restore(), state.shown), ("ok", "ok"))  # the reply, back at the caret
+
+    def test_after_sending_the_keys_follow_one_ladder(self):
+        """docs/design/visual.md, round 3: a digit picks only with nothing typed and in range;
+        ↑/↓ move the highlight; Esc cancels what you typed, then edits, then drops (named in
+        the footer); Shift+Esc brings a dropped instruction back."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("summarize this thread")
+        state.submit()
+        self.assertEqual(state.shown, "")  # the instruction left your text
+        state.ask(state.revision, {"id": "q", "label": "The model asks", "body": "All, or the last?",
+                                   "choices": [{"label": "All"}, {"label": "The last"}]}, "s")
+        self.assertEqual(state.panel()["thread"], [{"label": "You asked", "body": "summarize this thread"}])
+        self.assertTrue(state.move(1) and state.panel()["on"] == 1 and state.chosen == 2)  # ↓
+        state.insert("3")
+        state.insert(" ")
+        state.insert("days")
+        self.assertEqual((state.shown, state.panel()["replying"]), ("3 days", True))  # digits are text
+        self.assertEqual(state.panel()["foot"], [("Enter", "send reply"), ("Esc", "cancel reply")])
+        self.assertFalse(state.move(1))  # typing: nothing is highlighted
+        self.assertEqual(state.answer_text()[2], "3 days")
+        self.assertEqual(state.panel()["thread"][-1], {"label": "You answered", "body": "3 days"})
+        self.assertEqual(state.escape(), "back")  # while it works: Esc edits (and stops it)
+        self.assertEqual((state.shown, state.panel(state.typed_at)["foot"][-1]), ("summarize this thread", ("Esc", "drop")))
+        self.assertEqual(state.escape(), "drop")
+        self.assertEqual((state.text, state.restore()), ("", "summarize this thread"))  # Shift+Esc
+        self.assertEqual(state.shown, "summarize this thread")
 
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()

@@ -38,6 +38,7 @@ def main():
         from pime_claudish.claudish_ime import ClaudishTextService
         import pime_claudish.composition
         pime_claudish.composition.ENTER_GUARD_SECONDS = 0  # Enter right after a result; the guard has its own test
+        pime_claudish.composition.PICK_GUARD_SECONDS = pime_claudish.composition.ROLLED_SHIFT_SECONDS = 0
         # The foreground app is pinned: on Windows the real one is the console running this smoke,
         # a terminal, where continue is quiet.
         with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \
@@ -167,8 +168,9 @@ def main():
             reply = key(0x10)  # Shift: a key that only polls and publishes
             assert reply.get("candidateList") == ["Hello.", "Hi there."], reply
             worker_class.return_value.poll.return_value = None
-            assert key(0x32)["commitString"] == "Hi there."
-            # An agent session asks a question: the choices are the list, and a digit answers.
+            key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
+            assert key(0x0D)["commitString"] == "Hi there."
+            # An agent session asks a question: the choices are the list, and Enter takes the highlighted one.
             for char in "check":
                 key(ord(char.upper()), ord(char))
             key(0x0D)
@@ -179,10 +181,10 @@ def main():
             assert reply.get("candidateList") == ["Allow", "Deny"], reply
             assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
-            reply = key(0x31)
+            reply = key(0x0D)
             assert "commitString" not in reply, reply
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
-            # Another question: typed words answer it instead of a number.
+            # Another question: typed words answer it (a digit in them is text).
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
             key(0x10)
             worker_class.return_value.poll.return_value = None

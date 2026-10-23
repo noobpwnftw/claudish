@@ -28,3 +28,7 @@
   font-size: 12px; font-weight: bold; }
 .cd-spinner { icon-size: 12px; color: #b4b4b9; }
 .cd-ghost { color: #808085; }
+.cd-turn { padding: 5px 10px 3px; spacing: 6px; }
+.cd-rule { width: 2px; margin: 2px 0; border-radius: 1px; background-color: rgba(255,255,255,0.35); }
+.cd-turn-text { color: #ffffff; }
+.cd-replying .cd-text { color: #b4b4b9; }

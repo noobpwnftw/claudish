@@ -18,7 +18,7 @@ BORDERLESS, NONACTIVATING = 0, 1 << 7  # NSWindowStyleMask values
 POPUP_LEVEL = 101  # NSPopUpMenuWindowLevel: above the app's own windows
 MATERIAL_MENU, BLENDING_BEHIND, STATE_ACTIVE = 5, 0, 1
 ACCENT = (217 / 255, 119 / 255, 87 / 255)  # Claudish's: the AI tile only
-KEYS = {"Enter": "↩", "Esc": "⎋", "Tab": "⇥", "Shift": "⇧"}  # macOS menus' glyphs
+KEYS = {"Enter": "↩", "Esc": "esc", "Tab": "⇥", "Shift": "⇧", "Shift+Enter": "⇧↩", "Shift+Esc": "⇧esc"}  # macOS menus' names
 
 
 def rounded_mask(radius):
@@ -95,6 +95,7 @@ class Panel:
 
     def __init__(self):
         self.window = None
+        self.opened = None  # (x, line y) where the panel opened: it stays there while it is open
 
     def build(self):
         window = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -124,7 +125,20 @@ class Panel:
         inner = MAX_WIDTH - 2 * PAD - 2 * ROW_X
         secondary = NSColor.secondaryLabelColor()
         blocks = []  # (kind, views, height), laid out top to bottom
-        widest = MIN_WIDTH if spec["rows"] or spec["body"] else 0
+        widest = MIN_WIDTH if spec["rows"] or spec["body"] or spec.get("thread") else 0
+        for turn in spec.get("thread") or []:
+            # Your earlier turns: one line, your words at full size and colour, underlined as they
+            # were at the caret; the label is the muted part.
+            line = label("%s  %s" % (turn["label"], turn["body"]), SIZE)
+            words = line.attributedStringValue().mutableCopy()
+            words.addAttribute_value_range_("NSFont", NSFont.systemFontOfSize_weight_(SMALL, NSFontWeightSemibold),
+                                            (0, len(turn["label"])))
+            words.addAttribute_value_range_("NSColor", secondary, (0, len(turn["label"])))
+            words.addAttribute_value_range_("NSUnderline", 1, (len(turn["label"]) + 2, len(turn["body"])))
+            line.setAttributedStringValue_(words)
+            line.setLineBreakMode_(5)  # NSLineBreakByTruncatingMiddle
+            widest = max(widest, min(inner, line.fittingSize().width) + 2 * (PAD + ROW_X))
+            blocks.append(("turn", line, line.fittingSize().height + ROW_Y + 2))
         if spec["body"]:
             views = []
             if spec["label"]:
@@ -133,20 +147,23 @@ class Panel:
             widest = max([widest] + [v.fittingSize().width + 2 * (PAD + ROW_X) for v in views])
             blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1) + 2 * ROW_Y + 1))
         takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's ↩
-        text_width = inner - 20 - (TAKE if takes else 0)
+        numbered = any(row["key"] for row in spec["rows"])  # choices are not numbered: digits are text
+        keys = 20 if numbered else 0
+        text_width = inner - keys - (TAKE if takes else 0)
+        replying = spec.get("replying")  # you are typing at the caret: the choices take no number
         for index, row in enumerate(spec["rows"]):
             on = index == spec["on"]
-            number = label(row["key"], SIZE, NSFontWeightMedium if on else NSFontWeightRegular,
+            number = label("" if replying else row["key"], SIZE, NSFontWeightMedium if on else NSFontWeightRegular,
                            NSColor.labelColor() if on else secondary)
             legend = " — " + row["legend"] if row.get("legend") else ""
-            text = label(row["text"] + legend, SIZE, width=text_width)
+            text = label(row["text"] + legend, SIZE, color=secondary if replying else None, width=text_width)
             if legend:  # the legend in the secondary colour
                 words = text.attributedStringValue().mutableCopy()
                 words.addAttribute_value_range_("NSColor", secondary, (len(row["text"]), len(legend)))
                 text.setAttributedStringValue_(words)
             size = text.fittingSize()
-            widest = max(widest, size.width + 20 + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
-            blocks.append(("row", (number, text, on, index + 1), max(size.height, 18) + 2 * ROW_Y))
+            widest = max(widest, size.width + keys + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
+            blocks.append(("row", (number, text, on, index + 1, keys), max(size.height, 18) + 2 * ROW_Y))
         foot = self.footer(spec, secondary)
         widest = max(widest, sum(self.size(v).width + gap for v, gap in foot) + 2 * (PAD + ROW_X))
         blocks.append(("foot", foot, 20 + 2 * ROW_Y - 1))
@@ -160,8 +177,13 @@ class Panel:
             getattr(self, "place_" + kind)(views, y, h, width, pick)
         (cx, cy), (cw, ch) = rect
         # Under the caret's line, the content starting at the caret (as on every platform: GNOME
-        # knows only the caret).
-        frame = NSMakeRect(cx + cw - PAD - ROW_X, cy - height - 6, width, height)
+        # knows only the caret). It opens there and stays while it is open on that line: it never
+        # slides while you type (a reply, or more words).
+        x = cx + cw - PAD - ROW_X
+        if self.window.isVisible() and self.opened and abs(self.opened[1] - cy) < 2:
+            x = self.opened[0]
+        self.opened = (x, cy)
+        frame = NSMakeRect(x, cy - height - 6, width, height)
         screen = NSScreen.mainScreen().visibleFrame()
         if frame.origin.y < screen.origin.y:  # no room below: above the line
             frame.origin.y = cy + ch + 6
@@ -202,6 +224,11 @@ class Panel:
             items.append((label(spec["mark"], SMALL, color=secondary), 0))
         return items
 
+    def place_turn(self, line, y, h, width, pick):
+        size = line.fittingSize()
+        line.setFrame_(NSMakeRect(PAD + ROW_X, y + 1, width - 2 * (PAD + ROW_X), size.height))
+        self.effect.addSubview_(line)
+
     def place_head(self, views, y, h, width, pick):
         top = y + h - ROW_Y - 1
         for view in views:
@@ -212,7 +239,7 @@ class Panel:
             top -= 2
 
     def place_row(self, parts, y, h, width, pick):
-        number, text, on, picked = parts
+        number, text, on, picked, keys = parts
         row = Row.alloc().initWithFrame_(NSMakeRect(PAD, y, width - 2 * PAD, h))
         if pick is not None:
             row.picked = lambda: pick(picked)
@@ -229,7 +256,7 @@ class Panel:
             row.addSubview_(take)
         size = number.fittingSize()
         number.setFrame_(NSMakeRect(ROW_X, h - ROW_Y - size.height, 12, size.height))
-        text.setFrame_(NSMakeRect(ROW_X + 20, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
+        text.setFrame_(NSMakeRect(ROW_X + keys, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
         row.addSubview_(number)
         row.addSubview_(text)
         self.effect.addSubview_(row)

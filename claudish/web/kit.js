@@ -59,7 +59,7 @@
     }
     rows.forEach((row, index) => {
       const line = el("div", "k-row" + (index === spec.on ? " on" : ""));
-      line.append(el("span", "k-key", row.key));
+      if (row.key) line.append(el("span", "k-key", row.key));  // choices are not numbered (digits are text)
       const words = el("span", "k-text" + (spec.mono ? " k-mono" : ""), row.text);
       if (row.legend) words.append(el("span", "k-legend", " — " + row.legend));
       line.append(words);
