@@ -97,7 +97,7 @@ async def check(url, executable, screenshots=None):
             for await (const _ of (await navigator.storage.getDirectory()).keys()) return true;
             return false; }"""), "something was left in storage after Remove"
         assert after < stored - 400e6, (stored, after)
-        await expect(page.locator("#status")).to_contain_text("Removed the stored model")
+        await expect(page.locator("#status")).to_contain_text("Removed the model")
         await page.reload()  # and it stays removed
         await page.wait_for_function("() => self.crossOriginIsolated", timeout=15000)
         await expect(page.locator("#load-model")).to_have_text("Run the model in this browser")

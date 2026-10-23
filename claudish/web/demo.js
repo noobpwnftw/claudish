@@ -607,29 +607,20 @@ if (IN_BROWSER) {
     <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
     <span id="model-progress-label">0%</span></div></div>`;
   document.querySelector(".workspace").before(strip);
-  $("model-copy").textContent = `${model} runs right here: downloaded once, then cached. Nothing you type leaves this page.`;
+  $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
   $("load-model").addEventListener("click", loadInBrowser);
   $("remove-model").addEventListener("click", async () => {
-    const { removeStored, storedBytes } = await import("./browser.js");
+    const { removeStored } = await import("./browser.js");
     if (browserBackend) {  // a running model holds its files open: stop it first
       try { await browserBackend.exit(); } catch {}
       browserBackend = null;
       $("model-strip").classList.remove("ready");
-      $("model-copy").textContent = `${model} runs right here: downloaded once, then cached. Nothing you type leaves this page.`;
+      $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
       $("connection").className = "connection";
       $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
     }
     await removeStored();
-    const { countedBytes } = await import("./browser.js");
-    const left = await storedBytes(), counted = await countedBytes();
-    if (left > 1e6) setStatus(`${Math.round(left / 1e6)} MB could not be removed: reload the page and try again.`);
-    else if (counted > 50e6) {
-      // Space the browser still counts for this site but that no page can reach (an older storage
-      // layout): only the browser's own site settings can clear it.
-      setStatus(`Removed the model. The browser still counts ${Math.round(counted / 1e6)} MB for this site that the `
-        + "page cannot reach: clear it in the browser's site settings (Chrome: the icon left of the address, "
-        + "Site settings, Delete data).");
-    } else setStatus("Removed the stored model from this browser.");
+    setStatus("Removed the model from this browser.");
     showStored();
   });
   showStored();

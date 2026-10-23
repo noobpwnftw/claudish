@@ -60,9 +60,6 @@ export async function removeStored() {
     }
   } catch {}
 }
-// The browser's own count of this site's storage, which can include what the page cannot reach.
-export async function countedBytes() {
-  try { return (await navigator.storage.estimate()).usage || 0; } catch { return 0; }
 }
 
 // Without room to store the model (a small quota: a guest profile, a full disk), it runs from memory:
