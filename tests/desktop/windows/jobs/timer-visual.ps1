@@ -15,7 +15,7 @@ Get-Process Notepad -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Process notepad; Start-Sleep 3
 $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
 [Keys]::Focus($window.MainWindowHandle) | Out-Null; Start-Sleep 1
-[Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
+Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
 [Keys]::Type('this is important'); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x09)  # Tab asks; no key after this
 Start-Sleep 4

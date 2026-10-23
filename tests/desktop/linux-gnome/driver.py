@@ -72,6 +72,8 @@ class Keyboard:
     def press(self, *names, delay=0.04):
         """Key names such as "Return", "Shift_L", "ctrl+a" (held modifiers, then the key)."""
         for name in names:
+            if name == "Shift_L":
+                time.sleep(0.4)  # a Shift tap comes after a pause (a Shift right after a key is rolled typing)
             values = [Gdk.KEY_Control_L if part == "ctrl" else Gdk.keyval_from_name(part) for part in name.split("+")]
             for value in values:
                 self.keysym(value, True)

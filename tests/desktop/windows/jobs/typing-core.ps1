@@ -94,7 +94,7 @@ function Invoke-Scenarios {
   [Keys]::Type('ls -la'); Start-Sleep -Milliseconds 300  # switching to cd_AI types like en_US
   Check 'cd_AI starts in continue: keys go straight in' (Get-Text) 'ls -la'
   Reset-Target
-  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue -> compose
+  Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue -> compose
   [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
   Check 'composition is not committed while typing' (Get-Text) ''
   [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 500  # Shift+Enter keeps your words
@@ -117,14 +117,14 @@ function Invoke-Scenarios {
   [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 300  # Shift+Enter keeps your words
   Check 'a leading space goes straight to the app' (Get-Text) ' hi'
   Reset-Target
-  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue, typing goes straight in
+  Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue, typing goes straight in
   [Keys]::Type('Only my words '); Start-Sleep -Milliseconds 300  # a pause after a word: continue asks
   Check 'continue: typing goes straight into the app' (Get-Text) 'Only my words '
   Start-Sleep -Milliseconds 800; [Keys]::Press(0x75)  # F6 shows the suggestion (PIME redraws on keys)
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
   Check 'continue: Tab takes the rest of the sentence' (Get-Text) "Only my words and then some${dash}naturally."
   Reset-Target
-  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
+  Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
   [Keys]::Type('say hi')
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
   Check 'instruct holds the text until it is inserted' (Get-Text) ''

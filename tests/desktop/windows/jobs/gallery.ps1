@@ -17,7 +17,7 @@ Start-Sleep 1
 [Keys]::Type('Thanks for the review '); Start-Sleep -Milliseconds 1500
 Show-State '01-continue-suggestion'
 [Keys]::Press(0x1B); [Keys]::ClearEdit($window.MainWindowHandle)
-[Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
+Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
 [Keys]::Type('this is very important'); Start-Sleep -Milliseconds 400
 Show-State '02-compose-typing'
 [Keys]::Press(0x09); Start-Sleep -Milliseconds 1200  # the rewrite in place

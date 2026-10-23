@@ -79,7 +79,9 @@ KEYS = {"Tab": 48, "Return": 36, "Escape": 53, "Shift": 56, "Down": 125}
 
 
 def shift_tap():
-    """Shift pressed and released alone: the mode switch (macOS sends flagsChanged events)."""
+    """Shift pressed and released alone: the mode switch (macOS sends flagsChanged events), after
+    a pause (a Shift right after a key is rolled typing, not a tap)."""
+    time.sleep(0.4)
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, KEYS["Shift"], down)
         CGEventSetFlags(event, kCGEventFlagMaskShift if down else 0)

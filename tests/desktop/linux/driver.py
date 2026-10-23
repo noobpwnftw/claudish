@@ -48,6 +48,8 @@ def focus(name):
 
 
 def key(*names):
+    if "shift" in names:
+        time.sleep(0.4)  # a Shift tap comes after a pause (a Shift right after a key is rolled typing)
     sh("xdotool", "key", "--delay", "40", *names)
 
 

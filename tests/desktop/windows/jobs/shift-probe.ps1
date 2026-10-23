@@ -11,7 +11,7 @@ Start-Process notepad; Start-Sleep 3
 $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
 [Keys]::Focus($window.MainWindowHandle) | Out-Null; Start-Sleep 1
 Add-Content $log '--- Shift tap, then ab'
-[Keys]::Press(0x10); Start-Sleep -Milliseconds 300
+Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 300
 [Keys]::Type('ab'); Start-Sleep -Milliseconds 300
 Get-Content $log | Select-Object -Last 14
 "text: '$([Keys]::EditText($window.MainWindowHandle))'"

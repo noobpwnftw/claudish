@@ -82,7 +82,7 @@ async def check(args):
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
             await expect(window).to_contain_text("rewrite", timeout=3000)  # after a pause: Tab rewrite, Enter ask
             await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
-            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
+            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
             rewrite = await page.locator("#preedit").text_content()
             print("Real backend, rewrite:", repr(rewrite))
             assert rewrite != "This is very important.", rewrite
@@ -90,7 +90,7 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "rewrite.png"))
             await keys.press("Escape")  # your words again
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
-            await expect(window).to_contain_text("Esc: drop it")  # the next Esc drops them: the footer says so
+            await expect(window).to_contain_text("drop")  # the next Esc drops them: the footer says so
             await keys.press("Tab")
             await keys.press("Tab")  # converted, then kept
             await expect(committed).to_have_attribute("data-text", before + rewrite)
@@ -198,9 +198,11 @@ async def check(args):
                     await page.screenshot(path=str(args.screenshots / "instruct.png"))
                 count = await choices.count()
                 second = await choices.nth(1).locator(".k-text").text_content()
-                await keys.press("2")
+                await page.wait_for_timeout(400)  # past the double-Enter guard
+                await keys.press("ArrowDown")  # choices are not numbered: ↓ then Enter
+                await keys.press("Enter")
                 await expect(committed).to_have_attribute("data-text", second)
-                print("instruct offered %d readings; 2 inserted the second" % count)
+                print("instruct offered %d readings; ↓ Enter inserted the second" % count)
             else:
                 draft = await window.locator(".k-row .k-text").first.text_content()
                 await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
@@ -219,7 +221,7 @@ async def check(args):
             await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
             await keys.press("Tab")
-            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
+            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
             await expect(committed).to_have_attribute("data-text", "")  # out of the text while it is rewritten
             await keys.press("Escape")
             await keys.press("Escape")
@@ -231,7 +233,7 @@ async def check(args):
             await keys.press("Shift+Enter")  # kept as typed
             await keys.press("Control+A")
             await page.locator("[data-label=rewrite]").click()  # types, then Tab rewrites it
-            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
+            await expect(window).to_contain_text("Your words", timeout=10000)  # the rewrite in place; the panel keeps yours
             await expect(committed).to_have_attribute("data-text", "")  # the selection went; no empty line
             await keys.press("Escape")
             await keys.press("Escape")  # the sample goes too

@@ -296,7 +296,7 @@ function key(name, shift = false) {
     }
     if (!state.text) return false;
     if (sent() && state.reply) { state.reply = ""; render(); return true; }
-    if (state.converted) { state.converted = false; render(); return true; }  // your words again
+    if (state.converted) { state.converted = false; state.editing = true; render(); return true; }  // your words again
     if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
     if (sent()) { change(state.text); state.editing = true; render(); return true; }  // edit: back at the caret
     state.dropped = state.text;

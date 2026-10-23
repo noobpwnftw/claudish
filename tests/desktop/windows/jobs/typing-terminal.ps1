@@ -19,12 +19,12 @@ function Invoke-Terminal($name, $window) {
   Start-Sleep 1
   [Keys]::Type('gti status'); Start-Sleep -Milliseconds 400
   if (-not ((Last-Line) -like '*gti status')) {  # composing: drop it and switch to continue
-    [Keys]::Press(0x1B); [Keys]::Press(0x10); Start-Sleep -Milliseconds 300
+    [Keys]::Press(0x1B); Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 300
     [Keys]::Type('gti status'); Start-Sleep -Milliseconds 400
   }
   Check "${name}: continue types the command straight in" ((Last-Line) -like '*>gti status') $true
   [Keys]::Press(0x0D); Wait-Screen 'not recognized'
-  [Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
+  Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # compose
   [Keys]::Type('fix'); [Keys]::Press(0x0D)  # the instruction, with the screen's last lines
   Start-Sleep -Milliseconds 1500
   [Keys]::Press(0x0D)  # the draft, inserted at the prompt; running it would be the user's Enter

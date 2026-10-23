@@ -260,6 +260,7 @@ class Composition:
             return "clear"
         if self.converted:
             self.converted = False
+            self.editing = True  # your words again; the next Esc drops them, and the footer says so
             return "back"
         if self.adopted and not self.question:
             return "keep"  # text taken from the app goes back, as it was
