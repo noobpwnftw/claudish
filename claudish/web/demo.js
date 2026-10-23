@@ -402,10 +402,11 @@ function placeCandidateWindow() {
   // As on every platform: under the caret's line, the panel's content starting at the caret.
   const inset = 14;  // the panel's border, padding, and row inset (kit.css)
   let left = Math.max(12, Math.min(caret.right - editor.left - inset, editor.width - window.offsetWidth - 12));
-  // It opens under the caret and stays where it opened while it shows on that line: it never
-  // slides while you type (a reply, more words).
-  const line = Math.round(caret.bottom - editor.top);
-  if (!window.hidden && placeCandidateWindow.opened && placeCandidateWindow.opened.line === line) left = placeCandidateWindow.opened.left;
+  // It opens under the caret and stays where it opened while it shows on that line and the caret
+  // is at or right of it: it never slides while you type (a reply, more words), and when the text
+  // leaves (sent) or you delete back past it, it moves to the caret.
+  const line = Math.round(caret.bottom - editor.top), opened = placeCandidateWindow.opened;
+  if (!window.hidden && opened && opened.line === line && left >= opened.left) left = opened.left;
   placeCandidateWindow.opened = window.hidden ? null : {left, line};
   window.style.left = `${left}px`;
   window.style.top = `${caret.bottom - editor.top + 6}px`;

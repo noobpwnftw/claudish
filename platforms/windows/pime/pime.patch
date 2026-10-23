@@ -329,10 +329,10 @@ index 28d8286..b6682ba 100644
  }
  
 +// Claudish: the candidate window opens under the caret and stays where it opened while it shows
-+// on the same line.
++// on the same line with the caret at or right of it (when the text leaves, it moves to the caret).
 +void TextService::placeCandidates(const RECT& caret) {
 +	int x = caret.left - candidateWindow_->textInset();
-+	if (candidateWindow_->isVisible() && pinnedLine_ == caret.bottom)
++	if (candidateWindow_->isVisible() && pinnedLine_ == caret.bottom && x >= pinnedX_)
 +		x = pinnedX_;
 +	pinnedX_ = x;
 +	pinnedLine_ = caret.bottom;

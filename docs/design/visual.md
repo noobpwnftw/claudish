@@ -86,7 +86,9 @@ an anti-AI writer, an accessibility consultant and an office manager
   keeps the bar and the Enter key.
 - **A panel opens under the caret and stays where it opened until it closes** (its content
   starting at the caret, clamped to the screen, above the line when there is no room below); it
-  moves only if the caret leaves that line. It never slides while you type. GNOME reports only
+  moves only if the caret leaves that line or lands left of the panel's start, as when a long
+  instruction is sent and its text leaves (owner, 2026-10-24): then it moves once, to the caret.
+  It never slides while you type. GNOME reports only
   the caret, not where the composition starts, so no platform anchors to the composition.
 
 **After an instruction is sent (round 3, the same reviewers):**

@@ -182,10 +182,11 @@ class Panel:
             getattr(self, "place_" + kind)(views, y, h, width, pick)
         (cx, cy), (cw, ch) = rect
         # Under the caret's line, the content starting at the caret (as on every platform: GNOME
-        # knows only the caret). It opens there and stays while it is open on that line: it never
-        # slides while you type (a reply, or more words).
+        # knows only the caret). It opens there and stays while it is open on that line and the caret
+        # is at or right of it: it never slides while you type (a reply, or more words), and when the
+        # text leaves (sent) it moves to the caret.
         x = cx + cw - PAD - ROW_X
-        if self.window.isVisible() and self.opened and abs(self.opened[1] - cy) < 2:
+        if self.window.isVisible() and self.opened and abs(self.opened[1] - cy) < 2 and x >= self.opened[0]:
             x = self.opened[0]
         self.opened = (x, cy)
         frame = NSMakeRect(x, cy - height - 6, width, height)

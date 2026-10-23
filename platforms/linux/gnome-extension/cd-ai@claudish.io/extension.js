@@ -190,8 +190,9 @@ export default class CdAiExtension extends Extension {
             const [, tall] = box.get_preferred_height(natural);
             const inset = box.get_theme_node().get_padding(St.Side.LEFT) + 10;
             let left = Math.round(x + width - inset), top = Math.round(y + height + GAP);
-            // It opens under the caret and stays where it opened while it is open on that line.
-            if (box._opened && box._opened.line === y)
+            // It opens under the caret and stays where it opened while it is open on that line and the
+            // caret is at or right of it (when the text leaves, it moves to the caret).
+            if (box._opened && box._opened.line === y && left >= box._opened.left)
                 left = box._opened.left;
             box._opened = {left, line: y};
             left = Math.max(monitor.x + 4, Math.min(left, monitor.x + monitor.width - natural - 4));

@@ -184,8 +184,13 @@ async def check(args):
             await keys.type("thank the team for shipping the release", delay=10)
             await page.wait_for_timeout(600)
             assert not any(body and body.get("mode") == "instruct" for body in sent), "sent before Enter"
+            await expect(window).to_contain_text("ask", timeout=3000)  # the panel, open at the end of the text
             await keys.press("Enter")
             await expect(window.locator(".k-row").first).to_be_visible(timeout=10000)  # the drafts
+            # The text left, so the panel moved back to the caret (it does not stay where the text ended).
+            panel_left = (await window.bounding_box())["x"]
+            caret_left = (await page.locator("#caret").bounding_box())["x"]
+            assert panel_left <= caret_left, ("the panel stayed where the sent text ended", panel_left, caret_left)
             assert any(body and body.get("mode") == "instruct" for body in sent), sent
             # Esc closes the drafts and keeps the instruction to refine; Enter sends it again.
             await keys.press("Escape")
