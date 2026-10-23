@@ -46,7 +46,7 @@ class Unfocused(RuntimeError):
 def post(code, text=None, shift=False):
     # Keys go wherever focus is: if the test app is not in front, stop rather than type into
     # whatever is (a function key there is a system shortcut).
-    if STATE.exists() and not state().get("active"):
+    if STATE.exists() and not state().get("active") and not front():
         raise Unfocused("the test app lost focus; stopping before typing elsewhere")
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, code, down)
@@ -89,8 +89,23 @@ def document():
     return state().get("text", "")
 
 
+def front():
+    """Bring the test app to the front. The consent dialog leaves System Settings in front, and a
+    click on the Mac can leave anything there, so close System Settings and ask the app to activate
+    until it is active."""
+    subprocess.run(["pkill", "-x", "System Settings"], check=False)
+    for _ in range(3):
+        COMMANDS.write_text("focus")
+        if wait_for(lambda: not COMMANDS.read_text() and state().get("active"), timeout=5):
+            return True
+        time.sleep(1)
+    print(">>> the test window is not in front: click it on the Mac", flush=True)
+    return wait_for(lambda: state().get("active"), timeout=60)
+
+
 def fresh_document():
     """Empty the test app's text view and bring it to the front."""
+    front()
     COMMANDS.write_text("clear")
     wait_for(lambda: not COMMANDS.read_text())
     time.sleep(0.5)

@@ -56,24 +56,37 @@ def main():
         print("select", sys.argv[2], status, "current:", current())
         return 0 if status == 0 else 1
     path, bundle_id = sys.argv[1], sys.argv[2]
-    print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
-    # Enabling a third-party input method asks the user (macOS: "Allow … to enable …?"): ask once,
-    # then wait for the answer; asking again on every retry raises the dialog again.
-    for source in sources(bundle_id):
-        if not prop(source, "kTISPropertyInputSourceIsEnabled"):
-            print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
-    for attempt in range(1, 61):
+
+    def enabled():
+        return any(prop(s, "kTISPropertyInputSourceIsEnabled") and prop(s, "kTISPropertyInputSourceIsSelectCapable")
+                   for s in sources(bundle_id))
+
+    # Registering or enabling a third-party input method makes macOS ask the user ("Allow … to
+    # enable …?"), so do either only when needed, once, and then wait for the answer.
+    if not sources(bundle_id):
+        print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
+    if not enabled():
+        for source in sources(bundle_id):
+            if not prop(source, "kTISPropertyInputSourceIsEnabled"):
+                print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
+        print(">>> macOS is asking to enable cd_AI: click Allow on the Mac. Nothing else is needed;"
+              " the test closes System Settings and continues.", flush=True)
+        deadline = time.monotonic() + 180
+        while not enabled() and time.monotonic() < deadline:
+            time.sleep(1)
+        if not enabled():
+            print("cd_AI was not enabled (no Allow within 3 minutes)")
+            return 1
+    for attempt in range(1, 11):
         for source in sources(bundle_id):
             if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
                 status = carbon.TISSelectInputSource(source)
-                print("attempt", attempt, "select", prop(source, "kTISPropertyInputSourceID"), status)
                 if status == 0 and current().startswith(bundle_id):
                     print("current:", current())
                     return 0
         time.sleep(1)
     print("current:", current())
     return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
