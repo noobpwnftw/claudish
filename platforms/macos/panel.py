@@ -5,13 +5,29 @@ marked text, so continue's suggestion looked typed. This draws both: a panel at 
 its content (an instruction's drafts, a question as is, an answer to read, one short hint), and the
 suggestion as grey text right after the caret. Non-activating panels: the app keeps the keyboard.
 """
-from AppKit import (NSBackingStoreBuffered, NSColor, NSFont, NSFontWeightRegular, NSFontWeightSemibold,
-                    NSMakeRect, NSPanel, NSScreen, NSTextField, NSView, NSVisualEffectView)
+from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsMake, NSFont, NSFontWeightRegular,
+                    NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel, NSScreen, NSTextField, NSView,
+                    NSVisualEffectView)
 
-PADDING, ROW_GAP, WIDTH, MIN_WIDTH = 12, 4, 440, 220
+PADDING, ROW_GAP, WIDTH, MIN_WIDTH, RADIUS = 12, 4, 440, 220, 10
 BORDERLESS, NONACTIVATING = 0, 1 << 7  # NSWindowStyleMask values
 POPUP_LEVEL = 101  # NSPopUpMenuWindowLevel: above the app's own windows
 MATERIAL_MENU, BLENDING_BEHIND, STATE_ACTIVE = 5, 0, 1
+
+
+def rounded_mask(radius):
+    """A stretchable rounded-rectangle mask: a visual-effect view clips its material only to a
+    mask image (a layer's corner radius leaves square corners of material behind)."""
+    edge = 2 * radius + 1
+
+    def draw(rect):
+        NSColor.blackColor().set()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, radius, radius).fill()
+        return True
+    image = NSImage.imageWithSize_flipped_drawingHandler_((edge, edge), False, draw)
+    image.setCapInsets_(NSEdgeInsetsMake(radius, radius, radius, radius))
+    image.setResizingMode_(1)  # NSImageResizingModeStretch
+    return image
 
 
 def split_title(text):
@@ -58,9 +74,7 @@ class Panel:
         effect.setMaterial_(MATERIAL_MENU)
         effect.setBlendingMode_(BLENDING_BEHIND)
         effect.setState_(STATE_ACTIVE)
-        effect.setWantsLayer_(True)
-        effect.layer().setCornerRadius_(10)
-        effect.layer().setMasksToBounds_(True)
+        effect.setMaskImage_(rounded_mask(RADIUS))
         window.setContentView_(effect)
         self.window, self.effect = window, effect
 
@@ -128,6 +142,7 @@ class Panel:
             frame.origin.y = cy + ch + 6
         frame.origin.x = max(screen.origin.x + 4, min(frame.origin.x, screen.origin.x + screen.size.width - width - 4))
         self.window.setFrame_display_(frame, True)
+        self.window.invalidateShadow()  # the shadow follows the rounded mask, not the square window
         self.window.orderFrontRegardless()
 
     def hide(self):
