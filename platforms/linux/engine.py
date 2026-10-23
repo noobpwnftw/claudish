@@ -78,10 +78,10 @@ class ClaudishEngine(IBus.Engine):
         elif state.working and state.status:
             hint = "instruct · %s · Esc: stop" % " ".join(state.status.split())[-90:]
         elif state.choosing:
-            hint = ("instruct · 1–%d: insert that one · Enter: the first · Esc: back to the instruction"
+            hint = ("instruct · 1–%d: pick one · Enter: the first · Esc: back to the instruction"
                     % len(state.candidates))
         elif state.converted:
-            hint = "rewrite · Tab/Enter: keep it · Esc: your words"
+            hint = "rewrite · Tab: keep it · Esc: your words"
         elif state.candidate and state.mode == "rewrite":
             hint = "rewrite · Tab: rewrite it · Enter/Esc: keep your words"
         elif state.candidate:
@@ -89,10 +89,10 @@ class ClaudishEngine(IBus.Engine):
         elif state.working:
             hint = "instruct · %s… · Esc: stop" % ("looking and working" if state.look else "working")
         elif state.failed:
-            hint = "instruct · the request failed · Enter: retry · Esc: back"
+            hint = "instruct · the request failed · Enter: send it again · Esc: back"
         elif state.mode == "instruct":
-            hint = ("instruct + window picture · Enter: send · F8: no picture" if state.look else
-                    "instruct · Enter: send · F8: look at the window · F7: mode · Esc: drop it")
+            hint = ("instruct + window picture · Enter: send it · F8: no picture" if state.look else
+                    "instruct · Enter: send it · F8: look at the window · F7: mode · Esc: drop it")
         else:
             hint = "%s · F7: mode · Enter/Esc: keep wording" % state.mode
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))

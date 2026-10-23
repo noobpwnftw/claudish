@@ -285,13 +285,13 @@ function render() {
   const lines = [];
   if (composing() && state.mode === "instruct") {
     if (state.working) lines.push(["", "working…"]);
-    else if (state.failed) lines.push(["Enter", "the request failed: retry"]);
+    else if (state.failed) lines.push(["Enter", "the request failed: send it again"]);
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
-    else lines.push(["Enter", "send"]);
+    else lines.push(["Enter", "send it"]);
   } else if (composing() && state.candidate) {
     // Rewrite has no list: a hint that it is ready, then the rewrite itself in place of your words.
-    lines.push(["Tab", state.converted ? "keep the rewrite" : "rewrite it"]);
+    lines.push(["Tab", state.converted ? "keep it" : "rewrite it"]);  // Enter keeps it too
   }
   window.hidden = !lines.length;
   for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
@@ -311,9 +311,9 @@ function render() {
     const foot = document.createElement("div");
     foot.className = "candidate-foot";
     // One pattern everywhere: "Key: action".
-    foot.textContent = choosing() ? "1–3: pick · Enter: the first · Esc: back to the instruction"
+    foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to the instruction"
       : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc: drop it")
-      : state.converted ? "Enter: keep it · Esc: your words" : "Enter or Esc: keep your words";
+      : state.converted ? "Esc: your words" : "Enter or Esc: keep your words";
     window.append(foot);
   }
   placeCandidateWindow();
@@ -473,7 +473,8 @@ $("samples").addEventListener("click", (event) => {
   sink.focus();
   settle();
   while (state.mode !== button.dataset.mode) key("F7");
-  if (doc.text && !doc.text.endsWith("\n")) commit("\n");
+  if (selected()) removeSelection();  // a sample replaces the selection, as typing would
+  if (doc.caret > 0 && doc.text[doc.caret - 1] !== "\n") commit("\n");  // its own line, unless at one already
   const chars = [...button.dataset.sample];
   typing = setInterval(() => {
     if (!chars.length) {

@@ -161,7 +161,7 @@ class ClaudishTextService(TextService):
             elif "error" in data:
                 self.state.fail(revision)
                 if self.state.failed:
-                    self.showMessage("cd_AI: the request failed; Enter retries", 3)
+                    self.showMessage("cd_AI: the request failed; Enter sends it again", 3)
 
     def onKeyDown(self, event):
         keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))

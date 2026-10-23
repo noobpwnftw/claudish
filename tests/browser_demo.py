@@ -188,7 +188,7 @@ async def check(args):
             await keys.press("Escape")
             await expect(page.locator("#preedit")).to_have_text("thank the team for shipping the release")
             await expect(window.locator("button.candidate-row")).to_have_count(0)  # drafts closed
-            await expect(window).to_contain_text("send")
+            await expect(window).to_contain_text("send it")
             await keys.press("Enter")
             await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             choices = window.locator("button.candidate-row")
@@ -209,6 +209,18 @@ async def check(args):
             await keys.press("Escape")
             await expect(page.locator("#preedit")).to_have_text("")
             await expect(committed).to_have_attribute("data-text", "")
+
+            # A sample over a selection replaces it, with no empty line left behind.
+            await page.locator("#clear").click() if await page.locator("#clear").is_enabled() else None
+            await keys.press("F7")  # instruct -> rewrite
+            await keys.type("old words", delay=5)
+            await keys.press("Escape")  # kept as typed
+            await keys.press("Control+A")
+            await page.locator("[data-mode=rewrite]").click()
+            await expect(page.locator("#preedit")).to_have_text("This is very important.", timeout=5000)
+            await expect(committed).to_have_attribute("data-text", "")
+            await keys.press("Escape")
+            await page.locator("#clear").click()
 
             # A sample types itself, key by key, in its own mode.
             await page.locator("[data-mode=rewrite]").click()
