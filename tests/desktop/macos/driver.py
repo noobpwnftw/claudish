@@ -211,7 +211,9 @@ def scenarios():
     key("Down")  # the context starts over
     fresh_document()
     type_text("Thanks for the review ")
-    wait_for(lambda: state().get("marked"))
+    # The first answer after a new build can take longer: macOS checks a newly installed app on its
+    # first launch (likely why the first suggestion was missed after reinstalls).
+    wait_for(lambda: state().get("marked"), timeout=20)
     check("continue: the suggestion waits as marked text", state().get("marked"), "and then some—naturally.")
     # KNOWN (ROADMAP G01): IMK drops the marked text's color on its way to the app, so the suggestion
     # is drawn underlined in the text color (accepted for now).
