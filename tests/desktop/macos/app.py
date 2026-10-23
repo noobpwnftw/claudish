@@ -6,7 +6,7 @@ import os
 import sys
 
 from AppKit import (NSApp, NSForegroundColorAttributeName, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
-                    NSMakeRect, NSTextView, NSWindow, NSWindowStyleMaskTitled)
+                    NSMakeRect, NSTextView, NSView, NSWindow, NSWindowStyleMaskTitled)
 from Foundation import NSObject, NSTimer
 
 STATE, COMMANDS = sys.argv[1], sys.argv[2]
@@ -21,9 +21,10 @@ class Mirror(NSObject):
                 open(COMMANDS, "w").close()
                 if command == "clear":
                     view.setString_("")
+                    other.setString_("")
                 NSApp.activateIgnoringOtherApps_(True)
                 window.makeKeyAndOrderFront_(None)
-                window.makeFirstResponder_(view)
+                window.makeFirstResponder_(other if command == "other" else view)
         except OSError:
             pass
         marked, color = "", ""
@@ -35,7 +36,7 @@ class Mirror(NSObject):
                                                                             location, None)[0]
                 color = str(found.colorNameComponent()) if found is not None and found.type() == 2 else str(found)
         with open(STATE + ".tmp", "w") as out:
-            json.dump({"text": str(view.string()), "marked": marked, "marked_color": color, "active": bool(NSApp.isActive())}, out)
+            json.dump({"text": str(view.string()), "other": str(other.string()), "marked": marked, "marked_color": color, "active": bool(NSApp.isActive())}, out)
         os.replace(STATE + ".tmp", STATE)
 
 
@@ -44,10 +45,14 @@ app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
 window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
     NSMakeRect(200, 200, 600, 300), NSWindowStyleMaskTitled, NSBackingStoreBuffered, False)
 window.setTitle_("Claudish test app")
-view = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 300))
-view.setAutomaticDashSubstitutionEnabled_(False)  # the app's own substitutions are not the input method's
-view.setAutomaticQuoteSubstitutionEnabled_(False)
-window.setContentView_(view)
+content = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 300))
+view = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 100, 600, 200))
+other = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 90))  # a second field, for focus changes
+for field in (view, other):
+    field.setAutomaticDashSubstitutionEnabled_(False)  # the app's own substitutions are not the input method's
+    field.setAutomaticQuoteSubstitutionEnabled_(False)
+    content.addSubview_(field)
+window.setContentView_(content)
 window.makeKeyAndOrderFront_(None)
 window.makeFirstResponder_(view)
 app.activateIgnoringOtherApps_(True)

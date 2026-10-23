@@ -184,9 +184,22 @@ def scenarios():
     # KNOWN (ROADMAP G01): IMK drops the marked text's color on its way to the app, so the suggestion
     # is drawn underlined in the text color (accepted for now).
     print("KNOWN continue: the suggestion is drawn in %s, not grey" % state().get("marked_color"))
+    # A focus change while the suggestion shows must leave only your words: the suggestion is
+    # marked text, which an app could commit as if it were typed.
+    COMMANDS.write_text("other")
+    wait_for(lambda: not COMMANDS.read_text())
+    time.sleep(0.8)
+    check("focus change keeps only your words", (document(), state().get("other")), ("Thanks for the review ", ""))
+    COMMANDS.write_text("focus")
+    wait_for(lambda: not COMMANDS.read_text())
+    time.sleep(0.3)
+    key("Down")  # back in the field: the caret is at the end; the next word asks again
+    post(US["s"])
+    post(US[" "])
+    wait_for(lambda: state().get("marked"))
     key("Tab")
     wait_for(lambda: document().endswith("naturally."))
-    check("continue: Tab takes the suggestion", document(), "Thanks for the review and then some—naturally.")
+    check("continue: Tab takes the suggestion", document(), "Thanks for the review s and then some—naturally.")
 
     # 4. Instruct: F7, type, Enter sends, Enter inserts.
     key("Return")
