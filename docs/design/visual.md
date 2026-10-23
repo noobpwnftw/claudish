@@ -36,12 +36,12 @@ gallery.sh`, `tests/desktop/windows/gallery.sh`, `tests/desktop/macos/gallery.sh
 | State | Looks like |
 | --- | --- |
 | Continue, a suggestion | cd_AI's own grey text right after the caret, in its UI font at the caret's height, only at the end of a line; Tab takes it |
-| Compose, typing | your words with the platform's own composition underline; the panel's footer starts with the AI tile (compose is visible) and says Tab: rewrite, Enter: ask AI |
-| Compose, rewrite in place | the rewrite in place of your words; the panel shows "was" and your words, Tab: keep, Esc: undo |
+| Compose, typing | your words with the platform's own composition underline; from the first key the panel's footer starts with the AI tile (compose is visible) and says Tab rewrite · Enter ask · Shift+Enter keep |
+| Compose, a rewrite | your words stay in your text; the rewrite waits in the panel ("Rewrite"); Tab puts it in, Esc or typing on keeps your words |
 | Waiting | the composition as it is; the footer says what is happening ("rewriting…") |
-| Drafts | rows: a muted number, the draft; the first highlighted (a soft fill, an accent bar); 1–3: pick, Esc: back |
-| A question | the question as is (a small label for who asks), its choices numbered; an approval highlights nothing |
-| An answer to read | the text as a short paragraph, wrapped to a readable width, then Insert it / Dismiss |
+| Drafts | under "You asked" (your instruction, which left your text): rows, the first highlighted (a neutral fill, an accent bar, the Tab key at its end); ↑↓ choose, Tab insert, Esc edit |
+| A question | the question as is (a small label for who asks), its choices as rows, not numbered; ↑↓ choose, Enter answers; an approval highlights nothing and lists Deny first |
+| An answer to read | the text as a short paragraph, wrapped to a readable width, with no rows; Tab insert, Esc dismiss, or type to ask more |
 | Progress (an agent) | one muted footer line: what it is doing |
 | Hosted model | a small mark at the footer's end when the answer came from a hosted model |
 | A mode switch | the mode's tile and name, briefly, at the caret |
@@ -58,8 +58,9 @@ an anti-AI writer, an accessibility consultant and an office manager
 ([research/2026-10-24-design-review.md](../research/2026-10-24-design-review.md)). Decisions:
 
 - **One panel anatomy:** an optional header (a small label for who asks or what this is, then the
-  content as is), numbered rows, one footer. The footer is the AI tile, then each key with its
-  verb in the order Enter, numbers, Tab, Esc, then free text ("or type a reply"). Key names are a
+  content as is), rows, one footer. The footer is the AI tile, then each key with its verb, then
+  free text ("or type a reply"). (Since round 4 the rows are not numbered, and the highlighted
+  row's key is the one that takes it: Tab for the model's text, Enter for an answer.) Key names are a
   skin token (macOS ↩ ⎋ ⇥ without boxes, at the hint's size and contrast; Windows and GNOME words
   in keycaps).
 - **The highlighted row** is a neutral fill with a bar in **the platform's accent** and its own
@@ -105,7 +106,7 @@ an anti-AI writer, an accessibility consultant and an office manager
 - **Keys (round 4: five CJK input-method users, who weigh most on how an input method behaves;
   owner, 2026-10-24):** **choices are not numbered.** In pinyin digits are free to be select keys;
   in English they are text, as Space is, and "2 + Enter" is no shorter than "↓ + Enter". So ↑ and ↓
-  move the highlight (no wrap), Enter takes it, a click picks; digits are always text (a reply
+  move the highlight (no wrap), Enter takes an answer (Tab a draft: see below), a click picks; digits are always text (a reply
   that starts "2 tests are flaky" is a reply). An approval starts with nothing highlighted: the
   first ↓ lands on its safe choice, Enter does nothing until a row is highlighted, so Allow is
   always a deliberate ↓↓ Enter. Space while composing is text; with nothing typed while choices

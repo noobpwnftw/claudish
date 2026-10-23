@@ -326,7 +326,7 @@ from any text box. Set the profile's `"helper"` to its command, with `{prompt}`
 
 The model offers it when a task takes more than an answer at the caret, or
 when you ask ("have claude look into why the build fails"), and you are asked
-first: "Send this task to claude? 1 Yes 2 No". Yes opens the helper in a new
+first: "Send this task to claude?", with No first and then Yes. Yes opens the helper in a new
 terminal window, on a note with the task and what was observed (a terminal's
 screen, redacted), in a file only you can read; nothing is inserted. The note
 never goes on a command line. Not offered when the program is not installed or
@@ -357,7 +357,7 @@ Several helpers can be named, each its own tool behind its own question, and a
 
 When you ask to understand something ("what does this error mean?"), the model
 can show an answer to read instead of text for the box, marked "The model
-says:", with Insert it or Dismiss.
+says", with Tab to insert it or Esc to dismiss it.
 
 The model can also ask you itself, as a question with choices ("Did you mean
 git status?"); your answer goes back to it.

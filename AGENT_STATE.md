@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-24 (latest), `main` at `0a2145d` plus a docs pass. An interactive session on the Spark; no 24/7 runner.
 
 ## Where things stand
 
@@ -10,7 +10,7 @@ Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on t
   Continue's model workarounds are duct tape (G32, remove after G21).
 - **Key design (G33, done):** F7 is retired. A Shift tap switches continue (keys go straight in,
   Tab takes the suggestion) and compose (buffered). Compose: Tab rewrites in place (Tab again
-  keeps), Enter instructs (drafts, 1–3 pick), Shift+Enter commits as is, Esc steps back then
+  keeps), Enter instructs (drafts: ↑↓, Tab inserts), Shift+Enter commits as is, Esc steps back then
   drops. Only letters and digits start a composition. A selection taken into compose goes back
   on Esc (never dropped). Same in all adapters, the demo, and the docs.
 - **Text box description (G34):** every request carries app, field purpose, text before/after the
@@ -47,7 +47,8 @@ Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on t
   changes the design for all. Designs are settled with synthetic reviewers before building
   (docs/research/2026-10-24-design-review.md; CJK input-method users weigh most on keys).
 - **Settled (docs/design/visual.md):** one panel anatomy from Composition.panel(); choices not
-  numbered (↑↓ Enter; approvals start unhighlighted, Deny first); a sent instruction leaves your
+  numbered (↑↓; approvals start unhighlighted, Deny first); Tab takes the model's text, Enter
+  talks to the model (no double-Enter guard); a sent instruction leaves your
   text and the panel carries the thread; a rewrite waits in the panel until Tab; a focus change
   commits only your own words (held exchanges, a pill on return, Shift+Esc); compose keys show from
   the first key; drops say so; rolled Shift is not a tap.
@@ -55,6 +56,10 @@ Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on t
   PIME only (released PIME dropped), Direct2D/DirectWrite panel, layered suggestion window, toast,
   caret-placed panel with no composition; GNOME Shell extension (platforms/linux/gnome-extension,
   installed by install.py; the engine publishes io.claudish.Screen); the demo and homepage on the kit.
+- **Tab/Enter split (owner, 2026-10-24):** Tab takes the model's text (suggestion, rewrite,
+  draft, an answer to read); Enter talks to the model and never inserts. The panel re-anchors to
+  the caret when it lands left of the panel (a long instruction sent). Verified on 0a2145d's
+  parent d73123e: gate 10/10, CI 5/5, GNOME Wayland 13/13, Windows Notepad 16/16 and the gallery.
 - **Next:** macOS dark and the focus rules on the VM (needs a rebuild: warn the owner); X11 desktop
   rig on the new engine; Windows checks the reviewers asked for (100/150/200% scale, high contrast);
   G46 (selection into the buffer) is tabled.

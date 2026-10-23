@@ -9,10 +9,11 @@ offers. English goes in. Em dashes come out.
 ### What is in it
 
 - **Two modes, one Shift:** continue (keys go straight in; the rest of the
-  sentence waits after the caret for Tab) and compose (Tab rewrites your words
-  in place, as a CJK input method converts; Enter sends them as an instruction
-  and offers drafts to pick with 1–3; Shift+Enter keeps them as typed; Esc
-  steps back). A Shift tap switches, as it switches English and pinyin.
+  sentence waits after the caret for Tab) and compose (Tab shows a rewrite of
+  your words, as a CJK input method converts, and Tab again puts it in; Enter
+  sends them as an instruction and offers drafts: ↑ ↓ to choose, Tab to insert;
+  Shift+Enter keeps them as typed; Esc steps back). Tab takes the model's text,
+  Enter talks to the model. A Shift tap switches, as it switches English and pinyin.
 - **Terminals:** an instruction typed at a terminal prompt ("fix") sees what the
   terminal shows, read through the accessibility APIs (GNOME Terminal, Windows
   Terminal, the classic console, Terminal.app); nothing is installed in the shell.
@@ -31,10 +32,10 @@ offers. English goes in. Em dashes come out.
   **`claudish service`** starts Claudish at login (systemd, a logon task, launchd).
 - **Context:** files, commands, and MCP servers, per app ("supported text
   boxes"); `claudish mcp import` brings in the servers you already use with Claude.
-- **Instruct, further:** several readings to pick with 1–3; F8 adds a picture of
+- **Instruct, further:** up to three drafts to choose from; F8 adds a picture of
   the window you are typing in (for vision models); read-only MCP tools the model
   may call before drafting; agent sessions whose permission questions arrive as
-  choices in the candidate list (first slice).
+  choices in the panel (first slice).
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/): the
   model runs in the page; nothing you type leaves it.
 

@@ -111,8 +111,8 @@ when they end.
      tools; Claudish is its host and turns each permission request into a question,
      through the same policy.
 3. **Events:** both drivers emit the same events, so every adapter renders them the
-   same way: progress in the status line, questions as a numbered list, the result
-   as readings to pick.
+   same way: progress in the panel's footer, questions as rows (↑ ↓, Enter), the result
+   as drafts (↑ ↓, Tab).
 
 ## The tool policy (one policy, both drivers)
 
@@ -147,7 +147,7 @@ be allowed by policy instead of interrupting you, and the rest become questions.
 ## Readings after tools
 
 Tools run once; the final answer can then be sampled several times over the same
-results, so an instruction that looked things up still offers readings 1–3, at
+results, so an instruction that looked things up still offers up to three drafts, at
 the cost of the last turn only.
 
 ## Backends

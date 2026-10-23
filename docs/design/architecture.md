@@ -38,12 +38,12 @@ The model answers with exactly one of:
 | --- | --- | --- |
 | **complete** | after the caret, grey; Tab takes it | a pause in continue |
 | **replace** | in place of your words or the selection; Tab keeps it | Tab in compose |
-| **insert** | drafts at the caret, 1–3 to pick | Enter in compose |
+| **insert** | drafts in the panel, ↑ ↓ to choose, Tab inserts | Enter in compose |
 | **ask** | a question with choices, shown as is; the answer goes back to the model | any instruction, when it needs you |
 
 Side effects happen only through tools, and a tool that writes or acts goes
 through **ask** first unless the configuration trusts it. Handing a task to
-Claude Code is such a tool: after "Send this task to claude? 1 Yes 2 No", it
+Claude Code is such a tool: after "Send this task to claude?" (No first, then Yes), it
 opens the helper with a note (the task and what was observed), in any text box.
 In a terminal the model can also simply **insert** `claude "…"` as the command,
 because the box says what goes there; no special case either way.
