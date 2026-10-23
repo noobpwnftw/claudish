@@ -65,28 +65,28 @@ def main():
     # enable …?"), so do either only when needed, once, and then wait for the answer.
     if not sources(bundle_id):
         print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
-    if not enabled():
+
+    def select(tries):
+        for _ in range(tries):
+            for source in sources(bundle_id):
+                if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
+                    if carbon.TISSelectInputSource(source) == 0 and current().startswith(bundle_id):
+                        return True
+            time.sleep(1)
+        return False
+
+    # After the bundle changes macOS can still report it enabled yet refuse to select it until the
+    # user allows it again: so try first, and ask only when that fails.
+    if not (enabled() and select(3)):
         for source in sources(bundle_id):
-            if not prop(source, "kTISPropertyInputSourceIsEnabled"):
-                print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
+            print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
         print(">>> macOS is asking to enable cd_AI: click Allow on the Mac. Nothing else is needed;"
               " the test closes System Settings and continues.", flush=True)
-        deadline = time.monotonic() + 180
-        while not enabled() and time.monotonic() < deadline:
-            time.sleep(1)
-        if not enabled():
-            print("cd_AI was not enabled (no Allow within 3 minutes)")
+        if not select(180):
+            print("cd_AI could not be selected (no Allow within 3 minutes?); current:", current())
             return 1
-    for attempt in range(1, 11):
-        for source in sources(bundle_id):
-            if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
-                status = carbon.TISSelectInputSource(source)
-                if status == 0 and current().startswith(bundle_id):
-                    print("current:", current())
-                    return 0
-        time.sleep(1)
     print("current:", current())
-    return 1
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
