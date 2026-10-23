@@ -121,8 +121,10 @@ class ClaudishTextService(TextService):
             return False
         if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
             self.shift.press(time.monotonic())
+            self.switching = False
             return False
         self.shift.other()
+        self.switching = False
         if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
@@ -238,9 +240,12 @@ class ClaudishTextService(TextService):
         # A Shift tap switches mode; its key-up is taken so onKeyUp, with an edit session, can commit
         # what you composed.
         if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
-            self.switching = self.shift.release(time.monotonic())
-            keylog("filterKeyUp shift", "tap=%s" % self.switching)
-            return self.switching
+            # PIME asks twice for one key-up (TSF's test, then the key itself): the second answer
+            # must match the first.
+            if self.shift.down_at is not None:
+                self.switching = self.shift.release(time.monotonic())
+            keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
+            return getattr(self, "switching", False)
         return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
                                            event.keyCode == 0x09 and self.state.asked == "rewrite"
                                            and self.state.working))

@@ -56,6 +56,7 @@ def main():
                 """Shift pressed and released alone: its key-up is taken, and onKeyUp switches mode."""
                 assert key(0x10, method="filterKeyDown")["return"] is False  # the app sees Shift too
                 assert key(0x10, method="filterKeyUp")["return"] is True
+                assert key(0x10, method="filterKeyUp")["return"] is True  # PIME asks twice; the same answer
                 return key(0x10, method="onKeyUp")
 
             # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
