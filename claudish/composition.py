@@ -1,4 +1,5 @@
 """Platform-neutral IME state. Keep compatible with PIME's Python 3.6+."""
+import time
 
 MAX_COMPOSITION = 512
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
@@ -8,6 +9,9 @@ MAX_COMPOSITION = 512
 # Esc steps back until it is gone.
 MODES = ("continue", "compose")
 LABELS = {"continue": "Tab continues: ", "instruct": "Enter inserts: "}
+# Enter right after an instruction's drafts appear is a double-tapped Enter, not a choice: it would
+# insert (and the next Enter send) a draft nobody read.
+ENTER_GUARD_SECONDS = 0.3
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 
 
@@ -29,6 +33,7 @@ class Composition:
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.reply = ""  # your own words in answer to it, typed instead of a number
         self.status = ""  # what the agent is doing, or its draft so far
+        self.offered_at = 0.0  # when the latest result arrived (time.monotonic)
 
     def change(self, text):
         self.reply = ""
@@ -121,6 +126,8 @@ class Composition:
             return "pass"
         if self.question:
             return "reply" if self.reply.strip() else "wait"
+        if self.asked == "instruct" and self.candidate and time.monotonic() - self.offered_at < ENTER_GUARD_SECONDS:
+            return "wait"
         if self.converted or (self.asked == "instruct" and self.candidate):
             return "accept"
         return "wait" if self.working else "submit"
@@ -189,6 +196,11 @@ class Composition:
             return True
         if len(self.text) >= MAX_COMPOSITION or self.converted:
             return False
+        if char == " " and self.asked == "instruct" and self.candidates:
+            # Drafts showing: a space (an IME user's reflex to take one) keeps them; the next
+            # letter, digit, or punctuation refines the instruction.
+            self.text += char
+            return True
         self.change(self.text + char)  # as typed: em dashes come from the model, never from a key
         return True
 
@@ -198,6 +210,9 @@ class Composition:
             return
         if self.converted:  # back to your words, as Esc
             self.converted = False
+            return
+        if self.asked == "instruct" and self.candidates and self.text.endswith(" "):
+            self.text = self.text[:-1]  # a held space goes; the drafts stay
             return
         self.change(self.text[:-1])
 
@@ -230,6 +245,7 @@ class Composition:
             return False
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
+        self.offered_at = time.monotonic()
         if self.asked == "rewrite" and self.working:
             self.converted = True  # you asked with Tab: it takes your words' place as it arrives
         self.working = False

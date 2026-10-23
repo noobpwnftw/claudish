@@ -115,6 +115,34 @@ class ModeFeelTests(unittest.TestCase):
         state.tab()
         self.assertEqual(state.request_mode, "rewrite")
 
+    def test_a_space_keeps_the_drafts_and_a_quick_enter_waits(self):
+        """Poll (a pinyin user): a reflexive Space must not throw away drafts you waited for, and a
+        double-tapped Enter must not insert one nobody read."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("decline politely")
+        state.submit()
+        state.offer(state.revision, "No, thank you.", ["Sadly, no."])
+        self.assertEqual(state.enter(), "wait")  # right after the drafts appear
+        state.insert(" ")
+        self.assertTrue(state.choosing)  # the space is held; the drafts stay
+        self.assertEqual(state.shown, "decline politely ")
+        state.backspace()
+        self.assertTrue(state.choosing and state.text == "decline politely")
+        state.insert(" ")
+        self.assertEqual(state.pick(2), "Sadly, no.")
+        state.change("decline politely")
+        state.submit()
+        state.offer(state.revision, "No, thank you.", ["Sadly, no."])
+        state.insert(" ")
+        state.insert("t")  # a letter refines the instruction: the drafts close
+        self.assertFalse(state.choosing)
+        self.assertEqual(state.text, "decline politely t")
+        state.submit()
+        state.offer(state.revision, "No, thank you.")
+        state.offered_at -= 1  # a moment later, Enter takes the first draft
+        self.assertEqual(state.enter(), "accept")
+
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()
         state.mode = "compose"

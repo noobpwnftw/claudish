@@ -76,6 +76,7 @@ async def check(url, executable, screenshots=None):
         await keys.press("Enter")  # sends
         await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=60000)
         draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
+        await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
         await keys.press("Enter")  # inserts
         await expect(committed).to_have_attribute("data-text", before + rewrite + draft)
         # While the model runs, Remove stops it and deletes what the page stored (its files are open

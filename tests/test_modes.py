@@ -75,6 +75,23 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(result["text"], "As requested—fix, having read the terminal.")
         self.assertIn("terminal screen (3 lines)", result["consulted"])
 
+    def test_the_tone_is_claudish_unless_a_profile_sets_another(self):
+        claudish = Rewriter(max_tokens=64)
+        self.assertIn("em dash", claudish.modes["rewrite"]["system"])
+        self.assertTrue(claudish.modes["instruct"]["examples"])
+        plain = Rewriter(max_tokens=64, tone="plain and concise")
+        for mode in ("rewrite", "continue", "instruct"):
+            self.assertIn("plain and concise", plain.modes[mode]["system"])
+            self.assertNotIn("em dash", plain.modes[mode]["system"])
+            self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its voice
+        custom = Rewriter(max_tokens=64, prompt=("Translate to French.", []), tone="plain")
+        self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # --prompt wins
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.json"
+            path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
+            _, settings, _, _ = config.resolve(path, "work")
+            self.assertIn("formal British", Rewriter.from_settings(settings).modes["instruct"]["system"])
+
     def test_a_terminal_screen_is_trimmed_to_its_last_lines(self):
         from claudish import screen
         padded = "C:\\> gti status   \r\n'gti' is not recognized   \r\n\r\nC:\\>      \r\n   \r\n"

@@ -204,6 +204,7 @@ async def check(args):
                 print("instruct offered %d readings; 2 inserted the second" % count)
             else:
                 draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
+                await page.wait_for_timeout(400)  # reading it: an Enter right after the draft appears waits
                 await keys.press("Enter")
                 await expect(committed).to_have_attribute("data-text", draft)
             await page.locator("#clear").click()

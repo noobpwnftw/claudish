@@ -13,6 +13,7 @@ const HINTS = {
   compose: "Type, or select some text. Tab rewrites it in place; Enter does it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
 };
 const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
+const ENTER_GUARD_MS = 300;  // Enter this soon after drafts appear is a double tap: it waits
 // [label, mode, text, the key that finishes it]
 const SAMPLES = [
   ["rewrite", "compose", "This is very important.", "Tab"],
@@ -45,6 +46,7 @@ const state = {
   asked: null,       // compose: what the pending or shown result is ("rewrite" or "instruct")
   candidate: "",
   candidates: [],
+  offeredAt: 0,  // when the latest answer arrived (performance.now)
   converted: false,  // compose: the rewrite shows in place of your words
   adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
@@ -121,6 +123,7 @@ async function ask(revision) {
     if (revision !== state.revision) return;  // you typed since: a stale answer never lands
     state.candidate = data.text;
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
+    state.offeredAt = performance.now();
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: in place as it arrives
     state.working = false;
     const elapsed = Math.round(performance.now() - started);
@@ -185,6 +188,8 @@ function key(name, shift = false) {
   if (name === "Enter") {
     if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
     if (shift) { commit(shown()); change(""); changed(); return true; }  // Shift+Enter: as it is
+    // Right after the drafts appear, Enter is a double-tapped Enter, not a choice.
+    if (state.asked === "instruct" && state.candidate && performance.now() - state.offeredAt < ENTER_GUARD_MS) return true;
     if (state.converted || (state.asked === "instruct" && state.candidate)) {
       commit(state.candidate); change(""); changed(); return true;
     }
@@ -224,6 +229,7 @@ function key(name, shift = false) {
   }
   if (name === "Backspace") {
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
+    if (state.asked === "instruct" && state.candidates.length && state.text.endsWith(" ")) { state.text = state.text.slice(0, -1); render(); return true; }  // a held space; the drafts stay
     if (state.text) change(state.text.slice(0, -1));
     else if (selected()) removeSelection();
     else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
@@ -236,6 +242,8 @@ function key(name, shift = false) {
     if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
     if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
+    // Drafts showing: a space (an IME user's reflex to take one) keeps them; a letter refines.
+    if (name === " " && state.asked === "instruct" && state.candidates.length) { state.text += name; render(); return true; }
     change(state.text + name);  // as typed: em dashes come from the model, never from a key
     changed();
     return true;

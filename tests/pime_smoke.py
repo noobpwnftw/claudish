@@ -30,6 +30,8 @@ def main():
             shutil.copy(root / "claudish" / name, target / name)
         sys.path.insert(0, temporary)
         from pime_claudish.claudish_ime import ClaudishTextService
+        import pime_claudish.composition
+        pime_claudish.composition.ENTER_GUARD_SECONDS = 0  # Enter right after a result; the guard has its own test
         # The foreground app is pinned: on Windows the real one is the console running this smoke,
         # a terminal, where continue is quiet.
         with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \

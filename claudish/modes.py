@@ -36,17 +36,39 @@ INSTRUCT_EXAMPLES = [
 ]
 
 
-def defaults(rewrite_prompt=None):
+def toned(tone):
+    """The templates in another voice (a profile's "tone", such as "plain and concise"), for
+    rewrite, continue, and instruct. Claudish's voice (polished, slightly verbose, em dashes) is
+    the default and the identity; the examples teach that voice, so a tone goes without them."""
+    return {
+        "rewrite": ("Rewrite the user's text in %s English. Keep its meaning, names, numbers and language. "
+                    "Output only the rewritten text, no explanation." % tone, []),
+        "continue": ("Continue the user's unfinished text with the next few words, in the same language, "
+                     "%s. Output only the words that come next, not the text itself." % tone, []),
+        "instruct": ("The user typed an instruction for text they want to write. Write that text, ready to "
+                     "send, in %s English. Use the reference context for names, terms, and facts. Refer to "
+                     "people by name, or as they/them unless their pronouns are given. Output only the text "
+                     "itself, with no preamble or notes." % tone, []),
+    }
+
+
+def defaults(rewrite_prompt=None, tone=None):
     """name -> {"system", "examples", "max_tokens", "candidates"}; max_tokens None means the backend's default.
 
     candidates: how many readings to offer. An instruction is sent on purpose and its result
-    is awaited, so it offers a short list to pick from (1-3); while you type, one at a time."""
+    is awaited, so it offers a short list to pick from (1-3); while you type, one at a time.
+    tone: a voice other than Claudish's (see toned); a rewrite template from --prompt wins."""
     system, examples = rewrite_prompt or (model.SYSTEM, model.EXAMPLES)
+    voices = toned(tone) if tone else {}
+    if tone and rewrite_prompt is None:
+        system, examples = voices["rewrite"]
+    continued, continue_examples = voices.get("continue") or (CONTINUE_SYSTEM, CONTINUE_EXAMPLES)
+    instructed, instruct_examples = voices.get("instruct") or (INSTRUCT_SYSTEM, INSTRUCT_EXAMPLES)
     return {
         "rewrite": {"system": system, "examples": examples, "max_tokens": None, "candidates": 1},
-        "continue": {"system": CONTINUE_SYSTEM, "examples": CONTINUE_EXAMPLES, "max_tokens": 24, "candidates": 1,
+        "continue": {"system": continued, "examples": continue_examples, "max_tokens": 24, "candidates": 1,
                      "frame": CONTINUE_FRAME},
-        "instruct": {"system": INSTRUCT_SYSTEM, "examples": INSTRUCT_EXAMPLES, "max_tokens": 400, "candidates": 3},
+        "instruct": {"system": instructed, "examples": instruct_examples, "max_tokens": 400, "candidates": 3},
     }
 
 

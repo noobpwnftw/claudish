@@ -108,7 +108,7 @@ class Rewriter:
                 raise ValueError("environment variable %s is not set" % settings["api_key_env"])
         rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
                        settings["model"], api_key, settings["timeout"], prompt, context, settings["modes"],
-                       settings["command"], settings["hosted"], settings["bindings"])
+                       settings["command"], settings["hosted"], settings["bindings"], settings.get("tone"))
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
         rewriter.read_terminal = settings.get("read_terminal", True)
@@ -123,7 +123,7 @@ class Rewriter:
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
-                 context=None, modes=None, command=None, hosted=None, bindings=()):
+                 context=None, modes=None, command=None, hosted=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
@@ -143,7 +143,8 @@ class Rewriter:
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
         self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
-        self.modes = invocation.defaults((self.system, self.examples))
+        custom = prompt is not None  # a --prompt rewrite template wins over a tone
+        self.modes = invocation.defaults((self.system, self.examples) if custom or not tone else None, tone)
         for name, override in (modes or {}).items():
             self.modes[name] = dict(self.modes.get(name, {"max_tokens": None}), **override)
         self.finish = invocation.finish

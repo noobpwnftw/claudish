@@ -192,6 +192,15 @@ class MacOSAdapterTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.module = load_adapter()
+        # These tests press Enter the moment a result arrives; the double-Enter guard is tested in
+        # test_candidates.
+        import claudish.composition
+        cls.guard = patch.object(claudish.composition, "ENTER_GUARD_SECONDS", 0)
+        cls.guard.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.guard.stop()
 
     def setUp(self):
         self.client = Client()

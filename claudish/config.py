@@ -22,10 +22,10 @@ BACKENDS = ("llama", "openai", "claude", "command", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
-            "bindings": None, "look_command": None, "read_terminal": True, "tools": None,
+            "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "tools": None,
             "session_command": None}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tools": list, "session_command": list}
+         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "tools": list, "session_command": list}
 
 
 def default_path():
@@ -119,7 +119,7 @@ STARTER = {
         "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
         "Keys never go in this file: name an environment variable with api_key_env.",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
-        "prompt, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tools, session_command. See docs/configuration.md.",
+        "prompt, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, tools, session_command. See docs/configuration.md.",
     ],
     "profile": "local",
     "profiles": {

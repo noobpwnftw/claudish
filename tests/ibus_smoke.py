@@ -14,6 +14,8 @@ root = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("claudish_ibus", root / "platforms/linux/engine.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+import claudish.composition
+claudish.composition.ENTER_GUARD_SECONDS = 0  # Enter right after a result; the guard has its own test
 IBus.init()
 connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 engine = module.ClaudishEngine(connection=connection, object_path="/org/claudish/TestEngine")

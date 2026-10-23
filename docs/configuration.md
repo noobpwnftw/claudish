@@ -285,6 +285,21 @@ candidate like any other. For Claude Code:
   Claudish's patched PIME a question shows as it arrives; with a released PIME,
   at your next key press (F6).
 
+### Tone
+
+Claudish's voice (polished, slightly verbose, fond of em dashes) is the default
+and the point. A profile can speak in another one:
+
+```json
+{"profiles": {"work": {"backend": "llama", "tone": "plain and concise"}}}
+```
+
+The tone replaces the voice in the rewrite, continue, and instruct templates
+(any words work: "warm and friendly", "formal British"), and Claudish's own
+examples, which teach its voice, are left out. A rewrite template from
+`--prompt` or the profile's `"prompt"` wins over it. Instructions typed in a
+terminal always get a command line.
+
 ## Modes
 
 Every request names a mode, and every mode only offers a candidate, which you
