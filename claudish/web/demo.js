@@ -589,7 +589,7 @@ if (IN_BROWSER) {
   strip.className = "model-strip";
   strip.setAttribute("aria-label", "In-browser model");
   strip.innerHTML = `<div><div class="strip-label">IN-BROWSER MODEL</div><p id="model-copy"></p></div>
-    <div class="model-action"><button id="remove-model" class="text-button" type="button" hidden>Remove from this browser</button>
+    <div class="model-action"><button id="remove-model" type="button" hidden>Remove from this browser</button>
     <button id="load-model" class="accept-button" type="button">Run the model in this browser</button>
     <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
     <span id="model-progress-label">0%</span></div></div>`;
