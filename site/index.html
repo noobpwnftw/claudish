@@ -51,12 +51,12 @@
       </section>
 
       <section class="section" aria-labelledby="layers">
-        <div class="eyebrow">01 / THREE LAYERS, ONE KEYBOARD</div>
-        <h2 id="layers">Continue, instruct, rewrite<span class="dash">—</span>F7 switches.</h2>
+        <div class="eyebrow">01 / TWO MODES, ONE SHIFT</div>
+        <h2 id="layers">Continue, or compose<span class="dash">—</span>Shift switches.</h2>
         <div class="cards">
           <article class="card"><div class="card-body"><h3>Continue</h3><p>What cd_AI starts in: you type as usual; pause, and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Instruct</h3><p>Type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to pick from</span><kbd class="io-key">1–3</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Ordinary English becomes unnecessarily polished prose.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Instruct</h3><p>In compose, type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to pick from</span><kbd class="io-key">1–3</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>In compose, Tab: ordinary English becomes unnecessarily polished prose.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
 
@@ -67,12 +67,13 @@
           <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. Claudish extends it from what you meant to say to what you meant to do.</p>
         </div>
         <table class="keys">
-          <tr><td><kbd>F7</kbd></td><td>switch layer: continue → instruct → rewrite</td></tr>
-          <tr><td><kbd>Tab</kbd></td><td>take the suggestion; in rewrite, convert, then keep</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>in instruct, send, then insert; in rewrite, keep your wording</td></tr>
+          <tr><td><kbd>Shift</kbd></td><td>tap to switch: continue or compose</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>take the suggestion; in compose, rewrite, then keep</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>in compose, do it as an instruction</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>in compose, keep it as it is</td></tr>
           <tr><td><kbd>1–9</kbd></td><td>pick a reading, or answer an agent's question</td></tr>
-          <tr><td><kbd>F8</kbd></td><td>in instruct, also send a picture of this window</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>one step back; in instruct, twice drops the instruction</td></tr>
+          <tr><td><kbd>F8</kbd></td><td>with an instruction, also send this window</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>one step back, until what you composed is gone</td></tr>
         </table>
       </section>
 
@@ -102,7 +103,7 @@
 4. Run `python -m claudish setup --yes`. It downloads a verified llama.cpp build and a 491 MB model, writes a config, registers the input method, and starts Claudish at login.
 5. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
-7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: F7 switches mode, Tab takes a suggestion (in rewrite: Tab rewrites my words in place, Tab again keeps it), Enter sends an instruction, Esc steps back.
+7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: tapping Shift switches between continue and compose; Tab takes a suggestion (in compose: Tab rewrites my words in place, Tab again keeps it); in compose, Enter sends my words as an instruction and Shift+Enter keeps them as they are; Esc steps back.
 
 Make no mistakes.</pre>
         </div>

@@ -8,18 +8,18 @@ Typing in detail, the browser demos, and `claudish fix`.
 | --- | --- |
 | Type | Accumulate the phrase in an editable composition buffer |
 | `-` | Insert `—` immediately |
-| Pause for 180 ms | Continue only: ask for the rest of the sentence. Rewrite asks on Tab and instruct on Enter, so nothing is sent while you type in those modes |
+| Pause for 180 ms | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
 | F6 | Show a suggestion that arrived after your last key; only needed on Windows with a released PIME (Claudish's patched PIME shows it as it arrives) |
-| F7 | Switch mode: continue → instruct → rewrite (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
+| Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second: Shift with another key (a capital, Shift+Enter) or held (Shift+click) is not one. Leaving compose keeps what you see, as it is. GNOME's top bar shows C or AI; Windows' taskbar indicator shows the mode icon; Linux also shows it in the status line, Windows in a notice |
 | Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as grey marked text on macOS (apps that draw marked text themselves may show it underlined), and in the candidate window on Windows. Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
-| Enter (instruct) | Send the held instruction; Enter again (or Tab) inserts the result |
-| Esc (instruct) | One step back: with drafts showing (or an answer pending), close them and keep the instruction to refine and send again, as a follow-up in the same conversation; with just the instruction, drop it (nothing is inserted) |
+| Enter (compose) | Send what you composed as an instruction; Enter again (or Tab) inserts the result. With nothing composed, Enter is the app's (a newline) |
+| Shift+Enter (compose) | Keep what you composed as it is, and stay in compose |
+| Esc (compose) | One step back: the rewrite shown → your words; drafts showing (or an answer pending) → your words again, to refine and send as a follow-up in the same conversation; just your words → dropped (nothing is inserted; a selection taken from the app goes back instead) |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
 | Typing while an agent asks | Composes a reply instead of a number; Enter sends it (the agent hears it as your reason), Backspace edits it, Esc clears it, and digits in it are text |
-| F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
-| Tab (rewrite) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. Rewrite has no list |
-| Tab with a selection (rewrite) | With nothing composed, rewrite the selected text in place (CJK input methods call this reconversion): it leaves the text while it is rewritten, Tab keeps the rewrite, Esc twice puts your words back. macOS and the demo; on Linux only where the toolkit reports selections (GTK3 and GTK4 do not, in our tests) |
-| Enter / Escape (rewrite) | Commit your wording, including the em-dash substitution |
+| F8 (compose) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
+| Tab (compose) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. A rewrite has no list |
+| Tab with a selection (compose) | With nothing composed, rewrite the selected text in place (CJK input methods call this reconversion): it leaves the text while it is rewritten, Tab keeps the rewrite, Esc twice puts your words back. macOS and the demo; on Linux only where the toolkit reports selections (GTK3 and GTK4 do not, in our tests) |
 | Backspace | Edit the composition and invalidate its candidate |
 
 Enter commits composition first; press it again to send a newline. This first
@@ -42,10 +42,10 @@ rewrite is never offered; Enter/Escape still commits your wording.
 With the launcher running, open **http://127.0.0.1:18765**. The demo is the
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and a candidate window, following the same rules as the
-desktop adapters. It opens in rewrite, the pitch (Tab takes the rewrite, Enter
-keeps your words); F7 or the badge switches to continue (keys go straight in;
-pause after a word and the rest waits in grey; Tab takes it) and instruct (Enter
-sends; pick a draft with 1–3). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
+desktop adapters. It opens in compose, the pitch (Tab rewrites, Enter does it as
+an instruction and offers drafts to pick with 1–3, Shift+Enter keeps your
+words); a Shift tap or the badge switches to continue (keys go straight in;
+pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default; a choice lasts only for the current page,
 with no cookies or storage.

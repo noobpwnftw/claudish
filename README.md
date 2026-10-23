@@ -7,17 +7,17 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 
 **[Try it in your browser →](https://claudish.io/demo/)** The model runs in the page; nothing you type leaves it.
 
-## Three modes, one key
+## Two modes, one Shift
 
-| Mode | You type | cd_AI offers |
+| | You type | cd_AI |
 | --- | --- | --- |
 | **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
-| **instruct** | `decline the meeting politely` | drafts to pick from with 1–3 |
-| **rewrite** | `this is important` | Tab turns it into Claudish |
+| **compose**, then Tab | `this is important` | Tab turns it into Claudish |
+| **compose**, then Enter | `decline the meeting politely` | drafts to pick from with 1–3 |
 
-F7 switches modes. Nothing is inserted until you take it, and your own words are
-always one key away. Continue can be ignored forever; the other modes are there
-when you want them.
+Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
+until you take it, and your own words are always one key away. Continue can be
+ignored forever; compose is there when you want it.
 
 The model is yours to choose: a small local one by default, any
 OpenAI-compatible server, Claude with your own key, or an agent CLI. It can read
@@ -43,12 +43,13 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 
 | Key | Does |
 | --- | --- |
-| F7 | switch mode: continue → instruct → rewrite |
-| Tab | take the suggestion; rewrite: convert in place, then keep (with nothing offered, Tab is the app's) |
-| Enter | instruct: send, then insert; rewrite: keep your wording |
+| Shift (tap) | switch: continue ↔ compose |
+| Tab | take the suggestion; in compose, rewrite in place, then keep (with nothing offered, Tab is the app's) |
+| Enter | in compose, send it as an instruction, then insert the draft (with nothing composed, a newline) |
+| Shift+Enter | in compose, keep it as it is |
 | 1–9 | pick a draft, or answer an agent's question |
-| F8 | instruct: also send a picture of this window |
-| Esc | one step back: your words again; instruct: close the drafts, then drop the instruction |
+| F8 | with an instruction: also send a picture of this window |
+| Esc | one step back: your words again, the drafts closed, then what you composed dropped |
 
 ## Status
 

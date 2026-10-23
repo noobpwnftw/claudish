@@ -120,7 +120,7 @@ three readings, with 1–3 to pick and Tab for the first (G27).
 
 The keys are the same everywhere, on every platform:
 
-- **F7** switches mode while composing.
+- **A Shift tap** switches mode: continue (keys straight in) or compose (Tab rewrites, Enter instructs, Shift+Enter keeps), as Shift switches English and pinyin (owner, 2026-10-23; F7 retired).
 - **Tab** accepts the candidate.
 - **Enter** keeps your wording in layers 1 and 2. In layer 3 it sends; when the
   result is ready, Enter inserts it.
@@ -310,9 +310,10 @@ Supported text boxes are a progressive enhancement, never a prerequisite:
 Switching from en_US to cd_AI changes nothing you have to learn. Continue, where
 an installed input method starts, types exactly what you type; a suggestion
 appears in grey after a pause, and you can leave it there forever without
-pressing Tab. Then, at your own pace, you find F7: instruct (ask for something)
-and rewrite (polish your words). The demo leads with rewrite because it is the
-pitch; the installed input method leads with continue because it is the habit.
+pressing Tab. Then, at your own pace, you tap Shift into compose: Tab rewrites
+(polish your words) and Enter instructs (ask for something). The demo leads with
+compose because it is the pitch; the installed input method leads with continue
+because it is the habit.
 Changes must keep this pathway: continue never holds your words, never takes a
 key it does not need, and never asks for attention.
 
@@ -327,4 +328,4 @@ minutes, in this order:
    CLI. It switches nothing on that you did not choose.
 3. **Install for your OS.** One command per platform, then add **cd_AI —
    Claudish** in Input Sources.
-4. **Learn four keys:** F7, Tab, Enter, and Esc. Everything else is typing.
+4. **Learn four keys:** Shift, Tab, Enter, and Esc. Everything else is typing.

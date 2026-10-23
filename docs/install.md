@@ -54,7 +54,7 @@ Or step by step:
 
 | Key | Does |
 | --- | --- |
-| F7 | switch layer: continue → instruct → rewrite |
+| Shift (tap) | switch: continue ↔ compose |
 | Tab | accept the candidate; in continue, take the rest of the sentence (with nothing offered, Tab is the app's) |
 | Enter | the app's in continue; send, then insert (instruct); keep your wording (rewrite) |
 | Esc | keep what you typed |
