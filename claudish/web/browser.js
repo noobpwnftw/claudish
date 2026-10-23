@@ -60,7 +60,6 @@ export async function removeStored() {
     }
   } catch {}
 }
-}
 
 // Without room to store the model (a small quota: a guest profile, a full disk), it runs from memory:
 // downloaded each visit, never half-written into storage. wllama's own "no cache" path still writes.
