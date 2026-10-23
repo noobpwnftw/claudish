@@ -137,7 +137,10 @@ class ClaudishTextService(TextService):
         # PIME can only change what is shown in reply to a request. In continue Claudish takes the
         # key-downs of printable keys (it commits them itself), so it takes their key-ups too: the
         # onKeyUp reply carries an edit session, and with it the suggestion.
-        return bool(self.keyboardOpen and self.state.live and event.isPrintableChar())
+        # Likewise Tab's key-up while a rewrite it asked for is on its way: it often is by then.
+        return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
+                                           event.keyCode == 0x09 and self.state.mode == "rewrite"
+                                           and self.state.working))
 
     def onKeyUp(self, event):
         self.poll_results()
@@ -220,6 +223,11 @@ class ClaudishTextService(TextService):
             return True
         if key == 0x09:
             action = self.state.tab()
+            if action == "request":  # rewrite: ask now; it converts in place when it arrives
+                if self.worker:
+                    self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
+                                         app=focused_app())
+                self.showMessage("cd_AI: rewriting…", 2)
             if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
                 self.publish()
                 return True

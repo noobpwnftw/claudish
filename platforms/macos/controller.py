@@ -99,6 +99,11 @@ class ClaudishInputController(IMKInputController):
         if result:
             revision, data = result
             if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
+                if self.state.converted:  # the rewrite you asked for with Tab, in place of your words
+                    client = self.client()
+                    if client is not None:
+                        self.changed(client)
+                    return
                 if self.state.live:  # continue: the rest of the sentence, as marked text after the caret
                     client = self.client()
                     if client is not None:
@@ -329,6 +334,10 @@ class ClaudishInputController(IMKInputController):
             action = self.state.tab()
             if action == "accept":
                 self.finish(client, suggested=True)
+            elif action == "request":  # rewrite: ask now; it converts in place when it arrives
+                if self.worker is not None:
+                    self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
+                                         app=self.app(client))
             elif action == "convert":
                 self.changed(client)
             return action != "pass"

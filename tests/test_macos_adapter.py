@@ -229,11 +229,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.worker.result = (old_revision, {"text": "stale"})
         self.controller.pollSuggestions_(None)
         self.assertEqual(state.candidate, "")
+        self.assertEqual(self.controller.worker.modes, [])  # nothing is asked while you type
+        self.key(48)  # Tab asks
+        self.assertEqual((self.controller.worker.modes[-1], self.controller.worker.immediate), ("rewrite", True))
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
-        self.controller.pollSuggestions_(None)
-        self.assertFalse(self.controller.panel.visible)  # rewrite has no list
-        self.assertEqual(self.client.marked, "draft!")
-        self.key(48)  # Tab converts: the rewrite in place of your words
+        self.controller.pollSuggestions_(None)  # it arrives: in place of your words, no list
+        self.assertFalse(self.controller.panel.visible)
         self.assertEqual((self.client.marked, self.client.commits), ("A considered draft.", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")
@@ -293,7 +294,7 @@ class MacOSAdapterTests(unittest.TestCase):
         # Continue types into the app: the held words go in, and stay as the model's context.
         self.assertEqual((state.mode, state.candidate, state.text), ("continue", "", "thank the team"))
         self.assertEqual(self.client.commits, ["thank the team"])
-        self.assertNotEqual(self.controller.worker.modes[-1], "continue")  # mid-word: no suggestion yet
+        self.assertNotIn("continue", self.controller.worker.modes)  # mid-word: no suggestion yet
         self.key(49, " ")
         self.assertEqual(self.controller.worker.modes[-1], "continue")  # a word boundary asks
         self.key(98)
@@ -361,6 +362,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_requests_name_the_focused_app(self):
         self.type_text("hi")
+        self.key(48)  # rewrite asks on Tab
         self.assertEqual(self.controller.worker.app, "com.apple.TextEdit")
 
     def test_deactivation_commits_and_closes_worker_timer(self):

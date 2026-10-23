@@ -39,13 +39,12 @@ class Composition:
 
     @property
     def automatic(self):
-        """Ask on this pause? Rewrite: always. Continue: only at a word boundary (after a space or
-        punctuation), so a pause mid-word never splits it ("rev" + " iew"). Instruct: only on Enter."""
-        if self.mode == "instruct":
-            return False
+        """Ask on this pause? Only continue, and only at a word boundary (after a space or
+        punctuation), so a pause mid-word never splits it ("rev" + " iew"). Rewrite asks on Tab and
+        instruct on Enter: you ask for them, so nothing is sent while you type."""
         if self.mode == "continue":
             return bool(self.text) and not self.text[-1].isalnum() and not self.taken
-        return True
+        return False
 
     @property
     def shown(self):
@@ -54,13 +53,19 @@ class Composition:
         return self.candidate if self.converted else self.text
 
     def tab(self):
-        """What Tab does: "pass" (the app's), "wait" (nothing ready yet), "convert" (rewrite: the
-        result now shows in place of your words), or "accept"."""
+        """What Tab does: "pass" (the app's), "request" (rewrite: ask for it now; it converts in
+        place when it arrives), "wait" (asked already), "convert" (rewrite: show it in place of your
+        words), or "accept"."""
         if not self.text:
             return "pass"
-        if self.mode == "rewrite" and self.candidate and not self.converted:
-            self.converted = True
-            return "convert"
+        if self.mode == "rewrite" and not self.converted:
+            if self.candidate:
+                self.converted = True
+                return "convert"
+            if not self.working:
+                self.working, self.failed = True, False
+                return "request"
+            return "wait"
         return "accept" if self.candidate else "wait"
 
     def escape(self):
@@ -72,6 +77,9 @@ class Composition:
             return "pass"
         if self.converted:
             self.converted = False
+            return "back"
+        if self.mode == "rewrite" and (self.working or self.failed):
+            self.change(self.text)  # stop asking: your words, still composing
             return "back"
         if self.mode == "instruct":
             if self.candidates or self.working or self.failed or self.question:
@@ -161,6 +169,8 @@ class Composition:
             return False
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
+        if self.mode == "rewrite" and self.working:
+            self.converted = True  # you asked with Tab: it takes your words' place as it arrives
         self.working = False
         self.question, self.status = None, ""
         return True

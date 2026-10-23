@@ -81,9 +81,9 @@ async def check(args):
             before = await committed_text()
             await keys.type("This is very important.", delay=20)
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
-            await expect(window).to_contain_text("rewrite it", timeout=10000)
-            await keys.press("Tab")
-            await expect(page.locator("#preedit.converted")).to_be_visible()
+            await expect(window).to_contain_text("rewrite it")
+            await keys.press("Tab")  # asks; the rewrite takes your words' place as it arrives
+            await expect(page.locator("#preedit.converted")).to_be_visible(timeout=10000)
             rewrite = await page.locator("#preedit").text_content()
             print("Real backend, rewrite:", repr(rewrite))
             assert rewrite != "This is very important.", rewrite
@@ -146,10 +146,12 @@ async def check(args):
             }""")
             await page.locator("#editor").click()
             await keys.type("an earlier thought", delay=10)
+            await keys.press("Tab")  # asks (held)
             await asyncio.wait_for(first_started.wait(), timeout=3)
-            await keys.type(" now", delay=10)
+            await keys.type(" now", delay=10)  # typing on: that answer is stale
             release.set()
-            await expect(window).to_contain_text("rewrite it")
+            await page.wait_for_timeout(300)
+            await expect(page.locator("#preedit")).to_have_text("an earlier thought now")  # it never lands
             await keys.press("Tab")
             await expect(page.locator("#preedit")).to_have_text("Rewrite: an earlier thought now")
             await page.unroute("**/suggest", controlled)
@@ -164,9 +166,12 @@ async def check(args):
             await page.route("**/suggest", unavailable)
             await page.locator("#editor").click()
             await keys.type("Keep this thought intact.", delay=10)
+            await keys.press("Tab")  # asks: the service fails
             await expect(page.locator("#status")).to_contain_text("model unavailable")
             await expect(page.locator("#preedit")).to_have_text("Keep this thought intact.")
-            await keys.press("Escape")  # keeps your words
+            await expect(window).to_contain_text("the rewrite failed")
+            await keys.press("Escape")  # past the failure: your words, still composing
+            await keys.press("Escape")  # kept
             await expect(committed).to_have_attribute("data-text", "Keep this thought intact.")
             await page.unroute("**/suggest", unavailable)
             await page.locator("#clear").click()

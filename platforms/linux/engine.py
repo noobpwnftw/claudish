@@ -82,8 +82,10 @@ class ClaudishEngine(IBus.Engine):
                     % len(state.candidates))
         elif state.converted:
             hint = "rewrite · Tab: keep it · Esc: your words"
-        elif state.candidate and state.mode == "rewrite":
-            hint = "rewrite · Tab: rewrite it · Enter/Esc: keep your words"
+        elif state.mode == "rewrite":
+            hint = ("rewrite · rewriting… · Esc: your words" if state.working else
+                    "rewrite · the rewrite failed · Tab: try again · Enter/Esc: keep your words" if state.failed else
+                    "rewrite · Tab: rewrite it · Enter/Esc: keep your words")
         elif state.candidate:
             hint = LABELS[state.mode] + state.candidate
         elif state.working:
@@ -219,6 +221,10 @@ class ClaudishEngine(IBus.Engine):
             action = self.composition.tab()
             if action == "accept":
                 self.finish(True)
+            elif action == "request":  # rewrite: ask now; it converts in place when it arrives
+                self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
+                                          immediate=True, app=self.app)
+                self.render()
             elif action == "convert":
                 self.render()
             return action != "pass"

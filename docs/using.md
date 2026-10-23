@@ -8,7 +8,7 @@ Typing in detail, the browser demos, and `claudish fix`.
 | --- | --- |
 | Type | Accumulate the phrase in an editable composition buffer |
 | `-` | Insert `—` immediately |
-| Pause for 180 ms | Request a local rewrite in the background |
+| Pause for 180 ms | Continue only: ask for the rest of the sentence. Rewrite asks on Tab and instruct on Enter, so nothing is sent while you type in those modes |
 | F6 | Preview a completed candidate; useful on Windows |
 | F7 | Switch mode: continue → instruct → rewrite (Linux shows it in the auxiliary text, Windows in a notice). F7 belongs to the input method while cd_AI is the active input source, so apps do not receive it then |
 | Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as grey marked text on macOS (apps that draw marked text themselves may show it underlined), and in the candidate window on Windows (F6 shows it). Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
@@ -16,7 +16,7 @@ Typing in detail, the browser demos, and `claudish fix`.
 | Esc (instruct) | One step back: with drafts showing (or an answer pending), close them and keep the instruction to refine and send again, as a follow-up in the same conversation; with just the instruction, drop it (nothing is inserted) |
 | 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
 | F8 (instruct) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
-| Tab (rewrite) | When the rewrite is ready (the status line says so), convert your words in place, as a CJK input method converts what you typed; Tab again (or Enter, or typing on) keeps it, Esc or Backspace brings your words back. Rewrite has no list |
+| Tab (rewrite) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. Rewrite has no list |
 | Enter / Escape (rewrite) | Commit your wording, including the em-dash substitution |
 | Backspace | Edit the composition and invalidate its candidate |
 

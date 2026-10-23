@@ -52,13 +52,14 @@ class ModeFeelTests(unittest.TestCase):
         state = Composition()
         state.mode = "rewrite"
         state.change("very good")
-        self.assertEqual(state.tab(), "wait")  # nothing ready yet
+        self.assertEqual(state.tab(), "request")  # Tab asks for it
+        self.assertEqual(state.tab(), "wait")  # asked already
         state.offer(state.revision, "Exceptionally good.")
         self.assertFalse(state.choosing)  # no list for a rewrite
-        self.assertEqual((state.tab(), state.shown), ("convert", "Exceptionally good."))
+        self.assertEqual(state.shown, "Exceptionally good.")  # in place as it arrives: you asked
         self.assertEqual((state.escape(), state.shown), ("back", "very good"))
         self.assertEqual(state.escape(), "keep")  # a second Esc: your words, as typed
-        state.tab()
+        self.assertEqual(state.tab(), "convert")  # the rewrite again, without asking again
         self.assertEqual(state.enter(), "accept")  # Enter keeps the converted text
         self.assertFalse(state.insert("x"))  # typing on keeps it too (the adapter commits first)
         self.assertEqual(state.commit(), "Exceptionally good.")
@@ -72,6 +73,15 @@ class ModeFeelTests(unittest.TestCase):
         state.mode = "continue"
         state.change("")
         self.assertFalse(state.passes(" "))  # continue types everything into the app anyway
+
+    def test_rewrite_esc_while_asking_stops_and_keeps_your_words(self):
+        state = Composition()
+        state.mode = "rewrite"
+        state.change("very good")
+        state.tab()
+        revision = state.revision
+        self.assertEqual((state.escape(), state.text, state.working), ("back", "very good", False))
+        self.assertFalse(state.offer(revision, "Late."))  # the stopped request's answer is ignored
 
     def test_rewrite_backspace_after_converting_is_your_words_again(self):
         state = Composition()
@@ -111,9 +121,9 @@ class ContinueTests(unittest.TestCase):
         self.assertFalse(state.automatic)  # taking it is not a pause: nothing more until the next key
         state.change(state.text + " ")
         self.assertTrue(state.automatic)
-        state.next_mode(), state.next_mode()  # rewrite asks on every pause
+        state.next_mode(), state.next_mode()  # rewrite asks on Tab, not on pauses
         state.change("very")
-        self.assertTrue(state.automatic)
+        self.assertFalse(state.automatic)
 
 
 class RewriterTests(unittest.TestCase):

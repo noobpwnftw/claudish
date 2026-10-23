@@ -67,10 +67,9 @@ const ghost = () => live() && !selected() && state.candidate.length > state.text
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
 function automatic() {
-  if (state.mode === "instruct") return false;
-  // Continue asks at a word boundary, not at the start of an empty line.
-  if (live()) return Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
-  return true;
+  // Only continue asks on a pause, at a word boundary (not at the start of an empty line). Rewrite
+  // asks on Tab and instruct on Enter: nothing is sent while you type.
+  return live() && Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
 }
 // Continue's context is the text before the caret, as an input method reads the app's surrounding
 // text: typed, pasted, or already there.
@@ -103,7 +102,7 @@ async function ask(revision) {
   const text = state.text, mode = state.mode, started = performance.now();
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
-  setStatus(mode === "instruct" ? (hosted ? "working remotely…" : "working…") : "");
+  setStatus(mode === "continue" ? "" : hosted ? "working remotely…" : "working…");
   try {
     let data;
     if (IN_BROWSER) {
@@ -118,6 +117,7 @@ async function ask(revision) {
     if (revision !== state.revision) return;  // you typed since: a stale answer never lands
     state.candidate = data.text;
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
+    if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: in place as it arrives
     state.working = false;
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
@@ -186,13 +186,16 @@ function key(name, shift = false) {
     if (!state.text) return false;
     // Rewrite: the first Tab converts your words in place, the second keeps it. A pending
     // candidate is not stale text, so Tab waits for it.
-    if (state.mode === "rewrite" && state.candidate && !state.converted) { state.converted = true; render(); }
-    else if (state.candidate) { commit(state.candidate); change(""); changed(); }
+    if (state.mode === "rewrite" && !state.converted) {
+      if (state.candidate) { state.converted = true; render(); }
+      else if (!state.working) { state.working = true; state.failed = false; render(); ask(state.revision); }
+    } else if (state.candidate) { commit(state.candidate); change(""); changed(); }
     return true;
   }
   if (name === "Escape") {  // one step back
     if (!state.text) return false;
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
+    if (state.mode === "rewrite" && (state.working || state.failed)) { change(state.text); render(); return true; }
     if (state.mode === "instruct") {
       // Drafts showing or an answer pending: back to the instruction, to refine and send again.
       // Otherwise the instruction is dropped: it is not text you meant to write.
@@ -289,9 +292,11 @@ function render() {
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
     else lines.push(["Enter", "send it"]);
-  } else if (composing() && state.candidate) {
-    // Rewrite has no list: a hint that it is ready, then the rewrite itself in place of your words.
-    lines.push(["Tab", state.converted ? "keep it" : "rewrite it"]);  // Enter keeps it too
+  } else if (composing()) {
+    // Rewrite has no list: Tab asks, and the rewrite takes your words' place as it arrives.
+    if (state.working) lines.push(["", "rewriting…"]);
+    else if (state.failed) lines.push(["Tab", "the rewrite failed: try again"]);
+    else lines.push(["Tab", state.converted ? "keep it" : "rewrite it"]);  // Enter keeps it too
   }
   window.hidden = !lines.length;
   for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
@@ -313,7 +318,7 @@ function render() {
     // One pattern everywhere: "Key: action".
     foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to the instruction"
       : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc: drop it")
-      : state.converted ? "Esc: your words" : "Enter or Esc: keep your words";
+      : state.converted || state.working ? "Esc: your words" : "Enter or Esc: keep your words";
     window.append(foot);
   }
   placeCandidateWindow();

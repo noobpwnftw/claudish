@@ -88,29 +88,29 @@ def scenarios():
 
     focus("other")
     type_text("very important")
-    settle()
-    key("Tab")  # converts: the rewrite in place of your words, still a composition
+    key("Tab")  # asks; the rewrite takes your words' place as it arrives, still a composition
     wait_for(lambda: state().get("preedit") == "particularly crucial", what="the rewrite in place")
     check("Tab converts the rewrite in place", (state().get("preedit"), state()["other"]),
           ("particularly crucial", ""))
     key("Escape")  # your words again
     wait_for(lambda: state().get("preedit") == "very important", what="your words again")
     check("Esc brings your words back", state().get("preedit"), "very important")
-    key("Tab", "Tab")  # converts, then keeps it
+    key("Tab", "Tab")  # the rewrite again (no new request), then kept
     wait_for(lambda: state()["other"], what="candidate commit")
     check("Tab again keeps the rewrite", state()["other"], "particularly crucial")
 
     focus("view")
     type_text("very")
     settle()
-    type_text(" good")  # A newer edit invalidates the candidate for "very".
+    check("rewrite asks nothing while you type", state().get("preedit"), "very")
+    type_text(" good")
     key("Tab")
     time.sleep(0.2)
-    check("Tab right after an edit commits nothing stale", state()["view"], "")
-    settle()
-    key("Tab", "Tab")
-    wait_for(lambda: state()["view"], what="fresh candidate")
-    check("fresh candidate after the edit", state()["view"], "particularly good")
+    check("Tab asks; nothing is committed", state()["view"], "")
+    wait_for(lambda: state().get("preedit") == "particularly good", what="the rewrite of the whole phrase")
+    key("Tab")
+    wait_for(lambda: state()["view"], what="the rewrite kept")
+    check("the rewrite is of everything typed", state()["view"], "particularly good")
 
     focus("entry")
     key("ctrl+a", "BackSpace")
