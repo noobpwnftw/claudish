@@ -408,7 +408,7 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..3d62b1a
+index 0000000..41eb1b4
 --- /dev/null
 +++ b/src/Panel.cpp
 @@ -0,0 +1,537 @@
@@ -604,7 +604,7 @@ index 0000000..3d62b1a
 +    const float textMax = inner - (takes ? px(TAKE) : 0);
 +    for (size_t i = 0; i < spec.rows.size(); ++i) {
 +        const PanelRow& row = spec.rows[i];
-+        std::wstring words = row.text + (row.legend.empty() ? L"" : L" — " + row.legend);
++        std::wstring words = row.text + (row.legend.empty() ? L"" : L" \u2014 " + row.legend);
 +        Line line;
 +        line.layout = makeLayout(words, text_, textMax);
 +        measure(line.layout, &line.w, &line.h);
