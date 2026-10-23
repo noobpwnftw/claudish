@@ -245,6 +245,27 @@ def scenarios():
     wait_for(lambda: document().endswith("say hi."))
     check("instruct: Enter sends, Enter inserts", document().split("\n")[-1], "As requested—say hi.")
 
+    # 5. G35: in Terminal.app an instruction sees the screen (the service reads it through AX; its
+    # Python needs the Accessibility permission), and the draft lands at the prompt.
+    sys.path.insert(0, str(ROOT))
+    from claudish.screen import read_ax, tail
+    screen = lambda: tail(read_ax(None) or "")
+    sh("osascript", "-e", 'tell application "Terminal" to do script "gti status"',
+       "-e", 'tell application "Terminal" to activate')
+    if wait_for(lambda: "command not found: gti" in screen(), timeout=15):
+        select_input_method()  # input sources are per document: Terminal's window gets cd_AI too
+        shift_tap()  # compose
+        type_text("fix")
+        key("Return")  # the instruction, with the screen's last lines
+        time.sleep(1.5)
+        key("Return")  # the draft, at the prompt; running it would be the user's Enter
+        wait_for(lambda: "having read the terminal" in screen(), timeout=10)
+        check("terminal: fix sees the screen, the draft lands at the prompt",
+              screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)
+    else:
+        check("terminal: the screen is readable (Accessibility for the service's Python)", screen(), "")
+    subprocess.run(["pkill", "-x", "Terminal"], check=False)
+
     # Errors inside an input method never reach the screen: with CLAUDISH_TRACE set (launchctl
     # setenv) cd_AI logs them, and any is a failure.
     trace = Path("/tmp/claudish-trace.log")
