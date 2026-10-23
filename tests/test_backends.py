@@ -96,7 +96,7 @@ class ClaudeBackendTests(unittest.TestCase):
             thread.start()
             try:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
-                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "hosted": hosted,
+                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "hosted": hosted, "routes": {},
                                                        "profile": None, "modes": ["rewrite", "continue", "instruct"],
                                                        "timeout": 3})
             finally:

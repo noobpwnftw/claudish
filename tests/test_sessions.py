@@ -209,6 +209,10 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("Dear Ana, ▮", item["system"])
         self.assertEqual(item["turn"], "very important")
         self.assertEqual(item["candidates"], ["particularly crucial"])
+        self.assertEqual(self.call("/recent/clear", {})[0], 200)
+        self.assertEqual(self.call("/recent")[1]["recent"], [])
+        # A password field is never sent, whatever an adapter does.
+        self.assertEqual(self.call("/suggest", {"text": "hunter2", "purpose": "password"})[0], 400)
 
     def test_the_token_file_is_private_and_new_for_each_run(self):
         import os

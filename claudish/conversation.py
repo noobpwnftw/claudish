@@ -17,6 +17,9 @@ KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs
 # A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
 # it may take far longer than a suggestion while typing (the profile's timeout, if longer).
 TURN_TIMEOUT = 60
+# How a model's own question is shown, and the choice labels only Claudish's own questions use.
+MODEL_ASKS = "The model asks: "
+OWN_LABELS = {"allow", "deny", "allow for this conversation"}
 
 
 class Conversation:
@@ -158,11 +161,16 @@ class ModelDriver:
         return waiter[1] or (1, "cancelled")
 
     def ask_user(self, session, arguments):
+        """The model's own question, shown as is but marked as the model's: it can never look like
+        one of Claudish's permission questions, and what you type in reply is redacted before it
+        goes back (a question must not be a way to collect a secret)."""
+        from .screen import redact
         labels = [str(c)[:80] for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
-        choice, words = self.question(session, str(arguments.get("question") or "")[:200],
+        labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
+        choice, words = self.question(session, MODEL_ASKS + str(arguments.get("question") or "")[:200],
                                       [{"label": label} for label in labels])
         if words is not None:
-            return "The user answered: " + words
+            return "The user answered: " + redact(words)[0]
         return "The user chose: " + labels[choice] if 0 <= choice < len(labels) else "No answer."
 
     def approve(self, session, server, tool, arguments, kind, asked=None):
@@ -172,9 +180,11 @@ class ModelDriver:
             return True, None
         shown = ", ".join("%s=%s" % (k, str(v)[:40]) for k, v in arguments.items())
         if asked:
-            what = str(arguments.get("task") or shown)[:80]
-            choice, text = self.question(session, asked, [{"label": "Yes", "legend": what},
-                                                          {"label": "No", "legend": "answer it here instead"}])
+            # The whole task, in the question itself: nothing the helper will be told is hidden.
+            what = str(arguments.get("task") or shown)
+            choice, text = self.question(session, "%s %s" % (asked, what),
+                                         [{"label": "Yes", "legend": "it opens in a new window"},
+                                          {"label": "No", "legend": "answer it here instead"}])
             return (False, text) if text is not None else (choice == 0, None)
         legend = "%s.%s(%s)" % (server, tool, shown)
         choices = [{"label": "Allow", "legend": legend}, {"label": "Deny", "legend": "the model continues without it"}]

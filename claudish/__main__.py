@@ -68,6 +68,7 @@ def main():
     recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
                                  "(in the service's memory only)")
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
+    recent.add_argument("--clear", action="store_true", help="Forget them now")
     recent.add_argument("--url", default="http://127.0.0.1:18765")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
@@ -78,6 +79,10 @@ def main():
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
     if args.command == "recent":
+        if args.clear:
+            from .client import call
+            call(args.url, "/recent/clear", {})
+            return print("Cleared.")
         return show_recent(args.url, args.full)
     if args.command == "textbox-mcp":
         from .textbox_mcp import main as textbox_mcp

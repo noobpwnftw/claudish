@@ -14,6 +14,8 @@ def checked_purpose(purpose):
     """The field's kind as the input method reports it ("terminal", "email", ...), or None."""
     if purpose is not None and not (isinstance(purpose, str) and purpose.isidentifier() and len(purpose) <= 32):
         raise ValueError("purpose must be a short name")
+    if purpose in ("password", "pin"):
+        raise ValueError("secure fields are never sent")  # the adapters stay out of them too
     return purpose
 
 
@@ -110,6 +112,9 @@ def make_server(rewriter, port=18765, token=None):
                 return self.reply(200, {"id": session.id})
             if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "textbox":
                 return self.textbox(parts[1], data)
+            if parts == ["recent", "clear"]:
+                rewriter.recent.clear()
+                return self.reply(200, {"ok": True})
             if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "end":
                 rewriter.conversations.end(parts[1])  # its text box went away
                 return self.reply(200, {"ok": True})
@@ -179,11 +184,17 @@ def make_server(rewriter, port=18765, token=None):
             if self.path == "/recent":
                 if not self.trusted():
                     return self.reply(403, {"error": "the service token is required"})
+                from .model import RECENT_SECONDS
+                import time as clock
+                while rewriter.recent and clock.time() - rewriter.recent[0]["time"] > RECENT_SECONDS:
+                    rewriter.recent.popleft()  # what you typed is not kept longer than this
                 return self.reply(200, {"recent": list(rewriter.recent)})
             if self.path == "/health":
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
                                         "hosted": rewriter.hosted,
                                         "profile": getattr(rewriter, "profile", None),
+                                        # Which app goes to which profile (the AI that answers there).
+                                        "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},
                                         "modes": list(rewriter.modes),
                                         "timeout": rewriter.timeout})
             self.reply(404, {"error": "not found"})
@@ -191,7 +202,7 @@ def make_server(rewriter, port=18765, token=None):
         def do_POST(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
-            if self.path.startswith(("/sessions", "/conversations/")):
+            if self.path.startswith(("/sessions", "/conversations/", "/recent/")):
                 return self.post_session()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})

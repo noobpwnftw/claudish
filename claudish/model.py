@@ -10,7 +10,8 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
-RECENT = 8  # requests kept for `claudish recent`
+RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
+RECENT_SECONDS = 600
 
 SYSTEM = (
     "Rewrite the user's text in polished, slightly verbose English. "
@@ -182,6 +183,10 @@ class Rewriter:
                     other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
                     other.url = getattr(self, "url", None)
                     self.routed[binding.profile] = other
+                    if other.hosted and not self.hosted:
+                        # A local service sending one app's text to a hosted model: said out loud.
+                        print("Text typed in %s goes to profile %r, a hosted model." % (binding.pattern, binding.profile),
+                              flush=True)
                 return self.routed[binding.profile]
         return self
 
@@ -310,9 +315,10 @@ class Rewriter:
         history = list(conversation.messages) if conversation is not None else []
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
+        from .screen import redact
         record = {"time": time.time(), "profile": getattr(self, "profile", None), "backend": self.backend,
                   "model": self.model or (self.claude.model if self.claude else None), "hosted": self.hosted,
-                  "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
+                  "mode": mode, "app": box.app, "kind": box.kind, "system": redact(prompt)[0], "turn": redact(said)[0],
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
         self.recent.append(record)
         if serial and not self.lock.acquire(blocking=False):
@@ -355,6 +361,7 @@ class Rewriter:
             conversation.remember([{"role": "user", "content": text}] + new
                                   + [{"role": "assistant", "content": candidates[0]}])
         return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
+                "profile": getattr(self, "profile", None), "hosted": self.hosted,
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}

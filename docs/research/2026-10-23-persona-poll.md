@@ -115,3 +115,26 @@ designs and goals before polishing details. Synthetic again: agents in personas.
   you want none, or ignore the suggestion. Not a blocker.
 - A second audience on the home page: the accessibility and everyday angle,
   in plain words, next to the joke.
+
+# Round 3: the architecture
+
+Two synthetic reviewers read the one-request architecture (docs/design/architecture.md).
+
+**The skeptic:** the shape is safer (one checkpoint for side effects, helpers only
+behind a worded question, nothing on a command line), but two new channels
+needed guarding. Done the same day: a model's own question is marked "The model
+asks:", cannot use Claudish's own labels (Allow, Deny), and what you type in
+reply is redacted before it goes back; a helper's question shows the whole task;
+a Claude helper whose own settings skip permission prompts is refused; answers
+say which profile answered and whether it is hosted, a routed hosted profile is
+announced, and `/health` lists the routes; the service itself refuses password
+and PIN fields; `claudish recent` keeps redacted records for ten minutes at most
+and `--clear` forgets them. Still open: a mark at the caret when the answering
+model is hosted (visual pass).
+
+**The power user:** the model holds for "text for this box"; missing are an
+answer to *read* rather than insert ("explain this regex"), a profile per mode
+(a tiny model for continue, a strong one for instructions), several named
+helpers, the tool loop on the Claude backend, and a handle to follow up after a
+handoff. Dissent recorded, not acted on: remove the single-shot `command`
+backend and the Claude Code session host in favour of helpers.

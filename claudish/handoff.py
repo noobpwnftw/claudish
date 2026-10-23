@@ -23,12 +23,28 @@ UNSAFE = re.compile(r"[\"$`!%^&|<>;'\r\n]")
 
 
 def available(template):
-    """Configured, installed, and supervised."""
+    """Configured, installed, and supervised: neither its command nor (for Claude Code) its own
+    settings skip its permission prompts."""
     if not template or not isinstance(template, list) or not all(isinstance(a, str) for a in template):
         return False
     if any(flag in argument.lower() for argument in template for flag in UNSUPERVISED):
         return False
+    if name(template) == "claude" and unsupervised_claude():
+        return False
     return shutil.which(template[0]) is not None
+
+
+def unsupervised_claude():
+    """Whether Claude Code's user settings make it skip permission prompts (defaultMode)."""
+    import json
+    path = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+    try:
+        with open(path, encoding="utf-8") as source:
+            settings = json.load(source)
+    except (OSError, ValueError):
+        return False
+    mode = str(((settings.get("permissions") or {}).get("defaultMode") or settings.get("defaultMode") or "")).lower()
+    return mode in ("bypasspermissions", "dontask")
 
 
 def name(template):

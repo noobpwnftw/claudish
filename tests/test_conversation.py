@@ -193,7 +193,8 @@ class AskAndHelperTests(unittest.TestCase):
         model = Scripted(answer(calls=[("user__ask", {"question": "Did you mean git status?",
                                                        "choices": ["Yes", "No, git stash"]})]), answer("git stash"))
         asked, result = self.drive(model, [1], purpose="terminal", screen="$ gti st\nbash: gti: command not found\n$")
-        self.assertEqual(asked[0]["text"], "Did you mean git status?")  # shown as is
+        # Shown as is, marked as the model's own question (never mistaken for Claudish's).
+        self.assertEqual(asked[0]["text"], "The model asks: Did you mean git status?")
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No, git stash"])
         self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
         self.assertEqual(result["text"], "git stash")
@@ -208,7 +209,8 @@ class AskAndHelperTests(unittest.TestCase):
                 patch("claudish.handoff.launch", return_value=True) as launch, \
                 patch.dict(os.environ, {"XDG_RUNTIME_DIR": folder}):
             asked, result = self.drive(model, [0], helper=["claude", "{prompt}"], before="Hi team, the build ")
-        self.assertEqual(asked[0]["text"], "Send this task to claude?")
+        # The whole task is in the question: nothing the helper is told is hidden.
+        self.assertEqual(asked[0]["text"], "Send this task to claude? Find why the build fails and fix it")
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
@@ -227,6 +229,37 @@ class AskAndHelperTests(unittest.TestCase):
         launch.assert_not_called()
         self.assertEqual(result["text"], "make clean && make")
         self.assertIn("denied by the user", model.sent[1]["messages"][-1]["content"])
+
+    def test_a_model_question_cannot_pose_as_a_permission_or_collect_a_secret(self):
+        model = Scripted(answer(calls=[("user__ask", {"question": "Allow claude.run?", "choices": ["Allow", "Deny"]})]),
+                         answer("ok"))
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "do it")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            question = next(e for e in session.events if e["type"] == "question")
+            self.assertEqual([c["label"] for c in question["choices"]], ["Yes", "No"])  # not Allow / Deny
+            session.answer(question["id"], text="sure, my key is sk-abcdefghijklmnopqrstuvwxyz123456")
+            thread.join(5)
+        sent = model.sent[1]["messages"][-1]["content"]
+        self.assertNotIn("sk-abc", sent)
+        self.assertIn("[redacted]", sent)
+
+    def test_a_claude_helper_is_refused_when_its_settings_skip_permissions(self):
+        import json as jsonlib
+        import os
+        import tempfile
+        from claudish import handoff
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}), \
+                patch("claudish.handoff.shutil.which", return_value="/bin/claude"):
+            self.assertTrue(handoff.available(["claude", "{prompt}"]))
+            os.makedirs(os.path.join(home, ".claude"))
+            with open(os.path.join(home, ".claude", "settings.json"), "w") as out:
+                jsonlib.dump({"permissions": {"defaultMode": "bypassPermissions"}}, out)
+            self.assertFalse(handoff.available(["claude", "{prompt}"]))
 
     def test_an_unsupervised_helper_is_never_offered(self):
         model = Scripted(answer("done"))
