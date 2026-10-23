@@ -165,10 +165,10 @@ class ClaudishInputController(IMKInputController):
         def text(location, length):
             if length <= 0:
                 return ""
-            found = client.stringFromRange_actualRange_((location, length), None)
-            if isinstance(found, tuple):  # PyObjC returns the out parameter alongside
-                found = found[0]
-            return str(found or "")
+            # Not stringFromRange:actualRange:: PyObjC passes its out-parameter as NULL, and IMK's
+            # client wrapper writes to it anyway (a crash on macOS 26, found in a real session).
+            found = client.attributedSubstringFromRange_((location, length))
+            return str(found.string()) if found is not None else ""
         def pair(found):
             return (found.location, found.length) if hasattr(found, "location") else tuple(found)
         try:

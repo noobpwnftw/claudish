@@ -54,8 +54,11 @@ class TextClient(Client):
         marked = getattr(self.marked, "text", self.marked)
         return (len(self.text), len(marked)) if marked else (2**63 - 1, 0)
 
+    def attributedSubstringFromRange_(self, span):
+        return types.SimpleNamespace(string=lambda: self.whole()[span[0]:span[0] + span[1]])
+
     def stringFromRange_actualRange_(self, span, actual):
-        return self.whole()[span[0]:span[0] + span[1]], span
+        raise AssertionError("crashes in IMK when PyObjC passes a NULL actualRange")
 
 
 class Grey:

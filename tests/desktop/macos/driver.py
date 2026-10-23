@@ -12,8 +12,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from Quartz import (CGEventCreateKeyboardEvent, CGEventKeyboardSetUnicodeString, CGEventPost,
-                    CGEventSetFlags, kCGEventFlagMaskShift, kCGHIDEventTap)
+from Quartz import (CGEventCreateKeyboardEvent, CGEventGetFlags, CGEventKeyboardSetUnicodeString,
+                    CGEventPost, CGEventSetFlags, kCGEventFlagMaskShift, kCGHIDEventTap)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -39,10 +39,21 @@ US[" "] = 49
 SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`"))
 
 
+class Unfocused(RuntimeError):
+    pass
+
+
 def post(code, text=None, shift=False):
+    # Keys go wherever focus is: if the test app is not in front, stop rather than type into
+    # whatever is (a function key there is a system shortcut).
+    if STATE.exists() and not state().get("active"):
+        raise Unfocused("the test app lost focus; stopping before typing elsewhere")
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, code, down)
-        CGEventSetFlags(event, kCGEventFlagMaskShift if shift else 0)  # else the session's modifiers stick
+        # Keep the flags macOS gives the key (function keys carry Fn), but Shift only when asked:
+        # otherwise a Shift from an earlier event sticks.
+        flags = CGEventGetFlags(event) & ~kCGEventFlagMaskShift
+        CGEventSetFlags(event, flags | (kCGEventFlagMaskShift if shift else 0))
         if text is not None:
             CGEventKeyboardSetUnicodeString(event, len(text.encode("utf-16-le")) // 2, text)
         CGEventPost(kCGHIDEventTap, event)
@@ -126,12 +137,13 @@ def scenarios():
     # 2. Install and select cd_AI.
     # Replacing a registered bundle leaves macOS without a server to launch until it notices, so an
     # installed cd_AI is kept unless --reinstall asks for the fresh build.
-    if "--reinstall" in sys.argv or not TARGET.exists():
-        if TARGET.exists():
-            subprocess.run(["pkill", "-f", str(TARGET)], check=False)
-            shutil.rmtree(TARGET)
+    if not TARGET.exists():
         TARGET.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(ROOT / "dist/macos/Claudish.app", TARGET, symlinks=True)
+    elif "--reinstall" in sys.argv:
+        # In place: a removed and re-added bundle is a new input source, which macOS asks about again.
+        sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
+        subprocess.run(["pkill", "-f", str(TARGET)], check=False)  # the next key starts the new build
     print(sh(sys.executable, str(HERE / "input_source.py"), str(TARGET), BUNDLE_ID, check=False))
     fresh_document()
     current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
