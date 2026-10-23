@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from AppKit import (NSApp, NSForegroundColorAttributeName, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
+from AppKit import (NSApp, NSFont, NSScrollView, NSForegroundColorAttributeName, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
                     NSMakeRect, NSTextView, NSView, NSWindow, NSWindowStyleMaskTitled)
 from Foundation import NSObject, NSTimer
 
@@ -46,12 +46,19 @@ window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
     NSMakeRect(200, 200, 600, 300), NSWindowStyleMaskTitled, NSBackingStoreBuffered, False)
 window.setTitle_("Claudish test app")
 content = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 300))
-view = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 100, 600, 200))
+# The main field in a scroll view, as text views are in real apps (TextEdit, Mail, Notes): IMK reports
+# the caret's rectangle the way those apps do (a bare text view reports it a line too high).
+scroll = NSScrollView.alloc().initWithFrame_(NSMakeRect(0, 100, 600, 200))
+view = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 200))
+view.setFont_(NSFont.systemFontOfSize_(14))
+scroll.setDocumentView_(view)
+scroll.setHasVerticalScroller_(True)
 other = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 600, 90))  # a second field, for focus changes
 for field in (view, other):
     field.setAutomaticDashSubstitutionEnabled_(False)  # the app's own substitutions are not the input method's
     field.setAutomaticQuoteSubstitutionEnabled_(False)
-    content.addSubview_(field)
+content.addSubview_(scroll)
+content.addSubview_(other)
 window.setContentView_(content)
 window.makeKeyAndOrderFront_(None)
 window.makeFirstResponder_(view)
