@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from AppKit import (NSApp, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
+from AppKit import (NSApp, NSForegroundColorAttributeName, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
                     NSMakeRect, NSTextView, NSWindow, NSWindowStyleMaskTitled)
 from Foundation import NSObject, NSTimer
 
@@ -26,12 +26,16 @@ class Mirror(NSObject):
                 window.makeFirstResponder_(view)
         except OSError:
             pass
-        marked = ""
+        marked, color = "", ""
         if view.hasMarkedText():
             location, length = view.markedRange()
             marked = str(view.string())[location:location + length]
+            if length:  # how it is drawn: continue's suggestion should not look like typed text
+                found = view.textStorage().attribute_atIndex_effectiveRange_(NSForegroundColorAttributeName,
+                                                                            location, None)[0]
+                color = str(found.colorNameComponent()) if found is not None and found.type() == 2 else str(found)
         with open(STATE + ".tmp", "w") as out:
-            json.dump({"text": str(view.string()), "marked": marked, "active": bool(NSApp.isActive())}, out)
+            json.dump({"text": str(view.string()), "marked": marked, "marked_color": color, "active": bool(NSApp.isActive())}, out)
         os.replace(STATE + ".tmp", STATE)
 
 
