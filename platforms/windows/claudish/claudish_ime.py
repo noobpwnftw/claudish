@@ -426,6 +426,10 @@ class ClaudishTextService(TextService):
         super().onCompositionTerminated(forced)
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
+        if self.state.sent:
+            # An instruction sent leaves your text (it ends the composition on purpose); a focus
+            # change hides its panel. Either way the exchange goes on, and returns with the box.
+            return
         self.state.change("")
         if self.worker:
             self.worker.schedule(self.state.revision, "")
