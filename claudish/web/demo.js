@@ -537,19 +537,6 @@ async function checkConnection() {
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Service unavailable"));
   }
 }
-// How much this page keeps in the browser (the model, once downloaded), with a way to remove it.
-async function showStored() {
-  let bytes = 0;
-  // Measured from the files themselves: the browser's usage estimate lags behind a removal.
-  try { bytes = await (await import("./browser.js")).storedBytes(); } catch {}
-  const button = $("remove-model");
-  const stored = bytes > 50e6;
-  button.hidden = !stored;
-  button.textContent = `Stored here: ${Math.round(bytes / 1e6)} MB · Remove`;
-  if (!browserBackend) {
-    $("load-model").textContent = stored ? "Run the model (already in this browser)" : "Run the model in this browser";
-  }
-}
 async function loadInBrowser() {
   const strip = $("model-strip");
   strip.classList.add("loading");
@@ -567,7 +554,7 @@ async function loadInBrowser() {
     }, (text) => { note = text; });
     strip.classList.replace("loading", "ready");
     $("model-copy").textContent = note || "The model is running in this browser. Type below; nothing leaves this page.";
-    showStored();
+    $("remove-model").hidden = false;
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Model ready in browser"));
     $("connection").className = "connection online";
     changed();
@@ -602,28 +589,26 @@ if (IN_BROWSER) {
   strip.className = "model-strip";
   strip.setAttribute("aria-label", "In-browser model");
   strip.innerHTML = `<div><div class="strip-label">IN-BROWSER MODEL</div><p id="model-copy"></p></div>
-    <div class="model-action"><button id="remove-model" class="text-button" type="button" hidden></button>
+    <div class="model-action"><button id="remove-model" class="text-button" type="button" hidden>Remove from this browser</button>
     <button id="load-model" class="accept-button" type="button">Run the model in this browser</button>
     <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
     <span id="model-progress-label">0%</span></div></div>`;
   document.querySelector(".workspace").before(strip);
   $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
   $("load-model").addEventListener("click", loadInBrowser);
+  // Only once the model runs: it stops the model (whose files are open while it runs) and deletes them.
   $("remove-model").addEventListener("click", async () => {
     const { removeStored } = await import("./browser.js");
-    if (browserBackend) {  // a running model holds its files open: stop it first
-      try { await browserBackend.exit(); } catch {}
-      browserBackend = null;
-      $("model-strip").classList.remove("ready");
-      $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
-      $("connection").className = "connection";
-      $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
-    }
+    try { await browserBackend.exit(); } catch {}
+    browserBackend = null;
     await removeStored();
+    $("remove-model").hidden = true;
+    $("model-strip").classList.remove("ready");
+    $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
+    $("connection").className = "connection";
+    $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
     setStatus("Removed the model from this browser.");
-    showStored();
   });
-  showStored();
   $("connection").className = "connection";
   $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
   $("backend").textContent = "cd_AI · IN-BROWSER LLM";

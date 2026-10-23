@@ -20,44 +20,11 @@ function finish(mode, text, output) {
 }
 
 // What this page keeps in the browser's storage, and a way to remove it.
-// What this site keeps in the browser is only the model (the page itself stores nothing), so the
-// whole origin-private file system and Cache Storage are measured and removed: wllama's cache
-// manager knows only its finished files, and a download cut short (no room) or an older version's
-// files stayed behind, still counted by the browser and impossible to remove from the page.
-async function walk(directory, visit) {
-  for await (const [name, handle] of directory.entries()) {
-    if (handle.kind === "directory") await walk(handle, visit);
-    else await visit(directory, name, handle);
-  }
-}
-export async function storedBytes() {
-  let bytes = 0;
-  try {
-    await walk(await navigator.storage.getDirectory(), async (_, __, handle) => {
-      bytes += (await handle.getFile()).size;
-    });
-  } catch {}
-  try {
-    for (const name of await caches.keys()) {
-      const cache = await caches.open(name);
-      for (const request of await cache.keys()) {
-        const response = await cache.match(request);
-        bytes += Number(response?.headers.get("content-length") || 0);
-      }
-    }
-  } catch {}
-  return bytes;
-}
+// The page stores nothing but the model, so removing it clears the page's file storage.
 export async function removeStored() {
   try {
     const root = await navigator.storage.getDirectory();
     for await (const name of root.keys()) await root.removeEntry(name, { recursive: true });
-  } catch {}
-  try { for (const name of await caches.keys()) await caches.delete(name); } catch {}
-  try {  // older storage layouts: nothing of the page's own is kept there
-    for (const { name } of await indexedDB.databases()) {
-      await new Promise((done) => { const request = indexedDB.deleteDatabase(name); request.onsuccess = request.onerror = request.onblocked = done; });
-    }
   } catch {}
 }
 
