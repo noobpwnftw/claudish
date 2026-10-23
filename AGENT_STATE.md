@@ -47,7 +47,14 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - macOS (d29b27f): surrounding text via IMK, grey suggestion, instructions carry the text
   box; doubles and CI only. The owner's desktop is a Mac (VS Code remote to the Spark):
   the first real-Mac run is theirs (python3 platforms/macos/build.py --install).
-- Still open: Claude API tool loop (needs credentials), selection from the adapters.
+- Mac VM (owner's UTM, macOS 26.6.2): ssh -i ~/.ssh/claudish_mac_vm claudish@10.0.0.251,
+  passwordless sudo, Python 3.12.10 from python.org, repo in ~/claudish, service on the rules
+  backend (nohup python3 -m claudish serve --backend rules). Rig: tests/desktop/macos/driver.py,
+  7/7 three runs (e72c804). Rebuilding cd_AI makes macOS ask the owner to Allow again: warn
+  them first. No Screen Recording over SSH yet (screencapture fails). CLAUDISH_TRACE is set in
+  the VM's launchd for cd_AI traces.
+- Still open: Claude API tool loop (needs credentials), selection from the adapters, VS Code +
+  Claude Code chat box on the Mac VM.
 - The demo's continue sample must differ from the continue example's input (f5f7ac3):
   otherwise parroted() drops the answer and the demo shows nothing.
 - Home page: site/ at claudish.io, the demo at /demo/, an agent install prompt; releases
