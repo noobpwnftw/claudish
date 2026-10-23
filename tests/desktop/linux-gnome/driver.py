@@ -70,7 +70,7 @@ class Keyboard:
         self.session.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (value, pressed)), 0, -1, None)
 
     def press(self, *names, delay=0.04):
-        """Key names such as "Return", "F7", "ctrl+a" (held modifiers, then the key)."""
+        """Key names such as "Return", "Shift_L", "ctrl+a" (held modifiers, then the key)."""
         for name in names:
             values = [Gdk.KEY_Control_L if part == "ctrl" else Gdk.keyval_from_name(part) for part in name.split("+")]
             for value in values:
@@ -139,18 +139,15 @@ def scenarios(keys):
     check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
     check("the top bar shows the mode: continue", indicator(), "C")
     keys.press("ctrl+a", "BackSpace")
-    keys.press("F7")
+    keys.press("Shift_L")  # a Shift tap: compose
     time.sleep(0.4)
-    check("F7: the top bar shows instruct", indicator(), "I")
-    keys.press("F7")  # -> rewrite
-    time.sleep(0.4)
-    check("F7: the top bar shows rewrite", indicator(), "R")
+    check("a Shift tap: the top bar shows compose", indicator(), "AI")
     keys.type("hello-world")
     settle()
     check("composition is not committed while typing", state()["entry"], "")
-    keys.press("Return")
+    keys.press("Shift_L+Return")
     wait_for(lambda: state()["entry"], what="commit")
-    check("Enter commits your wording, dash substituted", state()["entry"], "hello—world")
+    check("Shift+Enter keeps your words, dash substituted", state()["entry"], "hello—world")
 
     focus("other")
     keys.type("very important")
@@ -178,7 +175,7 @@ def scenarios(keys):
 
     focus("entry")
     keys.press("ctrl+a", "BackSpace")
-    keys.press("F7")  # continue: typing goes straight in
+    keys.press("Shift_L")  # continue: typing goes straight in
     keys.type("Only my words")
     settle()
     focus("other")  # the suggestion must never be committed by a focus change
@@ -193,7 +190,7 @@ def scenarios(keys):
     check("continue: Tab takes the rest", state()["entry"], "Thanks for the review and then some—naturally.")
 
     focus("view")
-    keys.press("F7")  # instruct
+    keys.press("Shift_L")  # compose: Enter does it as an instruction
     keys.type("say hi")
     keys.press("Return")
     settle()

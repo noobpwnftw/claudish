@@ -83,13 +83,13 @@ def scenarios():
     time.sleep(0.3)
     check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
     key("ctrl+a", "BackSpace")
-    key("F7", "F7")  # continue -> instruct -> rewrite
+    key("shift")  # a Shift tap: continue -> compose
     type_text("hello-world")
     settle()
     check("composition is not committed while typing", state()["entry"], "")
-    key("Return")
+    key("shift+Return")
     wait_for(lambda: state()["entry"], what="commit")
-    check("Enter commits your wording, dash substituted", state()["entry"], "hello—world")
+    check("Shift+Enter keeps your words, dash substituted", state()["entry"], "hello—world")
 
     focus("other")
     type_text("very important")
@@ -131,9 +131,9 @@ def scenarios():
     focus("entry")
     key("ctrl+a", "BackSpace")
     type_text("Thanks for the review ")  # a pause after a word: continue asks
-    key("F7")  # rewrite -> continue
-    # The grey suggestion is the preedit, which the app sees; before F7 lands it still holds the
-    # rewrite composition, so wait for the suggestion itself.
+    key("shift")  # compose -> continue: your words go in as typed
+    # The grey suggestion is the preedit, which the app sees; before the tap lands it still holds the
+    # composition, so wait for the suggestion itself.
     expected = "and then some—naturally."
     try:
         wait_for(lambda: state().get("preedit") == expected, what="the grey suggestion")
@@ -157,7 +157,7 @@ def scenarios():
     key("Return")
     wait_for(lambda: state()["entry"], what="commit")
     check("continue: typing ignores the ghost", state()["entry"], "Keep typing on")
-    key("F7", "F7")  # continue -> instruct -> rewrite, for the scenarios below
+    key("shift")  # continue -> compose, for the scenarios below
     key("ctrl+a", "BackSpace")
 
     focus("other")
@@ -172,13 +172,12 @@ def scenarios():
 
     focus("view")
     key("ctrl+a", "BackSpace")
-    key("F7", "F7")  # rewrite -> continue -> instruct (F7 is the input method's while it is active)
-    type_text("say hi")
-    key("Return")  # Instruct sends on Enter.
+    type_text("say hi")  # still compose
+    key("Return")  # Enter sends it as an instruction.
     settle()
     key("Tab")  # Tab accepts too.
     wait_for(lambda: state()["view"], what="instruct draft")
-    check("F7 to instruct, Enter sends, Tab inserts", state()["view"], "As requested—say hi.")
+    check("Enter sends an instruction, Tab inserts", state()["view"], "As requested—say hi.")
 
     key("ctrl+a", "BackSpace")
     type_text("write a story")  # Still in instruct mode: held until Enter.
@@ -300,10 +299,9 @@ def surrounding_context(service):
     try:
         focus("other")
         key("ctrl+a", "BackSpace")
-        key("F7")  # instruct -> rewrite
-        type_text("Pasted words.")
-        key("Return")  # commits your words: the field now holds text that was never typed in continue
-        key("F7")  # rewrite -> continue, with nothing typed in continue yet
+        type_text("Pasted words.")  # compose
+        key("shift+Return")  # keeps your words: the field now holds text that was never typed in continue
+        key("shift")  # compose -> continue, with nothing typed in continue yet
         type_text(" We ship ")
         wait_for(lambda: received, what="a continue request")
         check("continue begins from the text already there", received[-1], "Pasted words. We ship ")
@@ -312,7 +310,7 @@ def surrounding_context(service):
         focus("view")
         key("ctrl+a", "BackSpace")
         type_text("Dear Ana, ")
-        key("F7", "F7")  # continue -> instruct -> rewrite
+        key("shift")  # continue -> compose
         type_text("thanks")
         key("Tab")
         wait_for(lambda: bodies and bodies[-1].get("mode") == "rewrite", what="a rewrite request")
@@ -323,7 +321,7 @@ def surrounding_context(service):
 
         # An email address field is not prose: nothing is suggested unasked.
         focus("email")
-        key("F7")  # rewrite -> continue
+        key("shift")  # compose -> continue
         count = len(bodies)
         type_text("ana at example dot com ")
         time.sleep(1.0)

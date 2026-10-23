@@ -18,7 +18,7 @@ if ($env:PROBE_EDGE -or (Test-Path C:\setup\probe-edge)) {
   $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
 }
 [Keys]::Focus($window.MainWindowHandle) | Out-Null; Start-Sleep 1
-[Keys]::Press(0x76); [Keys]::Press(0x76)  # rewrite
+[Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
 [Keys]::Type('very important'); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300
 Add-Content $log '--- Ctrl+A, then Tab'
 [Keys]::Press(0x41, 0x11); Start-Sleep -Milliseconds 300

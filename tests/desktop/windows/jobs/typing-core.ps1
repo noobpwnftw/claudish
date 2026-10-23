@@ -94,12 +94,12 @@ function Invoke-Scenarios {
   [Keys]::Type('ls -la'); Start-Sleep -Milliseconds 300  # switching to cd_AI types like en_US
   Check 'cd_AI starts in continue: keys go straight in' (Get-Text) 'ls -la'
   Reset-Target
-  [Keys]::Press(0x76); [Keys]::Press(0x76)  # continue -> instruct -> rewrite
+  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue -> compose
   [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
   Check 'composition is not committed while typing' (Get-Text) ''
-  [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500
+  [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 500  # Shift+Enter keeps your words
   $dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
-  Check 'Enter commits your wording, dash substituted' (Get-Text) "hello${dash}world"
+  Check 'Shift+Enter keeps your words, dash substituted' (Get-Text) "hello${dash}world"
   Reset-Target
   [Keys]::Type('very important'); Start-Sleep -Milliseconds 300
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500  # Tab asks; the rewrite takes your words' place
@@ -114,22 +114,22 @@ function Invoke-Scenarios {
   Check 'the rewrite is of the whole phrase' (Get-Text) 'particularly good'
   Reset-Target
   [Keys]::Type(' hi'); Start-Sleep -Milliseconds 300  # a leading space is the app's, not the phrase's
-  [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc keeps your words
+  [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 300  # Shift+Enter keeps your words
   Check 'a leading space goes straight to the app' (Get-Text) ' hi'
   Reset-Target
-  [Keys]::Press(0x76)  # continue: typing goes straight into the app
+  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue, typing goes straight in
   [Keys]::Type('Only my words '); Start-Sleep -Milliseconds 300  # a pause after a word: continue asks
   Check 'continue: typing goes straight into the app' (Get-Text) 'Only my words '
   Start-Sleep -Milliseconds 800; [Keys]::Press(0x75)  # F6 shows the suggestion (PIME redraws on keys)
   [Keys]::Press(0x09); Start-Sleep -Milliseconds 500
   Check 'continue: Tab takes the rest of the sentence' (Get-Text) "Only my words and then some${dash}naturally."
   Reset-Target
-  [Keys]::Press(0x76)  # instruct (F7 is the input method's while it is active)
+  [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: compose
   [Keys]::Type('say hi')
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800  # instruct: Enter sends
   Check 'instruct holds the text until it is inserted' (Get-Text) ''
   [Keys]::Press(0x0D); Start-Sleep -Milliseconds 500  # the next Enter inserts
-  Check 'F7 to instruct, Enter sends, Enter inserts' (Get-Text) "As requested${dash}say hi."
+  Check 'Enter sends an instruction, Enter inserts' (Get-Text) "As requested${dash}say hi."
   Reset-Target
   [Keys]::Type('never mind'); [Keys]::Press(0x0D); Start-Sleep -Milliseconds 800
   [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300  # Esc: the draft closes, the instruction stays
