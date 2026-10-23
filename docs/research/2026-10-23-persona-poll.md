@@ -43,13 +43,17 @@ AI apps.
 - Documentation drift: the install key table, F7 in the changelog, the macOS
   status on the site.
 
-## Raised for the owner
+## The owner's answers
 
-- **Space picks the first draft** while drafts show (pinyin muscle memory; today
-  a space is typed into the instruction and the drafts close).
-- **Enter sends an instruction** in compose, where every pinyin user expects
-  Enter to commit raw letters. The owner chose this; the poll flags it as the
-  likeliest accidental send in work chats.
-- **A plain register by default**, with the Claudish voice as an opt-in.
-- **Releases and signing** (Apple Developer ID, a Windows installer with the
-  patched PIME), which need the owner's accounts and approval.
+- **Space stays a space** in English compose ("it ain't a pinyin IME"); negotiated
+  with the pinyin persona, who withdrew "Space picks draft 1" and asked instead
+  that a reflexive space not throw away drafts: while drafts show, a space is
+  held and keeps them, and Enter right after the drafts appear waits (a
+  double-tapped Enter never inserts a draft nobody read). Both done. The persona
+  also withdrew "Enter as instruct is the biggest break": nothing reaches the app
+  without a visible draft step. Still open: an "AI›" mark at the caret while
+  composing (visual pass).
+- **The Claudish voice is the default**, it is the identity; a profile's `tone`
+  sets another (done).
+- **Releases:** internal beta until it is robust enough to ship (G37), not a
+  blocker.
