@@ -204,6 +204,7 @@ class ClaudishInputController(IMKInputController):
             x, y = (origin.x, origin.y) if hasattr(origin, "x") else origin
             w, h = (size.width, size.height) if hasattr(size, "width") else size
             if h > 0:
+                trace("caret", round(x), round(y), round(w), round(h), "at", location)
                 return (x, y), (w, h)
         except Exception:
             trace("caret failed", traceback.format_exc().splitlines()[-1])
@@ -217,8 +218,10 @@ class ClaudishInputController(IMKInputController):
             location = selected.location if hasattr(selected, "location") else selected[0]
             found = client.attributesForCharacterIndex_lineHeightRectangle_(max(0, location - 1), None)
             attributes = found[0] if isinstance(found, tuple) else found
+            trace("font", type(found).__name__, sorted(attributes.keys()) if attributes else None)
             return attributes.get("NSFont") if attributes else None
         except Exception:
+            trace("font failed", traceback.format_exc().splitlines()[-1])
             return None
 
     @objc.python_method
