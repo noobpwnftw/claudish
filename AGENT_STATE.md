@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-23 (late), `main` at `8a091ae`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-23 (late), `main` at `8fc0332`. An interactive session on the Spark; no 24/7 runner.
 
 ## Where things stand
 
@@ -25,15 +25,11 @@ Checkpoint 2026-10-23 (late), `main` at `8a091ae`. An interactive session on the
 
 - Gate `scripts/check.py --model` 10 PASS on main; Pages deploy green on `8a091ae`.
 - Linux X11 39/39 (with a Qt app), GNOME 12/12. Windows (patched PIME, VM) Notepad 15/15, Edge 14/14 + 1 known
-  (Ctrl shortcuts, G01, tabled). Mac VM 9/9 after the owner added cd_AI by hand and relogged.
+  (Ctrl shortcuts, G01, tabled). Mac VM 8/8 on `8fc0332` (rebuilt, owner relogged; the lowercase cd icon shows in the menu bar; the first suggestion after the reinstall arrived).
 - Live Claude Code (haiku, owner's quota): per-conversation agent, textbox MCP, Allow/Deny, Esc.
 
 ## Pending / waiting on the owner
 
-- Mac VM: the lowercase cd icon and the "cd_AI" display name (64fbfaa) are merged but not yet
-  built on the VM. A rebuild needs the owner's Allow click and a relogin (a bundle overwrite is
-  not picked up until login), so do it when they are around. The VM checkout is on an older
-  branch (`macname`, a02625b): `git fetch && git checkout main` first.
 - macOS: the first suggestion after a reinstall was missed three times; it never reproduced by
   restarting the process (8/8). Likely the first-launch check of a new ad-hoc-signed app; the rig
   now waits 20 s. `launchctl setenv CLAUDISH_TRACE` did not reach an IME relaunched with
