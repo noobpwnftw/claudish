@@ -123,7 +123,7 @@ command:
 | Model / Q4_K_M | Fixed | Wrong | Left alone | Harmful | Median |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Qwen3 30B-A3B Instruct 2507 | 20 / 23 | 3 | 3 / 7 | 4 | 1.0 s |
-| Qwen2.5 1.5B Instruct | 2 / 23 | 21 | 1 / 7 | 6 | 0.7 s |
+| Qwen2.5 1.5B Instruct | 7 / 23 | 16 | 6 / 7 | 1 | 0.4 s |
 
 The cases carry no error output for the legitimate commands, so a model sees
 only the command and guesses; on a real screen it sees what went wrong.

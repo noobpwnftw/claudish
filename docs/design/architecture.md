@@ -76,6 +76,19 @@ permission prompts become **ask**.
 The adapters change little: they already send the box (app, kind, text around
 the caret) and the key, and already render a candidate, a list, or a question.
 
+## Where it stands
+
+Steps 1–3 are done (2026-10-23): `claudish/turn.py` holds the text box (`Box`:
+kind, app, the text around the caret, observations, constraints), the observers,
+and the system prompt; `Rewriter.answer` is the one loop for `/suggest` and for
+instruction sessions alike; the terminal template, `in_terminal`, and the
+per-path screen reads are gone. Measured against the special-cased version:
+fidelity 38/41 (unchanged); the terminal set, Qwen3 30B 20/23 fixed
+(unchanged), Qwen2.5 1.5B 7/23 fixed with 6/7 legitimate commands left alone
+and 1 harmful (was 2/23, 1/7, 6 harmful). The general rules (voice only for
+prose, observations next to the request, the kind stated as a fact) did better
+than the hand-made terminal template.
+
 ## Order of work
 
 Each step keeps the gate green and the prompts measured (the fidelity eval and

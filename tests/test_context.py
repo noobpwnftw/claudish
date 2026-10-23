@@ -78,10 +78,13 @@ class ContextTests(unittest.TestCase):
         with patch("claudish.model.build_opener") as opener:
             opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
             rewriter.rewrite("ok", before="Dear Zoë,")
-            system = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][0]["content"]
+            messages = json.loads(opener.return_value.open.call_args.args[0].data)["messages"]
+        system, turn = messages[0]["content"], messages[-1]["content"]
         self.assertTrue(system.startswith(rewriter.system))
-        self.assertIn("Fjordline: the ferry company.", system)
-        self.assertIn("Dear Zoë,▮", system)
+        self.assertIn("Dear Zoë,▮", system)  # the text box is described in the system prompt
+        # What was observed goes next to the user's words, fenced as material.
+        self.assertIn("Fjordline: the ferry company.", turn)
+        self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nok"))
 
     def test_service_validates_caret_text(self):
         server = make_server(Rewriter("rules"), 0)
@@ -125,8 +128,8 @@ class BindingTests(unittest.TestCase):
             reply = {"choices": [{"message": {"content": "Indeed."}, "finish_reason": "stop"}]}
             opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
             Rewriter(bindings=[binding]).rewrite("ok", app="firefox")
-            system = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][0]["content"]
-        self.assertIn("PR #42 adds retries.", system)
+            turn = json.loads(opener.return_value.open.call_args.args[0].data)["messages"][-1]["content"]
+        self.assertIn("PR #42 adds retries.", turn)
 
     def test_binding_config_and_service(self):
         path = self.root / "config.json"

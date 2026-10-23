@@ -55,10 +55,11 @@ class ModeTests(unittest.TestCase):
             _, payload = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal")
             system, turn = payload["messages"][0]["content"], payload["messages"][-1]["content"]
             self.assertIn("The text box is a terminal in com.apple.Terminal.", system)
-            self.assertIn("lands at the prompt", system)
-            self.assertIn("the command line", system)  # the terminal template, not the prose one
+            self.assertIn("run when the user presses Enter", system)  # what the box's kind means
+            self.assertNotIn("em dash", system)  # a command line has no voice
             # The screen goes with the instruction it explains; the prose examples stay out.
-            self.assertTrue(turn.startswith("<terminal screen") and turn.endswith("\n\nfix"))
+            self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nfix"))
+            self.assertIn("<context name=\"terminal screen, last lines\">", turn)
             self.assertIn("zsh: command not found: gti", turn)
             self.assertEqual(len(payload["messages"]), 2)
             self.call(rewriter, "ls -la ", "continue", app="com.apple.Terminal")

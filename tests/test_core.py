@@ -158,7 +158,7 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(payload["temperature"], 0)
             response["choices"][0]["finish_reason"] = "length"
             opener.return_value.open.return_value = BytesIO(json.dumps(response).encode())
-            with self.assertRaisesRegex(RuntimeError, "token budget"):
+            with self.assertRaisesRegex(RuntimeError, "length budget"):
                 model.rewrite("hello")
 
 

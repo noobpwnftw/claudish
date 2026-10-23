@@ -209,6 +209,19 @@ class Context:
         """Return a block to append to the system prompt, or "" when there is no context."""
         return self.gather(before, after, extra)[0]
 
+    def sections(self, extra=()):
+        """[(name, text)]: what the providers (and the app's bindings, extra) contribute, within
+        max_chars. The text around the caret is not one of them: the text box describes it."""
+        found, budget = [], self.max_chars
+        for provider in list(self.providers) + list(extra):
+            if budget <= 0:
+                break
+            text = provider.get()
+            if text:
+                found.append((provider.name, text[:budget]))
+                budget -= len(text[:budget])
+        return found
+
     def gather(self, before="", after="", extra=()):
         """(block, names of the providers that contributed); extra providers come from app bindings."""
         sections = []

@@ -23,13 +23,17 @@ INSTRUCT_SYSTEM = (
     "not give. Refer to people by name, or as they/them unless their pronouns are given. Output "
     "only the text itself, with no preamble or notes."
 )
-# An instruction typed at a terminal prompt (G35): the screen comes with it, and the answer goes
-# where commands are typed. The prose template's voice and examples do not apply there.
-TERMINAL_SYSTEM = (
-    "The user typed an instruction at a terminal prompt; the terminal screen shows what happened "
-    "before it. Reply with the command line that does what they want, ready to run, and nothing "
-    "else: no explanation, no quotes, no code fence."
-)
+# The actions without a voice, for boxes that are not prose (a terminal, a URL, a number): what
+# goes there has no style to polish, and the box's description says what it takes.
+PLAIN = {
+    "rewrite": "Rewrite the user's text. Keep its meaning, names, numbers and language. "
+               "Output only the rewritten text, no explanation.",
+    "continue": "Continue the user's unfinished text with the next few words. Output only the words that "
+                "come next, not the text itself.",
+    "instruct": "The user typed an instruction. Write what it asks for, ready to use where the caret is. Use "
+                "the reference material for names, terms, and facts, and add no facts, promises, or "
+                "commitments the user did not give. Output only that text, with no preamble or notes.",
+}
 INSTRUCT_EXAMPLES = [
     {"role": "user", "content": "decline the meeting politely, propose thursday"},
     {"role": "assistant", "content": "Thank you for the invitation—unfortunately, I can't make that time. "
@@ -81,10 +85,12 @@ def defaults(rewrite_prompt=None, tone=None):
     continued, continue_examples = voices.get("continue") or (CONTINUE_SYSTEM, CONTINUE_EXAMPLES)
     instructed, instruct_examples = voices.get("instruct") or (INSTRUCT_SYSTEM, INSTRUCT_EXAMPLES)
     return {
-        "rewrite": {"system": system, "examples": examples, "max_tokens": None, "candidates": 1},
-        "continue": {"system": continued, "examples": continue_examples, "max_tokens": 24, "candidates": 1,
-                     "frame": CONTINUE_FRAME},
-        "instruct": {"system": instructed, "examples": instruct_examples, "max_tokens": 400, "candidates": 3},
+        "rewrite": {"system": system, "plain": PLAIN["rewrite"], "examples": examples, "max_tokens": None,
+                    "candidates": 1},
+        "continue": {"system": continued, "plain": PLAIN["continue"], "examples": continue_examples,
+                     "max_tokens": 24, "candidates": 1, "frame": CONTINUE_FRAME},
+        "instruct": {"system": instructed, "plain": PLAIN["instruct"], "examples": instruct_examples,
+                     "max_tokens": 400, "candidates": 3},
     }
 
 
