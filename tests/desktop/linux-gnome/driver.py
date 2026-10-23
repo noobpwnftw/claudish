@@ -137,7 +137,7 @@ def scenarios(keys):
     keys.type("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
     time.sleep(0.4)
     check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
-    check("the top bar shows the mode: continue", indicator(), "C")
+    check("the top bar shows the mode: continue", indicator(), "cd")
     keys.press("ctrl+a", "BackSpace")
     keys.press("Shift_L")  # a Shift tap: compose
     time.sleep(0.4)

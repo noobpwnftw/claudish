@@ -21,4 +21,4 @@ claudish = "claudish.__main__:main"
 packages = ["claudish"]
 
 [tool.setuptools.package-data]
-claudish = ["web/*.html", "web/*.css", "web/*.js"]
+claudish = ["web/*.html", "web/*.css", "web/*.js", "web/*.png"]

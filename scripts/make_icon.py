@@ -1,51 +1,76 @@
-"""Generate the small code-drawn icons: cd (the input method), and C, AI (its modes, continue and compose, for the
-Windows input indicator). No imaging dependencies."""
-import struct
-import zlib
+"""Render cd_AI's icons from the wordmark's type (a serif "cd", a monospaced "AI"),
+at high resolution and scaled down, so they are crisp at every size (G45; docs/design/visual.md).
+
+  python scripts/make_icon.py        (needs Pillow and the Noto Serif / Noto Sans Mono fonts)
+
+Writes, and these files are committed:
+  platforms/windows/claudish/icon.ico            the input method (16-256 px): "cd" on cream
+  platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile
+  platforms/windows/claudish/mode-compose.ico    compose: "AI" on the accent colour
+  platforms/macos/cd.png, cd@2x.png              the menu-bar template (black on clear; macOS tints it)
+  site/favicon.png, claudish/web/favicon.png     the site's and the demo's icon
+
+The fonts are open (SIL OFL): Noto Serif stands in for the site's Georgia, Noto Sans Mono for its
+system monospace.
+"""
+import os
 from pathlib import Path
 
-GLYPHS = {
-    "icon": ["00000000000", "01110000100", "10000000100", "10000011100",
-             "10000100100", "10000100100", "01110011100"],
-    "mode-continue": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
-    "mode-compose": ["01110011100", "10001001000", "10001001000", "11111001000",
-                     "10001001000", "10001001000", "10001011100"],
-}
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = Path(__file__).resolve().parents[1]
+SERIF = os.environ.get("CLAUDISH_SERIF", "/usr/share/fonts/truetype/noto/NotoSerif-Bold.ttf")
+MONO = os.environ.get("CLAUDISH_MONO", "/usr/share/fonts/truetype/noto/NotoSansMono-Bold.ttf")
+INK, PAPER, ACCENT = (31, 30, 29, 255), (250, 249, 245, 255), (217, 119, 87, 255)  # the site's tokens
+BIG = 1024  # drawn at this size, then scaled down
 
 
-def chunk(kind, data):
-    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+def text_box(draw, text, font):
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    return left, top, right - left, bottom - top
 
 
-def png(glyph, on=(94, 234, 212, 255), off=(24, 28, 39, 255), size=(32, 32)):
-    """A PNG (32x32 unless sized) with the glyph centered, two pixels per dot."""
-    width, height = len(glyph[0]), len(glyph)
-    left, top = (size[0] - 2 * width) // 2, (size[1] - 2 * height) // 2
-    dot, blank = bytes(on), bytes(off)
-    rows = []
-    for y in range(size[1]):
-        row = bytearray()
-        for x in range(size[0]):
-            gx, gy = (x - left) // 2, (y - top) // 2
-            lit = 0 <= gx < width and 0 <= gy < height and x >= left and y >= top and glyph[gy][gx] == "1"
-            row.extend(dot if lit else blank)
-        rows.append(b"\x00" + row)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size[0], size[1], 8, 6, 0, 0, 0))
-            + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
+def tile(text, font_path, fill, background, scale=0.62):
+    """A rounded square with the text centred on its ink (not its line box), and a faint rim in the
+    opposite tone, so a cream tile holds its edge on a light taskbar and a dark one on a dark taskbar."""
+    image = Image.new("RGBA", (BIG, BIG), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    rim = (0, 0, 0, 40) if background == PAPER else None
+    draw.rounded_rectangle((0, 0, BIG - 1, BIG - 1), radius=int(BIG * 0.22), fill=background,
+                           outline=rim, width=int(BIG * 0.03) if rim else 0)
+    font = ImageFont.truetype(font_path, int(BIG * scale))
+    left, top, width, height = text_box(draw, text, font)
+    draw.text(((BIG - width) / 2 - left, (BIG - height) / 2 - top), text, font=font, fill=fill)
+    return image
 
 
-def ico(glyph):
-    image = png(glyph)
-    return struct.pack("<HHH", 0, 1, 1) + struct.pack("<BBBBHHII", 32, 32, 0, 0, 1, 32, len(image), 22) + image
+def template(text, font_path, size):
+    """A macOS menu-bar template: black glyphs on clear, cropped to the ink, height `size`."""
+    font = ImageFont.truetype(font_path, BIG)
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    left, top, width, height = text_box(probe, text, font)
+    image = Image.new("RGBA", (width + 8, height + 8), (0, 0, 0, 0))
+    ImageDraw.Draw(image).text((4 - left, 4 - top), text, font=font, fill=(0, 0, 0, 255))
+    ratio = size / image.height
+    return image.resize((max(1, round(image.width * ratio)), size), Image.LANCZOS)
 
 
-directory = Path(__file__).resolve().parents[1] / "platforms/windows/claudish"
-for name, glyph in GLYPHS.items():
-    (directory / (name + ".ico")).write_bytes(ico(glyph))
-# macOS: the input source's menu-bar icon, a template (black on transparent; the system tints it).
-# platforms/macos/build.py converts it to TIFF with sips, which macOS loads for input sources.
-# Lowercase: the c at x-height, the d with its ascender; cropped to the glyph, so the menu bar
-# scales it to its full height.
-CD = ["00000000100", "00000000100", "00000000100", "01110011100", "10000100100", "10000100100", "01110011100"]
-(Path(__file__).resolve().parents[1] / "platforms/macos/cd.png").write_bytes(
-    png(CD, on=(0, 0, 0, 255), off=(0, 0, 0, 0), size=(24, 16)))
+def save_ico(image, path):
+    image.save(path, format="ICO", sizes=[(s, s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)])
+
+
+def main():
+    windows = ROOT / "platforms/windows/claudish"
+    brand = tile("cd", SERIF, INK, PAPER, scale=0.66)  # cream, the site's light look (owner's pick)
+    save_ico(brand, windows / "icon.ico")
+    save_ico(brand, windows / "mode-continue.ico")
+    save_ico(tile("AI", MONO, (255, 255, 255, 255), ACCENT, scale=0.56), windows / "mode-compose.ico")
+    template("cd", SERIF, 16).save(ROOT / "platforms/macos/cd.png")
+    template("cd", SERIF, 32).save(ROOT / "platforms/macos/cd@2x.png")
+    for folder in (ROOT / "site", ROOT / "claudish/web"):
+        brand.resize((64, 64), Image.LANCZOS).save(folder / "favicon.png")
+    print("icons written")
+
+
+if __name__ == "__main__":
+    main()

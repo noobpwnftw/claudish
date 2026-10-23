@@ -32,7 +32,7 @@ def trace(*fields):
 
 
 # The mode, as the input source indicator shows it.
-SYMBOLS = {"continue": "C", "compose": "AI"}
+SYMBOLS = {"continue": "cd", "compose": "AI"}  # the top bar: the brand while it stays out of the way, AI in compose
 
 # The field kinds IBus reports, by the names the service understands.
 PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "email", IBus.InputPurpose.URL: "url",

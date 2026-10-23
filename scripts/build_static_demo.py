@@ -25,7 +25,7 @@ CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-uns
        "worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https:; style-src 'self'; "
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
 REPO = "https://github.com/noobpwnftw/claudish"
-FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js"]
+FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png"]
 
 
 def build(out):
@@ -38,7 +38,6 @@ def build(out):
         shutil.copy(web / name, out / name)
     page = (out / "index.html").read_text(encoding="utf-8")
     page = re.sub(r'(href|src)="/(?!/)', r'\1="', page)  # relative paths: hosts may serve from a subpath
-    page = page.replace('  <link rel="icon" href="favicon.ico">\n', "")
     head = ('  <meta name="claudish-backend" content="browser">\n'
             '  <meta name="claudish-model" content="Qwen2.5 0.5B (%d MB)">\n'
             '  <meta http-equiv="Content-Security-Policy" content="%s">\n' % (MODEL_BYTES // 1_000_000, CSP))
@@ -68,6 +67,7 @@ def build_site(out):
     (out / "site.css").write_text("\n".join(tokens) + "\n" + (site / "site.css").read_text(encoding="utf-8"),
                                   encoding="utf-8")
     shutil.copy(site / "site.js", out / "site.js")
+    shutil.copy(site / "favicon.png", out / "favicon.png")
     shutil.copy(web / "theme.js", out / "theme.js")
     page = (site / "index.html").read_text(encoding="utf-8")
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n'
