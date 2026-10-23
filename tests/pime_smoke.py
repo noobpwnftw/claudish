@@ -198,7 +198,17 @@ def main():
                 key(0x20, ord(" "), inputScopes=[5])
                 assert all(len(c.args) < 3 or c.args[2] != "continue"
                            for c in worker_class.return_value.schedule.call_args_list[calls:])
-                print("patched PIME: text around the caret, answers shown on a timer, input scopes")
+                # One conversation per text box: another TSF context starts a new one.
+                key(0x10, document="1")
+                first = worker_class.return_value.new_conversation.call_count
+                key(0x10, document="2")
+                assert worker_class.return_value.new_conversation.call_count == first + 1
+                # A password field (IS_PASSWORD): the first key is typed as is, then cd_AI stays out.
+                service.state.change("")
+                reply = key(ord("S"), ord("s"), inputScopes=[31])
+                assert reply.get("commitString") == "s", reply
+                assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
+                print("patched PIME: text around the caret, answers on a timer, input scopes, one conversation per field, password fields")
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)

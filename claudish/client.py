@@ -77,6 +77,18 @@ class Suggestions:
                 pass  # the session reports its own failure
         threading.Thread(target=send, daemon=True).start()
 
+    def new_conversation(self):
+        """Another text box behind the same input method instance (Windows runs one per app thread):
+        end this conversation and start a fresh one."""
+        old, self.conversation = self.conversation, "%032x" % random.getrandbits(128)
+        threading.Thread(target=lambda: self._end(old), daemon=True).start()
+
+    def _end(self, conversation):
+        try:
+            call(self.endpoint, "/conversations/%s/end" % conversation, {}, timeout=2)
+        except Exception:
+            pass
+
     def close(self):
         """The text box went away: stop, and end its conversation (off the input thread)."""
         with self.condition:

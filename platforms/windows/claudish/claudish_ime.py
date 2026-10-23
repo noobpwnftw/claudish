@@ -21,7 +21,7 @@ def keylog(*fields):
 MODE_COMMAND = 100  # the input indicator's click; its menu items follow
 # TSF input scopes (InputScope.h) by the names the service understands.
 INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "number",
-                32: "phone", 33: "phone", 34: "phone", 35: "phone", 36: "phone"}
+                31: "password", 32: "phone", 33: "phone", 34: "phone", 35: "phone", 36: "phone"}
 TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its way
 
 
@@ -100,9 +100,21 @@ class ClaudishTextService(TextService):
             self.worker = None
         self.state.change("")
 
+    def sensitive(self):
+        """A password field (IS_PASSWORD): cd_AI stays out, as IBus does for its password purpose."""
+        return self.field() == "password"
+
+    def follow_document(self):
+        """One conversation per text box: Claudish's PIME names the TSF context of each request."""
+        document = getattr(self, "document", None)
+        if document and document != getattr(self, "last_document", None):
+            if getattr(self, "last_document", None) is not None and self.worker:
+                self.worker.new_conversation()
+            self.last_document = document
+
     def filterKeyDown(self, event):
         keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
-        if not self.keyboardOpen:
+        if not self.keyboardOpen or self.sensitive():
             return False
         if event.keyCode in (0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
@@ -183,7 +195,9 @@ class ClaudishTextService(TextService):
     def field(self):
         """The field's kind from the input scopes the app declares (Claudish's PIME), as the
         service names them; None for prose or when unknown."""
-        for scope in getattr(self, "inputScopes", None) or ():
+        if getattr(self, "inputScopes", None) is not None:  # only requests with an edit session carry them
+            self.known_scopes = self.inputScopes
+        for scope in getattr(self, "known_scopes", None) or ():
             if scope in INPUT_SCOPES:
                 return INPUT_SCOPES[scope]
         return None
@@ -249,7 +263,12 @@ class ClaudishTextService(TextService):
                "around=%s/%s" % tuple(len(s) for s in self.around()),
                "selected=%d" % len(getattr(self, "textSelected", None) or ""), "scopes=%s" % getattr(self, "inputScopes", None))
         self.poll_results()
+        self.follow_document()
         key = event.keyCode
+        if self.sensitive() and event.isPrintableChar() and not self.state.text:
+            # The first key in a password field, taken before its kind was known: type it as is.
+            self.setCommitString(chr(event.charCode))
+            return True
         if self.shortcut(event):
             # Commit the wording and consume the key; pressing the shortcut again runs it. Passing
             # it on (not eaten after the test phase said eaten) made Edge drop the composition.

@@ -1,5 +1,5 @@
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..403ce30 100644
+index 7829c72..159fdf9 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -17,7 +17,7 @@ index 7829c72..403ce30 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -345,6 +352,74 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +352,76 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -89,10 +89,12 @@ index 7829c72..403ce30 100644
 +	}
 +	// What kind of field this is (IS_URL, IS_EMAIL_SMTPEMAILADDRESS, ...), as the app declares it.
 +	request["inputScopes"] = textService_->inputScopes(session);
++	// Which text box: the TSF context, so the input method can keep one conversation per field.
++	request["document"] = std::to_string(reinterpret_cast<uintptr_t>(static_cast<ITfContext*>(session->context())));
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -458,6 +533,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +535,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -100,7 +102,7 @@ index 7829c72..403ce30 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +566,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +568,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -145,10 +147,10 @@ index feb9813..12eb1d5 100644
  	State state_;
  };
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..8b3665d 100644
+index 400c374..c68c1b5 100644
 --- a/python/textService.py
 +++ b/python/textService.py
-@@ -90,12 +90,19 @@ class TextService:
+@@ -90,12 +90,20 @@ class TextService:
              self.checkConfigChange()  # check if configurations are changed
  
          self.updateStatus(msg)
@@ -157,6 +159,7 @@ index 400c374..8b3665d 100644
 +        self.textBefore, self.textAfter = msg.get("textBefore"), msg.get("textAfter")
 +        self.textSelected = msg.get("textSelected")  # the selection, when nothing is composed
 +        self.inputScopes = msg.get("inputScopes")  # IS_* values the app declares for the field
++        self.document = msg.get("document")  # which text box (the TSF context), when known
          if method == "filterKeyDown":
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyDown(keyEvent)
@@ -168,7 +171,7 @@ index 400c374..8b3665d 100644
          elif method == "filterKeyUp":
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyUp(keyEvent)
-@@ -176,6 +183,15 @@ class TextService:
+@@ -176,6 +184,15 @@ class TextService:
          self.commitString = ""
          self.compositionString = ""
  
