@@ -882,10 +882,10 @@ index 0000000..4391040
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..1ecc33d
+index 0000000..96d74e9
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,152 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -992,23 +992,47 @@ index 0000000..1ecc33d
 +    static void show(HWND hwnd, const std::wstring& text, const RECT& caret);
 +};
 +
-+class GhostWindow : public Window {
++// Its own window class: no drop shadow and no frame (the IME windows' class has CS_DROPSHADOW,
++// right for the panel, wrong for text drawn after the caret).
++class GhostWindow {
 +public:
 +    explicit GhostWindow(HWND parent) {
-+        create(parent, WS_POPUP, WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE);
++        static ATOM atom = 0;
++        HINSTANCE instance = (HINSTANCE)GetModuleHandleW(nullptr);
++        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
++                           (LPCWSTR)&GhostWindow::proc, &instance);
++        if (!atom) {
++            WNDCLASSEXW wc = { sizeof(wc) };
++            wc.lpfnWndProc = GhostWindow::proc;
++            wc.hInstance = instance;
++            wc.lpszClassName = L"ClaudishGhost";
++            atom = RegisterClassExW(&wc);
++        }
++        hwnd_ = CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
++                                L"ClaudishGhost", L"", WS_POPUP, 0, 0, 1, 1, parent, nullptr, instance, nullptr);
++    }
++    ~GhostWindow() {
++        if (hwnd_)
++            DestroyWindow(hwnd_);
 +    }
 +    void show(const std::wstring& text, const RECT& caret) {
-+        GhostPainter::show(hwnd_, text, caret);
++        if (hwnd_)
++            GhostPainter::show(hwnd_, text, caret);
++    }
++    void hide() {
++        if (hwnd_)
++            ShowWindow(hwnd_, SW_HIDE);
 +    }
 +
-+protected:
-+    LRESULT wndProc(UINT msg, WPARAM wp, LPARAM lp) override {
++private:
++    static LRESULT CALLBACK proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 +        if (msg == WM_MOUSEACTIVATE)
 +            return MA_NOACTIVATE;
 +        if (msg == WM_NCHITTEST)
 +            return HTTRANSPARENT;  // the mouse goes to the app underneath
-+        return Window::wndProc(msg, wp, lp);
++        return DefWindowProcW(hwnd, msg, wp, lp);
 +    }
++    HWND hwnd_ = nullptr;
 +};
 +
 +} // namespace Ime

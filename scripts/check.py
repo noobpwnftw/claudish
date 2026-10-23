@@ -36,7 +36,10 @@ def run(name, command, **options):
     output = (process.stdout + process.stderr).strip().splitlines()
     results.append((name, status, "%.1fs" % (time.monotonic() - started)))
     if status == "FAIL":
-        print("\n".join(output[-25:]))
+        # The traceback and what it asserted (a browser test appends a long page snapshot), then the end.
+        start = next((i for i, line in enumerate(output) if line.startswith("Traceback")), None)
+        shown = output[start:start + 14] + ["  ..."] + output[-8:] if start is not None else output[-25:]
+        print("\n".join(shown))
     elif output:
         print("  " + output[-1])
     return process
