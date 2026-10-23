@@ -183,6 +183,12 @@ function panel() {
     return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], ...(state.editing ? [["Esc", "drop"]] : [])]};
   return null;
 }
+// A click on a draft: it goes in at the caret (choices are not numbered; the mouse picks directly).
+function pickRow(number) {
+  const picked = state.candidates[number - 1];
+  if (picked === undefined || state.reply) return;
+  commit(picked); change(""); changed();
+}
 // Milliseconds until compose's keys show (0: now); null when they are not waiting.
 function hintDue() {
   if (live() || !state.text || state.working || state.failed || state.converted || state.candidate) return null;
@@ -298,7 +304,8 @@ function key(name, shift = false) {
     if (sent() && state.reply) { state.reply = ""; render(); return true; }
     if (state.converted) { state.converted = false; state.editing = true; render(); return true; }  // your words again
     if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
-    if (sent()) { change(state.text); state.editing = true; render(); return true; }  // edit: back at the caret
+    // Sent, or a rewrite pending or failed: back to your words, to edit (a late answer is ignored).
+    if (sent() || state.working || state.failed) { change(state.text); state.editing = true; render(); return true; }
     state.dropped = state.text;
     change("");
     render();
@@ -387,7 +394,8 @@ function render() {
   // The panel, as every platform draws it (kit.js; claudish/composition.py's panel()).
   const window = $("candidates");
   const spec = panel();
-  window.replaceChildren(...(spec ? [Kit.panel(spec, {}, (number) => key(String(number)))] : []));
+  window.replaceChildren(...(spec ? [Kit.panel(spec, {}, pickRow)] : []));
+  if (spec) document.querySelectorAll("#editor > .k-toast").forEach((toast) => toast.remove());  // a panel replaces a toast
   window.hidden = !spec;
   clearTimeout(render.pause);
   const due = hintDue();

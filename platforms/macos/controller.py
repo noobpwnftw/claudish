@@ -226,6 +226,7 @@ class ClaudishInputController(IMKInputController):
         if not spec or client is None:
             self.hide_panel()
             return
+        TOAST.hide()  # a panel replaces a toast at the caret
         PANEL.show(self.caret(client), spec, self.pick)
         self.drawn = spec
 
