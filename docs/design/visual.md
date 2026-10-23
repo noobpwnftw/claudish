@@ -79,7 +79,8 @@ an anti-AI writer, an accessibility consultant and an office manager
 - **The compose hints show from the first key** (round 4, the CJK users: what Enter does must be
   visible before you press it; round 2 had them wait for a pause). States that need a decision
   (questions, approvals, failures) always show their keys. Whether hints fade as you learn the
-  keys was settled for the hints alone; learning your habits is a separate goal (G49).
+  keys was settled for the hints alone; learning how you write belongs to the model, if users ask
+  for it (G49).
 - **Mode switch:** the mode's tile, its name, and the key back ("Compose · Shift back"); continue's
   tile is neutral. The taskbar, menu bar or top bar shows the mode all along.
 - **Space** in compose types a space; it never picks a candidate.

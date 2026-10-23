@@ -47,7 +47,8 @@ wanted them kept (forgetting keys; a predictable panel), three wanted them gone 
 Decision: the hints appear when you pause, not while you type, and decision states always show
 their keys. No counters, nothing to set. (This settled the hints only. Round 4 then showed them
 from the first key. It was never a rule against learning: CJK input methods learn your habits,
-and so may Claudish, G49; owner, 2026-10-24.)
+and if users ask Claudish to write as they do, the place to solve it is the model, G49; owner,
+2026-10-24.)
 
 Raised, outside the caret UI (for the settings and onboarding work): a per-app or per-document
 "never suggest here" switch for continue (already possible with bindings; needs to be findable);
