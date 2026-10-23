@@ -19,4 +19,5 @@ $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Obj
 [Keys]::Type('this is important'); Start-Sleep -Milliseconds 300
 [Keys]::Press(0x09)  # Tab asks; no key after this
 Start-Sleep 4
-"ready for the screenshot; service $($slow.Id)"
+Stop-Process $slow -Force  # the rewrite stays on screen; later jobs start their own service
+"ready for the screenshot (vmscreen.sh): the rewrite should show in place, with no key pressed after Tab"
