@@ -17,6 +17,8 @@ case "$1" in
   logs) docker logs --tail 30 claudish-windows ;;
   sync)  # Copy the committed checkout into the shared folder for jobs to unpack.
     git -C "$here/../../.." archive --format=zip -o "$vm/shared/claudish.zip" HEAD && echo "synced $(git -C "$here/../../.." rev-parse --short HEAD)" ;;
+  pime)  # Claudish's patched PIME source, for jobs/build-pime.ps1.
+    sh "$here/../../../platforms/windows/pime/make_source.sh" "$vm/shared/pime-src.zip" ;;
   bootstrap)  # Start the job runner by typing into the VM, if the OEM hook did not run.
     mkdir -p "$vm/shared/oem" && cp "$here"/oem/* "$vm/shared/oem/"
     python3 "$here/vmkeys.py" 'New-Item -ItemType Directory -Force C:\OEM; Copy-Item \\host.lan\Data\oem\* C:\OEM; cmd /c C:\OEM\install.bat' --enter ;;
@@ -30,5 +32,5 @@ case "$1" in
     done
     # Windows PowerShell 5 may write UTF-16; print either as UTF-8.
     python3 -c 'import sys; d = open(sys.argv[1], "rb").read(); print(d.decode("utf-16" if d[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"))' "$vm/shared/results/$name.txt" ;;
-  *) echo "usage: $0 start|stop|logs|sync|bootstrap|run JOB.ps1 [SECONDS]" >&2; exit 2 ;;
+  *) echo "usage: $0 start|stop|logs|sync|pime|bootstrap|run JOB.ps1 [SECONDS]" >&2; exit 2 ;;
 esac

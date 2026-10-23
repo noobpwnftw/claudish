@@ -1,0 +1,67 @@
+diff --git a/src/TextService.cpp b/src/TextService.cpp
+index ea37cdc..76c3861 100644
+--- a/src/TextService.cpp
++++ b/src/TextService.cpp
+@@ -257,6 +257,48 @@ std::wstring TextService::compositionString(EditSession* session) const {
+     return result;
+ }
+ 
++bool TextService::surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit) const {
++    TfEditCookie cookie = session->editCookie();
++    ComPtr<ITfRange> anchor;
++    if (composition_) {
++        if (composition_->GetRange(&anchor) != S_OK || !anchor) {
++            return false;
++        }
++    }
++    else {
++        TF_SELECTION selection;
++        ULONG fetched = 0;
++        if (session->context()->GetSelection(cookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched) != S_OK || fetched == 0) {
++            return false;
++        }
++        ITfRange* range = selection.range;
++        anchor = ComPtr<ITfRange>::takeover(std::move(range));
++    }
++    auto read = [&](bool backward, std::wstring& out) {
++        ComPtr<ITfRange> range;
++        if (anchor->Clone(&range) != S_OK || !range) {
++            return;
++        }
++        LONG moved = 0;
++        if (backward) {
++            range->Collapse(cookie, TF_ANCHOR_START);
++            range->ShiftStart(cookie, -limit, &moved, nullptr);
++        }
++        else {
++            range->Collapse(cookie, TF_ANCHOR_END);
++            range->ShiftEnd(cookie, limit, &moved, nullptr);
++        }
++        auto buf = std::make_unique<wchar_t[]>(size_t(limit) + 1);
++        ULONG got = 0;
++        if (range->GetText(cookie, 0, buf.get(), ULONG(limit), &got) == S_OK) {
++            out.assign(buf.get(), got);
++        }
++    };
++    read(true, before);
++    read(false, after);
++    return true;
++}
++
+ void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
+     ITfContext* context = session->context();
+     if(context) {
+diff --git a/src/TextService.h b/src/TextService.h
+index f2c1c09..e853574 100644
+--- a/src/TextService.h
++++ b/src/TextService.h
+@@ -140,6 +140,9 @@ public:
+     HWND compositionWindow(EditSession* session) const;
+ 
+     std::wstring compositionString(EditSession* session) const;
++    // The text before and after the composition (or the selection, when not composing), up to
++    // limit characters each; false when the context does not share its text.
++    bool surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit) const;
+     void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
+     void setCompositionCursor(EditSession* session, int pos) const;
+ 

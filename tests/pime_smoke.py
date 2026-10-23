@@ -44,13 +44,13 @@ def main():
             service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
             assert service.state.mode == "continue"
 
-            def key(code, char=0, method="onKeyDown", modifiers=()):
+            def key(code, char=0, method="onKeyDown", modifiers=(), **around):
                 states = [0] * 256
                 for modifier in modifiers:
                     states[modifier] = 128
-                return service.handleRequest({"method": method, "seqNum": 1,
+                return service.handleRequest(dict({"method": method, "seqNum": 1,
                     "charCode": char, "keyCode": code, "repeatCount": 1,
-                    "scanCode": 0, "isExtended": False, "keyStates": states})
+                    "scanCode": 0, "isExtended": False, "keyStates": states}, **around))
 
             # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
             assert service.state.mode == "continue"
@@ -101,7 +101,8 @@ def main():
             reply = key(0x76)
             assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
             assert reply["commitString"] == "say hi"  # continue types into the app: the held words go in
-            assert worker_class.return_value.schedule.call_args.args[2] != "continue"  # mid-word: no suggestion yet
+            last = worker_class.return_value.schedule.call_args.args
+            assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
             assert key(ord("!"), ord("!"))["commitString"] == "!"
             assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
             assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
@@ -173,6 +174,22 @@ def main():
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
+            if hasattr(service, "setTimer"):  # Claudish's PIME (platforms/windows/pime)
+                # Requests carry the text around the caret, and an answer shows when it arrives.
+                service.state.mode = "rewrite"
+                service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
+                for char in "thanks":
+                    key(ord(char.upper()), ord(char))
+                reply = key(9, textBefore="Dear Ana, ", textAfter=" Best, Sam")
+                kwargs = worker_class.return_value.schedule.call_args.kwargs
+                assert (kwargs["before"], kwargs["after"], reply.get("timer")) == ("Dear Ana, ", " Best, Sam", 100), (kwargs, reply)
+                reply = service.handleRequest({"method": "onTimer", "seqNum": 2})
+                assert reply.get("timer") == 100  # still on its way: called back again
+                worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
+                reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
+                worker_class.return_value.poll.return_value = None
+                assert reply.get("compositionString") == "Thank you so much." and "timer" not in reply, reply
+                print("patched PIME: text around the caret, and answers shown on a timer")
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)

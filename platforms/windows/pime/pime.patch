@@ -1,0 +1,180 @@
+diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
+index 7829c72..effe870 100644
+--- a/PIMETextService/PIMEClient.cpp
++++ b/PIMETextService/PIMEClient.cpp
+@@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
+ 	guid_{ uuidToString(langProfileGuid) } {
+ }
+ 
++std::unordered_map<UINT_PTR, Client*> Client::timers_;
++
+ Client::~Client(void) {
++	if (timerId_) {
++		KillTimer(NULL, timerId_);
++		timers_.erase(timerId_);
++		timerId_ = 0;
++	}
+ 	state_ = State::Disconnected;
+ 	if (connector_) {
+ 		connector_->cancel();
+@@ -345,6 +352,71 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+ 		// customize the UI
+ 		updateUI(customizeUIVal);
+ 	}
++
++	updateTimer(msg);
++}
++
++void Client::updateTimer(json& msg) {
++	auto& timerVal = msg["timer"];
++	if (!timerVal.is_number_integer()) {
++		return;
++	}
++	if (timerId_) {
++		KillTimer(NULL, timerId_);
++		timers_.erase(timerId_);
++		timerId_ = 0;
++	}
++	int ms = timerVal.get<int>();
++	if (ms > 0) {
++		// A thread timer: it fires in this (the app's UI) thread, where TSF edit sessions belong.
++		timerId_ = SetTimer(NULL, 0, UINT(ms), onTimerProc);
++		if (timerId_) {
++			timers_[timerId_] = this;
++		}
++	}
++}
++
++// static
++void CALLBACK Client::onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time) {
++	KillTimer(NULL, id);  // one shot: the input method asks again if it still waits
++	auto it = timers_.find(id);
++	if (it == timers_.end()) {
++		return;
++	}
++	Client* client = it->second;
++	timers_.erase(it);
++	client->timerId_ = 0;
++	client->onTimer();
++}
++
++void Client::onTimer() {
++	if (!isReady()) {
++		return;
++	}
++	auto context = textService_->currentContext();
++	if (!context) {
++		return;
++	}
++	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this](Ime::EditSession* session, TfEditCookie) {
++		json req = createRpcRequest("onTimer");
++		addSurroundingText(req, session);
++		json ret;
++		callRpcMethod(req, ret);
++		handleRpcResponse(ret, session);
++	});
++	HRESULT result;
++	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
++}
++
++void Client::addSurroundingText(json& request, Ime::EditSession* session) {
++	if (session == nullptr) {
++		return;
++	}
++	std::wstring before, after;
++	if (textService_->surroundingText(session, before, after, 1500)) {
++		request["textBefore"] = utf16ToUtf8(before.c_str());
++		request["textAfter"] = utf16ToUtf8(after.c_str());
++	}
+ }
+ 
+ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -458,6 +530,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+ 
+ 	json req = createRpcRequest("onKeyDown");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	addSurroundingText(req, session);
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+@@ -490,6 +563,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+ 
+ 	json req = createRpcRequest("onKeyUp");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	addSurroundingText(req, session);
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
+index feb9813..e81a6e4 100644
+--- a/PIMETextService/PIMEClient.h
++++ b/PIMETextService/PIMEClient.h
+@@ -92,6 +92,10 @@ public:
+ 	// called just before current composition is terminated for doing cleanup.
+ 	void onCompositionTerminated(bool forced);
+ 
++	// A timer the input method asked for ("timer": ms in a reply) fired: send "onTimer" in an
++	// asynchronous edit session, so a result that arrives between keys can be shown.
++	void onTimer();
++
+ private:
+ 	void startAsyncConnect();
+ 	static std::wstring getPipeName(const wchar_t* baseName);
+@@ -119,6 +123,10 @@ private:
+ 	void updateKeyboardStatus(nlohmann::json& msg);
+ 	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
+ 	void updateUI(nlohmann::json& data);
++	void updateTimer(nlohmann::json& msg);
++	// "textBefore"/"textAfter": the text around the composition or the caret, for the input method.
++	void addSurroundingText(nlohmann::json& request, Ime::EditSession* session);
++	static void CALLBACK onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
+ 	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
+ 
+ private:
+@@ -128,6 +136,8 @@ private:
+ 	std::shared_ptr<AsyncConnector> connector_;
+ 	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
+ 	unsigned int nextSeqNum_;
++	UINT_PTR timerId_ = 0;
++	static std::unordered_map<UINT_PTR, Client*> timers_;
+ 	bool isActivated_;
+ 	State state_;
+ };
+diff --git a/python/textService.py b/python/textService.py
+index 400c374..ce447ab 100644
+--- a/python/textService.py
++++ b/python/textService.py
+@@ -90,12 +90,17 @@ class TextService:
+             self.checkConfigChange()  # check if configurations are changed
+ 
+         self.updateStatus(msg)
++        # The text around the composition or the caret, when the request was made in an edit
++        # session (onKeyDown, onKeyUp, onTimer); None otherwise.
++        self.textBefore, self.textAfter = msg.get("textBefore"), msg.get("textAfter")
+         if method == "filterKeyDown":
+             keyEvent = KeyEvent(msg)
+             ret = self.filterKeyDown(keyEvent)
+         elif method == "onKeyDown":
+             keyEvent = KeyEvent(msg)
+             ret = self.onKeyDown(keyEvent)
++        elif method == "onTimer":
++            self.onTimer()
+         elif method == "filterKeyUp":
+             keyEvent = KeyEvent(msg)
+             ret = self.filterKeyUp(keyEvent)
+@@ -176,6 +181,15 @@ class TextService:
+         self.commitString = ""
+         self.compositionString = ""
+ 
++    # A timer asked for with setTimer() fired; this reply can change the composition and the
++    # candidates like a key's (it runs in an edit session).
++    def onTimer(self):
++        pass
++
++    # Ask to be called back (onTimer) in ms milliseconds, once; 0 cancels.
++    def setTimer(self, ms):
++        self.currentReply["timer"] = int(ms)
++
+     def onKeyboardStatusChanged(self, opened):
+         pass
+ 

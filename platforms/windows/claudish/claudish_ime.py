@@ -1,6 +1,8 @@
 """PIME/TSF adapter. Shared files are copied here by install.ps1."""
 from textService import TextService
-from .composition import MODES, Composition
+import time
+
+from .composition import MAX_COMPOSITION, MODES, Composition
 from .client import Suggestions
 
 
@@ -17,6 +19,7 @@ def keylog(*fields):
 
 
 MODE_COMMAND = 100  # the input indicator's click; its menu items follow
+TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its way
 
 
 def mode_icon(mode):
@@ -163,12 +166,38 @@ class ClaudishTextService(TextService):
         self.setShowCandidates(bool(candidates))
 
     def changed(self):
-        if self.worker and (self.state.automatic or not self.state.text):
+        if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
             # ready by the time the key is released, and onKeyUp can show it.
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
-                                 immediate=self.state.live)
+                                 immediate=self.state.live, after=self.around()[1][:500])
+            self.await_result()
+        elif self.worker and not self.state.text:
+            self.worker.schedule(self.state.revision, "")
         self.publish()
+
+    def around(self):
+        """(before, after): the text around the composition or the caret, as Claudish's PIME
+        reports it with key events and timers; empty with a stock PIME."""
+        return getattr(self, "textBefore", None) or "", getattr(self, "textAfter", None) or ""
+
+    def await_result(self, seconds=10):
+        """Show an answer as soon as it arrives, not at the next key: Claudish's PIME calls back
+        (onTimer) in an edit session. A stock PIME has no timer; the next key shows it then."""
+        if hasattr(self, "setTimer"):
+            self.waiting_until = time.monotonic() + seconds
+            self.setTimer(TIMER_MS)
+
+    def onTimer(self):
+        before = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
+        self.poll_results()
+        after = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
+        if after != before:
+            self.publish()
+        # Still waiting: an instruction or rewrite that is working, or a suggestion not yet back.
+        waiting = self.state.working or (after == before and time.monotonic() < getattr(self, "waiting_until", 0))
+        if waiting:
+            self.setTimer(TIMER_MS)
 
     def filterKeyUp(self, event):
         # PIME can only change what is shown in reply to a request. In continue Claudish takes the
@@ -226,8 +255,10 @@ class ClaudishTextService(TextService):
             if action == "submit":
                 self.state.submit()
                 if self.worker:
+                    before, after = self.around()  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, self.state.mode, immediate=True,
-                                         app=focused_app(), look=self.state.look)
+                                         app=focused_app(), look=self.state.look, before=before, after=after)
+                    self.await_result(60)
                 self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
                 self.publish()
                 return True
@@ -265,8 +296,10 @@ class ClaudishTextService(TextService):
             action = self.state.tab()
             if action == "request":  # rewrite: ask now; it converts in place when it arrives
                 if self.worker:
+                    before, after = self.around()  # where the rewrite goes
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
-                                         app=focused_app())
+                                         app=focused_app(), before=before[-1500:], after=after[:500])
+                    self.await_result()
                 self.showMessage("cd_AI: rewriting…", 2)
             if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
                 self.publish()
@@ -319,6 +352,8 @@ class ClaudishTextService(TextService):
         elif key == 0x1B:
             self.state.dismiss()
         elif event.isPrintableChar():
+            if not self.state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
+                self.state.change(self.around()[0][-MAX_COMPOSITION:])
             self.setCommitString(self.state.type_live(chr(event.charCode)))
         self.changed()
         return True
