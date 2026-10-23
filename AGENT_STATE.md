@@ -50,8 +50,11 @@ Checkpoint 2026-10-23 (an interactive session on the Spark; no 24/7 runner).
 - Mac VM (owner's UTM, macOS 26.6.2): ssh -i ~/.ssh/claudish_mac_vm claudish@10.0.0.251,
   passwordless sudo, Python 3.12.10 from python.org, repo in ~/claudish, service on the rules
   backend (nohup python3 -m claudish serve --backend rules). Rig: tests/desktop/macos/driver.py,
-  7/7 three runs (e72c804). Rebuilding cd_AI makes macOS ask the owner to Allow again: warn
-  them first. No Screen Recording over SSH yet (screencapture fails). CLAUDISH_TRACE is set in
+  9/9 twice (209e936). Rebuilding cd_AI makes macOS ask the owner to Allow again: warn
+  them first; the rig waits for the click (fresh processes: TIS caches per process), then
+  closes System Settings. Owner saw the candidate panel with 3 readings after the show_ fix.
+- Risk (macOS): if cd_AI crashes, macOS does not restart it until login, and typing with it
+  selected does nothing. Two crashes fixed today (stringFromRange NULL, per-controller panel). No Screen Recording over SSH yet (screencapture fails). CLAUDISH_TRACE is set in
   the VM's launchd for cd_AI traces.
 - Still open: Claude API tool loop (needs credentials), selection from the adapters, VS Code +
   Claude Code chat box on the Mac VM.
