@@ -79,7 +79,7 @@ class ClaudishEngine(IBus.Engine):
             self.update_preedit_text_with_mode(preedit, 0, bool(ghost), IBus.PreeditFocusMode.CLEAR)
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string("continue · Tab: take the rest · Esc: dismiss · "
-                                                                 "F7: mode"), bool(ghost))
+                                                                 "Shift: compose"), bool(ghost))
             return
         state = self.composition
         text = state.shown  # rewrite after Tab: the rewrite, in place of your words
@@ -358,7 +358,7 @@ class ClaudishEngine(IBus.Engine):
         current = IBus.Property(key="InputMode", prop_type=IBus.PropType.MENU,
                                 label=IBus.Text.new_from_string("cd_AI · " + mode),
                                 symbol=IBus.Text.new_from_string(SYMBOLS[mode]),
-                                tooltip=IBus.Text.new_from_string("F7 switches mode"),
+                                tooltip=IBus.Text.new_from_string("Tap Shift to switch"),
                                 sensitive=True, visible=True, sub_props=menu)
         if register:
             properties = IBus.PropList()

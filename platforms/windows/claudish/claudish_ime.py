@@ -31,7 +31,7 @@ def mode_icon(mode):
 
 
 def mode_tooltip(mode):
-    return "cd_AI · %s (F7 switches mode)" % mode
+    return "cd_AI · %s (tap Shift to switch)" % mode
 
 
 def focused_app():
