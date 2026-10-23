@@ -104,26 +104,34 @@ shortcut keys, secure fields, service failure, and input-method switching.
 ## Real typing on macOS
 
 `tests/desktop/macos` types into a small Cocoa test app (`app.py`) with Quartz
-key events, through the built input method, and reads the text back from a file
-(no Apple Events, so no Automation permission). It needs a Mac whose user has
-**allowed cd_AI as an input source once**: macOS asks a person before enabling a
-third-party input method ("could include sensitive information…"), so CI
-runners, which nobody can click on, cannot select it. GitHub's macOS runners did
-deliver the synthetic keys, and registered and enabled the bundle, before
-stopping at that dialog.
+key events (real US key codes, so they go through the input method), and reads
+the text back from a file: no Apple Events, so no Automation permission. Verified
+on macOS 26.6 in a UTM VM (Apple Virtualization): 7 scenarios, three runs in a row.
 
-On a Mac or a macOS VM (UTM with Apple Virtualization works) with a logged-in
-desktop session:
+macOS asks a person before a third-party input method is enabled ("Allow … to
+enable cd_AI?"), and asks again after the bundle changes. So it cannot run on CI
+runners, which nobody can click on. GitHub's macOS runners did deliver the keys,
+and registered and enabled the bundle, before stopping at that dialog. When the
+rig needs it, it prints `>>> click Allow`, waits, then closes System Settings and
+brings its window back. It also refocuses its window before typing, and stops
+rather than type into another app.
+
+On a Mac or macOS VM with a logged-in desktop session, Python 3.12 from
+python.org, and Accessibility for the process that runs the driver (over SSH:
+`/usr/libexec/sshd-keygen-wrapper`):
 
 ```sh
 python3 platforms/macos/build.py
 python3 -m claudish serve --backend rules &
 .tools/macos-build-venv/bin/python -m pip install "pyobjc-framework-Quartz>=10,<13"
-.tools/macos-build-venv/bin/python tests/desktop/macos/driver.py
+.tools/macos-build-venv/bin/python tests/desktop/macos/driver.py [--reinstall]
 ```
 
-The first run shows the consent dialog; allow it, and later runs select cd_AI
-without asking. Run it over SSH with Accessibility granted to
-`/usr/libexec/sshd-keygen-wrapper`, or from Terminal with Accessibility granted
-to Terminal.
+`--reinstall` puts a fresh build in place (expect the Allow dialog). macOS starts
+an input method at login and does not restart it after an update or a crash, so
+the rig starts it (`open -g`) when it is not running.
 
+For debugging, `launchctl setenv CLAUDISH_TRACE /tmp/claudish-trace.log` before
+cd_AI starts makes it log event kinds and errors (never typed text). Exceptions
+in an input method otherwise vanish into the host app's run loop. Crash reports
+are in `~/Library/Logs/DiagnosticReports/Claudish-*.ips`.
