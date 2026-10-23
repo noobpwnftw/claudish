@@ -90,6 +90,7 @@ async def check(args):
                 await page.screenshot(path=str(args.screenshots / "rewrite.png"))
             await keys.press("Escape")  # your words again
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
+            await expect(window).to_contain_text("Esc: drop it")  # the next Esc drops them: the footer says so
             await keys.press("Tab")
             await keys.press("Tab")  # converted, then kept
             await expect(committed).to_have_attribute("data-text", before + rewrite)

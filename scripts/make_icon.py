@@ -17,20 +17,20 @@ def chunk(kind, data):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
 
 
-def png(glyph, on=(94, 234, 212, 255), off=(24, 28, 39, 255)):
-    """A 32x32 PNG with the glyph centered, two pixels per dot."""
+def png(glyph, on=(94, 234, 212, 255), off=(24, 28, 39, 255), size=(32, 32)):
+    """A PNG (32x32 unless sized) with the glyph centered, two pixels per dot."""
     width, height = len(glyph[0]), len(glyph)
-    left, top = (32 - 2 * width) // 2, (32 - 2 * height) // 2
+    left, top = (size[0] - 2 * width) // 2, (size[1] - 2 * height) // 2
     dot, blank = bytes(on), bytes(off)
     rows = []
-    for y in range(32):
+    for y in range(size[1]):
         row = bytearray()
-        for x in range(32):
+        for x in range(size[0]):
             gx, gy = (x - left) // 2, (y - top) // 2
             lit = 0 <= gx < width and 0 <= gy < height and x >= left and y >= top and glyph[gy][gx] == "1"
             row.extend(dot if lit else blank)
         rows.append(b"\x00" + row)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 32, 32, 8, 6, 0, 0, 0))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size[0], size[1], 8, 6, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
 
 
@@ -44,5 +44,8 @@ for name, glyph in GLYPHS.items():
     (directory / (name + ".ico")).write_bytes(ico(glyph))
 # macOS: the input source's menu-bar icon, a template (black on transparent; the system tints it).
 # platforms/macos/build.py converts it to TIFF with sips, which macOS loads for input sources.
+# Lowercase: the c at x-height, the d with its ascender; cropped to the glyph, so the menu bar
+# scales it to its full height.
+CD = ["00000000100", "00000000100", "00000000100", "01110011100", "10000100100", "10000100100", "01110011100"]
 (Path(__file__).resolve().parents[1] / "platforms/macos/cd.png").write_bytes(
-    png(GLYPHS["icon"], on=(0, 0, 0, 255), off=(0, 0, 0, 0)))
+    png(CD, on=(0, 0, 0, 255), off=(0, 0, 0, 0), size=(24, 16)))

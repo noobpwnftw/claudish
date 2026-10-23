@@ -189,6 +189,8 @@ def scenarios():
         # In place: a removed and re-added bundle is a new input source, which macOS asks about again.
         sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
         subprocess.run(["pkill", "-f", str(TARGET)], check=False)  # the next key starts the new build
+        print("note: macOS keeps the old bundle's name and icon (and sometimes the input method) until"
+              " you log out and in", flush=True)
     select_input_method()
     # macOS starts an input method at login; after an update (or a crash) it does not start it again
     # by itself, and keys then reach the app without it. Start it the way login would.

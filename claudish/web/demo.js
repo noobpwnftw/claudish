@@ -333,7 +333,7 @@ function render() {
     foot.className = "candidate-foot";
     // One pattern everywhere: "Key: action".
     foot.textContent = choosing() ? "1–3: pick one · Enter: the first · Esc: back to your words"
-      : state.converted || state.working || state.failed || state.candidate ? "Esc: your words"
+      : state.converted || state.working || state.failed ? "Esc: your words"
       : "Shift+Enter: keep it as it is · Esc: drop it";
     window.append(foot);
   }

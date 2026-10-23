@@ -179,6 +179,12 @@ to `~/Library/Input Methods/Claudish.app`. It does not change your active input
 source. Omit `--install` to build only. These commands must run on macOS; the
 Spark cannot build or validate a native Mac app bundle.
 
+Then log out and back in, and add it in **System Settings → Keyboard → Input
+Sources → Edit… → + → English → cd_AI**. macOS asks you to allow a third-party
+input method there; nothing can add it for you. After you update cd_AI, log out
+and back in again: until then macOS keeps using the bundle it loaded (its name,
+its icon, and sometimes the old code).
+
 Log out/in, then add Claudish under **System Settings → Keyboard → Text Input →
 Edit → +** (look under English). Choose it using the Input menu or your configured
 input-source shortcut. Start the service separately:
