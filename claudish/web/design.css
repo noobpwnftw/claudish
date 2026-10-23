@@ -73,3 +73,13 @@ body.solo .shell{padding:0;max-width:none}
 :root[data-theme="dark"] .host.macos.terminal{--h-bg:#1e1e1e}
 
 @media(max-width:650px){.host-text{padding:16px}.sheet{gap:30px}}
+
+/* How each platform draws it. */
+.drawn{border-top:1px solid var(--line);padding:30px 0 40px}
+.drawn h2{font-size:24px;margin:0 0 6px}
+.drawn p{margin:0 0 18px;font-size:14px;color:var(--muted);text-wrap:pretty}
+.drawn table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.5}
+.drawn th,.drawn td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--line)}
+.drawn tr:first-child th{font-family:var(--mono);font-size:11px;letter-spacing:.8px;color:var(--muted);font-weight:400}
+.drawn td{color:var(--label)}
+@media(max-width:650px){.drawn table{font-size:12px}}

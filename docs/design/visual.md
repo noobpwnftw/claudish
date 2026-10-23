@@ -35,28 +35,21 @@ gallery.sh`, `tests/desktop/windows/gallery.sh`, `tests/desktop/macos/gallery.sh
 
 | State | Looks like |
 | --- | --- |
-| Continue, a suggestion | the rest of the sentence after the caret, in a muted grey, no underline; Tab takes it |
-| Compose, typing | your words with the composition's underline in the accent colour (so compose is visible at the caret) |
-| Compose, rewrite in place | the rewrite in the same place, with the accent underline and a faint accent tint behind it (not your words) |
-| Compose, waiting | the composition as it is, and a small "…" after it while the model works |
-| Drafts | a list next to the caret: number, draft; the first highlighted; one short hint line (1–3, Esc) |
-| A question | the question as is, its choices numbered below, one short hint line |
+| Continue, a suggestion | cd_AI's own grey text right after the caret, in its UI font at the caret's height, only at the end of a line; Tab takes it |
+| Compose, typing | your words with the platform's own composition underline; the panel's footer starts with the AI tile (compose is visible) and says Tab: rewrite, Enter: ask AI |
+| Compose, rewrite in place | the rewrite in place of your words; the panel shows "was" and your words, Tab: keep, Esc: undo |
+| Waiting | the composition as it is; the footer says what is happening ("rewriting…") |
+| Drafts | rows: a muted number, the draft; the first highlighted (a soft fill, an accent bar); 1–3: pick, Esc: back |
+| A question | the question as is (a small label for who asks), its choices numbered; an approval highlights nothing |
 | An answer to read | the text as a short paragraph, wrapped to a readable width, then Insert it / Dismiss |
-| Progress (an agent) | one muted line: what it is doing |
-| Hosted model | a small mark in the hint line when the answer came from a hosted model |
+| Progress (an agent) | one muted footer line: what it is doing |
+| Hosted model | a small mark at the footer's end when the answer came from a hosted model |
+| A mode switch | the mode's tile and name, briefly, at the caret |
 
-## What each platform can draw
-
-| | Linux, X11 (GTK, Qt) | Linux, GNOME on Wayland | Windows (Claudish's PIME) | macOS (IMK) |
-| --- | --- | --- | --- | --- |
-| Colour in the composition | yes (IBus attributes) | no: text-input carries text and a cursor only | yes, with TSF display attributes (needs our PIME patch) | no: IMK drops colour; underline styles only |
-| A window at the caret | IBus's popup (the panel's) | GNOME Shell's popup: labels, orientation, aux text | PIME's candidate window (C++, ours to restyle) | our own panel (NSPanel) at the caret rect |
-| Suggestion after the caret | inline grey | in the popup, one line ("⇥ the rest"), not inline | inline grey (display attribute) | our own overlay at the caret: grey text in the app's size |
-
-So: macOS and Windows can reach the reference look with code we own (a panel and an overlay on
-macOS; display attributes and a restyled candidate window in Claudish's PIME). GNOME on Wayland is
-limited by the protocol: there the suggestion goes in the shell's popup rather than inline, where
-it would look exactly like typed text.
+Every element is drawn by means every platform has (the lab's table, "How each platform draws
+it"). Where a platform cannot draw one, the design changes for all of them: the composition is
+the platform's plain underline (macOS cannot colour it, Wayland cannot style it), and the
+suggestion is cd_AI's own text, not the app's (only macOS reports the app's font).
 
 ## Order of work
 

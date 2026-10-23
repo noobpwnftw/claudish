@@ -15,10 +15,12 @@
   --k-border:#48453e;--k-shadow:0 10px 28px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.4);--k-key-border:#5e5d59;
 }
 
-/* Your words and the machine's never look alike. */
-.k-ghost{color:var(--k-ghost)}
-.k-comp{text-decoration:underline dotted var(--k-accent);text-decoration-thickness:2px;text-underline-offset:.28em}
-.k-comp.converted{text-decoration-style:solid;background:color-mix(in srgb,var(--k-accent) 14%,transparent);border-radius:2px}
+/* Your words and the machine's never look alike, by means every platform has. The composition is
+   the platform's own: one plain underline (macOS cannot colour it; Wayland cannot style it at all).
+   The suggestion is cd_AI's own text after the caret, in its UI font at the caret's height (only
+   macOS reports the app's font), and only at the end of a line, so it never covers your text. */
+.k-ghost{color:var(--k-ghost);font-family:var(--k-font)}
+.k-comp{text-decoration:underline solid currentColor;text-decoration-thickness:1px;text-underline-offset:.2em}
 
 /* The panel next to the caret: an optional header (a small label, then the question or answer as
    is), the rows (a muted key, the text; the highlighted one a soft fill with an accent bar), and
@@ -43,6 +45,9 @@
 .k-cap{display:inline-block;font-size:calc(var(--k-small) - 1px);line-height:1;padding:2px 4px;margin-right:4px;border:1px solid var(--k-key-border);border-radius:4px;color:var(--k-text);vertical-align:1px}
 .k-mark{margin-left:auto;white-space:nowrap}
 .k-mark::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--k-accent);margin-right:5px;vertical-align:1px}
+.k-was{padding:0 var(--k-row-x) 2px;font-size:var(--k-small);color:var(--k-muted);text-wrap:pretty}
+.k-was::before{content:"was ";font-weight:600}
+.k-foot>.k-tile{margin-right:-4px}
 .k-status{color:var(--k-muted)}
 .k-status.failed{color:var(--k-accent)}
 .k-dots::after{content:"…"}

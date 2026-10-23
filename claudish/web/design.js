@@ -6,24 +6,24 @@
 
 const SKINS = {
   reference: {name: "Reference", note: "The demo's own look: the one every platform follows."},
-  windows: {name: "Windows 11", note: "Claudish's PIME draws the panel; display attributes draw the composition.", app: "Notepad"},
+  windows: {name: "Windows 11", note: "Claudish's PIME draws the panel and the suggestion.", app: "Notepad"},
   macos: {name: "macOS", note: "cd_AI's own panel and suggestion overlay (platforms/macos/panel.py).", app: "TextEdit"},
-  gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel; X11 apps get the attributes inline.", app: "Text Editor"},
+  gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel and the suggestion, on X11 and Wayland alike.", app: "Text Editor"},
 };
 
 // Each state: the text box around the caret, what cd_AI draws there, and the panel.
 const STATES = [
   {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.",
    before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, underlined in the accent: compose is visible at the caret.",
+  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The panel's AI tile says compose; the keys say what is next.",
    before: "Quick update for the team: ", comp: "running late, start without me",
    panel: {foot: ["Tab: rewrite", "Enter: ask AI"]}},
   {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
    before: "Quick update for the team: ", comp: "running late, start without me",
    panel: {status: "rewriting"}},
-  {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place, tinted, until you keep it.",
-   before: "Quick update for the team: ", comp: "I'm running a little late — please start without me.", converted: true,
-   panel: {foot: ["Tab: keep", "Esc: undo"]}},
+  {id: "converted", title: "Compose: the rewrite in place", note: "It takes your words' place; the panel keeps yours, until you keep it.",
+   before: "Quick update for the team: ", comp: "I'm running a little late — please start without me.",
+   panel: {was: "running late, start without me", foot: ["Tab: keep", "Esc: undo"]}},
   {id: "drafts", title: "An instruction's drafts", note: "Enter asked; three readings come back. The first is highlighted.",
    before: "Hi Sam, ", comp: "decline the offsite politely",
    panel: {rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],
@@ -106,7 +106,9 @@ function panel(spec) {
     row.append(words);
     node.append(row);
   });
+  if (spec.was) node.append(el("div", "k-was", spec.was));
   const foot = el("div", "k-foot");
+  foot.append(el("span", "k-tile ai", "AI"));
   if (spec.status) {
     const status = el("span", "k-status k-dots", spec.status);
     foot.append(status);
@@ -114,7 +116,7 @@ function panel(spec) {
   if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
   (spec.foot || []).forEach((text) => foot.append(hint(text)));
   if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
-  if (foot.childNodes.length) node.append(foot);
+  node.append(foot);
   return node;
 }
 
@@ -132,7 +134,7 @@ function frame(skin, state) {
   const line = el("div", "host-line");
   line.append(state.before);
   const anchor = el("span", "anchor");
-  if (state.comp) anchor.append(el("span", "k-comp" + (state.converted ? " converted" : ""), state.comp));
+  if (state.comp) anchor.append(el("span", "k-comp", state.comp));
   line.append(anchor, el("span", "host-caret"));
   if (state.ghost) line.append(el("span", "k-ghost", state.ghost));
   text.append(line);
@@ -198,7 +200,34 @@ function render() {
     card.append(host);
     sheet.append(card);
   }
+  if (!solo && !only) sheet.after(feasibility());
+  document.querySelectorAll(".drawn").forEach((node, index) => index && node.remove());
   requestAnimationFrame(() => document.querySelectorAll(".host").forEach(place));
+}
+
+const DRAWN = [
+  ["The suggestion after the caret", "cd_AI's overlay window at the caret", "cd_AI's overlay panel (panel.py)", "the extension's label at the IBus cursor"],
+  ["The composition (plain underline)", "TSF composition", "IMK marked text", "IBus preedit (Wayland text-input)"],
+  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window", "cd_AI's panel (panel.py)", "the extension's candidate popup"],
+  ["The mode switch", "the same overlay window", "the same overlay panel", "the extension's label"],
+  ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's colour scheme"],
+];
+
+function feasibility() {
+  const section = el("section", "drawn");
+  section.append(el("h2", "", "How each platform draws it"),
+                 el("p", "", "Every element has to be drawable on every platform. Where one cannot be, the design changes for all of them."));
+  const table = el("table");
+  const head = el("tr");
+  ["", "Windows 11", "macOS", "GNOME (X11 and Wayland)"].forEach((h) => head.append(el("th", "", h)));
+  table.append(head);
+  for (const [what, ...ways] of DRAWN) {
+    const row = el("tr");
+    row.append(el("th", "", what), ...ways.map((w) => el("td", "", w)));
+    table.append(row);
+  }
+  section.append(table);
+  return section;
 }
 
 window.addEventListener("hashchange", render);
