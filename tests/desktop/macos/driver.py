@@ -42,8 +42,7 @@ SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`"))
 def post(code, text=None, shift=False):
     for down in (True, False):
         event = CGEventCreateKeyboardEvent(None, code, down)
-        if shift:
-            CGEventSetFlags(event, kCGEventFlagMaskShift)
+        CGEventSetFlags(event, kCGEventFlagMaskShift if shift else 0)  # else the session's modifiers stick
         if text is not None:
             CGEventKeyboardSetUnicodeString(event, len(text.encode("utf-16-le")) // 2, text)
         CGEventPost(kCGHIDEventTap, event)
