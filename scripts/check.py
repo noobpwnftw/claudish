@@ -46,6 +46,17 @@ def skip(name, reason):
     results.append((name, "SKIP", reason))
 
 
+def patched_pime_source(source):
+    """The pinned textService.py with Claudish's PIME patch applied (its Python part), or None."""
+    work = Path(tempfile.mkdtemp(prefix="claudish-pime-"))  # outside the checkout: git apply inside a
+    (work / "python").mkdir()                                # repository skips paths outside its folder
+    target = work / "python/textService.py"
+    shutil.copy(source, target)
+    applied = subprocess.run(["git", "apply", "--include=python/textService.py",
+                              str(ROOT / "platforms/windows/pime/pime.patch")], cwd=work, capture_output=True)
+    return target if applied.returncode == 0 else None
+
+
 def pime_source():
     target = ROOT / ".tools/pime/textService.py"
     if not target.is_file():
@@ -140,7 +151,11 @@ def main():
         run("IBus smoke", ["dbus-run-session", "--", str(system_python), "tests/ibus_smoke.py"])
     source, reason = pime_source()
     if source:
-        run("PIME smoke", [sys.executable, "tests/pime_smoke.py", "--pime-source", str(source)])
+        patched = patched_pime_source(source)  # Claudish's PIME is the only one the adapter supports
+        if patched:
+            run("PIME smoke", [sys.executable, "tests/pime_smoke.py", "--pime-source", str(patched)])
+        else:
+            fail("PIME smoke", "platforms/windows/pime/pime.patch does not apply to the pinned PIME")
     else:
         skip("PIME smoke", reason)
     if args.model:

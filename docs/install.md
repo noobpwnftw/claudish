@@ -137,10 +137,10 @@ In an administrator PowerShell:
 .\platforms\windows\install.ps1 -PimeRoot 'C:\Program Files (x86)\PIME'
 ```
 
-With a released PIME, an answer that arrives after a key shows at your next key,
-and cd_AI does not see the text around the caret. Claudish's patched PIME
-([platforms/windows/pime](../platforms/windows/pime/README.md)) fixes both; until
-releases ship its build, it is built from source with the Visual Studio C++ tools.
+cd_AI needs Claudish's own PIME ([platforms/windows/pime](../platforms/windows/pime/README.md)):
+it shows answers as they arrive, tells cd_AI the text around the caret, and draws cd_AI's
+candidate window. A released PIME is not supported. Until Claudish ships its build, it is built
+from source with the Visual Studio C++ tools.
 
 This copies the plugin and shared modules into PIME's input-method directory
 and re-registers its existing x86/x64 DLLs so it can enumerate the new profile.

@@ -14,6 +14,18 @@ ENTER_GUARD_SECONDS = 0.3
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 
 
+def split_title(text):
+    """(header, body) of a question or an answer as shown: who asks or what is asked, small, then
+    the rest ("The model asks: Did you mean git status?", "Send this task to claude? Fix the build")."""
+    head, sep, rest = text.partition(": ")
+    if sep and len(head) <= 24 and rest:
+        return head, rest
+    head, sep, rest = text.partition("? ")
+    if sep and len(head) <= 60 and rest:
+        return head + "?", rest
+    return None, text
+
+
 class Composition:
     def __init__(self):
         self.text = ""

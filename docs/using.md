@@ -8,7 +8,6 @@ Typing in detail, the browser demos, and terminals.
 | --- | --- |
 | Type | Accumulate the phrase in an editable composition buffer |
 | Pause for 180 ms | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
-| F6 | Show a suggestion that arrived after your last key; only needed on Windows with a released PIME (Claudish's patched PIME shows it as it arrives) |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second: Shift with another key (a capital, Shift+Enter) or held (Shift+click) is not one. Leaving compose keeps what you see, as it is. GNOME's top bar shows C or AI; Windows' taskbar indicator shows the mode icon; Linux also shows it in the status line, Windows in a notice |
 | Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as grey marked text on macOS (apps that draw marked text themselves may show it underlined), and in the candidate window on Windows. Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app, so the space after a word is never part of what you rewrite or ask |
@@ -37,10 +36,8 @@ shortcuts pressed while composing commit your wording and are consumed; press th
 (Ctrl+Alt) stay in the composition, as they do on Linux. Application-driven focus
 changes and composition termination need particular attention in Windows testing.
 
-Linux and macOS show an answer as it arrives, and so does Windows with Claudish's
-patched PIME (platforms/windows/pime); a released PIME only updates the screen in
-reply to a key, so there F6 shows an answer that came after your last key, and
-Tab collects a ready one directly. Short phrases work best: the buffer is
+Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,
+platforms/windows/pime, calls back when it does). Short phrases work best: the buffer is
 limited to 512 characters and generation to 64 tokens. A truncated or failed
 rewrite is never offered; Enter/Escape still commits your wording.
 

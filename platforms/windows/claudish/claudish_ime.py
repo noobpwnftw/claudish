@@ -2,7 +2,7 @@
 from textService import TextService
 import time
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, split_title
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -141,8 +141,6 @@ class ClaudishTextService(TextService):
             return bool(self.state.text)
         if self.state.live:
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
-            if event.keyCode == 0x75:  # F6 shows it (PIME cannot redraw without a key)
-                return True
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
             # Backspace, Enter, and navigation are the app's (the context follows here).
             if event.keyCode in (0x09, 0x1B):
@@ -153,7 +151,7 @@ class ClaudishTextService(TextService):
                 if self.state.text:
                     self.state.backspace()
                 self.publish()
-            elif event.keyCode not in (0x10, 0x14, 0x75, 0x77):
+            elif event.keyCode not in (0x10, 0x14, 0x77):
                 self.drop_live()
             return False
         return event.isPrintableChar() or bool(self.state.text)
@@ -170,12 +168,18 @@ class ClaudishTextService(TextService):
         return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 
     def publish(self):
+        """The screen from the state, in Claudish's PIME candidate window (platforms/windows/pime):
+        the question as its header, the items, and the one short hint (or what is happening) as its
+        footer, so nothing shows in a passing notice."""
         if self.state.live:
             # Your words are in the app already; the suggestion shows in the candidate window
             # (TSF compositions cannot be greyed), and Tab takes it.
             self.setCompositionString("")
-            ghost = self.state.ghost
-            self.setCandidateList(["⇥ " + ghost.lstrip()] if ghost else [])  # the rest of the sentence; Tab takes it
+            ghost = self.state.ghost.lstrip()
+            self.setSelKeys("⇥")  # one row, its key ⇥: Tab takes it
+            self.setCandidateHeader("")
+            self.setCandidateFooter("")
+            self.setCandidateList([ghost] if ghost else [])
             self.setShowCandidates(bool(ghost))
             return
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
@@ -183,13 +187,26 @@ class ClaudishTextService(TextService):
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
         # A list only for an instruction's drafts or an agent's question; rewrite converts in place.
-        if self.state.question:
-            candidates = [c.get("label", "") + (" - " + c["legend"] if c.get("legend") else "")
-                          for c in self.state.question.get("choices") or []]
+        question = self.state.question if not self.state.reply else None
+        if question:
+            candidates = [c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
+                          for c in question.get("choices") or []]
         else:
             candidates = self.state.candidates if self.state.choosing else []
+        header, footer = "", self.state.hint()
+        if question:  # the question as is, a small label for who asks; an approval highlights nothing
+            label, body = split_title(question.get("text", ""))
+            header = "%s\n%s" % (label, body) if label else body
+            footer = ("Enter: the first · 1–%d · or type a reply" if self.state.asks
+                      else "1–%d · or type a reply") % len(candidates)
+            self.customizeUI(candUseCursor=self.state.asks)
+        else:
+            self.customizeUI(candUseCursor=True)
+        self.setSelKeys("123456789")
+        self.setCandidateHeader(header)
+        self.setCandidateFooter(footer if self.state.text else "")
         self.setCandidateList(candidates)
-        self.setShowCandidates(bool(candidates))
+        self.setShowCandidates(bool(candidates or header or (footer and self.state.text)))
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
@@ -223,10 +240,9 @@ class ClaudishTextService(TextService):
 
     def await_result(self, seconds=10):
         """Show an answer as soon as it arrives, not at the next key: Claudish's PIME calls back
-        (onTimer) in an edit session. A stock PIME has no timer; the next key shows it then."""
-        if hasattr(self, "setTimer"):
-            self.waiting_until = time.monotonic() + seconds
-            self.setTimer(TIMER_MS)
+        (onTimer) in an edit session."""
+        self.waiting_until = time.monotonic() + seconds
+        self.setTimer(TIMER_MS)
 
     def onTimer(self):
         before = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
@@ -274,19 +290,14 @@ class ClaudishTextService(TextService):
             if "text" in data:
                 self.state.offer(revision, data["text"], data.get("candidates", ()))
             elif "question" in data:
-                if self.state.ask(revision, data["question"], data["session"]):
-                    self.showMessage("%s (1-%d)" % (data["question"].get("text", ""),
-                                                                len(data["question"].get("choices") or [])), 5)
+                self.state.ask(revision, data["question"], data["session"])
             elif "progress" in data or "partial" in data:
-                if self.state.note(revision, data.get("progress") or data.get("partial")):
-                    self.showMessage("cd_AI: " + " ".join(self.state.status.split())[-60:], 2)
+                self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "done" in data:
                 if self.state.done(revision):
                     self.showMessage("cd_AI: " + data["done"], 3)  # a helper took the task
             elif "error" in data:
-                self.state.fail(revision)
-                if self.state.failed:
-                    self.showMessage("cd_AI: the request failed; Enter sends it again", 3)
+                self.state.fail(revision)  # the footer says so: Enter retries
 
     def onKeyDown(self, event):
         keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text),
@@ -322,7 +333,6 @@ class ClaudishTextService(TextService):
                 session, question, words = self.state.answer_text()
                 if self.worker:
                     self.worker.answer(session, question, text=words)
-                self.showMessage("cd_AI: " + self.state.status, 2)
                 self.publish()
                 return True
             if action == "submit":
@@ -333,17 +343,15 @@ class ClaudishTextService(TextService):
                                          app=focused_app(), look=self.state.look, before=before, after=after,
                                          purpose=self.field())
                     self.await_result(60)
-                self.showMessage("cd_AI: working… Enter inserts the result when ready", 3)
                 self.publish()
                 return True
-            if action == "wait":
-                self.showMessage("cd_AI: still working…", 2)
+            if action == "wait":  # the footer says it is still working
+                self.publish()
                 return True
         if self.state.question and not self.state.reply and 0x31 <= key <= 0x39:  # an agent's question: the digit is the answer
             chosen = self.state.answer_choice(key - 0x30)
             if chosen and self.worker:
                 self.worker.answer(*chosen)
-                self.showMessage("cd_AI: " + self.state.status, 2)
             self.publish()
             return True
         if self.state.choosing and not self.state.question and 0x31 <= key <= 0x39:  # 1-9 pick from the list, as in CJK input methods
@@ -354,13 +362,8 @@ class ClaudishTextService(TextService):
             return True
         if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
-        if key == 0x75:  # F6 previews the ready candidate without committing it.
-            self.publish()
-            return True
         if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.
             if self.state.toggle_look():
-                self.showMessage("cd_AI: " + ("the window picture goes with this instruction" if self.state.look
-                                              else "no window picture"), 2)
                 self.publish()
             return bool(self.state.text)
         if key == 0x09:
@@ -378,7 +381,6 @@ class ClaudishTextService(TextService):
                                          app=focused_app(), before=before[-1500:], after=after[:500],
                                          purpose=self.field())
                     self.await_result()
-                self.showMessage("cd_AI: rewriting…", 2)
             if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
                 self.publish()
                 return True
@@ -420,9 +422,6 @@ class ClaudishTextService(TextService):
     def live_key(self, event):
         """Continue mode: what filterKeyDown took (printable keys, Tab and Esc with a suggestion)."""
         key = event.keyCode
-        if key == 0x75:
-            self.publish()
-            return True
         if key == 0x09:
             ghost = self.state.take_ghost()
             if ghost:

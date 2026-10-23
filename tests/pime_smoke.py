@@ -1,6 +1,7 @@
-"""Exercise the Windows adapter against PIME's actual Python API, on either OS.
+"""Exercise the Windows adapter against Claudish's PIME Python API (PIME's, with
+platforms/windows/pime/pime.patch applied), on either OS.
 
-python tests/pime_smoke.py --pime-source /path/to/PIME/python/textService.py
+python tests/pime_smoke.py --pime-source /path/to/patched/python/textService.py
 This does not register or exercise the native TSF component.
 """
 import argparse
@@ -22,6 +23,11 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules["textService"] = module
+    # Claudish's PIME (platforms/windows/pime) shows the question, hint and status in the candidate
+    # window's header and footer.
+
+    def said(reply, words):
+        return words in json.dumps([reply.get("candidateHeader"), reply.get("candidateFooter")], ensure_ascii=False)
     root = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory() as temporary:
         target = Path(temporary) / "pime_claudish"
@@ -103,7 +109,7 @@ def main():
                 key(ord(char.upper()), ord(char))
             assert "commitString" not in key(9)  # Tab asks
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A nuanced draft."})
-            reply = key(0x75)  # it arrives: in place of your words, no list
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # it arrives: in place of your words, no list
             worker_class.return_value.poll.return_value = None
             assert reply["candidateList"] == [] and reply["compositionString"] == "A nuanced draft.", reply
             reply = key(0x1B)  # Esc: your words again
@@ -124,7 +130,8 @@ def main():
             assert key(ord("!"), ord("!"), "filterKeyUp")["return"] is True
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
             reply = key(ord("!"), ord("!"), "onKeyUp")
-            assert reply.get("candidateList") == ["⇥ Hello—truly."] and reply.get("showCandidates"), reply
+            assert reply.get("candidateList") == ["Hello—truly."] and reply.get("setSelKeys") == "⇥", reply  # one row, keyed ⇥
+            assert reply.get("showCandidates"), reply
             assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
@@ -142,9 +149,9 @@ def main():
                 key(ord(char.upper()), ord(char))
             assert worker_class.return_value.schedule.call_count == calls
             reply = key(0x77)  # F8: send a picture of the window too
-            assert service.state.look and "picture" in json.dumps(reply.get("showMessage")), reply
+            assert service.state.look and said(reply, "window"), reply
             reply = key(0x0D)
-            assert service.state.working and "working" in json.dumps(reply.get("showMessage"))
+            assert service.state.working and said(reply, "working"), reply
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
@@ -169,8 +176,8 @@ def main():
                         "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
             reply = key(0x10)
-            assert reply.get("candidateList") == ["Allow - Bash: git status", "Deny"], reply
-            assert "Allow Bash?" in json.dumps(reply.get("showMessage")), reply
+            assert reply.get("candidateList") == ["Allow — Bash: git status", "Deny"], reply
+            assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
             reply = key(0x31)
             assert "commitString" not in reply, reply

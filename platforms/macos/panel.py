@@ -9,6 +9,8 @@ from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsM
                     NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel, NSScreen, NSTextField, NSView,
                     NSVisualEffectView)
 
+from claudish.composition import split_title
+
 PADDING, ROW_GAP, WIDTH, MIN_WIDTH, RADIUS = 12, 4, 440, 220, 10
 BORDERLESS, NONACTIVATING = 0, 1 << 7  # NSWindowStyleMask values
 POPUP_LEVEL = 101  # NSPopUpMenuWindowLevel: above the app's own windows
@@ -28,18 +30,6 @@ def rounded_mask(radius):
     image.setCapInsets_(NSEdgeInsetsMake(radius, radius, radius, radius))
     image.setResizingMode_(1)  # NSImageResizingModeStretch
     return image
-
-
-def split_title(text):
-    """(header, body) of a question or an answer as shown: who asks or what is asked, small, then
-    the rest ("The model asks: Did you mean git status?", "Send this task to claude? Fix the build")."""
-    head, sep, rest = text.partition(": ")
-    if sep and len(head) <= 24 and rest:
-        return head, rest
-    head, sep, rest = text.partition("? ")
-    if sep and len(head) <= 60 and rest:
-        return head + "?", rest
-    return None, text
 
 
 def label(text, size=14, weight=NSFontWeightRegular, color=None, mono=False, width=None):
