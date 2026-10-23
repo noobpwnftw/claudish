@@ -25,7 +25,7 @@ CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-uns
        "worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https:; style-src 'self'; "
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
 REPO = "https://github.com/noobpwnftw/claudish"
-FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png", "favicon-dark.png"]
+FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png"]
 
 
 def build(out):
@@ -67,8 +67,7 @@ def build_site(out):
     (out / "site.css").write_text("\n".join(tokens) + "\n" + (site / "site.css").read_text(encoding="utf-8"),
                                   encoding="utf-8")
     shutil.copy(site / "site.js", out / "site.js")
-    for name in ("favicon.png", "favicon-dark.png"):
-        shutil.copy(site / name, out / name)
+    shutil.copy(site / "favicon.png", out / "favicon.png")
     shutil.copy(web / "theme.js", out / "theme.js")
     page = (site / "index.html").read_text(encoding="utf-8")
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n'

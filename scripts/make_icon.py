@@ -5,7 +5,7 @@ at high resolution and scaled down, so they are crisp at every size (G45; docs/d
 
 Writes, and these files are committed:
   platforms/windows/claudish/icon.ico            the input method (16-256 px): "cd" on cream
-  platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile (-dark: inverted, for a dark taskbar)
+  platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile
   platforms/windows/claudish/mode-compose.ico    compose: "AI" on the accent colour
   platforms/macos/cd.png, cd@2x.png              the menu-bar template (black on clear; macOS tints it)
   site/favicon.png, claudish/web/favicon.png     the site's and the demo's icon
@@ -30,7 +30,7 @@ def text_box(draw, text, font):
     return left, top, right - left, bottom - top
 
 
-def tile(text, font_path, fill, background, scale=0.62, size=BIG):
+def tile(text, font_path, fill, background, scale=0.72, size=BIG):
     """A tile that fills the whole icon square in its background colour (a small corner radius, so it
     reads as full size next to the tray's other icons), the text centred on its ink at the given
     proportion, drawn at 4x the target size and reduced once, so each size is crisp."""
@@ -69,16 +69,17 @@ def template(text, font_path, size):
 
 def main():
     windows = ROOT / "platforms/windows/claudish"
-    # The compare's design (owner's pick): cream "cd", and inverted on a dark taskbar; "AI" on the accent.
-    save_frames(ico("cd", SERIF, INK, PAPER, 0.62), windows / "icon.ico")
-    save_frames(ico("cd", SERIF, INK, PAPER, 0.62), windows / "mode-continue.ico")
-    save_frames(ico("cd", SERIF, PAPER, INK, 0.62), windows / "mode-continue-dark.ico")
-    save_frames(ico("AI", MONO, (255, 255, 255, 255), ACCENT, 0.54), windows / "mode-compose.ico")
+    # One cream "cd" tile in both themes, never inverted: a tile the colour of the surface it sits on
+    # vanishes (ink on a dark taskbar or tab strip, cream on a white tab), leaving only the letters at
+    # half the square. Cream shows as a full square on dark surfaces; on light ones the letters, at 80%
+    # of the width, fill the slot. "AI" on the accent shows on both.
+    save_frames(ico("cd", SERIF, INK, PAPER, 0.72), windows / "icon.ico")
+    save_frames(ico("cd", SERIF, INK, PAPER, 0.72), windows / "mode-continue.ico")
+    save_frames(ico("AI", MONO, (255, 255, 255, 255), ACCENT, 0.66), windows / "mode-compose.ico")
     template("cd", SERIF, 16).save(ROOT / "platforms/macos/cd.png")
     template("cd", SERIF, 32).save(ROOT / "platforms/macos/cd@2x.png")
     for folder in (ROOT / "site", ROOT / "claudish/web"):
-        tile("cd", SERIF, INK, PAPER, 0.62, 64).save(folder / "favicon.png")
-        tile("cd", SERIF, PAPER, INK, 0.62, 64).save(folder / "favicon-dark.png")
+        tile("cd", SERIF, INK, PAPER, 0.72, 64).save(folder / "favicon.png")
     print("icons written")
 
 
