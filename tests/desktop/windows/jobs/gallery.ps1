@@ -25,6 +25,13 @@ Show-State '03-rewrite-in-place'
 [Keys]::Press(0x1B); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300
 [Keys]::Type('say hi'); [Keys]::Press(0x0D); Start-Sleep -Milliseconds 1500  # drafts
 Show-State '04-instruct-drafts'
+[Keys]::Press(0x1B); [Keys]::Press(0x1B); Start-Sleep -Milliseconds 300
+# A long instruction: the panel opens at the end of it, and when Enter sends it (the text leaves),
+# the panel moves back to the caret.
+[Keys]::Type('write a short note to the whole team thanking them for shipping on time'); Start-Sleep -Milliseconds 1500
+Show-State '05-long-instruction'
+[Keys]::Press(0x0D); Start-Sleep -Milliseconds 1500
+Show-State '06-long-instruction-sent'
 [Keys]::Press(0x1B); [Keys]::Press(0x1B)
 Set-Content $state 'done'
 Stop-Process -Name Notepad -Force
