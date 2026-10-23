@@ -160,6 +160,12 @@ def scenarios():
         sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
         subprocess.run(["pkill", "-f", str(TARGET)], check=False)  # the next key starts the new build
     print(sh(sys.executable, str(HERE / "input_source.py"), str(TARGET), BUNDLE_ID, check=False))
+    # macOS starts an input method at login; after an update (or a crash) it does not start it again
+    # by itself, and keys then reach the app without it. Start it the way login would.
+    if subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode:
+        sh("open", "-g", str(TARGET))
+        wait_for(lambda: not subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")],
+                                            capture_output=True).returncode, timeout=10)
     fresh_document()
     current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
     check("cd_AI is the selected input source", current.startswith(BUNDLE_ID), True)
@@ -168,6 +174,8 @@ def scenarios():
     type_text("ls -la")
     time.sleep(0.5)
     check("cd_AI starts in continue: keys go straight in", document(), "ls -la")
+    running = not subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode
+    check("cd_AI is running (the keys went through it)", running, True)
     key("Down")  # the context starts over
     fresh_document()
     type_text("Thanks for the review ")
