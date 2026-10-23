@@ -259,7 +259,8 @@ def scenarios():
         key("Return")  # the instruction, with the screen's last lines
         time.sleep(1.5)
         key("Return")  # the draft, at the prompt; running it would be the user's Enter
-        wait_for(lambda: "having read the terminal" in screen(), timeout=10)
+        if not wait_for(lambda: "having read the terminal" in screen(), timeout=10):
+            print("--- Terminal's last lines\n" + "\n".join(screen().splitlines()[-4:]), flush=True)
         check("terminal: fix sees the screen, the draft lands at the prompt",
               screen().splitlines()[-1].endswith("As requested—fix, having read the terminal."), True)
     else:
