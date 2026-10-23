@@ -239,6 +239,7 @@ class ClaudishTextService(TextService):
         # what you composed.
         if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
             self.switching = self.shift.release(time.monotonic())
+            keylog("filterKeyUp shift", "tap=%s" % self.switching)
             return self.switching
         return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
                                            event.keyCode == 0x09 and self.state.asked == "rewrite"
