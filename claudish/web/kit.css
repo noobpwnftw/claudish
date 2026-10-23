@@ -77,6 +77,7 @@
 /* A mode switch: the mode's tile and name, briefly, at the caret, in the panel's shape. */
 .k-toast{position:absolute;z-index:3;display:inline-flex;align-items:center;gap:7px;padding:5px 10px 5px 6px;background:var(--k-surface);color:var(--k-text);
   border:1px solid var(--k-border);border-radius:var(--k-radius);box-shadow:var(--k-shadow);font-family:var(--k-font);font-size:var(--k-small);white-space:nowrap}
+.k-toast .k-hint{color:var(--k-muted)}  /* a toast is a footer: its verbs are muted, as in every panel */
 .k-tile{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;line-height:1}
 .k-tile.ai,.k-tile.cd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .k-tile.ai{background:#d97757;color:#fff}

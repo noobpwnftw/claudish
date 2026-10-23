@@ -18,6 +18,20 @@ import driver  # noqa: E402  the rig's helpers: Keyboard, focus, state, shell_ev
 OUT = driver.WORK / "gallery"
 
 
+def preview():
+    """Every design-lab state, drawn by the real extension: each panel description from
+    claudish/web/lab-states.js (made by composition.py) is sent on the engine's own D-Bus signal,
+    at the focused field's caret, and captured (named by its lab state id)."""
+    sys.path.insert(0, str(driver.SRC / "scripts"))
+    import lab_states
+    for name, spec in lab_states.load(driver.SRC / "claudish/web/lab-states.js").items():
+        toast = name in lab_states.TOASTS
+        screen = json.dumps({"panel": None if toast else spec, "ghost": "", "toast": spec if toast else None})
+        subprocess.run(["gdbus", "emit", "--session", "--object-path", "/io/claudish/Screen",
+                        "--signal", "io.claudish.Screen.Changed", json.dumps(screen)], check=True, capture_output=True)
+        shot(name)
+
+
 def shot(name):
     time.sleep(0.6)  # let the shell draw the popup
     path = OUT / (name + ".png")
@@ -62,6 +76,9 @@ def main():
                       '.activate(global.get_current_time())')
     try:
         driver.focus("view")
+        if "--preview" in sys.argv:
+            preview()
+            return
         keys.type("Thanks for the review ")  # continue: the rest of the sentence after the caret
         time.sleep(1.2)
         shot("continue")

@@ -67,7 +67,7 @@ class ClaudishInputController(IMKInputController):
         self.active = False
         global PANEL, OVERLAY, TOAST
         if PANEL is None:
-            PANEL, OVERLAY, TOAST = Panel(), Overlay(), Panel()
+            PANEL, OVERLAY, TOAST = Panel(), Overlay(), Panel(toast=True)
         self.drawn = None  # the panel as last drawn (Composition.panel()), redrawn when it changes
         return self
 

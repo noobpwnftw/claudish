@@ -17,5 +17,5 @@ user sh -c 'set -a; . ~/.config/environment.d/90-claudish-ibus.conf; set +a;
   nohup gnome-shell --headless --unsafe-mode --wayland --virtual-monitor 1280x800 >/tmp/gnome-shell.log 2>&1 &'
 for i in $(seq 60); do user test -S /run/user/1001/wayland-0 2>/dev/null && break; sleep 0.5; done
 for i in $(seq 60); do user ibus list-engine 2>/dev/null | grep -q claudish && break; sleep 0.5; done
-user python3 /claudish/tests/desktop/linux-gnome/gallery.py || { user tail -20 /tmp/gnome-shell.log; exit 1; }
+user python3 /claudish/tests/desktop/linux-gnome/gallery.py ${2:+--$2} || { user tail -20 /tmp/gnome-shell.log; exit 1; }
 out=${1:-$root/.tools/gallery/gnome}; mkdir -p "$out"; docker cp "$id:/tmp/claudish-gnome/gallery/." "$out/" && echo "screenshots in $out"

@@ -24,6 +24,18 @@ function mark(text, styleClass) {
             x_expand: true, y_expand: true})});
 }
 
+// The panel's room for text (stylesheet.css: max-width 440, padding 6, a row's 10 each side, the
+// key column): a wrapped label is given its width, so it is measured as
+// it is drawn (St otherwise measures it unwrapped, and the footer spills out of the panel).
+const INNER = 440 - 2 * 6 - 2 * 10, TAKE = 44 + 8;  // a row's 10 at the left is its 2, the bar's 3 and its 5
+
+function fit(widget, room) {
+    widget.set_width(-1);
+    const [, wide] = widget.get_preferred_width(-1);
+    if (wide > room)
+        widget.set_width(room);
+}
+
 function label(text, styleClass, wrap = false) {
     const widget = new St.Label({text, style_class: styleClass, y_align: Clutter.ActorAlign.CENTER});
     if (wrap) {
@@ -106,8 +118,10 @@ export default class CdAiExtension extends Extension {
         if (!panel)
             return;
         const thread = panel.thread || [];
-        box.style_class = 'cd-panel' + (panel.rows.length || panel.body || thread.length ? '' : ' cd-bare')
-            + (panel.replying ? ' cd-replying' : '');
+        // A toast (the mode switch, a drop, the pill) is its own compact line; a panel with only a
+        // footer (working, a failure) keeps the panel's shape.
+        box.style_class = 'cd-panel' + (box === this._toast ? ' cd-toast'
+            : panel.rows.length || panel.body || thread.length ? '' : ' cd-bare') + (panel.replying ? ' cd-replying' : '');
         // The exchange so far: your earlier turns as context, one line each, muted, a rule beside.
         for (const turn of thread) {
             // Your words at full size and colour, underlined as at the caret; the label muted.
@@ -125,6 +139,7 @@ export default class CdAiExtension extends Extension {
                 head.add_child(label(panel.label, 'cd-label', true));
             head.add_child(label(panel.body, panel.code ? 'cd-body cd-code' : 'cd-body', true));
             box.add_child(head);
+            head.get_children().forEach(child => fit(child, INNER));
         }
         const takes = panel.on >= 0;
         panel.rows.forEach((row, index) => {
@@ -143,6 +158,7 @@ export default class CdAiExtension extends Extension {
                 line.add_child(take);
             }
             box.add_child(line);
+            fit(text, INNER - (takes ? TAKE : 0));
         });
         const foot = new St.BoxLayout({style_class: 'cd-foot'});
         if (panel.tile === 'warn')
@@ -175,8 +191,8 @@ export default class CdAiExtension extends Extension {
         box.add_child(foot);
     }
 
-    // Under the caret's line, the content starting at the caret (IBus reports only the caret, so
-    // every platform anchors there); the suggestion right after the caret. Clamped to the monitor.
+    // Under the line, the content starting at the IBus cursor (where the composition starts while
+    // something is composed, else the caret); the suggestion right after the caret. Clamped.
     _place() {
         const {x, y, width, height} = this._cursor;
         const monitor = Main.layoutManager.findMonitorForActor(this._panel) || Main.layoutManager.primaryMonitor;
@@ -185,9 +201,18 @@ export default class CdAiExtension extends Extension {
                 box._opened = null;
                 continue;
             }
+            box.set_size(-1, -1);  // measured afresh: the last state's size is not this one's
             const [, natural] = box.get_preferred_width(-1);
-            const [, tall] = box.get_preferred_height(natural);
-            const inset = box.get_theme_node().get_padding(St.Side.LEFT) + 10;
+            // The height from the children as measured (wrapped rows at their set width): St's own
+            // figure for the box came out short of them, and the footer spilled below the panel.
+            const theme = box.get_theme_node();
+            const children = box.get_children();
+            const within = natural - theme.get_horizontal_padding();
+            const tall = Math.ceil(theme.get_vertical_padding() + (box.layout_manager.spacing || 0) * Math.max(0, children.length - 1)
+                + children.reduce((sum, child) => sum + child.get_preferred_height(within)[1], 0));
+            box.set_size(natural, tall);
+            // The content's left edge: a panel's padding and row inset; a toast's own padding (its tile).
+            const inset = box.has_style_class_name('cd-toast') ? 6 : box.get_theme_node().get_padding(St.Side.LEFT) + 10;
             let left = Math.round(x + width - inset), top = Math.round(y + height + GAP);
             // It opens under the caret and stays where it opened while it is open on that line and the
             // caret is at or right of it (when the text leaves, it moves to the caret).

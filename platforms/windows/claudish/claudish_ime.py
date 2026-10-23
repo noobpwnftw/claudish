@@ -1,5 +1,7 @@
 """PIME/TSF adapter. Shared files are copied here by install.ps1."""
 from textService import TextService
+import json
+import os
 import time
 
 from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, blank
@@ -57,6 +59,10 @@ def focused_app():
             kernel32.CloseHandle(handle)
     except (AttributeError, OSError):  # Not on Windows.
         return None
+
+
+# The design lab's states, for the Windows gallery's preview (test plumbing; see preview()).
+PREVIEW = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Claudish", "lab-preview.js")
 
 
 class ClaudishTextService(TextService):
@@ -125,8 +131,35 @@ class ClaudishTextService(TextService):
             if pill:
                 self.setToast(pill, 3)
 
+    def preview(self):
+        """Test plumbing (the gallery, tests/desktop/windows/jobs/gallery.ps1): with the design lab's
+        states at PREVIEW, each F12 draws the next one with the real panel, to compare with the lab.
+        Without that file F12 is the app's."""
+        if not os.path.exists(PREVIEW):
+            return False
+        if getattr(self, "previews", None) is None:
+            with open(PREVIEW, encoding="utf-8") as source:
+                text = source.read()
+            self.previews = list(json.loads(text[text.index("{"):text.rindex("}") + 1]).items())
+        name, spec = self.previews.pop(0) if self.previews else (None, None)
+        if name is None:
+            self.previews = None
+            self.setPanel(None)
+            self.setShowCandidates(False)
+            return True
+        if name in ("dropped", "returned", "mode-compose", "mode-continue"):  # toasts (scripts/lab_states.py)
+            self.setPanel(None)
+            self.setShowCandidates(False)
+            self.setToast(spec, 30)
+        else:
+            self.setPanel(spec)
+            self.setShowCandidates(True)
+        return True
+
     def filterKeyDown(self, event):
         keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
+        if event.keyCode == 0x7B and os.path.exists(PREVIEW):  # F12, with the lab's states there: the gallery
+            return True
         if not self.keyboardOpen or self.sensitive():
             return False
         if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
@@ -292,6 +325,8 @@ class ClaudishTextService(TextService):
                 self.state.fail(revision, data["error"])  # the panel says why: Enter retries
 
     def onKeyDown(self, event):
+        if event.keyCode == 0x7B and self.preview():
+            return True
         keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text),
                "around=%s/%s" % tuple(len(s) for s in self.around()),
                "selected=%d" % len(getattr(self, "textSelected", None) or ""), "scopes=%s" % getattr(self, "inputScopes", None))

@@ -284,7 +284,7 @@ index 2ea3635..b8ae3d1 100644
  
  }
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..11b15a3 100644
+index 581f89f..e7125dc 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -295,7 +295,15 @@ index 581f89f..11b15a3 100644
  
  namespace Ime {
  
-@@ -43,7 +44,16 @@ void MessageWindow::recalculateSize() {
+@@ -28,6 +29,7 @@ MessageWindow::MessageWindow(TextService* service, EditSession* session):
+ 
+     HWND parent = service->compositionWindow(session);
+     create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
++    painter_.setToast(true);  // Claudish: the message window shows toasts
+ }
+ 
+ MessageWindow::~MessageWindow(void) {
+@@ -43,7 +45,16 @@ void MessageWindow::recalculateSize() {
      ReleaseDC(hwnd_, dc);
  
      SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0,
@@ -313,7 +321,7 @@ index 581f89f..11b15a3 100644
  }
  
  void MessageWindow::setText(std::wstring text) {
-@@ -71,40 +81,19 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
+@@ -71,40 +82,19 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
      return 0;
  }
  
@@ -400,10 +408,10 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..6d4c02d
+index 0000000..3d62b1a
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,536 @@
+@@ -0,0 +1,537 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -538,8 +546,9 @@ index 0000000..6d4c02d
 +    if (spec.empty() || !ensureFactories())
 +        return none;
 +    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
-+    bare_ = spec.rows.empty() && spec.body.empty() && spec.thread.empty();
-+    float widest = bare_ ? 0 : px(MIN_WIDTH);
++    const bool footOnly = spec.rows.empty() && spec.body.empty() && spec.thread.empty();
++    bare_ = toast_;  // a toast is the toast window's (the mode switch, a drop, the pill), not any footer-only panel
++    float widest = footOnly ? 0 : px(MIN_WIDTH);
 +    float y = bare_ ? px(TOAST_Y) : px(PAD);
 +    // The exchange so far: your earlier turns as context, one line each (cut with an ellipsis),
 +    // muted, at full size, a neutral rule beside each.
@@ -942,10 +951,10 @@ index 0000000..6d4c02d
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..37d05cf
+index 0000000..ff42f31
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,164 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1014,6 +1023,8 @@ index 0000000..37d05cf
 +    // The x of the content's left edge, from the window's: the window is placed so that it starts
 +    // under the caret (the shadow's margin included).
 +    int textInset() const;
++    // Painting toasts (the toast window): one compact line, as the lab's .k-toast.
++    void setToast(bool toast) { toast_ = toast; }
 +    // The panel's top edge, from the window's (the shadow's margin above it).
 +    int topInset() const { return (int)std::ceil(shadowTop_); }
 +
@@ -1044,7 +1055,7 @@ index 0000000..37d05cf
 +    std::vector<FootItem> foot_;
 +    float footTop_ = 0, footHeight_ = 0;
 +    float shadowSide_ = 0, shadowTop_ = 0, shadowBottom_ = 0;  // the shadow's margin around the panel
-+    bool bare_ = false;  // a toast: only a footer, on one line
++    bool bare_ = false, toast_ = false;  // this layout is a toast; this painter paints toasts
 +    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Enter"
 +
 +    IDWriteTextFormat* text_ = nullptr;

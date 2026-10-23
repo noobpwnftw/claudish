@@ -143,8 +143,9 @@ class Row(NSView):
 class Panel:
     """The panel next to the caret: show(rect, spec, pick), hide()."""
 
-    def __init__(self):
+    def __init__(self, toast=False):
         self.window = None
+        self.toast = toast  # the mode switch, a drop, the pill: one compact line (.k-toast)
         self.opened = None  # (x, line y) where the panel opened: it stays there while it is open
 
     def build(self):
@@ -176,8 +177,8 @@ class Panel:
         inner = MAX_WIDTH - 2 * PAD - 2 * ROW_X
         secondary = NSColor.secondaryLabelColor()
         blocks = []  # (kind, views, height), laid out top to bottom
-        bare = not (spec["rows"] or spec["body"] or spec.get("thread"))  # a toast: one line (.k-toast)
-        widest = 0 if bare else MIN_WIDTH
+        bare = self.toast
+        widest = 0 if bare or not (spec["rows"] or spec["body"] or spec.get("thread")) else MIN_WIDTH
         for turn in spec.get("thread") or []:
             # Your earlier turns: one line, your words at full size and colour, underlined as they
             # were at the caret; the label is the muted part.

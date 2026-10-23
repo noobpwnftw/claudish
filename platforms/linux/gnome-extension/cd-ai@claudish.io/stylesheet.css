@@ -2,6 +2,9 @@
 .cd-panel { background-color: #fafafb; color: #2e2e32; border: 1px solid rgba(0,0,6,0.14); border-radius: 12px;
   padding: 6px; box-shadow: 0 4px 14px 2px rgba(0,0,6,0.13); font-size: 14.5px; min-width: 240px; max-width: 440px; }
 .cd-panel.cd-bare { min-width: 0; }
+/* A toast (only a footer: the mode switch, a drop, the pill): one line, as the lab's .k-toast. */
+.cd-panel.cd-toast { padding: 0; min-width: 0; }
+.cd-toast .cd-foot { padding: 5px 10px 5px 6px; spacing: 7px; }
 .cd-head { padding: 6px 10px 5px; spacing: 2px; }
 .cd-label { font-size: 12.5px; font-weight: 600; color: #5e5e63; }
 .cd-body { color: #2e2e32; }

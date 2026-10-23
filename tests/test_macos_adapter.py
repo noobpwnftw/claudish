@@ -104,7 +104,7 @@ class BaseController:
 class Panel:
     """cd_AI's panel (platforms/macos/panel.py): records what it shows."""
 
-    def __init__(self):
+    def __init__(self, toast=False):
         self.visible, self.spec, self.pick = False, None, None
 
     def show(self, rect, spec, pick=None):
