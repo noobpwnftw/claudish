@@ -539,7 +539,8 @@ async function checkConnection() {
 // How much this page keeps in the browser (the model, once downloaded), with a way to remove it.
 async function showStored() {
   let bytes = 0;
-  try { bytes = (await navigator.storage.estimate()).usage || 0; } catch {}
+  // Measured from the files themselves: the browser's usage estimate lags behind a removal.
+  try { bytes = await (await import("./browser.js")).storedBytes(); } catch {}
   const button = $("remove-model");
   const stored = bytes > 50e6;
   button.hidden = !stored;
@@ -608,9 +609,19 @@ if (IN_BROWSER) {
   $("model-copy").textContent = `${model} runs right here: downloaded once, then cached. Nothing you type leaves this page.`;
   $("load-model").addEventListener("click", loadInBrowser);
   $("remove-model").addEventListener("click", async () => {
-    const { removeStored } = await import("./browser.js");
+    const { removeStored, storedBytes } = await import("./browser.js");
+    if (browserBackend) {  // a running model holds its files open: stop it first
+      try { await browserBackend.exit(); } catch {}
+      browserBackend = null;
+      $("model-strip").classList.remove("ready");
+      $("model-copy").textContent = `${model} runs right here: downloaded once, then cached. Nothing you type leaves this page.`;
+      $("connection").className = "connection";
+      $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
+    }
     await removeStored();
-    setStatus("Removed the stored model from this browser.");
+    const left = await storedBytes();
+    setStatus(left > 1e6 ? `${Math.round(left / 1e6)} MB could not be removed: reload the page and try again.`
+      : "Removed the stored model from this browser.");
     showStored();
   });
   showStored();

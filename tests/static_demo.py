@@ -80,13 +80,28 @@ async def check(url, executable, screenshots=None):
         draft = (await window.locator(".candidate-row").first.text_content()).removeprefix("Enter")
         await keys.press("Enter")  # inserts
         await expect(committed).to_have_attribute("data-text", before + rewrite + draft)
-        # The model is kept in this browser, and can be removed.
+        # The model is kept in this browser, and can be removed, with anything else the page left:
+        # a download cut short leaves a file wllama does not know about.
+        await page.evaluate("""async () => {
+            const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('leftover', {create: true});
+            const writable = await (await dir.getFileHandle('partial.bin', {create: true})).createWritable();
+            await writable.write(new Uint8Array(60 * 1024 * 1024));
+            await writable.close(); }""")
+        # Removed while the model runs (its worker holds the files open): Remove stops it first.
         await expect(page.locator("#remove-model")).to_contain_text("Stored here", timeout=10000)
         stored = await page.evaluate("async () => (await navigator.storage.estimate()).usage")
         await page.locator("#remove-model").click()
         await expect(page.locator("#remove-model")).to_be_hidden(timeout=10000)
         after = await page.evaluate("async () => (await navigator.storage.estimate()).usage")
+        assert not await page.evaluate("""async () => {
+            for await (const _ of (await navigator.storage.getDirectory()).keys()) return true;
+            return false; }"""), "something was left in storage after Remove"
         assert after < stored - 400e6, (stored, after)
+        await expect(page.locator("#status")).to_contain_text("Removed the stored model")
+        await page.reload()  # and it stays removed
+        await page.wait_for_function("() => self.crossOriginIsolated", timeout=15000)
+        await expect(page.locator("#load-model")).to_have_text("Run the model in this browser")
+        await expect(page.locator("#remove-model")).to_be_hidden()
         assert not any("/suggest" in u or "/health" in u for u in requests), "the static page called a server"
         assert not errors, errors
         # A browser without room for the model runs it from memory and stores nothing.
