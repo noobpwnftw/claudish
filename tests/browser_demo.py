@@ -152,7 +152,9 @@ async def check(args):
             await page.wait_for_timeout(300)
             await expect(page.locator("#preedit")).to_have_text("an earlier thought now")  # it never lands
             await keys.press("Tab")
-            await expect(page.locator("#preedit")).to_have_text("Rewrite: an earlier thought now")
+            await expect(window.locator(".k-body")).to_have_text("Rewrite: an earlier thought now")  # in the panel
+            assert not any("an earlier thought" in u and "now" not in u for u in await page.evaluate("window.candidateUpdates")
+                           if "Rewrite: an earlier thought" in u), "the stale answer showed"
             await page.unroute("**/suggest", controlled)
             await keys.press("Escape")  # your words again
             await keys.press("Shift+Enter")  # and kept
