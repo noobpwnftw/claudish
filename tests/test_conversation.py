@@ -326,3 +326,28 @@ class ShowTests(unittest.TestCase):
     def test_dismiss_inserts_nothing(self):
         _, result = self.drive(1)
         self.assertEqual((result["text"], result["candidates"], result["done"]), ("", [], "read and dismissed"))
+
+
+class FollowUpTests(unittest.TestCase):
+    def test_a_shown_answer_stays_in_the_conversation_for_the_next_instruction(self):
+        """"What does this error mean?", read and dismissed, then "well then fix it for me" in the
+        same box: the second turn sees the first, so "it" is known."""
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        conversation = rewriter.conversations.get("term")
+        model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize."})]),
+                         answer("OK"), answer("cc -o app main.o parse.o tokenize.o"))
+        with patch.object(rewriter, "chat", model):
+            for text, choice in (("what does this error mean", 1), ("well then fix it for me", None)):
+                session, thread = run(ModelDriver(rewriter, conversation, purpose="terminal",
+                                                  screen="$ make\nundefined reference to `tokenize'\n$"), text)
+                if choice is not None:
+                    deadline = time.monotonic() + 5
+                    while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                        time.sleep(0.01)
+                    session.answer(next(e for e in session.events if e["type"] == "question")["id"], choice)
+                thread.join(5)
+        later = json.dumps(model.sent[-1]["messages"])
+        self.assertIn("what does this error mean", later)
+        self.assertIn("The linker cannot find tokenize.", later)  # what was shown, though dismissed
+        self.assertEqual(session.events[-1]["text"], "cc -o app main.o parse.o tokenize.o")
