@@ -5,7 +5,7 @@ at high resolution and scaled down, so they are crisp at every size (G45; docs/d
 
 Writes, and these files are committed:
   platforms/windows/claudish/icon.ico            the input method (16-256 px): "cd" on cream
-  platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile
+  platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile (-dark: inverted, for a dark taskbar)
   platforms/windows/claudish/mode-compose.ico    compose: "AI" on the accent colour
   platforms/macos/cd.png, cd@2x.png              the menu-bar template (black on clear; macOS tints it)
   site/favicon.png, claudish/web/favicon.png     the site's and the demo's icon
@@ -35,7 +35,7 @@ def tile(text, font_path, fill, background, scale=0.62):
     opposite tone, so a cream tile holds its edge on a light taskbar and a dark one on a dark taskbar."""
     image = Image.new("RGBA", (BIG, BIG), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    rim = (0, 0, 0, 40) if background == PAPER else None
+    rim = (0, 0, 0, 40) if background == PAPER else (255, 255, 255, 60) if background == INK else None
     draw.rounded_rectangle((0, 0, BIG - 1, BIG - 1), radius=int(BIG * 0.22), fill=background,
                            outline=rim, width=int(BIG * 0.03) if rim else 0)
     font = ImageFont.truetype(font_path, int(BIG * scale))
@@ -61,14 +61,19 @@ def save_ico(image, path):
 
 def main():
     windows = ROOT / "platforms/windows/claudish"
-    brand = tile("cd", SERIF, INK, PAPER, scale=0.66)  # cream, the site's light look (owner's pick)
+    # Cream, the site's light look (owner's pick), and inverted for dark taskbars; the letters fill
+    # the tile, so it is as big as the icons around it.
+    brand = tile("cd", SERIF, INK, PAPER, scale=0.84)
+    dark = tile("cd", SERIF, PAPER, INK, scale=0.84)
     save_ico(brand, windows / "icon.ico")
     save_ico(brand, windows / "mode-continue.ico")
-    save_ico(tile("AI", MONO, (255, 255, 255, 255), ACCENT, scale=0.56), windows / "mode-compose.ico")
+    save_ico(dark, windows / "mode-continue-dark.ico")
+    save_ico(tile("AI", MONO, (255, 255, 255, 255), ACCENT, scale=0.66), windows / "mode-compose.ico")
     template("cd", SERIF, 16).save(ROOT / "platforms/macos/cd.png")
     template("cd", SERIF, 32).save(ROOT / "platforms/macos/cd@2x.png")
     for folder in (ROOT / "site", ROOT / "claudish/web"):
         brand.resize((64, 64), Image.LANCZOS).save(folder / "favicon.png")
+        dark.resize((64, 64), Image.LANCZOS).save(folder / "favicon-dark.png")
     print("icons written")
 
 

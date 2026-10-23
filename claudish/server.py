@@ -170,8 +170,9 @@ def make_server(rewriter, port=18765, token=None):
         def do_GET(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
-            if self.path in ("/favicon.ico", "/favicon.png"):
-                return self.send_body(200, files("claudish").joinpath("web", "favicon.png").read_bytes(), "image/png")
+            if self.path in ("/favicon.ico", "/favicon.png", "/favicon-dark.png"):
+                name = "favicon-dark.png" if "dark" in self.path else "favicon.png"
+                return self.send_body(200, files("claudish").joinpath("web", name).read_bytes(), "image/png")
             assets = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/demo.css": ("demo.css", "text/css; charset=utf-8"),
                       "/demo.js": ("demo.js", "text/javascript; charset=utf-8"),

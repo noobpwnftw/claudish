@@ -27,8 +27,23 @@ TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its
 
 
 def mode_icon(mode):
+    """The taskbar's mode icon: continue's "cd" tile inverted on a dark taskbar (Windows' own setting;
+    the icon is chosen when it is set, at activation and on a switch)."""
     import os
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "mode-%s.ico" % mode)
+    name = "mode-%s.ico" % mode
+    if mode == "continue" and dark_taskbar():
+        name = "mode-continue-dark.ico"
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+
+
+def dark_taskbar():
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
+            return winreg.QueryValueEx(key, "SystemUsesLightTheme")[0] == 0
+    except (ImportError, OSError):
+        return False
 
 
 def mode_tooltip(mode):
