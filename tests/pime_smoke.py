@@ -30,7 +30,10 @@ def main():
             shutil.copy(root / "claudish" / name, target / name)
         sys.path.insert(0, temporary)
         from pime_claudish.claudish_ime import ClaudishTextService
-        with patch("pime_claudish.claudish_ime.Suggestions") as worker_class:
+        # The foreground app is pinned: on Windows the real one is the console running this smoke,
+        # a terminal, where continue is quiet.
+        with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \
+                patch("pime_claudish.claudish_ime.focused_app", return_value="notepad.exe"):
             worker_class.return_value.poll.return_value = None
             service = ClaudishTextService(None)
             reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
