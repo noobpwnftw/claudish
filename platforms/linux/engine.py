@@ -58,10 +58,10 @@ class ClaudishEngine(IBus.Engine):
             self.update_auxiliary_text(IBus.Text.new_from_string("continue · Tab: take the rest · Esc: dismiss · "
                                                                  "F7: mode"), bool(ghost))
             return
-        text = self.composition.text
+        state = self.composition
+        text = state.shown  # rewrite after Tab: the rewrite, in place of your words
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           IBus.PreeditFocusMode.COMMIT)
-        state = self.composition
         # Several readings of an instruction: a numbered list, like any CJK input method's.
         if state.choosing:
             table = IBus.LookupTable.new(9, 0, True, False)
@@ -78,16 +78,21 @@ class ClaudishEngine(IBus.Engine):
         elif state.working and state.status:
             hint = "instruct · %s · Esc: stop" % " ".join(state.status.split())[-90:]
         elif state.choosing:
-            hint = "instruct · 1–%d: insert that one · Enter: the first · Esc: keep your words" % len(state.candidates)
+            hint = ("instruct · 1–%d: insert that one · Enter: the first · Esc: back to the instruction"
+                    % len(state.candidates))
+        elif state.converted:
+            hint = "rewrite · Tab/Enter: keep it · Esc: your words"
+        elif state.candidate and state.mode == "rewrite":
+            hint = "rewrite · Tab: rewrite it · Enter/Esc: keep your words"
         elif state.candidate:
             hint = LABELS[state.mode] + state.candidate
         elif state.working:
-            hint = "instruct · %s… · Esc: keep your words" % ("looking and working" if state.look else "working")
+            hint = "instruct · %s… · Esc: stop" % ("looking and working" if state.look else "working")
         elif state.failed:
-            hint = "instruct · the request failed · Enter: retry · Esc: keep your words"
+            hint = "instruct · the request failed · Enter: retry · Esc: back"
         elif state.mode == "instruct":
             hint = ("instruct + window picture · Enter: send · F8: no picture" if state.look else
-                    "instruct · Enter: send · F8: look at the window · F7: mode · Esc: keep your words")
+                    "instruct · Enter: send · F8: look at the window · F7: mode · Esc: drop it")
         else:
             hint = "%s · F7: mode · Enter/Esc: keep wording" % state.mode
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
@@ -210,13 +215,22 @@ class ClaudishEngine(IBus.Engine):
             elif action in ("accept", "keep"):
                 self.finish(action == "accept")
             return action != "pass"
-        if keyval in (IBus.KEY_Escape, IBus.KEY_Tab):
-            if not self.composition.text:
-                return False
-            if keyval == IBus.KEY_Tab and not self.composition.candidate:
-                return True
-            self.finish(keyval == IBus.KEY_Tab)
-            return True
+        if keyval == IBus.KEY_Tab:
+            action = self.composition.tab()
+            if action == "accept":
+                self.finish(True)
+            elif action == "convert":
+                self.render()
+            return action != "pass"
+        if keyval == IBus.KEY_Escape:
+            action = self.composition.escape()
+            if action == "keep":
+                self.finish()
+            elif action in ("back", "drop"):
+                # A pending answer or agent turn is for the old revision: stop it.
+                self.suggestions.schedule(self.composition.revision, "")
+                self.render()
+            return action != "pass"
         if keyval == IBus.KEY_BackSpace:
             if not self.composition.text:
                 return False

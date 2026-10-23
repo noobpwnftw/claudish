@@ -89,9 +89,16 @@ def scenarios():
     focus("other")
     type_text("very important")
     settle()
-    key("Tab")
+    key("Tab")  # converts: the rewrite in place of your words, still a composition
+    wait_for(lambda: state().get("preedit") == "particularly crucial", what="the rewrite in place")
+    check("Tab converts the rewrite in place", (state().get("preedit"), state()["other"]),
+          ("particularly crucial", ""))
+    key("Escape")  # your words again
+    wait_for(lambda: state().get("preedit") == "very important", what="your words again")
+    check("Esc brings your words back", state().get("preedit"), "very important")
+    key("Tab", "Tab")  # converts, then keeps it
     wait_for(lambda: state()["other"], what="candidate commit")
-    check("Tab accepts the rewrite", state()["other"], "particularly crucial")
+    check("Tab again keeps the rewrite", state()["other"], "particularly crucial")
 
     focus("view")
     type_text("very")
@@ -101,7 +108,7 @@ def scenarios():
     time.sleep(0.2)
     check("Tab right after an edit commits nothing stale", state()["view"], "")
     settle()
-    key("Tab")
+    key("Tab", "Tab")
     wait_for(lambda: state()["view"], what="fresh candidate")
     check("fresh candidate after the edit", state()["view"], "particularly good")
 
@@ -191,6 +198,18 @@ def scenarios():
     key("2")
     wait_for(lambda: state()["view"], what="the second reading")
     check("2 inserts the second of several readings", state()["view"], "Certainly—as requested—greet.")
+
+    key("ctrl+a", "BackSpace")
+    type_text("greet")
+    key("Return")
+    settle()
+    key("Escape")  # the drafts close; the instruction stays, to refine
+    time.sleep(0.3)
+    check("Esc closes the drafts and keeps the instruction", (state().get("preedit"), state()["view"]),
+          ("greet", ""))
+    key("Escape")  # and is dropped: nothing inserted
+    time.sleep(0.3)
+    check("Esc again drops the instruction", (state().get("preedit"), state()["view"]), ("", ""))
 
     check("binding for the focused app ran its context provider", (WORK / "bound-app.py").exists(), True)
     check("binding for another app did not run", (WORK / "bound-firefox").exists(), False)

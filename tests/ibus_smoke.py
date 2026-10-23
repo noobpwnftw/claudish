@@ -45,7 +45,9 @@ try:
     for char in "draft":
         engine.do_process_key_event(ord(char), 0, 0)
     engine.composition.offer(engine.composition.revision, "A considered draft.")
-    engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
+    engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab converts: the rewrite in place
+    assert engine.composition.shown == "A considered draft." and commits[-1] == "hello—world"
+    engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab again keeps it
     assert commits[-1] == "A considered draft."
     for char in "say hi":
         engine.do_process_key_event(ord(char), 0, 0)

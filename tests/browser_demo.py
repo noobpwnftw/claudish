@@ -73,24 +73,37 @@ async def check(args):
             await keys.press("Escape")  # dismiss it
             await keys.press("Enter")
 
-            # Rewrite (F7 twice): your words are a composition; the candidate window is under it.
+            # Rewrite (F7 twice): your words are a composition; when the rewrite is ready, Tab converts
+            # them in place (no list), Esc brings them back, and Tab again keeps the rewrite.
             await keys.press("F7")
             await keys.press("F7")
             await expect(page.locator("#source-mode")).to_have_text("rewrite")
             before = await committed_text()
             await keys.type("This is very important.", delay=20)
             await expect(page.locator("#preedit")).to_have_text("This is very important.")
-            await expect(window).to_be_visible(timeout=10000)
-            rewrite = (await window.locator(".candidate-row").first.text_content()).removeprefix("Tab")
+            await expect(window).to_contain_text("rewrite it", timeout=10000)
+            await keys.press("Tab")
+            await expect(page.locator("#preedit.converted")).to_be_visible()
+            rewrite = await page.locator("#preedit").text_content()
             print("Real backend, rewrite:", repr(rewrite))
+            assert rewrite != "This is very important.", rewrite
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "rewrite.png"))
+            await keys.press("Escape")  # your words again
+            await expect(page.locator("#preedit")).to_have_text("This is very important.")
             await keys.press("Tab")
+            await keys.press("Tab")  # converted, then kept
             await expect(committed).to_have_attribute("data-text", before + rewrite)
             await keys.type("hello-world", delay=20)  # in rewrite, the dash is Claudish
             await expect(page.locator("#preedit")).to_have_text("hello—world")
             await keys.press("Enter")  # keeps your words
             await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world")
+            # Paste in rewrite joins the composition, to be rewritten like typed words.
+            await page.evaluate("() => navigator.clipboard.writeText('a pasted phrase')")
+            await keys.press("Control+V")
+            await expect(page.locator("#preedit")).to_have_text("a pasted phrase")
+            await keys.press("Escape")  # kept as is
+            await expect(committed).to_have_attribute("data-text", before + rewrite + "hello—world" + "a pasted phrase")
             await page.locator("#copy").click()
             assert await page.evaluate("() => navigator.clipboard.readText()") == await committed_text()
             # A text box: a right click keeps the keyboard; select, copy, and type over a selection.
@@ -136,11 +149,12 @@ async def check(args):
             await asyncio.wait_for(first_started.wait(), timeout=3)
             await keys.type(" now", delay=10)
             release.set()
-            await expect(window).to_contain_text("Rewrite: an earlier thought now")
-            assert not any("Rewrite: an earlier thought" in u and "now" not in u
-                           for u in await page.evaluate("() => window.candidateUpdates"))
+            await expect(window).to_contain_text("rewrite it")
+            await keys.press("Tab")
+            await expect(page.locator("#preedit")).to_have_text("Rewrite: an earlier thought now")
             await page.unroute("**/suggest", controlled)
-            await keys.press("Escape")
+            await keys.press("Escape")  # your words again
+            await keys.press("Escape")  # and kept
             await page.locator("#clear").click()
 
             async def unavailable(route):
@@ -170,6 +184,13 @@ async def check(args):
             await keys.press("Enter")
             await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             assert any(body and body.get("mode") == "instruct" for body in sent), sent
+            # Esc closes the drafts and keeps the instruction to refine; Enter sends it again.
+            await keys.press("Escape")
+            await expect(page.locator("#preedit")).to_have_text("thank the team for shipping the release")
+            await expect(window.locator("button.candidate-row")).to_have_count(0)  # drafts closed
+            await expect(window).to_contain_text("Enter sends")
+            await keys.press("Enter")
+            await expect(window.locator(".candidate-row").first).not_to_have_text("working…", timeout=10000)
             choices = window.locator("button.candidate-row")
             if await choices.count() > 1:
                 if args.screenshots:
@@ -184,6 +205,10 @@ async def check(args):
                 await keys.press("Enter")
                 await expect(committed).to_have_attribute("data-text", draft)
             await page.locator("#clear").click()
+            await keys.type("never mind", delay=10)  # an instruction you drop: Esc, nothing inserted
+            await keys.press("Escape")
+            await expect(page.locator("#preedit")).to_have_text("")
+            await expect(committed).to_have_attribute("data-text", "")
 
             # A sample types itself, key by key, in its own mode.
             await page.locator("[data-mode=rewrite]").click()
@@ -196,8 +221,8 @@ async def check(args):
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
-            print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (candidate window, "
-                  "dash, Tab, Enter), paste as context, clipboard, selection, clear, stale responses, service failure, instruct, samples, "
+            print("Browser acceptance passed: continue (ghost, Tab, literal keys), rewrite (converts in place, "
+                  "Esc back, dash, Tab, Enter), instruct Esc (back, drop), paste as context, clipboard, selection, clear, stale responses, service failure, instruct, samples, "
                   "theme toggle, and mobile layout")
         finally:
             await browser.close()

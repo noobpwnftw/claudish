@@ -22,6 +22,7 @@ h1,h2,.lede,.candidate,.feedback,.samples>span{text-wrap:balance}
 .editor.focused{background:var(--focus-bg)}
 .page{font-family:var(--serif);font-size:24px;line-height:1.6;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 .preedit{text-decoration:underline dotted var(--accent);text-underline-offset:6px;text-decoration-thickness:2px}
+.preedit.converted{text-decoration-style:solid;text-decoration-thickness:3px}
 .ghost{color:var(--placeholder)}
 .caret{display:inline-block;position:relative;width:0;height:1.15em;vertical-align:-.2em}.caret::after{content:"";position:absolute;left:-1px;top:0;width:2px;height:100%;background:transparent}
 .editor.focused .caret::after{background:var(--ink);animation:blink 1.1s steps(1) infinite}

@@ -3,7 +3,9 @@
 MAX_COMPOSITION = 512
 # F7 cycles through these in every adapter. Switching to cd_AI starts in continue, which types like
 # en_US (your keys go straight in) and only adds a suggestion you can take with Tab; one F7 asks
-# for something (instruct), a second polishes your words (rewrite).
+# for something (instruct), a second polishes your words (rewrite). Each looks different at the
+# caret: continue adds after it, rewrite converts your words in place (Tab), and instruct is the
+# only one with a list (its drafts).
 MODES = ("continue", "instruct", "rewrite")
 LABELS = {"rewrite": "Tab: ", "continue": "Tab continues: ", "instruct": "Enter inserts: "}
 
@@ -19,6 +21,7 @@ class Composition:
         self.failed = False
         self.look = False  # F8 in instruct: send a picture of the focused window with the instruction
         self.taken = False  # continue: a suggestion was just taken; wait for the next key
+        self.converted = False  # rewrite: Tab showed the rewrite in place of your words
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.status = ""  # what the agent is doing, or its draft so far
 
@@ -28,6 +31,7 @@ class Composition:
         self.candidates = []
         self.question, self.status = None, ""
         self.taken = False
+        self.converted = False
         self.working = self.failed = False
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
@@ -43,12 +47,46 @@ class Composition:
             return bool(self.text) and not self.text[-1].isalnum() and not self.taken
         return True
 
+    @property
+    def shown(self):
+        """What the composition shows: your words, or, in rewrite after Tab, the rewrite in their
+        place (like a CJK input method converting what you typed)."""
+        return self.candidate if self.converted else self.text
+
+    def tab(self):
+        """What Tab does: "pass" (the app's), "wait" (nothing ready yet), "convert" (rewrite: the
+        result now shows in place of your words), or "accept"."""
+        if not self.text:
+            return "pass"
+        if self.mode == "rewrite" and self.candidate and not self.converted:
+            self.converted = True
+            return "convert"
+        return "accept" if self.candidate else "wait"
+
+    def escape(self):
+        """Esc, one step back: "pass" (the app's); "back" (still composing: your words again in
+        rewrite, or the instruction again with its drafts closed and a pending answer dropped);
+        "drop" (an instruction you no longer want: nothing is inserted, as it is not text you
+        meant to write); or "keep" (rewrite: your words as typed)."""
+        if not self.text:
+            return "pass"
+        if self.converted:
+            self.converted = False
+            return "back"
+        if self.mode == "instruct":
+            if self.candidates or self.working or self.failed or self.question:
+                self.change(self.text)  # a new revision: a late answer for the old one is ignored
+                return "back"
+            self.change("")
+            return "drop"
+        return "keep"
+
     def enter(self):
         """What Enter does now: "pass", "submit", "wait", "accept" (the candidate), or "keep" (your wording)."""
         if not self.text:
             return "pass"
         if self.mode != "instruct":
-            return "keep"
+            return "accept" if self.converted else "keep"
         if self.candidate:
             return "accept"
         return "wait" if self.working else "submit"
@@ -84,12 +122,17 @@ class Composition:
         return question["session"], question["id"], number - 1
 
     def insert(self, char):
-        if len(self.text) >= MAX_COMPOSITION:
+        """Add a typed character; False when the adapter should commit first (the composition is
+        full, or a converted rewrite: typing on keeps it and starts afresh)."""
+        if len(self.text) >= MAX_COMPOSITION or self.converted:
             return False
         self.change(self.text + ("—" if char == "-" else char))
         return True
 
     def backspace(self):
+        if self.converted:  # back to your words, as Esc
+            self.converted = False
+            return
         self.change(self.text[:-1])
 
     def next_mode(self):
@@ -166,6 +209,7 @@ class Composition:
         return text
 
     def commit(self, suggested=False):
-        text = (self.candidate if suggested else "") or self.text
+        """The text to insert: the candidate if asked for or already shown in place, else your words."""
+        text = (self.candidate if suggested or self.converted else "") or self.text
         self.change("")
         return text

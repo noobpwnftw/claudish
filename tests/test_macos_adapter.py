@@ -221,21 +221,45 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(36)
         self.assertEqual(self.client.commits, ["Hi—"])
 
-    def test_candidate_panel_accept_and_stale_result(self):
+    def test_rewrite_converts_in_place_without_a_list(self):
         self.type_text("draft")
         state = self.controller.state
         old_revision = state.revision
         self.type_text("!")
         self.controller.worker.result = (old_revision, {"text": "stale"})
         self.controller.pollSuggestions_(None)
-        self.assertFalse(self.controller.panel.visible)
+        self.assertEqual(state.candidate, "")
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
         self.controller.pollSuggestions_(None)
-        self.assertEqual(self.controller.candidates_(None), ["A considered draft."])
-        self.assertTrue(self.controller.panel.visible)
+        self.assertFalse(self.controller.panel.visible)  # rewrite has no list
+        self.assertEqual(self.client.marked, "draft!")
+        self.key(48)  # Tab converts: the rewrite in place of your words
+        self.assertEqual((self.client.marked, self.client.commits), ("A considered draft.", []))
+        self.key(53)  # Esc: your words again
+        self.assertEqual(self.client.marked, "draft!")
         self.key(48)
+        self.key(48)  # Tab again keeps it
         self.assertEqual(self.client.commits, ["A considered draft."])
-        self.assertFalse(self.controller.panel.visible)
+
+    def test_esc_in_instruct_goes_back_a_step_then_drops(self):
+        self.key(98)
+        self.key(98)  # instruct
+        self.type_text("say hi")
+        state, worker = self.controller.state, self.controller.worker
+        self.key(36)  # send
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.assertTrue(self.controller.panel.visible)
+        self.assertTrue(self.key(53))  # Esc: the drafts close, the instruction stays to refine
+        self.assertEqual((state.text, state.candidates, self.controller.panel.visible), ("say hi", [], False))
+        self.assertEqual(self.client.marked, "say hi")
+        self.type_text(", warmly")  # refine and send again: a follow-up in the same conversation
+        self.key(36)
+        self.assertTrue(state.working and worker.immediate)
+        self.assertTrue(self.key(53))  # Esc while it works: back to the instruction
+        self.assertFalse(state.working)
+        self.assertTrue(self.key(53))  # Esc again: the instruction is dropped, nothing inserted
+        self.assertEqual((state.text, self.client.marked, self.client.commits), ("", "", []))
 
     def test_shortcuts_and_navigation_commit_original_and_pass_through(self):
         self.type_text("original")

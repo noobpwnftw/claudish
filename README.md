@@ -13,7 +13,7 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 | --- | --- | --- |
 | **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 | **instruct** | `decline the meeting politely` | drafts to pick from with 1–3 |
-| **rewrite** | `this is important` | `This is of utmost significance.`; Tab takes it |
+| **rewrite** | `this is important` | Tab turns it into `This is of utmost significance.` in place; Tab again keeps it |
 
 F7 switches modes. Nothing is inserted until you take it, and your own words are
 always one key away. Continue can be ignored forever; the other modes are there
@@ -44,11 +44,11 @@ in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 | Key | Does |
 | --- | --- |
 | F7 | switch mode: continue → instruct → rewrite |
-| Tab | take the suggestion (with nothing offered, Tab is the app's) |
+| Tab | take the suggestion; rewrite: convert in place, then keep (with nothing offered, Tab is the app's) |
 | Enter | instruct: send, then insert; rewrite: keep your wording |
 | 1–9 | pick a draft, or answer an agent's question |
 | F8 | instruct: also send a picture of this window |
-| Esc | keep what you typed |
+| Esc | one step back: your words again; instruct: close the drafts, then drop the instruction |
 
 ## Status
 

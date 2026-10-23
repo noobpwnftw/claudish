@@ -66,10 +66,11 @@ async def check(url, executable, screenshots=None):
         await keys.press("F7")  # rewrite
         before = await committed.get_attribute("data-text")
         await keys.type("This is very important.", delay=20)
-        await expect(window).to_be_visible(timeout=60000)
-        rewrite = (await window.locator(".candidate-row").first.text_content()).removeprefix("Tab")
+        await expect(window).to_contain_text("rewrite it", timeout=60000)
+        await keys.press("Tab")  # converts in place
+        rewrite = await page.locator("#preedit").text_content()
         assert rewrite.strip(), "empty rewrite"
-        await keys.press("Tab")
+        await keys.press("Tab")  # keeps it
         await expect(committed).to_have_attribute("data-text", before + rewrite)
         await keys.press("F7")
         await keys.press("F7")  # instruct

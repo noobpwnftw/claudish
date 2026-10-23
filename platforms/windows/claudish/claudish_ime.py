@@ -112,15 +112,16 @@ class ClaudishTextService(TextService):
             self.setCandidateList(["Tab: …" + ghost.lstrip()] if ghost else [])
             self.setShowCandidates(bool(ghost))
             return
-        self.setCompositionString(self.state.text)
+        shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
+        self.setCompositionString(shown)
         # TSF cursor offsets count UTF-16 code units.
-        self.setCompositionCursor(len(self.state.text.encode("utf-16-le")) // 2)
+        self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
+        # A list only for an instruction's drafts or an agent's question; rewrite converts in place.
         if self.state.question:
             candidates = [c.get("label", "") + (" - " + c["legend"] if c.get("legend") else "")
                           for c in self.state.question.get("choices") or []]
         else:
-            candidates = (self.state.candidates if self.state.choosing else
-                          [self.state.candidate] if self.state.candidate else [])
+            candidates = self.state.candidates if self.state.choosing else []
         self.setCandidateList(candidates)
         self.setShowCandidates(bool(candidates))
 
@@ -217,12 +218,25 @@ class ClaudishTextService(TextService):
             self.showMessage("cd_AI: " + self.state.mode, 2)
             self.changed()
             return True
-        if key == 0x09 and not self.state.candidate:
-            self.publish()
-            return True
-        if key in (0x09, 0x0D, 0x1B):
+        if key == 0x09:
+            action = self.state.tab()
+            if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
+                self.publish()
+                return True
+            self.setCommitString(self.state.commit(True))
+        elif key == 0x1B:
+            action = self.state.escape()
+            if action != "keep":  # back: still composing; drop: nothing is inserted
+                if self.worker:
+                    self.worker.schedule(self.state.revision, "")  # stop a pending answer
+                if action == "drop":
+                    self.setCommitString("")
+                self.publish()
+                return True
+            self.setCommitString(self.state.commit())
+        elif key == 0x0D:
             # Enter reaches here in instruct mode only with a result ready (see above).
-            self.setCommitString(self.state.commit(key == 0x09 or (key == 0x0D and self.state.mode == "instruct")))
+            self.setCommitString(self.state.commit(self.state.mode == "instruct"))
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar():

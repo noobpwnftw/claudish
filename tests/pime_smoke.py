@@ -77,9 +77,14 @@ def main():
                 key(ord(char.upper()), ord(char))
             revision = service.state.revision
             worker_class.return_value.poll.return_value = (revision, {"text": "A nuanced draft."})
-            assert key(0x75)["candidateList"] == ["A nuanced draft."]
+            assert key(0x75)["candidateList"] == []  # rewrite has no list: Tab converts in place
             worker_class.return_value.poll.return_value = None
-            assert key(9)["commitString"] == "A nuanced draft."
+            reply = key(9)
+            assert "commitString" not in reply and reply["compositionString"] == "A nuanced draft.", reply
+            reply = key(0x1B)  # Esc: your words again
+            assert "commitString" not in reply and reply["compositionString"] == "draft", reply
+            key(9)
+            assert key(9)["commitString"] == "A nuanced draft."  # Tab again keeps it
             for char in "say hi":
                 key(ord(char.upper()), ord(char))
             assert key(0x76, method="filterKeyDown")["return"]
@@ -140,7 +145,11 @@ def main():
             reply = key(0x31)
             assert "commitString" not in reply, reply
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
-            assert key(0x1B)["commitString"] == "check"  # Esc keeps the words and stops the session
+            # Esc stops the session and goes back to the instruction; Esc again drops it unsent.
+            reply = key(0x1B)
+            assert "commitString" not in reply and service.state.text == "check", reply
+            assert worker_class.return_value.schedule.call_args.args[1] == ""  # the pending answer is stopped
+            assert key(0x1B)["commitString"] == ""  # nothing is inserted
             assert service.state.text == ""  # nothing composed: shortcuts are not taken at all
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})

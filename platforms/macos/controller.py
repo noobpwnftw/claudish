@@ -105,8 +105,9 @@ class ClaudishInputController(IMKInputController):
                         client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost),
                                                                               (0, 0), (NSNotFound, 0))
                     return
-                self.panel.updateCandidates()
-                self.panel.show_(kIMKLocateCandidatesBelowHint)
+                if self.state.choosing:  # an instruction's drafts; rewrite converts in place on Tab
+                    self.panel.updateCandidates()
+                    self.panel.show_(kIMKLocateCandidatesBelowHint)
             elif "question" in data and self.state.ask(revision, data["question"], data["session"]):
                 self.panel.updateCandidates()  # the choices, numbered by the panel
                 self.panel.show_(kIMKLocateCandidatesBelowHint)
@@ -206,10 +207,10 @@ class ClaudishInputController(IMKInputController):
             client.setMarkedText_selectionRange_replacementRange_(self.grey(self.state.ghost), (0, 0),
                                                                   (NSNotFound, 0))
             return
+        shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
-        length = len(self.state.text.encode("utf-16-le")) // 2
-        client.setMarkedText_selectionRange_replacementRange_(
-            self.state.text, (length, 0), (NSNotFound, 0))
+        length = len(shown.encode("utf-16-le")) // 2
+        client.setMarkedText_selectionRange_replacementRange_(shown, (length, 0), (NSNotFound, 0))
 
     @objc.python_method
     def live_key(self, client, key, chars):
@@ -308,7 +309,7 @@ class ClaudishInputController(IMKInputController):
         if self.state.live:
             return self.live_key(client, key, chars)
         if key == 97 and self.state.text:  # F6
-            if self.state.candidate:
+            if self.state.choosing:
                 self.panel.updateCandidates()
                 self.panel.show_(kIMKLocateCandidatesBelowHint)
             return True
@@ -324,13 +325,22 @@ class ClaudishInputController(IMKInputController):
             elif action in ("accept", "keep"):
                 self.finish(client, suggested=action == "accept")
             return action != "pass"
-        if key in (48, 53):  # Tab, Escape
-            if not self.state.text:
-                return False
-            if key == 48 and not self.state.candidate:
-                return True
-            self.finish(client, suggested=key == 48)
-            return True
+        if key == 48:  # Tab
+            action = self.state.tab()
+            if action == "accept":
+                self.finish(client, suggested=True)
+            elif action == "convert":
+                self.changed(client)
+            return action != "pass"
+        if key == 53:  # Escape: one step back
+            action = self.state.escape()
+            if action == "keep":
+                self.finish(client)
+            elif action in ("back", "drop"):
+                if self.worker is not None:
+                    self.worker.schedule(self.state.revision, "")  # stop a pending answer
+                self.changed(client)
+            return action != "pass"
         if key == 51:  # Backspace
             if not self.state.text:
                 return False

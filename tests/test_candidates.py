@@ -45,6 +45,48 @@ class CompositionTests(unittest.TestCase):
         self.assertFalse(state.choosing)
 
 
+class ModeFeelTests(unittest.TestCase):
+    """Each mode looks different at the caret: rewrite converts in place, instruct lists drafts."""
+
+    def test_rewrite_tab_converts_in_place_and_esc_brings_your_words_back(self):
+        state = Composition()
+        state.mode = "rewrite"
+        state.change("very good")
+        self.assertEqual(state.tab(), "wait")  # nothing ready yet
+        state.offer(state.revision, "Exceptionally good.")
+        self.assertFalse(state.choosing)  # no list for a rewrite
+        self.assertEqual((state.tab(), state.shown), ("convert", "Exceptionally good."))
+        self.assertEqual((state.escape(), state.shown), ("back", "very good"))
+        self.assertEqual(state.escape(), "keep")  # a second Esc: your words, as typed
+        state.tab()
+        self.assertEqual(state.enter(), "accept")  # Enter keeps the converted text
+        self.assertFalse(state.insert("x"))  # typing on keeps it too (the adapter commits first)
+        self.assertEqual(state.commit(), "Exceptionally good.")
+
+    def test_rewrite_backspace_after_converting_is_your_words_again(self):
+        state = Composition()
+        state.mode = "rewrite"
+        state.change("hi")
+        state.offer(state.revision, "Hello.")
+        state.tab()
+        state.backspace()
+        self.assertEqual((state.shown, state.text, state.candidate), ("hi", "hi", "Hello."))
+
+    def test_instruct_esc_closes_the_drafts_then_drops_the_instruction(self):
+        state = Composition()
+        state.mode = "instruct"
+        state.change("say hi")
+        state.submit()
+        revision = state.revision
+        self.assertEqual((state.escape(), state.text, state.working), ("back", "say hi", False))
+        self.assertFalse(state.offer(revision, "Hi."))  # the answer to the stopped request is ignored
+        state.submit()
+        state.offer(state.revision, "Hi.", ["Hello there."])
+        self.assertEqual((state.escape(), state.text, state.candidates), ("back", "say hi", []))
+        self.assertEqual((state.escape(), state.text), ("drop", ""))  # nothing is inserted
+        self.assertEqual(state.escape(), "pass")  # with nothing composed, Esc is the app's
+
+
 class ContinueTests(unittest.TestCase):
     def test_continue_asks_only_at_a_word_boundary(self):
         state = Composition()

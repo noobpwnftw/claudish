@@ -12,7 +12,7 @@ const MODES = ["continue", "instruct", "rewrite"];  // F7 order, as in every ada
 const HINTS = {
   continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey. Tab takes it.",
   instruct: "Type what you want, then Enter. Pick a draft with 1–3.",
-  rewrite: "Type something ordinary. Tab takes the rewrite; Enter keeps your words.",
+  rewrite: "Type something ordinary. Tab rewrites it in place; Tab again keeps it, Esc brings your words back.",
 };
 const SAMPLES = [
   ["rewrite", "This is very important."],
@@ -44,6 +44,7 @@ const state = {
   mode: "rewrite",   // the demo opens with the pitch; the installed input method starts in continue
   candidate: "",
   candidates: [],
+  converted: false,  // rewrite: Tab showed the rewrite in place of your words
   working: false,
   failed: false,
   revision: 0,
@@ -55,11 +56,13 @@ function change(text) {
   state.text = text;
   state.candidate = "";
   state.candidates = [];
+  state.converted = false;
   state.working = state.failed = false;
   state.revision++;
 }
 const live = () => state.mode === "continue";
 const composing = () => !live() && Boolean(state.text);
+const shown = () => state.converted ? state.candidate : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.mode === "instruct" && state.candidates.length > 1;
@@ -175,21 +178,33 @@ function key(name, shift = false) {
       if (!state.working) { state.working = true; state.failed = false; render(); ask(state.revision); }
       return true;  // the first Enter sends; the next inserts the result
     }
-    commit(state.mode === "instruct" ? state.candidate : state.text);
+    commit(state.mode === "instruct" || state.converted ? state.candidate : state.text);
     change(""); changed();
     return true;
   }
   if (name === "Tab") {
     if (!state.text) return false;
-    if (state.candidate) { commit(state.candidate); change(""); changed(); }
-    return true;  // rewrite: a pending candidate is not stale text, so Tab waits for it
+    // Rewrite: the first Tab converts your words in place, the second keeps it. A pending
+    // candidate is not stale text, so Tab waits for it.
+    if (state.mode === "rewrite" && state.candidate && !state.converted) { state.converted = true; render(); }
+    else if (state.candidate) { commit(state.candidate); change(""); changed(); }
+    return true;
   }
-  if (name === "Escape") {
+  if (name === "Escape") {  // one step back
     if (!state.text) return false;
+    if (state.converted) { state.converted = false; render(); return true; }  // your words again
+    if (state.mode === "instruct") {
+      // Drafts showing or an answer pending: back to the instruction, to refine and send again.
+      // Otherwise the instruction is dropped: it is not text you meant to write.
+      change(state.candidates.length || state.working || state.failed ? state.text : "");
+      render();
+      return true;
+    }
     commit(state.text); change(""); changed();
     return true;
   }
   if (name === "Backspace") {
+    if (state.converted) { state.converted = false; render(); return true; }  // your words again
     if (state.text) change(state.text.slice(0, -1));
     else if (selected()) removeSelection();
     else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
@@ -198,6 +213,7 @@ function key(name, shift = false) {
   }
   if (name.length === 1) {
     if (selected() && !state.text) removeSelection();  // typing replaces the selection
+    if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
     if (state.text.length >= MAX) { commit(state.text); change(""); }
     change(state.text + (name === "-" && state.mode === "rewrite" ? "—" : name));
     changed();
@@ -248,7 +264,8 @@ function render() {
   page.dataset.text = doc.text;
   const [start, end] = selection();
   const preedit = PREEDIT, caret = CARET, suggestion = GHOST;
-  preedit.textContent = composing() ? state.text : "";
+  preedit.textContent = composing() ? shown() : "";
+  preedit.classList.toggle("converted", state.converted);
   suggestion.textContent = ghost();
   const nodes = [];
   if (selected()) {
@@ -267,12 +284,13 @@ function render() {
   const lines = [];
   if (composing() && state.mode === "instruct") {
     if (state.working) lines.push(["", "working…"]);
-    else if (state.failed) lines.push(["", "the request failed · Enter retries · Esc keeps your words"]);
+    else if (state.failed) lines.push(["", "the request failed · Enter retries · Esc goes back"]);
     else if (choosing()) state.candidates.forEach((c, i) => lines.push([String(i + 1), c]));
     else if (state.candidate) lines.push(["Enter", state.candidate]);
     else lines.push(["", "Enter sends"]);
   } else if (composing() && state.candidate) {
-    lines.push(["Tab", state.candidate]);
+    // Rewrite has no list: a hint that it is ready, then the rewrite itself in place of your words.
+    lines.push(["Tab", state.converted ? "keep the rewrite" : "rewrite it"]);
   }
   window.hidden = !lines.length;
   for (const [label, text] of lines) {  // nodes, not HTML: the text comes from a model
@@ -291,8 +309,9 @@ function render() {
   if (lines.length) {
     const foot = document.createElement("div");
     foot.className = "candidate-foot";
-    foot.textContent = choosing() ? "1–3 picks · Enter takes the first · Esc keeps your words"
-      : state.mode === "instruct" ? "Esc keeps your words" : "Tab takes it · Enter keeps your words";
+    foot.textContent = choosing() ? "1–3 picks · Enter takes the first · Esc: back to the instruction"
+      : state.mode === "instruct" ? (state.working || state.failed ? "Esc: back to the instruction" : "Esc drops it")
+      : state.converted ? "Enter keeps it too · Esc: your words" : "Enter or Esc keeps your words";
     window.append(foot);
   }
   placeCandidateWindow();
@@ -377,10 +396,20 @@ sink.addEventListener("copy", (event) => clip(event, false));
 sink.addEventListener("cut", (event) => clip(event, true));
 function paste(text) {
   stopTyping();
+  if (!live() && text && (state.text + text).length <= MAX) {
+    // Rewrite and instruct: pasted words join the composition, to be rewritten (Tab) or sent
+    // (Enter) like typed ones. The installed input method's counterpart is a selection.
+    if (selected() && !state.text) removeSelection();
+    if (state.converted) { commit(state.candidate); change(""); }
+    change(state.text + text);
+    changed();
+    return;
+  }
   if (composing()) commit(state.text);
   commit(text.slice(0, 5000));
   change(live() ? context() : "");
   changed();
+  if (!live() && text) setStatus(`Pasted as is: ${MAX} characters is the most ${state.mode} takes at once.`);
 }
 sink.addEventListener("paste", (event) => {
   event.preventDefault();
