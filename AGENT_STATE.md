@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-23 (latest), `main` at `71993ad`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-23 (latest), `main` at `aefd5c8`. An interactive session on the Spark; no 24/7 runner.
 
 ## Where things stand
 
@@ -31,6 +31,13 @@ Checkpoint 2026-10-23 (latest), `main` at `71993ad`. An interactive session on t
 - Measured: fidelity 38/41 unchanged; terminal set Qwen3 30B 20/23, Qwen 1.5B 7/23 (was 2/23).
   Live on Qwen3 30B: handoff, "did you mean", clarification, and plain answers all as intended.
 - Owner works hands-off on this: think at the architecture level, never per-situation patches.
+- Since: agents' own questions (AskUserQuestion) are ask (live, haiku); `claudish recent` (memory
+  only, 10 min, redacted, --clear); round-3 safeguards (model questions marked, whole task shown,
+  who answered, secure fields refused by the service); a profile per mode; named helpers and a
+  launcher; Claude backend in the same tool loop (stand-in SDK only, no key); `user__show` (an
+  answer to read). Codex reads a Claudish note fine (via stdin: its bwrap sandbox cannot start on
+  the Spark). Merges only after a clean gate summary (one slip on b40121f, fixed in 7e199dd).
+- Mac VM: its installed cd_AI predates the service token; rebuild + relogin with the owner.
 
 ## Since the last checkpoint
 
