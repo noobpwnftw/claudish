@@ -65,6 +65,10 @@ def main():
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
+    recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
+                                 "(in the service's memory only)")
+    recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
+    recent.add_argument("--url", default="http://127.0.0.1:18765")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     # `service ... -- ARGS`: split before argparse, so no flag of ours can be swallowed into ARGS
@@ -73,6 +77,8 @@ def main():
     if argv[:1] == ["service"] and "--" in argv:
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
+    if args.command == "recent":
+        return show_recent(args.url, args.full)
     if args.command == "textbox-mcp":
         from .textbox_mcp import main as textbox_mcp
         return textbox_mcp()
@@ -171,6 +177,33 @@ def main():
                           "median_ms": statistics.median(latencies),
                           "p95_ms": latencies[min(len(latencies)-1, int(len(latencies)*0.95))],
                           "results": results}, ensure_ascii=False, indent=2))
+
+
+def show_recent(url, full=False):
+    """The service's last requests: who answered, what was observed, what was sent, how long it took."""
+    import time
+    from .client import call
+    try:
+        items = call(url, "/recent")["recent"]
+    except Exception as exc:
+        sys.exit("cannot read the service's recent requests: %s" % exc)
+    if not items:
+        print("No requests yet.")
+    for item in items:
+        where = " · ".join(str(part) for part in (item.get("app"), item.get("kind")) if part) or "no app"
+        print("%s  %s in %s  →  %s%s (%s%s)" % (
+            time.strftime("%H:%M:%S", time.localtime(item["time"])), item["mode"], where,
+            item.get("backend"), " " + item["model"] if item.get("model") else "",
+            "hosted" if item.get("hosted") else "local", ", profile " + item["profile"] if item.get("profile") else ""))
+        print("  consulted: %s" % (", ".join(item.get("consulted") or []) or "nothing"))
+        print("  outcome:   %s%s" % (item.get("outcome", "running"),
+                                     ", %s ms" % item["elapsed_ms"] if item.get("elapsed_ms") is not None else ""))
+        for name in ("system", "turn"):
+            text = item.get(name) or ""
+            if not full and len(text) > 300:
+                text = text[:300] + " … (%d characters; --full shows all)" % len(text)
+            print("  %s:\n    %s" % (name, text.replace("\n", "\n    ")))
+        print()
 
 
 if __name__ == "__main__":

@@ -176,6 +176,10 @@ def make_server(rewriter, port=18765, token=None):
                 return self.send_body(200, body, content_type)
             if self.path.startswith("/sessions/"):
                 return self.get_session()
+            if self.path == "/recent":
+                if not self.trusted():
+                    return self.reply(403, {"error": "the service token is required"})
+                return self.reply(200, {"recent": list(rewriter.recent)})
             if self.path == "/health":
                 return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
                                         "hosted": rewriter.hosted,

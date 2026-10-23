@@ -195,6 +195,21 @@ class ServiceTests(unittest.TestCase):
                       {"look": True, "mode": "instruct"}):
             self.assertEqual(anonymous("/suggest", dict({"text": "fix", "mode": "rewrite"}, **extra)), 403, extra)
 
+    def test_recent_requests_show_what_was_sent_only_with_the_token(self):
+        url = "http://127.0.0.1:%d" % self.server.server_port
+        self.rewriter.rewrite("very important", before="Dear Ana, ", app="thunderbird")
+        with self.assertRaises(HTTPError) as error:
+            self.opener.open(Request(url + "/recent"), timeout=5)
+        self.assertEqual(error.exception.code, 403)  # typed text: not for any local process
+        status, data = self.call("/recent")
+        self.assertEqual(status, 200)
+        item = data["recent"][-1]
+        self.assertEqual((item["mode"], item["app"], item["backend"], item["outcome"]),
+                         ("rewrite", "thunderbird", "rules", "answered"))
+        self.assertIn("Dear Ana, ▮", item["system"])
+        self.assertEqual(item["turn"], "very important")
+        self.assertEqual(item["candidates"], ["particularly crucial"])
+
     def test_the_token_file_is_private_and_new_for_each_run(self):
         import os
         import tempfile

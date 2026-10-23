@@ -10,6 +10,8 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
+RECENT = 8  # requests kept for `claudish recent`
+
 SYSTEM = (
     "Rewrite the user's text in polished, slightly verbose English. "
     "Keep its meaning, names, numbers and language. Use an em dash where natural. "
@@ -137,6 +139,10 @@ class Rewriter:
         self.bindings = list(bindings)
         from .sessions import Sessions
         self.sessions = Sessions()  # instructions as sessions: events, questions, a result (G18)
+        import collections
+        # The last requests, in memory only (never on disk): what was sent, to whom, and what came
+        # back, for `claudish recent` (G41). Shared with routed profiles, like the sessions.
+        self.recent = collections.deque(maxlen=RECENT)
         from .conversation import Conversations
         self.conversations = Conversations()  # one per text box (docs/design/instruct.md)
         self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
@@ -173,7 +179,7 @@ class Rewriter:
             if binding.profile and binding.matches(app) and self.loader is not None:
                 if binding.profile not in self.routed:
                     other = self.loader(binding.profile)
-                    other.sessions, other.conversations = self.sessions, self.conversations
+                    other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
                     other.url = getattr(self, "url", None)
                     self.routed[binding.profile] = other
                 return self.routed[binding.profile]
@@ -304,7 +310,13 @@ class Rewriter:
         history = list(conversation.messages) if conversation is not None else []
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
+        record = {"time": time.time(), "profile": getattr(self, "profile", None), "backend": self.backend,
+                  "model": self.model or (self.claude.model if self.claude else None), "hosted": self.hosted,
+                  "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
+                  "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
+        self.recent.append(record)
         if serial and not self.lock.acquire(blocking=False):
+            record["outcome"] = "busy"
             raise RuntimeError("the model is busy; keep typing or retry")
         try:
             if self.backend == "rules":
@@ -320,6 +332,9 @@ class Rewriter:
                 outputs, usage, new, called = self.ask_model(mode, prompt, examples, history, said, box, count,
                                                              tools, approve, progress, local, serial)
                 consulted += called
+        except Exception as exc:
+            record["outcome"] = "failed: %s" % exc
+            raise
         finally:
             if serial:
                 self.lock.release()
@@ -332,6 +347,8 @@ class Rewriter:
                 candidates.append(output)
         if not candidates:
             raise RuntimeError("the model offered nothing for this %s" % mode)
+        record.update(outcome="answered" if candidates else "nothing offered", candidates=candidates,
+                      consulted=consulted, elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
         if conversation is not None:
             # The conversation keeps this turn: the instruction as typed (without what was observed),
             # the tool calls and results, and the first draft.

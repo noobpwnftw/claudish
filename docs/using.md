@@ -98,6 +98,15 @@ multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
 A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 
+## What was sent
+
+`claudish recent` shows the service's last few requests: the mode and the text
+box, which profile and backend answered (and whether it is hosted), what was
+consulted, the exact system prompt and turn the model received, the outcome,
+and the time it took (`--full` prints the prompts whole). They live in the
+service's memory only, never on disk, and only you can read them (the service
+token).
+
 ## In a terminal
 
 A terminal prompt is a text box too. Type a command, and if it fails, tap
