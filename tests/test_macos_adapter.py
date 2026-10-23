@@ -81,6 +81,12 @@ class BaseController:
     def client(self):
         return self._client
 
+    def activateServer_(self, sender):
+        pass
+
+    def deactivateServer_(self, sender):
+        pass
+
 
 class Panel:
     @classmethod
@@ -94,7 +100,7 @@ class Panel:
     def updateCandidates(self):
         pass
 
-    def show(self, hint):
+    def show_(self, hint):  # PyObjC's name for -show:; a plain show() does not exist on a real panel
         self.visible = True
 
     def hide(self):

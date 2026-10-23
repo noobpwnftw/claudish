@@ -139,6 +139,7 @@ def main():
 
 
 def scenarios():
+    Path("/tmp/claudish-trace.log").unlink(missing_ok=True)
     # 1. Without the input method: can this session post keys to the app?
     print(sh(sys.executable, str(HERE / "input_source.py"), "--select", "com.apple.keylayout.US", check=False))
     fresh_document()
@@ -211,6 +212,12 @@ def scenarios():
     wait_for(lambda: document().endswith("say hi."))
     check("instruct: Enter sends, Enter inserts", document().split("\n")[-1], "As requested—say hi.")
 
+    # Errors inside an input method never reach the screen: with CLAUDISH_TRACE set (launchctl
+    # setenv) cd_AI logs them, and any is a failure.
+    trace = Path("/tmp/claudish-trace.log")
+    if trace.exists():
+        failures = [line for line in trace.read_text().splitlines() if " failed" in line]
+        check("cd_AI raised no errors (trace)", failures, [])
     print("%d/%d scenarios passed" % (sum(results), len(results)))
     return 0 if all(results) else 1
 

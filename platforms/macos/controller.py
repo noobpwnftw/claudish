@@ -23,7 +23,11 @@ def trace(*fields):
             out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
 
 
-SURROUNDING = 8000  # characters each side of the caret an instruction takes along (as on Linux)
+SURROUNDING = 8000
+# One candidate panel for the server, as in Apple's sample: a panel per controller registers with
+# the server and is freed with its controller, and IMK later messaged the freed panel while
+# deactivating (a crash on macOS 26).
+PANEL = None  # characters each side of the caret an instruction takes along (as on Linux)
 
 
 class ClaudishInputController(IMKInputController):
@@ -36,11 +40,14 @@ class ClaudishInputController(IMKInputController):
         self.worker = None
         self.timer = None
         self.active = False
-        self.panel = IMKCandidates.alloc().initWithServer_panelType_(
-            server, kIMKSingleColumnScrollingCandidatePanel)
+        global PANEL
+        if PANEL is None:
+            PANEL = IMKCandidates.alloc().initWithServer_panelType_(server, kIMKSingleColumnScrollingCandidatePanel)
+        self.panel = PANEL
         return self
 
     def activateServer_(self, sender):
+        objc.super(ClaudishInputController, self).activateServer_(sender)
         self.active = True
         if self.worker is None:
             self.worker = Suggestions()
@@ -49,8 +56,12 @@ class ClaudishInputController(IMKInputController):
                 0.04, self, "pollSuggestions:", None, True)
 
     def deactivateServer_(self, sender):
-        self.finish(self.client())
-        self.stop()
+        try:
+            self.finish(self.client())
+            self.stop()
+        except Exception:
+            trace("deactivate failed", traceback.format_exc())
+        objc.super(ClaudishInputController, self).deactivateServer_(sender)
 
     def inputControllerWillClose(self):
         self.stop()
@@ -95,10 +106,10 @@ class ClaudishInputController(IMKInputController):
                                                                               (0, 0), (NSNotFound, 0))
                     return
                 self.panel.updateCandidates()
-                self.panel.show(kIMKLocateCandidatesBelowHint)
+                self.panel.show_(kIMKLocateCandidatesBelowHint)
             elif "question" in data and self.state.ask(revision, data["question"], data["session"]):
                 self.panel.updateCandidates()  # the choices, numbered by the panel
-                self.panel.show(kIMKLocateCandidatesBelowHint)
+                self.panel.show_(kIMKLocateCandidatesBelowHint)
             elif "progress" in data or "partial" in data:
                 self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "error" in data:
@@ -299,7 +310,7 @@ class ClaudishInputController(IMKInputController):
         if key == 97 and self.state.text:  # F6
             if self.state.candidate:
                 self.panel.updateCandidates()
-                self.panel.show(kIMKLocateCandidatesBelowHint)
+                self.panel.show_(kIMKLocateCandidatesBelowHint)
             return True
         if key in (36, 76):  # Return, keypad Enter
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
