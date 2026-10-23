@@ -1,9 +1,17 @@
 # How cd_AI looks (G45)
 
 An input method is on screen all day, in every app. The framework (docs/design/architecture.md)
-decides *what* to show; this page decides how it looks, on each platform as far as the platform
-lets an input method draw. The browser demo draws everything itself, so it is the reference; the
-platforms get as close as they can.
+decides *what* to show; this page decides how it looks.
+
+**The web is the design (owner, 2026-10-24).** The look is made perfect in the browser first, then
+the real input methods follow it to the pixel. `claudish/web/kit.css` is the one look at the caret
+(the suggestion, the composition, the panel, the mode switch); the demo uses it as is. The design
+lab (`claudish/web/design.html`, served at `/design.html` and on the site at `demo/design.html`)
+draws every state below in a mock of each platform: the reference skin, Windows 11, macOS, and
+GNOME, light and dark. A skin changes only tokens (type, surface, shape); the kit never changes per
+platform. A platform passes a state when a screenshot of the real input method matches its mock
+(`design.html?platform=windows&state=drafts&solo` shows one mock alone, at its size). Designs are
+settled in the lab (and its polls) before any native drawing changes.
 
 Screenshots of every state on each platform come from the galleries (`tests/desktop/linux-gnome/
 gallery.sh`, `tests/desktop/windows/gallery.sh`, `tests/desktop/macos/gallery.sh`, into
@@ -52,9 +60,10 @@ it would look exactly like typed text.
 
 ## Order of work
 
-1. Quiet hints and consistent words in every adapter (cheap, everywhere).
-2. macOS: our own panel (drafts, questions, answers) and the suggestion overlay.
-3. Windows: display attributes (grey suggestion, tinted rewrite) and the candidate window restyled
-   in Claudish's PIME.
-4. Linux: popup-only suggestion on Wayland; attributes on X11; the popup's layout.
-5. The demo and the home page, matched to the result.
+1. The lab: every state, every skin, both themes, until each passes review.
+2. The demo on the kit (the reference skin, live).
+3. Windows: Claudish's PIME (the only one supported) draws the panel to the Windows 11 mock;
+   display attributes draw the suggestion and the composition.
+4. macOS: the panel and overlay to the macOS mock.
+5. Linux: a GNOME Shell extension draws the panel to the GNOME mock; attributes on X11.
+6. The home page, matched to the result.

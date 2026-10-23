@@ -25,7 +25,8 @@ CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-uns
        "worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https:; style-src 'self'; "
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
 REPO = "https://github.com/noobpwnftw/claudish"
-FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png"]
+FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png",
+         "kit.css", "design.html", "design.css", "design.js"]
 
 
 def build(out):
@@ -45,6 +46,9 @@ def build(out):
     # As the project home page, point visitors to the source and the install instructions.
     page = page.replace('<footer class="page-footer">', '<footer class="page-footer"><a href="%s">Source, install, and docs on GitHub ↗</a>' % REPO, 1)
     (out / "index.html").write_text(page, encoding="utf-8")
+    design = (out / "design.html").read_text(encoding="utf-8")  # the design lab, beside the demo
+    design = re.sub(r'(href|src)="/(?!/)', r'\1="', design).replace('href="" aria-label="Claudish home"', 'href="../"', 1)
+    (out / "design.html").write_text(design, encoding="utf-8")
     templates = {"model_url": MODEL_URL, "model_bytes": MODEL_BYTES, "max_tokens": 64,
                  "modes": {name: {"system": spec["system"], "examples": spec["examples"],
                                   "max_tokens": spec["max_tokens"], "frame": spec.get("frame")}

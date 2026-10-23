@@ -1,0 +1,55 @@
+/* cd_AI at the caret: the one look every platform draws (docs/design/visual.md). The demo and the
+   design lab (design.html) use it as is; the native input methods match it, skin by skin, to the
+   pixel. A skin sets only the tokens: the host's text, the panel's surface, type, and shape. */
+
+/* The reference skin: the demo's own palette. */
+.kit{
+  --k-font:system-ui,-apple-system,'Segoe UI',sans-serif;--k-size:15px;--k-small:12px;--k-line:1.4;
+  --k-surface:#fbfaf6;--k-text:#141413;--k-muted:#73726c;--k-ghost:#9c9a92;
+  --k-selection:#ebe8de;--k-accent:#d97757;--k-border:#dcd9ce;--k-shadow:0 8px 24px rgba(20,20,19,.12),0 1px 3px rgba(20,20,19,.08);
+  --k-radius:10px;--k-row-radius:6px;--k-pad:4px;--k-row-x:8px;--k-row-y:5px;--k-gap:10px;--k-backdrop:none;
+  --k-min:240px;--k-max:440px;--k-key-border:#cfccc1;
+}
+:root[data-theme="dark"] .kit,.kit.dark{
+  --k-surface:#262522;--k-text:#faf9f5;--k-muted:#b0aea5;--k-ghost:#7d7b74;--k-selection:#353430;
+  --k-border:#48453e;--k-shadow:0 10px 28px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.4);--k-key-border:#5e5d59;
+}
+
+/* Your words and the machine's never look alike. */
+.k-ghost{color:var(--k-ghost)}
+.k-comp{text-decoration:underline dotted var(--k-accent);text-decoration-thickness:2px;text-underline-offset:.28em}
+.k-comp.converted{text-decoration-style:solid;background:color-mix(in srgb,var(--k-accent) 14%,transparent);border-radius:2px}
+
+/* The panel next to the caret: an optional header (a small label, then the question or answer as
+   is), the rows (a muted key, the text; the highlighted one a soft fill with an accent bar), and
+   one short footer. Sized to its content. */
+.k-panel{position:absolute;z-index:3;box-sizing:border-box;min-width:var(--k-min);max-width:var(--k-max);width:max-content;
+  padding:var(--k-pad);background:var(--k-surface);color:var(--k-text);border:1px solid var(--k-border);
+  border-radius:var(--k-radius);box-shadow:var(--k-shadow);-webkit-backdrop-filter:var(--k-backdrop);backdrop-filter:var(--k-backdrop);
+  font-family:var(--k-font);font-size:var(--k-size);line-height:var(--k-line);text-align:left;font-synthesis:none}
+.k-panel.bare{min-width:0}
+.k-head{padding:calc(var(--k-row-y) + 1px) var(--k-row-x) var(--k-row-y)}
+.k-label{display:block;font-size:var(--k-small);font-weight:600;color:var(--k-muted);margin-bottom:1px}
+.k-body{display:block;text-wrap:pretty}
+.k-row{position:relative;display:flex;align-items:baseline;gap:var(--k-gap);padding:var(--k-row-y) var(--k-row-x);border-radius:var(--k-row-radius)}
+.k-row.on{background:var(--k-selection)}
+.k-row.on::before{content:"";position:absolute;left:0;top:50%;width:3px;height:min(16px,calc(100% - 2 * var(--k-row-y)));transform:translateY(-50%);border-radius:2px;background:var(--k-accent)}
+.k-key{flex:none;min-width:.75em;text-align:center;color:var(--k-muted);font-variant-numeric:tabular-nums}
+.k-text{min-width:0;text-wrap:pretty;overflow-wrap:anywhere}
+.k-legend{color:var(--k-muted)}
+.k-foot{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;padding:var(--k-row-y) var(--k-row-x) calc(var(--k-row-y) - 1px);font-size:var(--k-small);color:var(--k-muted)}
+.k-head+.k-foot,.k-row+.k-foot{margin-top:2px}
+.k-hint{white-space:nowrap}
+.k-cap{display:inline-block;font-size:calc(var(--k-small) - 1px);line-height:1;padding:2px 4px;margin-right:4px;border:1px solid var(--k-key-border);border-radius:4px;color:var(--k-text);vertical-align:1px}
+.k-mark{margin-left:auto;white-space:nowrap}
+.k-mark::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--k-accent);margin-right:5px;vertical-align:1px}
+.k-status{color:var(--k-muted)}
+.k-status.failed{color:var(--k-accent)}
+.k-dots::after{content:"…"}
+
+/* A mode switch: the mode's tile and name, briefly, at the caret. */
+.k-toast{position:absolute;z-index:3;display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 5px;background:var(--k-surface);color:var(--k-text);
+  border:1px solid var(--k-border);border-radius:999px;box-shadow:var(--k-shadow);font-family:var(--k-font);font-size:var(--k-small);white-space:nowrap}
+.k-tile{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;line-height:1}
+.k-tile.cd{background:#faf9f5;color:#1f1e1d;font-family:Georgia,serif;font-size:11px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.k-tile.ai{background:#d97757;color:#fff;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}

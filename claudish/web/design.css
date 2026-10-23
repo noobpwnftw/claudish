@@ -1,0 +1,75 @@
+/* The design lab's page, and the mock of each platform around the kit (kit.css). A skin sets the
+   host window's look and the kit's tokens; the kit itself never changes per platform. */
+
+.lab-intro{padding:46px 0 26px;max-width:760px}
+.lab-intro h1{margin:0 0 14px}
+.platforms{display:flex;flex-wrap:wrap;align-items:center;gap:8px 6px;padding:0 0 26px;border-bottom:1px solid var(--line)}
+.platforms a{font-family:var(--mono);font-size:12px;letter-spacing:.6px;color:var(--label);text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:7px 13px}
+.platforms a:hover{background:var(--chip-hover)}
+.platforms a.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.platform-note{flex-basis:100%;font-size:13px;color:var(--muted);margin-top:8px;text-wrap:pretty}
+.sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,560px),1fr));gap:36px 32px;padding:32px 0 48px}
+.card-head h2{font-size:19px;margin:0 0 4px}
+.card-head p{margin:0 0 14px;font-size:13px;line-height:1.55;color:var(--muted);text-wrap:pretty;min-height:2lh}
+body.solo .shell>header,body.solo .lab-intro,body.solo .platforms,body.solo .page-footer{display:none}
+body.solo .sheet{display:block;padding:24px}
+body.solo .shell{padding:0;max-width:none}
+
+/* The host window. */
+.host{position:relative;border-radius:8px;overflow:visible;background:var(--h-bg);box-shadow:0 0 0 1px var(--h-edge),0 12px 30px rgba(0,0,0,.10)}
+.host-bar{display:flex;align-items:center;gap:10px;height:var(--h-bar);padding:0 12px;background:var(--h-bar-bg);color:var(--h-bar-text);border-radius:8px 8px 0 0;border-bottom:1px solid var(--h-edge);font-family:var(--h-ui);font-size:12px}
+.host-title{flex:1}
+.host-text{position:relative;min-height:190px;box-sizing:border-box;padding:22px 24px;border-radius:0 0 8px 8px;background:var(--h-bg);color:var(--h-text);font-family:var(--h-font);font-size:var(--h-size);line-height:var(--h-line)}
+.host-line{white-space:pre-wrap;overflow-wrap:anywhere}
+.host-caret{display:inline-block;width:0;height:1.2em;vertical-align:-.22em;border-left:var(--h-caret,2px) solid var(--h-text);margin-right:-1px}
+.k-mono{font-family:var(--h-mono,ui-monospace,Consolas,monospace);font-size:.94em}
+
+/* The reference: the demo's workspace. */
+.host.reference{--h-font:Georgia,'Times New Roman',serif;--h-size:20px;--h-line:1.55;--h-bg:var(--editor-bg);--h-edge:var(--workspace-border);--h-bar:44px;--h-bar-bg:var(--toolbar-bg);--h-bar-text:var(--label);--h-ui:var(--mono);--h-text:var(--ink)}
+.host.reference .host-bar{letter-spacing:1.3px;font-size:11px}
+.host.reference.terminal{--h-font:var(--mono);--h-size:16px}
+
+/* Windows 11: Notepad (Mica title bar, Consolas), the panel a Fluent flyout. */
+.host.windows{--h-bg:#ffffff;--h-edge:#e5e5e5;--h-bar:36px;--h-bar-bg:#f3f3f3;--h-bar-text:#1a1a1a;--h-ui:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;--h-text:#1a1a1a;--h-caret:1.5px}
+.host.windows .host-text{--h-font:Consolas,'Cascadia Mono',ui-monospace,monospace;--h-size:16px;--h-line:1.45;
+  --k-font:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;--k-size:14px;--k-small:12px;--k-line:1.43;
+  --k-surface:#f9f9f9;--k-text:#1a1a1a;--k-muted:#616161;--k-ghost:#8a8a8a;--k-selection:#ebebeb;--k-border:#e0e0e0;
+  --k-shadow:0 8px 16px rgba(0,0,0,.14);--k-radius:8px;--k-row-radius:4px;--k-pad:4px;--k-row-x:10px;--k-row-y:5px;--k-key-border:#c8c8c8;--h-mono:Consolas,'Cascadia Mono',monospace}
+.host.windows .caption{width:84px;height:10px;background:linear-gradient(90deg,transparent 0 10px,currentColor 10px 20px,transparent 20px 37px,currentColor 37px 47px,transparent 47px 64px,currentColor 64px 74px,transparent 74px);-webkit-mask:linear-gradient(transparent 4px,#000 4px 5.5px,transparent 5.5px);mask:linear-gradient(transparent 4px,#000 4px 5.5px,transparent 5.5px);opacity:.75}
+.host.windows.terminal{--h-bg:#0c0c0c;--h-text:#cccccc;--h-bar-bg:#202020;--h-bar-text:#ffffff;--h-edge:#333}
+.host.windows.terminal .host-text{--h-font:'Cascadia Mono',Consolas,monospace;--k-ghost:#767676}
+
+/* macOS: TextEdit (Helvetica), the panel menu material with vibrancy. */
+.host.macos{--h-bg:#ffffff;--h-edge:#d9d9d9;--h-bar:30px;--h-bar-bg:#f6f6f6;--h-bar-text:#4d4d4d;--h-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;--h-text:#1d1d1f;--h-caret:2px;border-radius:12px}
+.host.macos .host-bar{border-radius:12px 12px 0 0;justify-content:center}.host.macos .host-title{flex:none;font-weight:600}
+.host.macos .host-text{border-radius:0 0 12px 12px;--h-font:Helvetica,'Helvetica Neue',Arial,sans-serif;--h-size:15px;--h-line:1.5;
+  --k-font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;--k-size:14px;--k-small:11px;--k-line:1.38;
+  --k-surface:rgba(246,246,246,.82);--k-backdrop:blur(24px) saturate(1.6);--k-text:#1d1d1f;--k-muted:#7a7a7e;--k-ghost:#a1a1a6;--k-selection:rgba(0,0,0,.07);--k-border:rgba(0,0,0,.12);
+  --k-shadow:0 12px 32px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.08);--k-radius:12px;--k-row-radius:7px;--k-pad:5px;--k-row-x:9px;--k-row-y:4px;--k-key-border:rgba(0,0,0,.2);--h-mono:'SF Mono',Menlo,monospace}
+.host.macos .lights{position:absolute;left:12px;width:52px;height:12px;background:radial-gradient(circle 6px at 6px 6px,#ff5f57 5.5px,transparent 6px),radial-gradient(circle 6px at 26px 6px,#febc2e 5.5px,transparent 6px),radial-gradient(circle 6px at 46px 6px,#28c840 5.5px,transparent 6px)}
+.host.macos.terminal{--h-bg:#ffffff;--h-text:#000}
+.host.macos.terminal .host-text{--h-font:'SF Mono',Menlo,monospace;--h-size:13px}
+
+/* GNOME: Text Editor (libadwaita), the panel a popover. */
+.host.gnome{--h-bg:#ffffff;--h-edge:#dededf;--h-bar:46px;--h-bar-bg:#ebebed;--h-bar-text:#2e2e32;--h-ui:'Adwaita Sans',Cantarell,'Inter',system-ui,sans-serif;--h-text:#2e2e32;--h-caret:1.5px;border-radius:12px}
+.host.gnome .host-bar{border-radius:12px 12px 0 0;justify-content:center;font-weight:700;font-size:14px}.host.gnome .host-title{flex:none}
+.host.gnome .close{position:absolute;right:12px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.08)}
+.host.gnome .host-text{border-radius:0 0 12px 12px;--h-font:'Adwaita Mono','DejaVu Sans Mono',monospace;--h-size:15px;--h-line:1.5;
+  --k-font:'Adwaita Sans',Cantarell,'Inter',system-ui,sans-serif;--k-size:14.5px;--k-small:12px;--k-line:1.4;
+  --k-surface:#ffffff;--k-text:#2e2e32;--k-muted:#6e6e73;--k-ghost:#9a9a9e;--k-selection:rgba(0,0,6,.07);--k-border:rgba(0,0,6,.12);
+  --k-shadow:0 2px 8px 2px rgba(0,0,6,.07),0 0 0 1px rgba(0,0,6,.05);--k-radius:12px;--k-row-radius:6px;--k-pad:6px;--k-row-x:10px;--k-row-y:5px;--k-key-border:rgba(0,0,6,.2);--h-mono:'Adwaita Mono',monospace}
+.host.gnome.terminal{--h-bg:#ffffff}
+
+/* Dark: every skin. */
+:root[data-theme="dark"] .host{box-shadow:0 0 0 1px var(--h-edge),0 12px 30px rgba(0,0,0,.4)}
+:root[data-theme="dark"] .host.windows{--h-bg:#272727;--h-edge:#3a3a3a;--h-bar-bg:#202020;--h-bar-text:#ffffff;--h-text:#ffffff}
+:root[data-theme="dark"] .host.windows .host-text{--k-surface:#2c2c2c;--k-text:#ffffff;--k-muted:#c5c5c5;--k-ghost:#8b8b8b;--k-selection:#3b3b3b;--k-border:#1f1f1f;--k-shadow:0 8px 16px rgba(0,0,0,.4);--k-key-border:#5a5a5a}
+:root[data-theme="dark"] .host.windows.terminal .host-text{--h-bg:#0c0c0c}
+:root[data-theme="dark"] .host.macos{--h-bg:#1e1e1e;--h-edge:#3a3a3a;--h-bar-bg:#2a2a2a;--h-bar-text:#d0d0d0;--h-text:#f5f5f7}
+:root[data-theme="dark"] .host.macos .host-text{--k-surface:rgba(40,40,40,.78);--k-text:#f5f5f7;--k-muted:#9d9da2;--k-ghost:#6e6e73;--k-selection:rgba(255,255,255,.1);--k-border:rgba(255,255,255,.12);--k-shadow:0 12px 32px rgba(0,0,0,.5),0 0 0 .5px rgba(0,0,0,.6);--k-key-border:rgba(255,255,255,.25)}
+:root[data-theme="dark"] .host.gnome{--h-bg:#1d1d20;--h-edge:#2e2e32;--h-bar-bg:#2e2e32;--h-bar-text:#ffffff;--h-text:#ffffff}
+:root[data-theme="dark"] .host.gnome .host-text{--k-surface:#36363a;--k-text:#ffffff;--k-muted:#a8a8ad;--k-ghost:#77777c;--k-selection:rgba(255,255,255,.08);--k-border:rgba(0,0,0,.4);--k-shadow:0 2px 8px 2px rgba(0,0,0,.3),0 0 0 1px rgba(0,0,0,.35);--k-key-border:rgba(255,255,255,.25)}
+:root[data-theme="dark"] .host.gnome .close{background:rgba(255,255,255,.1)}
+:root[data-theme="dark"] .host.macos.terminal{--h-bg:#1e1e1e}
+
+@media(max-width:650px){.host-text{padding:16px}.sheet{gap:30px}}
