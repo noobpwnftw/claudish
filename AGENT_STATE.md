@@ -1,7 +1,7 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-24, `main` at `72a763c` plus the full review (detours cut, docs folded into
-docs/design/design.md and architecture.md). An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-24, `main` at `626fe8d`: the visual pass merged (every native's lab preview
+reviewed against the lab). An interactive session on the Spark; no 24/7 runner.
 
 ## Settled
 
@@ -19,9 +19,10 @@ the settled design and checked against the lab by reviewers with gallery screens
 
 ## Verified (latest)
 
-- Gate `scripts/check.py --model` 10/10 and CI 5/5 on `72a763c`.
-- GNOME Wayland 13/13; macOS 26 VM 10/10 (TextEdit and Terminal: the kept instruction gives cd_AI
-  Tab, ↓, Enter there); Windows 11 VM Notepad 16/16 on `fc2fc7c` (rerun pending: the VM restarted).
+- Gate `scripts/check.py --model` 10/10 (`--desktop` 13/13 just before) and CI 5/5 on `626fe8d`.
+- Lab previews (`gallery.sh OUT preview`) reviewed state by state against the lab: Windows 20/20
+  (the legend's em dash fixed: MSVC reads source as cp1252, so non-ASCII literals are `\u` escapes),
+  macOS 20/20, GNOME 8/8. Demo footer stays on one line at 390/768/1280.
 
 ## Open, waiting, or parked
 
