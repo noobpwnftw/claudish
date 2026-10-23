@@ -105,19 +105,19 @@ def render():
 
 def load(path=OUT):
     """The states as written: {state id: panel description} (for the native previews)."""
-    text = Path(path).read_text(encoding="utf-8")
+    text = Path(path).read_text(encoding="utf-8").replace("\r\n", "\n")
     return json.loads(text[len(PREFIX):].rstrip().rstrip(";"))
 
 
 def main():
     text = render()
     if "--check" in sys.argv:
-        current = OUT.read_text() if OUT.exists() else ""
+        current = OUT.read_text(encoding="utf-8").replace("\r\n", "\n") if OUT.exists() else ""
         if current != text:
             print("claudish/web/lab-states.js is out of date: run python scripts/lab_states.py")
             return 1
         return 0
-    OUT.write_text(text)
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     print("wrote", OUT.relative_to(ROOT))
     return 0
 

@@ -1,1 +1,2 @@
 *.patch -whitespace eol=lf
+claudish/web/lab-states.js text eol=lf
