@@ -95,7 +95,7 @@ reply"; "from Claude · hosted" at the end when a hosted model answered).
   when nothing is composed; clamped to the screen, above the line when there is no room below. It
   stays where it opened while it is open (a sent instruction stays, and a reply takes its place,
   so it never jumps); it moves only if its anchor leaves that line or lands left of it. It never
-  slides while you type. It fits its editor or screen. Panels follow the system theme, not the
+  slides while you type. It fits its editor or screen, not the app's window (the owner, 2026-10-24: tracking window bounds on every platform is not worth it). Panels follow the system theme, not the
   app's: on GNOME 46 that is the Shell's, which is always dark (the light GNOME skin is GNOME 47+).
 - **Shape:** each platform draws the panel's own corners, border and shadow from its skin's tokens
   (no reliance on a compositor that may not draw them).
@@ -120,5 +120,5 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals). The galleri
 
 The summon key (Enter or Shift+Enter, G47); how much context continue gets (G48); per-app input
 profiles (G50: continue's Tab in macOS Terminal); replacing an instruction a focus change left in
-the text when a draft is taken on return (G51); keeping the panel inside the app's window;
+the text when a draft is taken on return (G51);
 screen-reader announcements.

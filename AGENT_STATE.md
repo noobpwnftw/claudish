@@ -26,7 +26,7 @@ the settled design and checked against the lab by reviewers with gallery screens
 
 ## Open, waiting, or parked
 
-- Owner decisions: the summon key default (G47); the panel inside the app's window.
+- Owner decisions: the summon key default (G47). Dropped: keeping the panel inside the app's window.
 - Parked: the Claude API tool loop against the live API (needs a key); G30 (needs releases); G21
   (a trained model); an upstream PIME proposal (a public post: owner's OK).
 - Known: Linux GTK reports no selection (Qt does); macOS Terminal keeps Tab from continue's
