@@ -75,6 +75,36 @@ class Claude:
         self.client = anthropic.Anthropic(timeout=10.0, max_retries=0)
         self.model = model
 
+    def converse(self, messages, tools=None, max_tokens=1024):
+        """One Messages API call for the tool loop: (an OpenAI-shaped reply, usage)."""
+        system, conversation = claude_messages(messages)
+        options = {}
+        if not self.model.startswith("claude-haiku"):
+            options = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+        if tools:
+            options["tools"] = [{"name": tool["function"]["name"], "description": tool["function"].get("description", ""),
+                                 "input_schema": tool["function"].get("parameters") or {"type": "object", "properties": {}}}
+                                for tool in tools]
+        try:
+            response = self.client.beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
+                                                        system=system, messages=conversation,
+                                                        output_config={"effort": "low"}, **options)
+        except TypeError as exc:
+            if "authentication" not in str(exc):
+                raise
+            raise RuntimeError("no Claude credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from exc
+        if response.stop_reason == "refusal":
+            raise RuntimeError("Claude declined this; your wording is unchanged")
+        reply = {"content": "".join(block.text for block in response.content if block.type == "text").strip()}
+        calls = [{"id": block.id, "type": "function",
+                  "function": {"name": block.name, "arguments": json.dumps(block.input)}}
+                 for block in response.content if block.type == "tool_use"]
+        if calls:
+            reply["tool_calls"] = calls
+        finish = "length" if response.stop_reason == "max_tokens" else "stop"
+        usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
+        return {"message": reply, "finish_reason": finish}, usage
+
     def rewrite(self, text, system, examples, image=None):
         options = {}
         if not self.model.startswith("claude-haiku"):  # Haiku has no server-side fallback.
@@ -95,6 +125,49 @@ class Claude:
         output = "".join(block.text for block in response.content if block.type == "text").strip()
         usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
         return output, usage
+
+
+def claude_messages(messages):
+    """(system, messages) for the Messages API from the tool loop's OpenAI-shaped messages: tool
+    calls become tool_use blocks, tool results tool_result blocks (consecutive ones in one user
+    message), and a picture an image block."""
+    system, out = "", []
+
+    def add(role, blocks):
+        if out and out[-1]["role"] == role:
+            out[-1]["content"].extend(blocks)
+        else:
+            out.append({"role": role, "content": list(blocks)})
+    for message in messages:
+        role, content = message["role"], message.get("content")
+        if role == "system":
+            system += content or ""
+        elif role == "tool":
+            add("user", [{"type": "tool_result", "tool_use_id": message.get("tool_call_id") or "",
+                          "content": content or ""}])
+        elif role == "assistant":
+            blocks = [{"type": "text", "text": content}] if content else []
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") or {}
+                try:
+                    arguments = json.loads(function.get("arguments") or "{}")
+                except ValueError:
+                    arguments = {}
+                blocks.append({"type": "tool_use", "id": call.get("id") or "", "name": function.get("name") or "",
+                               "input": arguments})
+            add("assistant", blocks or [{"type": "text", "text": "OK"}])
+        elif isinstance(content, list):  # text with a picture (user_content, OpenAI style)
+            blocks = []
+            for part in content:
+                if part.get("type") == "image_url":
+                    data = part["image_url"]["url"].split(",", 1)[1]
+                    blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}})
+                elif part.get("text"):
+                    blocks.append({"type": "text", "text": part["text"]})
+            add("user", blocks)
+        else:
+            add("user", [{"type": "text", "text": content or " "}])
+    return system, out
 
 
 class Rewriter:
@@ -119,9 +192,9 @@ class Rewriter:
         rewriter.launcher = settings.get("launcher")
         rewriter.session_command = settings.get("session_command")
         if settings.get("tools"):
-            if settings["backend"] not in ("llama", "openai"):
-                raise ValueError("tools need an OpenAI-compatible backend with tool calls (llama.cpp, vLLM, Ollama) "
-                                 "for now; the %s backend cannot use them yet" % settings["backend"])
+            if settings["backend"] not in ("llama", "openai", "claude"):
+                raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
+                                 "Claude); the %s backend cannot use them" % settings["backend"])
             from .tools import Toolbox
             rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {})
         return rewriter
@@ -321,7 +394,7 @@ class Rewriter:
         started = time.perf_counter()
         spec = self.modes[mode]
         local = local or {}
-        tools = mode == "instruct" and self.backend in ("llama", "openai") and bool(self.toolbox or local)
+        tools = mode == "instruct" and self.backend in ("llama", "openai", "claude") and bool(self.toolbox or local)
         prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
         examples = spec["examples"] if box.prose or spec.get("custom") else []
         said = box.material(spec["frame"].replace("{text}", text) if spec.get("frame") else text)
@@ -342,13 +415,16 @@ class Rewriter:
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
                 outputs = [self.run_command(prompt + "\n\nText:\n" + said)]
-            elif self.claude:
+            elif self.claude and not (tools or history or conversation is not None):
                 output, usage = self.claude.rewrite(said, prompt, examples, box.image)
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost
             else:
-                outputs, usage, new, called = self.ask_model(mode, prompt, examples, history, said, box, count,
+                # The loop: an OpenAI-compatible server, or Claude when there are tools or a
+                # conversation (one reading: alternatives would multiply the cost).
+                outputs, usage, new, called = self.ask_model(mode, prompt, examples, history, said, box,
+                                                             1 if self.claude else count,
                                                              tools, approve, progress, local, serial)
                 consulted += called
         except Exception as exc:
@@ -399,6 +475,12 @@ class Rewriter:
                 payload["tools"] = offered
             if self.model:
                 payload["model"] = self.model
+            if self.claude:
+                choice, used = self.claude.converse(messages, offered, max_tokens)
+                usage = usage or used
+                if choice.get("finish_reason") == "length":
+                    raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
+                return choice["message"]
             try:
                 choice, used = self.chat(payload, self.request_headers(), box.image,
                                          timeout=None if serial else max(self.timeout, TURN_TIMEOUT))

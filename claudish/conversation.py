@@ -101,7 +101,7 @@ class ModelDriver:
         self.conversation.textbox = Textbox(self.before, self.after)
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
-        tools_loop = rewriter.backend in ("llama", "openai")  # no conversation or tools for other backends yet
+        tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
         self.handed = None
         result = rewriter.answer(
             "instruct", prompt, box, conversation=self.conversation if tools_loop else None,

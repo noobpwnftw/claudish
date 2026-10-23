@@ -208,3 +208,43 @@ class CommandBackendTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClaudeLoopTests(unittest.TestCase):
+    """Claude with tools and a conversation: the same loop as any model (the tool calls translated)."""
+
+    def setUp(self):
+        self.sdk = FakeSDK()
+        patcher = patch.dict("sys.modules", {"anthropic": self.sdk.module})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_claude_asks_and_drafts_through_the_loop(self):
+        import time
+        from claudish.conversation import ModelDriver
+        from claudish.sessions import Session
+        replies = [types.SimpleNamespace(stop_reason="tool_use", usage=types.SimpleNamespace(input_tokens=5, output_tokens=5),
+                                         content=[types.SimpleNamespace(type="tool_use", id="tu1", name="user__ask",
+                                                                        input={"question": "Did you mean git status?"})]),
+                   response("git status")]
+        self.sdk.create = lambda **kwargs: (self.sdk.calls.append(kwargs), replies.pop(0))[1]
+        rewriter = Rewriter("claude")
+        driver = ModelDriver(rewriter, rewriter.conversations.get("t"), purpose="terminal",
+                             screen="$ gti status\nbash: gti: command not found\n$")
+        session = Session(driver)
+        thread = threading.Thread(target=lambda: driver.run(session, "fix"))
+        thread.start()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+            time.sleep(0.01)
+        question = next(e for e in session.events if e["type"] == "question")
+        session.answer(question["id"], 0)
+        thread.join(5)
+        self.assertEqual(session.events[-1]["text"], "git status")
+        first, second = self.sdk.calls
+        self.assertIn("user__ask", [tool["name"] for tool in first["tools"]])
+        self.assertIn("run when the user presses Enter", first["system"])
+        self.assertEqual(second["messages"][-2]["content"][0]["type"], "tool_use")
+        result = second["messages"][-1]["content"][0]
+        self.assertEqual((result["type"], result["tool_use_id"], result["content"]),
+                         ("tool_result", "tu1", "The user chose: Yes"))
