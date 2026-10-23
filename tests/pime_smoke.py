@@ -26,7 +26,7 @@ def main():
     with tempfile.TemporaryDirectory() as temporary:
         target = Path(temporary) / "pime_claudish"
         shutil.copytree(root / "platforms/windows/claudish", target)
-        for name in ["composition.py", "client.py"]:
+        for name in ["composition.py", "client.py", "screen.py"]:
             shutil.copy(root / "claudish" / name, target / name)
         sys.path.insert(0, temporary)
         from pime_claudish.claudish_ime import ClaudishTextService

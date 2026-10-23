@@ -4,6 +4,7 @@ import time
 
 from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from .client import Suggestions
+from .screen import is_terminal
 
 
 def keylog(*fields):
@@ -188,7 +189,8 @@ class ClaudishTextService(TextService):
         self.setShowCandidates(bool(candidates))
 
     def changed(self):
-        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits")
+        # Not prose: a URL, an address, a number, or a terminal's command line.
+        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits") or is_terminal(focused_app())
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
             # ready by the time the key is released, and onKeyUp can show it.

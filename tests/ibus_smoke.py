@@ -117,9 +117,17 @@ try:
     assert engine.composition.mode == "continue"
     engine.do_property_activate("mode.compose", IBus.PropState.UNCHECKED)  # a radio item turning off: nothing
     assert engine.composition.mode == "continue"
+    # A terminal (its field purpose, or the program) is not prose: continue asks nothing there.
+    engine.do_set_content_type(IBus.InputPurpose.TERMINAL, 0)
+    assert engine.composition.quiet and not engine.composition.automatic
+    engine.do_set_content_type(IBus.InputPurpose.FREE_FORM, 0)
+    engine.do_focus_in_id("/", "gtk3-im:gnome-terminal-server")
+    assert engine.composition.quiet
+    engine.do_focus_in_id("/", "gtk3-im:gedit")
+    assert not engine.composition.quiet
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Enter), live continue, F8, candidate list, mode menu, password bypass")
+    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Enter), live continue, F8, candidate list, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()

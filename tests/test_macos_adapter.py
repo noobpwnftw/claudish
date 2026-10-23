@@ -435,6 +435,20 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
+    def test_continue_is_quiet_in_a_terminal(self):
+        client = TextClient("~ % ")
+        client.bundleIdentifier = lambda: "com.apple.Terminal"
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            for char in "ls ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                                                characters=lambda char=char: char), client)
+            self.assertTrue(fresh.state.quiet)
+            self.assertNotIn("continue", fresh.worker.modes)  # a command line is not prose: nothing unasked
+        finally:
+            fresh.inputControllerWillClose()
+
     def test_an_instruction_takes_the_text_box_but_not_itself(self):
         client = TextClient("Dear Ana,\n\n")
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)

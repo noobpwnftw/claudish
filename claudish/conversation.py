@@ -87,12 +87,26 @@ KINDS = {"terminal": "a terminal", "email": "an email address field", "url": "a 
          "digits": "a digits field", "alpha": "a letters-only field"}
 
 
+def screen_note(screen):
+    """What was consulted, as the candidate window lists it."""
+    return "terminal screen (%d lines)" % (screen.count("\n") + 1)
+
+
 def describe(app, purpose):
     """One line about the text box: its kind and its app, as far as they are known."""
     kind = KINDS.get(purpose or "")
     if not (kind or app):
         return ""
     return "\n\nThe text box is %s%s." % (kind or "a text field", " in %s" % app if app else "")
+
+
+def terminal(screen):
+    """A terminal's last lines (G35), read when an instruction or a rewrite asked, and what it means
+    for the result: it lands at the prompt, where the user runs it."""
+    if not screen:
+        return ""
+    return ("\n\n<context name=\"the terminal screen, last lines\">\n%s\n</context>\n"
+            "What you write lands at the terminal prompt, where the user reads it and runs it." % screen)
 
 
 def clipped(before, after):
@@ -117,9 +131,10 @@ def window(before, after, tools=True):
 class ModelDriver:
     """Claudish runs the loop: the model, the profile's tools under the policy, and the conversation."""
 
-    def __init__(self, rewriter, conversation, app=None, before="", after="", look=False, purpose=None):
+    def __init__(self, rewriter, conversation, app=None, before="", after="", look=False, purpose=None, screen=""):
         self.rewriter, self.conversation = rewriter, conversation
         self.app, self.before, self.after, self.look, self.purpose = app, before, after, look, purpose
+        self.screen = screen  # a terminal's last lines, or ""
         self.pending = {}  # question id -> [event, answer]
         self.cancelled = False
         self.counter = 0
@@ -128,13 +143,16 @@ class ModelDriver:
         rewriter = self.rewriter
         if rewriter.backend not in ("llama", "openai"):
             # No conversation or tool loop for this backend yet: one call per turn.
-            result = rewriter.rewrite(prompt, self.before, self.after, "instruct", self.app, self.look)
+            result = rewriter.rewrite(prompt, self.before, self.after, "instruct", self.app, self.look, self.purpose,
+                                      self.screen)
             session.emit("result", text=result["text"], candidates=result.get("candidates") or [result["text"]],
                          consulted=result.get("consulted") or [])
             return
         from .model import user_content
         spec = rewriter.modes["instruct"]
         block, consulted = rewriter.gather(self.app)
+        if self.screen:
+            consulted.append(screen_note(self.screen))
         image = None
         if self.look:
             from .capture import capture
@@ -142,7 +160,7 @@ class ModelDriver:
             consulted.append("window picture (%d×%d)" % (width, height))
         context = window(self.before, self.after)
         system = (spec["system"] + block + describe(self.app, self.purpose) + context
-                  + (AGENT_NOTE if context else ""))
+                  + (AGENT_NOTE if context else "") + terminal(self.screen))
         turn = [{"role": "user", "content": user_content(prompt, image, "openai")}]
         messages = ([{"role": "system", "content": system}] + spec["examples"] + self.conversation.messages + turn)
         max_tokens = spec["max_tokens"] or rewriter.max_tokens

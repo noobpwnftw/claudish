@@ -13,6 +13,7 @@ from InputMethodKit import kIMKSingleColumnScrollingCandidatePanel, kIMKLocateCa
 
 from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
+from claudish.screen import is_terminal
 
 TRACE = os.environ.get("CLAUDISH_TRACE")  # a file path: event kinds and errors, never typed text
 
@@ -238,6 +239,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def changed(self, client):
+        self.state.quiet = is_terminal(self.app(client))  # a terminal's command line is not prose
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and self.state.automatic:  # continue: what follows the caret too
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client),

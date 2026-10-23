@@ -111,6 +111,7 @@ class Rewriter:
                        settings["command"], settings["hosted"], settings["bindings"])
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
+        rewriter.read_terminal = settings.get("read_terminal", True)
         rewriter.session_command = settings.get("session_command")
         if settings.get("tools"):
             if settings["backend"] not in ("llama", "openai"):
@@ -140,6 +141,7 @@ class Rewriter:
         self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
         self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
         self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
+        self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
         # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
         self.modes = invocation.defaults((self.system, self.examples))
         for name, override in (modes or {}).items():
@@ -167,14 +169,27 @@ class Rewriter:
             raise RuntimeError("model returned no text")
         return output, usage
 
-    def make_driver(self, app=None, conversation=None, before="", after="", look=False, purpose=None):
+    def terminal(self, app, purpose, mode):
+        """(purpose, screen): in a terminal (by the field's kind or the app), say so, and for a rewrite
+        or an instruction read its last lines (G35); never for continue's pauses."""
+        from .screen import is_terminal, read
+        if purpose != "terminal" and not is_terminal(app):
+            return purpose, ""
+        if mode == "continue" or not self.read_terminal:
+            return "terminal", ""
+        return "terminal", read(app) or ""
+
+    def make_driver(self, app=None, conversation=None, before="", after="", look=False, purpose=None, screen=None):
         """The driver for an instruction: the profile's agent (session_command), else the model
-        driver, which runs it as a turn in the text box's conversation."""
+        driver, which runs it as a turn in the text box's conversation. screen: a terminal's last
+        lines, read here when None."""
+        if screen is None:
+            purpose, screen = self.terminal(app, purpose, "instruct")
         if self.session_command:
             from .agent import AgentProcess, ClaudeCodeDriver
             if not conversation:
                 return ClaudeCodeDriver(self.session_command)  # a process for this turn only
-            from .conversation import AGENT_NOTE, describe, window
+            from .conversation import AGENT_NOTE, describe, terminal, window
             from .textbox import Textbox
             kept = self.conversations.get(conversation)
             kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
@@ -186,10 +201,11 @@ class Rewriter:
             context = block + describe(app, purpose) + place
             if place:
                 context += AGENT_NOTE + (" The textbox tools (read, search) see all of it." if textbox else "")
+            context += terminal(screen)
             policy = self.toolbox.policy() if self.toolbox else {}
             return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy)
         from .conversation import ModelDriver
-        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose)
+        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose, screen)
 
     def gather(self, app=None, before="", after=""):
         """(context block, what was consulted): the profile's context, plus the bindings for the
@@ -220,8 +236,9 @@ class Rewriter:
                                                                           if self.toolbox else ()) for tool in sorted(deny)]
         return ["--disallowedTools", ",".join(denied)] if denied else []
 
-    def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None):
-        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose), text)
+    def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None,
+                      screen=None):
+        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose, screen), text)
 
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -246,10 +263,11 @@ class Rewriter:
             raise
         return data["choices"][0], data.get("usage", {})
 
-    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None):
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None):
         """look: attach a picture of the focused window (instruct only; the user asked for it with F8).
         before/after: the text box around the caret, where the result goes (continue: the text is
-        what comes before, so only after adds); purpose: the field's kind."""
+        what comes before, so only after adds); purpose: the field's kind; screen: a terminal's
+        last lines, read here when None."""
         started = time.perf_counter()
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
@@ -261,15 +279,22 @@ class Rewriter:
                 raise RuntimeError("the command backend cannot take a window picture; use claude or a vision model")
             from .capture import capture
             image, width, height = capture(self.look_command)
+        if screen is None:
+            purpose, screen = self.terminal(app, purpose, mode)
+        elif screen:
+            purpose = "terminal"
         spec = self.modes[mode]
         block, consulted = self.gather(app, before, after)
+        if screen:
+            from .conversation import screen_note
+            consulted = consulted + [screen_note(screen)]
         if image is not None:
             consulted = consulted + ["window picture (%d×%d)" % (width, height)]
         # The text box, described the same way for every mode: its kind and app, and the text around
         # where the result goes.
-        from .conversation import describe, window
+        from .conversation import describe, terminal, window
         place = window("", after) if mode == "continue" else window(before, after)
-        system = spec["system"] + block + describe(app, purpose) + place
+        system = spec["system"] + block + describe(app, purpose) + place + terminal(screen)
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         # What the model is sent: the text itself, or the mode's frame around it (continue).
         sent = spec["frame"].replace("{text}", text) if spec.get("frame") else text
@@ -280,6 +305,8 @@ class Rewriter:
                       "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
             if image is not None:
                 output = output[:-1] + ", having looked at the window."
+            elif screen and mode == "instruct":
+                output = output[:-1] + ", having read the terminal."
             outputs = [output] + ["%s—%s" % (lead, output[0].lower() + output[1:])
                                   for lead in ("Certainly", "Of course")][:count - 1]
             usage = {}

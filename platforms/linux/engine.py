@@ -11,6 +11,7 @@ gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus
 from claudish.composition import LABELS, MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
+from claudish.screen import is_terminal
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -326,10 +327,15 @@ class ClaudishEngine(IBus.Engine):
     def do_set_content_type(self, purpose, hints):
         self.sensitive = purpose in (IBus.InputPurpose.PASSWORD, IBus.InputPurpose.PIN)
         self.purpose = PURPOSES.get(purpose)
-        # Not prose: suggestions only when asked for (Tab in rewrite, Enter in instruct).
-        self.composition.quiet = self.purpose in ("url", "email", "number", "phone", "digits")
+        self.update_quiet()
         if self.sensitive:
             self.do_reset()
+
+    def update_quiet(self):
+        """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;
+        Tab and Enter in compose still ask."""
+        self.composition.quiet = (self.purpose in ("url", "email", "number", "phone", "digits", "terminal")
+                                  or is_terminal(self.app))
 
     def switch_mode(self):
         """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose
@@ -377,6 +383,7 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
+        self.update_quiet()
         self.refresh_surrounding()
         self.show_mode(register=True)
 

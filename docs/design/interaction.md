@@ -338,6 +338,16 @@ than terminals (chat and mail apps, Electron apps). Consequences:
   app); Linux needs the accessibility bus (on in GNOME and KDE, off in a bare X
   session; Qt apps need it enabled); Windows needs nothing. Terminals without
   accessibility (xterm, and likely kitty and Alacritty) fall back to the picture.
+- **The entry point, not the whole job** (owner, 2026-10-23): with a wise
+  enough model, what it sees is the terminal and your words ("fix", or just
+  "fuck"), and it does one of three things, all of which the input method
+  already has a shape for: the command itself (a draft at the prompt); a
+  question when your intent is unclear ("did you mean `git status`?" as
+  numbered drafts or an agent's choices); or an offer to finish the work with a
+  helper (hand the terminal and the instruction to an agent such as Claude
+  Code). Claudish solves the immediate problem or calls up a helper. So the
+  prompt states facts (this is a terminal, here is its screen, the result
+  lands at the prompt), not rules for the model's answer.
 - **Then `claudish fix` goes:** "fix" typed as an instruction in a terminal does
   what the command did, with what is on screen as its context, and its shell
   hook and own prompt retire. Its 30 cases become a test of instruct in terminals.

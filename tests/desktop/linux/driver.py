@@ -383,6 +383,43 @@ def surrounding_context(service):
         stub.server_close()
 
 
+
+def terminal_scenario():
+    """G35: an instruction typed at a terminal prompt sees the terminal's screen, read through AT-SPI,
+    with nothing installed in the shell. Starts in continue, where surrounding_context() ends."""
+    sys.path.insert(0, str(SRC))
+    from claudish.screen import read_atspi, tail
+    background("/usr/libexec/at-spi-bus-launcher", "--launch-immediately")
+    time.sleep(1)
+    # gnome-terminal-server starts through D-Bus activation: give it the display and input method.
+    sh("dbus-update-activation-environment", "DISPLAY=:99", "GTK_IM_MODULE=ibus", "XMODIFIERS=@im=ibus")
+    service = background(sys.executable, "-m", "claudish", "serve", "--profile", "desk", cwd=str(SRC))
+    wait_for(health, what="the service")
+    background("gnome-terminal", "--", "bash", "--norc")
+    screen = lambda: tail(read_atspi("gnome-terminal-server") or "")
+    try:
+        window = wait_for(lambda: subprocess.run(["xdotool", "search", "--onlyvisible", "--class", "gnome-terminal"], capture_output=True,
+                                                 text=True).stdout.split(), what="the terminal")
+        subprocess.run(["xdotool", "windowfocus", window[-1]])  # no window manager to give it focus
+        wait_for(lambda: screen().rstrip().endswith("$"), what="the shell prompt")
+        type_text("gti status")  # continue: straight in, nothing suggested in a terminal
+        key("Return")
+        wait_for(lambda: "command not found" in screen(), what="the failure")
+        key("shift")  # compose
+        type_text("fix")
+        key("Return")  # the instruction, with the screen's last lines
+        time.sleep(1.0)
+        key("Return")  # its draft, inserted at the prompt (running it would be the user's Enter)
+        try:
+            wait_for(lambda: "having read the terminal" in screen(), what="the draft at the prompt")
+        except TimeoutError:
+            print("--- terminal screen\n" + screen(), flush=True)
+        check("terminal: fix sees the screen, the draft lands at the prompt", screen().splitlines()[-1],
+              "bash-5.2$ As requested—fix, having read the terminal.")
+    finally:
+        subprocess.run(["pkill", "-f", "gnome-terminal-server"])
+        service.terminate()
+
 def health():
     try:
         from urllib.request import urlopen
@@ -442,6 +479,7 @@ def main():
         qt_scenarios()
         service = agent_session(service)
         surrounding_context(service)
+        terminal_scenario()
     except TimeoutError:
         print("--- service log\n" + (WORK / "python3.log").read_text()[-3000:], flush=True)
         raise

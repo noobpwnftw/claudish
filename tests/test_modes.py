@@ -48,6 +48,37 @@ class ModeTests(unittest.TestCase):
         _, payload = self.call(rewriter, "this is important", "rewrite")
         self.assertNotIn("text box", payload["messages"][0]["content"])  # nothing known: nothing added
 
+    def test_a_terminal_is_read_for_an_instruction_never_for_continue(self):
+        screen = "~ % gti status\nzsh: command not found: gti\n~ %"
+        rewriter = Rewriter(max_tokens=64)
+        with patch("claudish.screen.read", return_value=screen) as read:
+            _, payload = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal")
+            system = payload["messages"][0]["content"]
+            self.assertIn("The text box is a terminal in com.apple.Terminal.", system)
+            self.assertIn("zsh: command not found: gti", system)
+            self.assertIn("lands at the terminal prompt", system)
+            self.call(rewriter, "ls -la ", "continue", app="com.apple.Terminal")
+            self.assertEqual(read.call_count, 1)  # continue's pauses never read the screen
+            _, payload = self.call(rewriter, "fix", "instruct", app="kate")  # not a terminal: never read
+            self.assertEqual(read.call_count, 1)
+            self.assertNotIn("terminal", payload["messages"][0]["content"])
+            rewriter.read_terminal = False  # the profile's "read_terminal": false
+            _, payload = self.call(rewriter, "fix", "instruct", app="gnome-terminal-server")
+            self.assertEqual(read.call_count, 1)
+            self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+        rules = Rewriter("rules")
+        result = rules.rewrite("fix", mode="instruct", screen=screen)
+        self.assertEqual(result["text"], "As requested—fix, having read the terminal.")
+        self.assertIn("terminal screen (3 lines)", result["consulted"])
+
+    def test_a_terminal_screen_is_trimmed_to_its_last_lines(self):
+        from claudish import screen
+        padded = "C:\\> gti status   \r\n'gti' is not recognized   \r\n\r\nC:\\>      \r\n   \r\n"
+        self.assertEqual(screen.tail(padded), "C:\\> gti status\n'gti' is not recognized\n\nC:\\>")
+        self.assertEqual(screen.tail("\n".join(str(n) for n in range(100))).split("\n")[0], "60")
+        self.assertTrue(screen.is_terminal("WindowsTerminal.exe") and screen.is_terminal("com.apple.Terminal"))
+        self.assertFalse(screen.is_terminal("notepad.exe") or screen.is_terminal(None))
+
     def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
         rewriter = Rewriter(max_tokens=64)
         _, payload = self.call(rewriter, "hello ", "continue")
