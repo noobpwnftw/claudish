@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
 p,li,td,figcaption{text-wrap:pretty}
-h2,h3,.ime-panel li{text-wrap:balance}
+h2,h3{text-wrap:balance}
 a{color:inherit}
 a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .shell{max-width:clamp(1280px,85vw,1440px);margin:0 auto;padding:0 54px}
@@ -31,13 +31,10 @@ h1 em{color:var(--accent)}
 .ime{margin:0;border:1px solid var(--workspace-border);border-radius:8px;background:var(--editor-bg);box-shadow:0 5px 0 var(--workspace-shadow);overflow:hidden}
 .ime-app{padding:18px 22px 20px;border-bottom:1px solid var(--line)}
 .ime-title{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;letter-spacing:.6px}
-.ime-caret{display:block;text-wrap:balance;font-family:var(--serif);font-size:21px;text-decoration:underline dotted var(--accent);text-underline-offset:6px}
+.ime-caret{display:block;min-height:1.5em;font-family:var(--serif);font-size:21px}
 .cursor{display:inline-block;width:2px;height:22px;background:var(--ink);vertical-align:-4px;margin-left:2px}
 .ime-panel{background:var(--candidate-bg);padding:14px 22px 18px}
-.ime-status{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px}
-.ime-panel ol{list-style:none;margin:0;padding:0}
-.ime-panel li{font-family:var(--serif);font-size:17px;line-height:1.45;padding:8px 0;border-top:1px solid var(--line)}
-.ime-panel li:first-child{border-top:0}
+.ime-panel .k-panel{position:static;max-width:none;width:auto}
 .ime figcaption{font-size:12px;color:var(--muted);padding:12px 22px;border-top:1px solid var(--line)}
 kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--key-border);border-radius:3px;padding:2px 5px;margin-right:6px;color:var(--label)}
 .section{border-top:1px solid var(--line);padding:46px 0 50px}

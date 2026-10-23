@@ -43,6 +43,7 @@
 .k-turn .k-label{display:inline;margin-right:6px}
 .k-turn .k-body{display:inline;color:var(--k-text);text-decoration:underline solid color-mix(in srgb,var(--k-text) 45%,transparent);text-decoration-thickness:1px;text-underline-offset:.2em}
 .k-turn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-turn .k-body,.k-turn .k-label{text-wrap:nowrap}  /* one line: text-wrap would wrap it again */
 .k-turn+.k-turn{padding-top:0}
 .k-turn+.k-head:not(.k-turn){padding-top:calc(var(--k-row-y) + 3px)}
 .k-label{display:block;font-size:var(--k-small);font-weight:600;color:var(--k-muted);margin-bottom:2px}

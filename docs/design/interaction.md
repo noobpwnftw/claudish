@@ -1,6 +1,10 @@
 # Design: the input method as the way you talk to machines
 
 Status: proposal, 2026-10-22. Owner direction; maintained in ROADMAP as G18–G19.
+**How it looks and the keys are now settled in [visual.md](visual.md)** (four review rounds,
+2026-10-24): choices are not numbered (↑ ↓ and Enter); a sent instruction leaves your text and the
+panel carries the exchange; a rewrite waits in the panel until Tab; a focus change commits only
+your own words. Where this page differs, visual.md is current.
 
 ## Scope: an input method, not a chat app
 
@@ -36,7 +40,7 @@ An input method already has every piece of that interaction:
 | a prompt you type | the composition, held and editable until you commit |
 | send | Enter |
 | the answer, before it lands | the candidate window |
-| a choice (yes / no / other) | the candidate list: number keys, arrows, Enter |
+| a choice (yes / no / other) | the panel's rows: ↑ ↓ and Enter (not numbered: digits are text) |
 | progress and status | the auxiliary text, or a status line in the candidate window |
 | "put the result here" | commit at the caret, which becomes one undo step in the app |
 | cancel | Esc |
@@ -44,7 +48,7 @@ An input method already has every piece of that interaction:
 So anything more capable than a flat notepad can host a turn of the loop, and it
 works the same in an editor, a browser, a chat app, or a terminal. Users of
 Chinese and Japanese input methods have used these exact controls (candidates,
-number keys, Enter, Esc) all day for decades. None of it is new to them.
+arrows, Enter, Esc) all day for decades. None of it is new to them.
 
 ### Principle: you take the initiative
 
@@ -108,15 +112,15 @@ it knows.
 Picking a candidate approves that candidate, not everything it leads to. If an
 agent finds a destructive or outgoing step halfway through, that step comes back
 as a new choice (see Safety under G18). Rewrite and continue benefit too: two or
-three readings, with 1–3 to pick and Tab for the first (G27).
+three readings, chosen with ↑ ↓ and Enter, the first highlighted (G27).
 
 ## Three layers, two modes, one key grammar
 
 | Layer | Mode | You type | Requests | You get |
 | --- | --- | --- | --- | --- |
 | 1. Autocomplete | continue | the start of a sentence | at a pause after a word | the rest of the sentence, after the caret |
-| 2. Translation | compose, Tab | a phrase | on Tab | the phrase in Claudish, in place |
-| 3. Instruction | compose, Enter | a command | on Enter | drafts to pick, at the caret |
+| 2. Translation | compose, Tab | a phrase | on Tab | the phrase in Claudish, in the panel until Tab again |
+| 3. Instruction | compose, Enter | a command | on Enter | drafts to choose, inserted at the caret |
 
 A Shift tap switches the two modes (the service still names the requests continue,
 rewrite, and instruct).
@@ -128,7 +132,8 @@ The keys are the same everywhere, on every platform:
 - **Enter** keeps your wording in layers 1 and 2. In layer 3 it sends; when the
   result is ready, Enter inserts it.
 - **Esc** keeps what you typed, in every mode.
-- **1–9** pick a choice when the candidate window shows a list (G18).
+- **↑ ↓** move the highlight through a list; Enter takes it. Choices are not numbered: in English
+  digits are text, as Space is (owner, 2026-10-24).
 
 Invariants: nothing lands in your app without a key you pressed, your own text
 is always one key away, a stale result never replaces newer text, and secure
@@ -156,12 +161,13 @@ The agent asks for permission:
 ```
   write a release note from the last 5 commits▮
  ┌──────────────────────────────────────────────────────┐
- │ Run `git log -5 --oneline`?                           │
- │ 1 Yes   2 Yes, for this session   3 No   4 Tell it…   │  ← candidate list: number keys
+ │ Claude Code wants to run  git log -5 --oneline        │
+ │   Deny                                                 │  ← nothing highlighted: the first ↓
+ │   Allow                                                │     lands on Deny; Enter confirms
  └──────────────────────────────────────────────────────┘
 ```
 
-Pressing 4 ("Tell it…") reopens the composition for a free-text answer; Enter
+Typing instead answers in your own words (at the caret, as a composition); Enter
 sends that answer into the same session. When the agent finishes:
 
 ```
@@ -199,8 +205,8 @@ adapter ──/sessions──▶ service ──stdin/stdout (stream-json)──�
   single-shot commands keep today's `command` backend.
 - **Adapters.** They render events with what each platform has: IBus lookup
   table and auxiliary text; TSF candidate list (PIME `setCandidateList`,
-  `showMessage`); IMK candidate panel. Number keys select when a list is shown
-  and type digits otherwise.
+  `showMessage`); IMK candidate panel. Since then each platform draws cd_AI's own
+  panel (visual.md); ↑ ↓ and Enter choose, and digits are always text.
 - **Terminal.** In a terminal, the result of an instruction is usually a
   command. It lands at the prompt like typed text, and running it is your
   Enter, never the input method's (G35: an instruction in a terminal sees its screen).
@@ -343,7 +349,7 @@ than terminals (chat and mail apps, Electron apps). Consequences:
   "fuck"), and it does one of three things, all of which the input method
   already has a shape for: the command itself (a draft at the prompt); a
   question when your intent is unclear ("did you mean `git status`?" as
-  numbered drafts or an agent's choices); or an offer to finish the work with a
+  drafts or an agent's choices); or an offer to finish the work with a
   helper (hand the terminal and the instruction to an agent such as Claude
   Code). Claudish solves the immediate problem or calls up a helper. So the
   prompt states facts (this is a terminal, here is its screen, the result
@@ -384,8 +390,8 @@ these changes):
   example `["claude", "{prompt}"]`, `["aider", "--message-file", "{note}"]`. It
   is not offered if the program is not installed, or if the template skips the
   helper's own permission prompts.
-- **Never picked by accident:** it is not a numbered draft. It sits on a fixed
-  key, 0, labelled "0 → hand off to claude"; Enter and Tab never take it.
+- **Never picked by accident:** it is a question, not a draft ("Hand off to Claude Code"): nothing
+  is highlighted, the first ↓ lands on No, and Enter alone never takes it.
 - **Only for an instruction typed in a terminal.** Elsewhere, nothing is
   offered (no silent clipboard writes); agent sessions at the caret (G18)
   remain the in-box path.

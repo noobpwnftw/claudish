@@ -19,9 +19,9 @@ const SKINS = {
 const STATES = [
   {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.",
    before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. When you pause, the keys show; while you type, only the AI tile.",
+  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The keys show from the first key: Enter sends your words away, so it must be known.",
    before: "Team: ", comp: "running late, start without me",
-   panel: {foot: ["Tab: rewrite", "Enter: ask"]}},
+   panel: {foot: ["Tab: rewrite", "Enter: ask", "Shift+Enter: keep"]}},
   {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.",
    before: "Team: ", comp: "running late, start without me",
    panel: {status: "Rewriting", busy: true, foot: ["Esc: stop"]}},
@@ -88,6 +88,10 @@ const STATES = [
    panel: {thread: [["You asked", "undo my last commit but keep the changes"]],
            rows: [["1", "git reset --soft HEAD~1"], ["2", "git reset --mixed HEAD~1"]], on: 0, mono: true,
            foot: ["↑↓: choose", "Enter: insert", "Esc: edit"]}},
+  {id: "dropped", title: "Esc dropped something", note: "Never silently: a drop or a clear says so, briefly, with the key that brings it back.",
+   before: "Hi Sam, ", toast: "dropped"},
+  {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: it was held. A pill says what waits; it takes no keys until Shift+Esc opens it.",
+   before: "Hi Sam, ", toast: "returned"},
   {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.",
    before: "Thanks for the review — I'll", toast: "compose"},
   {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.",
@@ -95,7 +99,7 @@ const STATES = [
 ];
 
 // Key names: the platform's own (a skin token). macOS menus show glyphs, without boxes.
-const KEYS = {macos: {Enter: "↩", Esc: "⎋", Tab: "⇥", Shift: "⇧"}};
+const KEYS = {macos: {Enter: "↩", Esc: "esc", Tab: "⇥", Shift: "⇧", "Shift+Enter": "⇧↩", "Shift+Esc": "⇧esc"}};
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, className, text) => {
@@ -145,10 +149,14 @@ function frame(skin, state) {
   }
   text.append(line);
   if (state.panel) text.append(Kit.panel(described(state.panel), KEYS[skin] || {}));
-  if (state.toast) {  // Composition.toast(): a panel with only a footer
-    const compose = state.toast === "compose";
-    text.append(Kit.toast({tile: compose ? "ai" : "cd", status: compose ? "Compose" : "Continue",
-                           foot: [["Shift", compose ? "continue" : "compose"]]}, KEYS[skin] || {}));
+  if (state.toast) {  // a panel with only a footer: Composition.toast(), dropped_toast(), returned()
+    const toasts = {
+      compose: {tile: "ai", status: "Compose", foot: [["Shift", "continue"]]},
+      continue: {tile: "cd", status: "Continue", foot: [["Shift", "compose"]]},
+      dropped: {tile: "ai", status: "Dropped", foot: [["Shift+Esc", "restore"]]},
+      returned: {tile: "ai", status: "3 drafts ready", foot: [["Shift+Esc", "open"]]},
+    };
+    text.append(Kit.toast(toasts[state.toast], KEYS[skin] || {}));
   }
   host.append(bar, text);
   return host;

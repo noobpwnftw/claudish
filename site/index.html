@@ -8,6 +8,7 @@
   <link rel="icon" href="favicon.png">
   <script src="theme.js"></script>
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="kit.css">
   <script src="site.js" defer></script>
 </head>
 <body>
@@ -36,17 +37,19 @@
           </div>
           <p class="note">The first release is coming; until then, install from source. <a href="https://github.com/noobpwnftw/claudish/releases">Releases ↗</a></p>
         </div>
-        <figure class="ime" aria-label="Example: an instruction typed into any app, with three readings to choose from">
-          <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret">tell the team the deploy slips to Friday<span class="cursor"></span></span></div>
-          <div class="ime-panel">
-            <div class="ime-status">instruct · 1–3: pick one · Enter: the first · Esc: back to the instruction</div>
-            <ol>
-              <li><kbd>1</kbd> Heads-up: the deploy moves to Friday—more soon.</li>
-              <li><kbd>2</kbd> Quick update—we're shipping Friday instead.</li>
-              <li><kbd>3</kbd> Deploy slips to Friday. Details to follow.</li>
-            </ol>
+        <figure class="ime" aria-label="Example: an instruction sent from any app, with three readings to choose from">
+          <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret"><span class="cursor"></span></span></div>
+          <!-- The kit's own markup (claudish/web/kit.css): the panel exactly as cd_AI draws it. -->
+          <div class="ime-panel kit">
+            <div class="k-panel takes">
+              <div class="k-head k-turn"><span class="k-label">You asked</span><span class="k-body">tell the team the deploy slips to Friday</span></div>
+              <div class="k-row on"><span class="k-text">Heads-up: the deploy moves to Friday—more soon.</span><span class="k-take"><span class="k-cap">Enter</span></span></div>
+              <div class="k-row"><span class="k-text">Quick update—we're shipping Friday instead.</span></div>
+              <div class="k-row"><span class="k-text">Deploy slips to Friday. Details to follow.</span></div>
+              <div class="k-foot"><span class="k-tile ai">AI</span><span class="k-hint"><span class="k-cap">↑↓</span>choose</span><span class="k-hint"><span class="k-cap">Enter</span>insert</span><span class="k-hint"><span class="k-cap">Esc</span>edit</span></div>
+            </div>
           </div>
-          <figcaption>Any text box: chat, mail, an editor, a terminal. Pick with a number.</figcaption>
+          <figcaption>Any text box: chat, mail, an editor, a terminal. Enter takes the highlighted one.</figcaption>
         </figure>
       </section>
 
@@ -55,7 +58,7 @@
         <h2 id="layers">Continue, or compose<span class="dash">—</span>Shift switches.</h2>
         <div class="cards">
           <article class="card"><div class="card-body"><h3>Continue</h3><p>What cd_AI starts in: you type as usual; pause, and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Instruct</h3><p>In compose, type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to pick from</span><kbd class="io-key">1–3</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Instruct</h3><p>In compose, type what you want; Enter sends it; the draft lands at the caret. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to choose from</span><kbd class="io-key">Enter</kbd></div></div></article>
           <article class="card"><div class="card-body"><h3>Rewrite</h3><p>In compose, Tab: ordinary English becomes unnecessarily polished prose.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
@@ -66,7 +69,7 @@
         <p class="body">No new app and no copying into a chat window: the help comes to the box you are already typing in, and nothing happens until you press a key.</p>
         <div class="cards">
           <article class="card"><div class="card-body"><h3>Fix it, keep it yours</h3><p>With the fix tone, Tab corrects spelling and grammar and keeps your words: for dyslexia, a second language, or a hurried day.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">pump 3 tripped again, no injuries</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; pick a draft, or press Esc for your own words back.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">We were two bags short today. Could you credit them by Tuesday?</span><kbd class="io-key">1–3</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; choose a draft, or press Esc for your own words back.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">We were two bags short today. Could you credit them by Tuesday?</span><kbd class="io-key">Enter</kbd></div></div></article>
           <article class="card"><div class="card-body"><h3>Ask what it means</h3><p>Ask about what is in front of you. The answer is shown to read, and goes into your text only if you say so.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">what does this error mean</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">It can't find a piece it needs to build.</span><kbd class="io-key">Esc</kbd></div></div></article>
         </div>
         <ul class="features everyone">
@@ -85,12 +88,13 @@
         </div>
         <table class="keys">
           <tr><td><kbd>Shift</kbd></td><td>tap to switch: continue or compose</td></tr>
-          <tr><td><kbd>Tab</kbd></td><td>take the suggestion; in compose, rewrite, then keep</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>in compose, do it as an instruction</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>take the suggestion; in compose, show a rewrite, then Tab again puts it in</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>in compose, send it as an instruction; then insert the highlighted draft</td></tr>
           <tr><td><kbd>Shift</kbd><span class="plus">+</span><kbd>Enter</kbd></td><td>in compose, keep it as it is</td></tr>
-          <tr><td><kbd>1–9</kbd></td><td>pick a reading, or answer an agent's question</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>choose a draft or an answer; Enter takes it</td></tr>
           <tr><td><kbd>F8</kbd></td><td>with an instruction, also send this window</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>one step back, until what you composed is gone</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>one step back: what you typed, then edit, then drop</td></tr>
+          <tr><td><kbd>Shift</kbd><span class="plus">+</span><kbd>Esc</kbd></td><td>bring back what Esc dropped</td></tr>
         </table>
       </section>
 
@@ -120,7 +124,7 @@
 4. Run `python -m claudish setup --yes`. It downloads a verified llama.cpp build and a 491 MB model, writes a config, registers the input method, and starts Claudish at login.
 5. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
-7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: tapping Shift switches between continue and compose; Tab takes a suggestion (in compose: Tab rewrites my words in place, Tab again keeps it); in compose, Enter sends my words as an instruction and Shift+Enter keeps them as they are; Esc steps back.
+7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: tapping Shift switches between continue and compose; Tab takes a suggestion (in compose: Tab shows a rewrite of my words, Tab again puts it in); in compose, Enter sends my words as an instruction and Shift+Enter keeps them as they are; Esc steps back.
 
 Make no mistakes.</pre>
         </div>

@@ -55,12 +55,12 @@ Or step by step:
 | Key | Does |
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
-| Tab | continue: take the rest of the sentence (with nothing offered, Tab is the app's); compose: rewrite in place, Tab again keeps it |
-| Enter | compose: send your words as an instruction, Enter again inserts the first draft; with nothing composed, the app's |
+| Tab | continue: take the rest of the sentence (with nothing offered, Tab is the app's); compose: show a rewrite, Tab again puts it in |
+| Enter | compose: send your words as an instruction (they leave your text; the panel shows them), Enter again inserts the highlighted draft; with nothing composed, the app's |
 | Shift+Enter | compose: keep your words as typed |
-| Esc | one step back: the rewrite or the drafts → your words → dropped |
+| ↑ ↓ | choose a draft or an answer; Enter takes it (choices are not numbered: digits are text) |
+| Esc | one step back: what you typed → edit (your instruction back at the caret) → dropped; Shift+Esc brings it back |
 | F8 | in compose, with an instruction: also send a picture of the window you are typing in |
-| 1–3 | when an instruction comes back as a numbered list, insert that reading; when an agent asks, answer |
 
 ## Start the model and service
 

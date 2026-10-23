@@ -6,19 +6,22 @@ Typing in detail, the browser demos, and terminals.
 
 | Key/action | Result |
 | --- | --- |
-| Type | Accumulate the phrase in an editable composition buffer |
-| Pause for 180 ms | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
-| Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second: Shift with another key (a capital, Shift+Enter) or held (Shift+click) is not one. Leaving compose keeps what you see, as it is. GNOME's top bar shows C or AI; Windows' taskbar indicator shows the mode icon; Linux also shows it in the status line, Windows in a notice |
-| Continue mode | Typing goes straight into the app (the model sees it as context); after a pause the rest of the sentence appears after the caret: greyed on Linux, as grey marked text on macOS (apps that draw marked text themselves may show it underlined), and in the candidate window on Windows. Tab takes it, Esc dismisses it, and typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered. A focus change only ever drops the suggestion: IBus discards commits made during focus-out, so a suggestion inside the composition would either lose your words or commit text you never accepted |
-| Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app, so the space after a word is never part of what you rewrite or ask |
-| Enter (compose) | Send what you composed as an instruction; Enter again (or Tab) inserts the result. With nothing composed, Enter is the app's (a newline) |
+| Type | Continue: straight into the app. Compose: your words gather as the composition (underlined) |
+| Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
+| Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second, after a pause: Shift with another key (a capital, Shift+Enter), held (Shift+click), or pressed right after another key (rolled typing) is not one. Leaving compose keeps your words as typed. A brief pill at the caret says the mode and where Shift goes next; GNOME's top bar, Windows' taskbar, and the macOS menu bar show it all along |
+| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in grey, drawn by cd_AI (never typed). Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
+| Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
+| Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
+| Tab (compose) | Ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again (or Enter) puts it in; Esc or typing on keeps your words. A focus change never inserts it: only Tab does |
+| Enter (compose) | Send what you composed as an instruction. It leaves your text: the panel shows "You asked" and what is happening, then the drafts (the first highlighted); Enter inserts the highlighted one. Enter right after the drafts appear waits (a double-tapped Enter never inserts a draft you did not read). With nothing composed, Enter is the app's (a newline) |
+| ↑ ↓ | Move the highlight through the drafts or a question's choices (no wrap). Choices are not numbered: digits are text, as Space is. An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
+| Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
 | Shift+Enter (compose) | Keep what you composed as it is, and stay in compose |
-| Esc (compose) | One step back: the rewrite shown → your words; drafts showing (or an answer pending) → your words again, to refine and send as a follow-up in the same conversation; just your words → dropped (nothing is inserted; a selection taken from the app goes back instead) |
-| 1–9 (instruct list) | An instruction offers up to three readings as a numbered list, as in a CJK input method; a digit inserts that one, Enter or Tab the first. Enter right after the list appears waits (a double-tapped Enter never inserts a draft you did not read), and a space keeps the list (a letter refines the instruction). While you type, digits are text. A profile sets the count per mode: `"modes": {"instruct": {"candidates": 1}}` |
-| Typing while an agent asks | Composes a reply instead of a number; Enter sends it (the agent hears it as your reason), Backspace edits it, Esc clears it, and digits in it are text |
+| Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (nothing is inserted; a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "Dropped · Shift+Esc restore" |
+| Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
+| Switching windows | Your own words go in as typed; a rewrite never does (only Tab); a sent instruction's exchange is held for that text box, and a reply you were typing is not inserted. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
 | F8 (compose) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
-| Tab (compose) | Ask for the rewrite; it takes your words' place as it arrives, as a CJK input method converts what you typed ("rewriting…" while it comes). Tab again (or Enter, or typing on) keeps it; Esc or Backspace brings your words back. A rewrite has no list |
-| Tab with a selection (compose) | With nothing composed, rewrite the selected text in place (CJK input methods call this reconversion): it leaves the text while it is rewritten, Tab keeps the rewrite, Esc twice puts your words back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
+| Tab with a selection (compose) | With nothing composed, the selected text becomes your words, and Tab asks for its rewrite as above; Esc twice puts it back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
 | Backspace | Edit the composition and invalidate its candidate |
 
 Where you want no suggestions at all, switch that app to your usual keyboard;
@@ -45,10 +48,10 @@ rewrite is never offered; Enter/Escape still commits your wording.
 
 With the launcher running, open **http://127.0.0.1:18765**. The demo is the
 input method, drawn in the page: one editor with an input-source badge, the
-composition at the caret, and a candidate window, following the same rules as the
-desktop adapters. It opens in compose, the pitch (Tab rewrites, Enter does it as
-an instruction and offers drafts to pick with 1–3, Shift+Enter keeps your
-words); a Shift tap or the badge switches to continue (keys go straight in;
+composition at the caret, and the panel, drawn with the same kit as the design lab
+(`/design.html`) and the desktop adapters. It opens in compose, the pitch (Tab
+offers a rewrite, Enter sends it as an instruction and offers drafts to choose
+with ↑↓ and Enter, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
 pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default; a choice lasts only for the current page,
@@ -151,7 +154,8 @@ Claude Code in VS Code.
   vision model) or from MCP servers you configure for Claudish; Claudish does not
   read Claude Code's own configuration or connection.
 - **Permissions**: if a tool you configured needs one (fetching a site, say), it
-  asks in the candidate list: 1 allow, 2 deny.
+  asks in the panel: what would run, in full; nothing is highlighted, ↓ then Enter
+  chooses (Deny comes first).
 
 It is not a replacement for the extension: the conversation with the agent stays
 in the agent's own window.

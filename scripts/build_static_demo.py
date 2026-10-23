@@ -72,6 +72,7 @@ def build_site(out):
                                   encoding="utf-8")
     shutil.copy(site / "site.js", out / "site.js")
     shutil.copy(site / "favicon.png", out / "favicon.png")
+    shutil.copy(web / "kit.css", out / "kit.css")  # the hero draws the panel with the kit itself
     shutil.copy(web / "theme.js", out / "theme.js")
     page = (site / "index.html").read_text(encoding="utf-8")
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n'

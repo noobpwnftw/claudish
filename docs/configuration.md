@@ -266,7 +266,8 @@ profile:
 With `"session_command"` in a profile, a sent instruction (Enter in compose)
 runs an agent instead of a single model call. Claudish is the agent's host: its
 progress and partial draft show in the input method's status line, its
-permission questions become the candidate list, the questions it asks you
+permission questions show in the panel (what would run, in full; Deny first, nothing
+highlighted), the questions it asks you
 itself (Claude Code's AskUserQuestion) are shown as is with its options to
 pick, and its final answer is a candidate like any other. For Claude Code:
 

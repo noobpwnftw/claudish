@@ -10,7 +10,7 @@ const PREEDIT = $("preedit"), CARET = $("caret"), GHOST = $("ghost"), PLACEHOLDE
 const MAX = 512;
 const HINTS = {
   continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey; Tab takes it. Tap Shift to compose.",
-  compose: "Type, or select some text. Tab rewrites it in place; Enter does it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
+  compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Enter sends it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
 };
 const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
 const ENTER_GUARD_MS = 300;  // Enter this soon after drafts appear is a double tap: it waits
@@ -47,7 +47,7 @@ const state = {
   candidate: "",
   candidates: [],
   offeredAt: 0,  // when the latest answer arrived (performance.now)
-  converted: false,  // compose: the rewrite shows in place of your words
+  converted: false,  // compose: the rewrite shows in the panel (your words stay the composition)
   adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
   failed: false,
@@ -83,7 +83,8 @@ const composing = () => !live() && Boolean(state.text);
 // Sent: the instruction has left your text (docs/design/visual.md); the composition is only ever
 // what you are typing now.
 const sent = () => state.asked === "instruct" && (state.working || state.failed || Boolean(state.candidate));
-const shown = () => sent() ? state.reply : state.converted ? state.candidate : state.text;
+// A rewrite waits in the panel: only Tab puts the model's words in your text.
+const shown = () => sent() ? state.reply : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.asked === "instruct" && state.candidates.length > 1;
@@ -140,7 +141,7 @@ async function ask(revision) {
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
     state.offeredAt = performance.now();
     state.hosted = hosted && data.backend !== "browser" ? (data.backend === "claude" ? "Claude" : "a hosted model") : "";
-    if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: in place as it arrives
+    if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
@@ -178,7 +179,7 @@ function panel() {
     return {...shown, rows: readings.map((text, i) => ({key: String(i + 1), text, legend: null})), on: state.highlight, mark,
             foot: [...(readings.length > 1 ? [[`1–${readings.length}`, "pick"]] : []), ["Esc", "edit"]], ...typing};
   }
-  if (state.converted) return {...shown, label: "Your words", body: state.text, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
+  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark, foot: [["Tab", "keep"], ["Esc", "undo"]]};
   if (state.editing || hintDue() === 0)
     return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], ...(state.editing ? [["Esc", "drop"]] : [])]};
   return null;
@@ -246,11 +247,7 @@ function key(name, shift = false) {
     return true;
   }
   if (live()) return liveKey(name);
-  // A digit picks only with nothing typed and in range; otherwise it is text.
-  if (choosing() && !state.reply && /^[1-9]$/.test(name) && Number(name) <= state.candidates.length) {
-    commit(state.candidates[Number(name) - 1]); change(""); changed();
-    return true;
-  }
+  // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Enter takes.
   if ((name === "ArrowUp" || name === "ArrowDown") && choosing() && !state.reply) {  // ↑ and ↓ move the highlight
     const count = state.candidates.length;
     state.highlight = (state.highlight + (name === "ArrowUp" ? count - 1 : 1)) % count;
@@ -324,7 +321,7 @@ function key(name, shift = false) {
     if (selected() && !state.text) removeSelection();  // typing replaces the selection
     // Nothing composed: only a letter or a digit starts a composition; spaces and punctuation are the app's.
     if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
-    if (state.converted) { commit(state.candidate); change(""); }  // typing on keeps the rewrite
+    // A rewrite showing in the panel: typing on goes on with your words (the rewrite goes).
     if (state.text.length >= MAX) { commit(state.text); change(""); }
     // Sent: what you type is your next words, at the caret; a Space with nothing typed does nothing.
     if (sent()) { if (name !== " " || state.reply) state.reply += name; render(); return true; }
@@ -429,7 +426,7 @@ function showMode() {
 }
 function setStatus(text) { $("status").textContent = text; }
 function flash(name) {
-  const strip = document.querySelector(`[data-key="${/^[1-9]$/.test(name) ? "1" : name}"]`);
+  const strip = document.querySelector(`[data-key="${name === "ArrowUp" ? "ArrowDown" : name}"]`);
   if (!strip) return;
   strip.classList.add("pressed");
   setTimeout(() => strip.classList.remove("pressed"), 220);
@@ -449,7 +446,7 @@ sink.addEventListener("keydown", (event) => {
   if (event.key === "Shift") { if (!event.repeat) shiftDownAt = performance.now(); return; }
   shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
   const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
-    .includes(event.key) || (choosing() && (/^[1-9]$/.test(event.key) || event.key === "ArrowUp" || event.key === "ArrowDown"));
+    .includes(event.key) || (choosing() && (event.key === "ArrowUp" || event.key === "ArrowDown"));
   if (named) {
     if (event.key === "Enter" && event.shiftKey && !composing()) return;  // a newline, as the app's
     stopTyping();
@@ -501,8 +498,7 @@ function paste(text) {
     // Rewrite and instruct: pasted words join the composition, to be rewritten (Tab) or sent
     // (Enter) like typed ones. The installed input method's counterpart is a selection.
     if (selected() && !state.text) removeSelection();
-    if (state.converted) { commit(state.candidate); change(""); }
-    change(state.text + text);
+    change(state.text + text);  // a rewrite showing goes; your words go on
     changed();
     return;
   }
