@@ -143,6 +143,7 @@ class ClaudishInputController(IMKInputController):
                     client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             elif "error" in data:
                 self.state.fail(revision, data["error"])
+        self.check_ghost()
         if self.state.panel() != self.drawn:  # an answer, a question, progress, or the pause for the keys
             self.show_panel()
 
@@ -219,8 +220,26 @@ class ClaudishInputController(IMKInputController):
         if not ghost or self.state.inside:  # text after the caret on its line: nothing to cover it with
             OVERLAY.hide()
             return
-        OVERLAY.show(self.caret(client), ghost)
+        self.ghost_at = self.caret(client)
+        self.ghost_checked = time.monotonic()
+        OVERLAY.show(self.ghost_at, ghost)
         trace("ghost overlay", len(ghost))
+
+    @objc.python_method
+    def check_ghost(self):
+        """macOS tells an input method nothing when the caret moves without a key (a click, a
+        scroll, the window moving): while the suggestion shows, look at the caret a few times a
+        second, and when it moved (or the text box is gone) drop the suggestion: Tab must never
+        take one you no longer see."""
+        if not OVERLAY.visible() or time.monotonic() - getattr(self, "ghost_checked", 0) < 0.25:
+            return
+        self.ghost_checked = time.monotonic()
+        client = self.client()
+        if client is not None and self.caret(client) == getattr(self, "ghost_at", None):
+            return
+        OVERLAY.hide()
+        self.state.dismiss()
+        trace("ghost dropped: the caret moved")
 
     @objc.python_method
     def show_panel(self, client=None):
@@ -232,6 +251,7 @@ class ClaudishInputController(IMKInputController):
             return
         TOAST.hide()  # a panel replaces a toast at the caret
         PANEL.show(self.caret(client), spec, self.pick)
+        trace("panel", len(spec["rows"]), "rows", "lit" if spec.get("nudge") else "plain")  # no text
         self.drawn = spec
 
     @objc.python_method
@@ -380,12 +400,16 @@ class ClaudishInputController(IMKInputController):
                 client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             return
         if self.state.sent and not suggested:
-            # The app ends the composition (a click, a focus change): an instruction's exchange is
-            # held for this app, its work going on; a reply you were typing is never inserted.
-            self.state.leave(self.app(client))
+            # The app ends the composition (a click, a focus change): what it shows (your
+            # instruction, or a reply) goes in, as a CJK preedit does, and the exchange is held for
+            # this app, its work going on, offered when you come back.
+            words = self.state.leave(self.app(client))
             self.hide_panel()
             if client is not None:
-                client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+                if words:
+                    client.insertText_replacementRange_(words, (NSNotFound, 0))
+                else:
+                    client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             return
         # Your own words, never the model's unless you asked for them (a rewrite waits for Tab).
         text = self.state.commit(suggested)
@@ -463,7 +487,7 @@ class ClaudishInputController(IMKInputController):
                     before, after = self.around_caret(client)  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=self.app(client), look=self.state.look, before=before, after=after)
-                self.changed(client)  # it leaves your text: the panel says what you asked
+                self.changed(client)  # your instruction stays marked while its exchange is open
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.show_panel(client)
             elif action in ("accept", "keep"):

@@ -77,20 +77,24 @@ def tile(text, background, foreground, round_=False):
     return view
 
 
-def key_label(key, lit=False):
-    """A key's glyph, bare as in macOS menus, at the text's size and colour (round 5: the hint's
-    size was too faint to read); lit on a draft's row after Enter: the same glyph in the accent,
-    heavier, so it keeps its shape (the lab's macOS skin: --k-lit-*)."""
-    if lit:
-        return label(KEYS.get(key, key), SIZE, NSFontWeightBold, NSColor.controlAccentColor())
-    return label(KEYS.get(key, key), SIZE, NSFontWeightMedium)
-
-
-def ink_middle(field):
-    """How far above its baseline a label's glyphs are centred: ↩ ⇥ ↑↓ sit higher than letters,
-    so keys are centred by their ink, not their baseline."""
-    ink = field.attributedStringValue().boundingRectWithSize_options_((1000, 100), 1 << 3)  # device metrics
-    return ink.origin.y + ink.size.height / 2
+def key_label(key, lit=False, size=SMALL):
+    """A key's glyph, bare as in macOS menus: at its words' size (the system font draws ⇥ ↩ ↑↓
+    to sit on the text's baseline, as in a menu's shortcuts), heavier and at full contrast
+    (round 5: the hint's grey was too faint); lit on a draft's row after Enter: a keycap, as on
+    every platform (the accent's outline, tinted inside; kit.css .k-cap.lit)."""
+    glyph = label(KEYS.get(key, key), size, NSFontWeightSemibold)
+    if not lit:
+        return glyph
+    inside = glyph.fittingSize()
+    accent = NSColor.controlAccentColor()
+    outline = box(accent, 4)
+    outline.setFrame_(NSMakeRect(0, 0, inside.width + 10, inside.height + 2))
+    tint = box(accent.blendedColorWithFraction_ofColor_(0.8, NSColor.windowBackgroundColor()), 3)
+    tint.setFrame_(NSMakeRect(1, 1, inside.width + 8, inside.height))
+    outline.addSubview_(tint)
+    glyph.setFrame_(NSMakeRect(5, 1, inside.width, inside.height))
+    outline.addSubview_(glyph)
+    return outline
 
 
 class Row(NSView):
@@ -225,7 +229,6 @@ class Panel:
         """[(view, gap after)]: the mark, what is happening, each key with its verb, the tail, and a
         hosted model's name at the end."""
         items = []
-        self.keys = []  # the key glyphs, centred by their ink (place_foot)
         if spec["tile"] == "warn":  # a failure reads without colour: a mark, then why
             items.append((tile("!", NSColor.systemRedColor(), NSColor.whiteColor(), round_=True), 8))
         else:
@@ -242,9 +245,7 @@ class Panel:
         if spec["failed"]:
             items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), 12))
         for key, verb in spec["foot"]:
-            glyph = key_label(key)
-            self.keys.append(glyph)
-            items.append((glyph, KEY_GAP - 2))
+            items.append((key_label(key), KEY_GAP - 2))
             items.append((label(verb, SMALL, color=secondary), 12))
         if spec["tail"]:
             items.append((label(spec["tail"], SMALL, color=secondary), 12))
@@ -280,7 +281,7 @@ class Panel:
             row.addSubview_(bar)
             key = spec_take(self.spec)  # Tab takes a draft; Enter confirms a choice
             take = key_label(key, bool(self.spec.get("nudge")))
-            size = take.fittingSize()
+            size = take.frame().size if self.spec.get("nudge") else take.fittingSize()
             take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
             row.addSubview_(take)
         size = number.fittingSize()
@@ -291,10 +292,9 @@ class Panel:
         self.effect.addSubview_(row)
 
     def place_foot(self, items, y, h, width, pick):
-        # One line through the footer's middle: the words on one baseline, their lowercase centred
-        # on it; each key's glyphs centred on it by their ink (esc, ↩, ⇥ and ↑↓ have different
-        # heights); the tile and the spinner centred on it. Centring each frame, or one baseline
-        # for everything, left the keys at different heights.
+        # One line through the footer's middle: every key and word in one size on one baseline,
+        # their lowercase centred on it (as a menu's shortcuts sit with its titles), the tile and
+        # the spinner centred on it. Keys in a larger size never lined up with their words.
         middle = y + h / 2
         baseline = middle - NSFont.systemFontOfSize_(SMALL).xHeight() / 2
         x = PAD + ROW_X
@@ -302,10 +302,8 @@ class Panel:
             size = self.size(view)
             if index == len(items) - 1 and gap == 0 and index:  # the hosted mark, at the end
                 x = max(x, width - PAD - ROW_X - size.width)
-            if any(view is glyph for glyph in getattr(self, "keys", [])):
-                bottom = middle - ink_middle(view) + view.font().descender()  # descender is negative
-            elif isinstance(view, NSTextField):
-                bottom = baseline + view.font().descender()
+            if isinstance(view, NSTextField):
+                bottom = baseline + view.font().descender()  # descender is negative
             else:
                 bottom = middle - size.height / 2
             view.setFrame_(NSMakeRect(x, round(bottom), size.width, size.height))
@@ -346,3 +344,6 @@ class Overlay:
     def hide(self):
         if self.window is not None:
             self.window.orderOut_(None)
+
+    def visible(self):
+        return self.window is not None and bool(self.window.isVisible())

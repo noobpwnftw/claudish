@@ -52,7 +52,7 @@ const state = {
   error: "",     // why the last request failed, in plain words
   hosted: "",    // the hosted model behind the shown answer, said in the panel
   typedAt: 0,    // compose's keys show after a pause (performance.now)
-  reply: "",     // what you type once an instruction has left your text: your next words
+  reply: "",     // what you type once an instruction is sent: a reply, or your next words
   highlight: 0,  // the highlighted draft (↑ and ↓ move it)
   editing: false,  // the instruction came back to the caret (Esc edit): the next Esc drops it
   dropped: "",   // the last instruction Esc dropped: Shift+Esc brings it back
@@ -79,11 +79,10 @@ function change(text) {
 }
 const live = () => state.mode === "continue";
 const composing = () => !live() && Boolean(state.text);
-// Sent: the instruction has left your text (docs/design/visual.md); the composition is only ever
-// what you are typing now.
+// Sent: the instruction stays the composition while its exchange is open, and a reply takes its
+// place (docs/design/visual.md). A rewrite waits in the panel: only Tab puts the model's words in.
 const sent = () => state.asked === "instruct" && (state.working || state.failed || Boolean(state.candidate));
-// A rewrite waits in the panel: only Tab puts the model's words in your text.
-const shown = () => sent() ? state.reply : state.text;
+const shown = () => sent() ? state.reply || state.text : state.text;
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 const choosing = () => state.asked === "instruct" && state.candidates.length > 1;
@@ -172,7 +171,8 @@ function panel() {
   const shown = {thread: [], label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
                  status: null, busy: false, failed: null, mark: null, replying: false};
   const mark = state.hosted ? `from ${state.hosted} · hosted` : null;
-  if (sent()) shown.thread = [{label: "You asked", body: state.text}];  // it left your text
+  // Once the composition no longer shows your instruction (you type a reply), the panel says it.
+  if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
   const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
   if (state.working) return {...shown, status: state.asked === "rewrite" ? "Rewriting" : "Working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
@@ -316,7 +316,7 @@ function key(name, shift = false) {
   }
   if (name === "Backspace") {
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
-    if (sent()) { state.reply = state.reply.slice(0, -1); render(); return true; }  // the instruction is in the panel
+    if (sent()) { state.reply = state.reply.slice(0, -1); render(); return true; }  // a reply; the instruction stays
     if (state.text) change(state.text.slice(0, -1));
     else if (selected()) removeSelection();
     else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }

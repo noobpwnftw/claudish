@@ -114,17 +114,19 @@ class Composition:
     @property
     def sent(self):
         """An instruction's exchange is open: it was sent (working, failed, asking, or offering its
-        drafts). Its words have left your text: the panel shows them ("You asked")."""
+        drafts). Its words stay the composition until you type a reply."""
         return self.asked == "instruct" and bool(self.working or self.failed or self.question or self.candidate)
 
     @property
     def shown(self):
-        """What the composition shows, only ever what you are typing now: your words, or after Tab
-        the rewrite in their place (like a CJK input method converting what you typed); once an
-        instruction is sent, nothing, or what you type next (a reply)."""
+        """What the composition shows: your own words, never the model's (a rewrite waits in the
+        panel until Tab). A sent instruction stays the composition while its exchange is open, and
+        a reply you type takes its place: as in a CJK input method, choices never show without a
+        composition (owner, 2026-10-24: macOS apps pass an input method Return, Tab and the arrows
+        only while there is marked text, and not reliably; so on every platform)."""
         if self.sent:
-            return self.reply
-        return self.text  # a rewrite shows in the panel, never in your text: only Tab puts it there
+            return self.reply or self.text
+        return self.text
 
     def panel(self, now=None):
         """What the panel next to the caret shows, the same for every adapter and the demo
@@ -140,7 +142,10 @@ class Composition:
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
                  "replying": False, "take": "Enter", "nudge": False}
         question = self.question
-        if self.sent:  # the exchange so far: your instruction, then your answers (the latest)
+        if self.sent and (self.reply or self.answers):
+            # The exchange so far, once the composition no longer shows your instruction (you type
+            # a reply, or answered): your instruction, then your latest answer. While it shows it,
+            # the composition at the caret says what you asked.
             shown["thread"] = [{"label": "You asked", "body": self.text}] + (
                 [{"label": "You answered", "body": self.answers[-1]}] if self.answers else [])
         if question:
@@ -463,8 +468,8 @@ class Composition:
         """Add a typed character; False when the adapter should commit first (the composition is
         full, or a rewrite shows in place: typing on keeps it and starts afresh)."""
         if self.sent:
-            # The instruction has left your text: what you type now is at the caret, a reply (or
-            # your next words). A Space with nothing typed does nothing (an IME user's reflex to
+            # What you type now is a reply (or your next words): it takes the instruction's place
+            # in the composition. A Space with nothing typed does nothing (an IME user's reflex to
             # take a choice must not type into the document, nor pick).
             if char == " " and not self.reply:
                 return True
@@ -586,19 +591,20 @@ class Composition:
         return text
 
     def leave(self, app=None):
-        """Focus left the text box: what the app may keep. Your own words for the document go in;
-        the model's words never (a rewrite is not taken); words for the model never (a reply);
-        nothing is sent or approved. A sent instruction's exchange is held (its work goes on) and
-        offered again on return (returned)."""
+        """Focus left the text box: what the app may keep. What the composition shows goes in, as a
+        CJK input method commits its preedit: your own words (an instruction, a reply), never the
+        model's (a rewrite is not taken); nothing is sent or approved. A sent instruction's exchange
+        is held (its work goes on) and offered again on return (returned)."""
         if self.live:
             self.change("")
             return ""
         if self.sent:
+            words = self.shown
             held = copy.copy(self)
             held.held = None
             self.held, self.held_app, self.held_at = held, app, time.monotonic()
             self.change("")
-            return ""
+            return words
         words = self.text
         self.change("")
         return words

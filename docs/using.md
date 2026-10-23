@@ -13,7 +13,7 @@ Typing in detail, the browser demos, and terminals.
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With an answer to read: insert it (Esc dismisses it). A focus change never inserts any of it |
-| Enter (compose) | Send what you composed as an instruction. It leaves your text: the panel shows "You asked" and what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Enter never inserts the model's text, so a reflexive second Enter inserts nothing: the highlighted draft lights its Tab, the key that does. With nothing composed, Enter is the app's (a newline) |
+| Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Enter never inserts the model's text, so a reflexive second Enter inserts nothing: the highlighted draft lights its Tab, the key that does. With nothing composed, Enter is the app's (a newline) |
 | ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, as Space is. An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
 | Shift+Enter (compose) | Keep what you composed as it is, and stay in compose |
@@ -125,10 +125,9 @@ Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
 Terminal.app.
 
 **Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
-Esc only while there is marked text. A sent instruction leaves your text, so its
-drafts cannot be taken there with Tab (Tab completes in the shell); continue's
-suggestion cannot be taken with Tab either. Instructions still see the screen and
-their drafts come back. Per-app profiles will close this (ROADMAP G50).
+Esc only while there is marked text. An instruction stays marked while its drafts show,
+so they work there; continue's suggestion is not marked text, so Tab completes in the
+shell instead of taking it (ROADMAP G50).
 
 On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
 cases (23 need a fix, 7 are legitimate commands that failed for environmental

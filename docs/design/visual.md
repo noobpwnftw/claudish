@@ -39,7 +39,7 @@ gallery.sh`, `tests/desktop/windows/gallery.sh`, `tests/desktop/macos/gallery.sh
 | Compose, typing | your words with the platform's own composition underline; from the first key the panel's footer starts with the AI tile (compose is visible) and says Tab rewrite · Enter ask · Shift+Enter keep |
 | Compose, a rewrite | your words stay in your text; the rewrite waits in the panel ("Rewrite"); Tab puts it in, Esc or typing on keeps your words |
 | Waiting | the composition as it is; the footer says what is happening ("rewriting…") |
-| Drafts | under "You asked" (your instruction, which left your text): rows, the first highlighted (a neutral fill, an accent bar, the Tab key at its end); ↑↓ choose, Tab insert, Esc edit |
+| Drafts | your instruction still underlined at the caret: rows, the first highlighted (a neutral fill, an accent bar, the Tab key at its end); ↑↓ choose, Tab insert, Esc edit |
 | A question | the question as is (a small label for who asks), its choices as rows, not numbered; ↑↓ choose, Enter answers; an approval highlights nothing and lists Deny first |
 | An answer to read | the text as a short paragraph, wrapped to a readable width, with no rows; Tab insert, Esc dismiss, or type to ask more |
 | Progress (an agent) | one muted footer line: what it is doing |
@@ -95,9 +95,13 @@ an anti-AI writer, an accessibility consultant and an office manager
 
 **After an instruction is sent (round 3, the same reviewers):**
 
-- **The composition is only ever what you are typing now.** Enter sends the instruction and it
-  leaves your text; in the same frame the panel shows "You asked" and what is happening. Nothing
-  waits underlined in your document.
+- **A sent instruction stays the composition while its exchange is open** (owner, 2026-10-24,
+  reversing round 3's "it leaves your text"): as in a CJK input method, choices never show
+  without a composition. macOS apps pass an input method Return, Tab and the arrows only while
+  there is marked text, and not reliably (Terminal never, a Notes title sometimes); so on every
+  platform. A reply you type takes its place; a focus change commits what it shows (your own
+  words) and holds the exchange. "You asked" shows in the panel only once the composition no
+  longer says it (a reply, an answer): to be polled.
 - **The panel is the exchange, not a chat:** your earlier turns ("You asked", "You answered") as
   context, one line each, muted, at full size, with a neutral rule beside them; the current turn
   (a question, a command to approve, the drafts, an answer) at full contrast. Only the first "You

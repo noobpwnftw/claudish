@@ -442,10 +442,10 @@ class ClaudishTextService(TextService):
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
         if self.state.sent:
-            # An instruction sent leaves your text (it ends the composition on purpose): the
-            # exchange goes on. Forced (focus left): it is held for this box, offered on return.
-            if forced:
-                self.state.leave(getattr(self, "last_document", None))
+            # The app ended the composition while an exchange was open (a click, a focus change):
+            # TSF keeps what it showed (your own words, as a CJK preedit), and the exchange is held
+            # for this box, offered on return.
+            self.state.leave(getattr(self, "last_document", None))
             return
         self.state.change("")
         if self.worker:

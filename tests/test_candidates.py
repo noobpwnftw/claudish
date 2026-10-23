@@ -41,7 +41,7 @@ class CompositionTests(unittest.TestCase):
     def test_typing_while_it_works_keeps_the_work_and_a_stale_list_is_dropped(self):
         state = self.instruct()
         revision = state.revision
-        state.insert("y")  # your next words: the instruction has left your text, the work goes on
+        state.insert("y")  # your next words take the instruction's place in the composition; the work goes on
         self.assertEqual((state.shown, state.reply), ("y", "y"))
         self.assertTrue(state.offer(revision, "One.", ["Two."]))
         self.assertTrue(state.choosing and state.panel()["replying"])  # the drafts, without numbers
@@ -135,10 +135,10 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         state.offer(state.revision, "No, thank you.", ["Sadly, no."])
         self.assertEqual(state.enter(), "wait")  # right after the drafts appear
-        self.assertEqual(state.shown, "")  # sent: the instruction has left your text
+        self.assertEqual(state.shown, "decline politely")  # sent: it stays the composition while choices show
         state.insert(" ")
         self.assertTrue(state.choosing)  # a Space with nothing typed does nothing; the drafts stay
-        self.assertEqual(state.shown, "")
+        self.assertEqual(state.shown, "decline politely")  # and types nothing
         self.assertEqual(state.pick(2), "Sadly, no.")
         state.change("decline politely")
         state.submit()
@@ -198,7 +198,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((drafts["foot"], drafts["mark"]),
                          ([("↑↓", "choose"), ("Tab", "insert"), ("Esc", "edit")], "from Claude · hosted"))
         self.assertEqual(drafts["take"], "Tab")  # the highlighted row says Tab takes it
-        self.assertEqual(drafts["thread"], [{"label": "You asked", "body": "say hi"}])  # the instruction left your text
+        self.assertEqual(drafts["thread"], [])  # the instruction is still the composition: no "You asked"
         state.change("this is important")
         state.tab()
         state.offer(state.revision, "This is crucial.")
@@ -325,10 +325,10 @@ class ModeFeelTests(unittest.TestCase):
         state.mode = "compose"
         state.change("summarize this thread")
         state.submit()
-        self.assertEqual(state.shown, "")  # the instruction left your text
+        self.assertEqual(state.shown, "summarize this thread")  # it stays the composition until you type a reply
         state.ask(state.revision, {"id": "q", "label": "The model asks", "body": "All, or the last?",
                                    "choices": [{"label": "All"}, {"label": "The last"}]}, "s")
-        self.assertEqual(state.panel()["thread"], [{"label": "You asked", "body": "summarize this thread"}])
+        self.assertEqual(state.panel()["thread"], [])  # the composition at the caret says what you asked
         self.assertTrue(state.move(1) and state.panel()["on"] == 1 and state.chosen == 2)  # ↓
         state.insert("3")
         state.insert(" ")
@@ -359,7 +359,7 @@ class ModeFeelTests(unittest.TestCase):
         state.ask(sent, {"id": "q", "label": "The model asks", "body": "All?", "choices": [{"label": "Yes"}]}, "s")
         state.insert("o")
         state.insert("n")
-        self.assertEqual(state.leave("app"), "")  # nothing: the reply was for the model
+        self.assertEqual(state.leave("app"), "on")  # what the composition shows goes in, as a CJK preedit
         self.assertIsNone(state.returned("other app"))  # never offered in another app
         self.assertEqual(state.returned("app")["status"], "The model asks")  # a pill, taking no keys
         self.assertEqual((state.text, state.panel()), ("", None))

@@ -129,6 +129,9 @@ class Overlay:
     def hide(self):
         self.text = ""
 
+    def visible(self):
+        return bool(self.text)
+
 
 class Timer:
     @classmethod
@@ -370,7 +373,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))
-        self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "")  # it left your text
+        self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "x")  # it stays marked: the keys keep coming
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
@@ -467,6 +470,15 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.changed(client)
             # Nothing follows on the line: our overlay draws it grey after the caret, nothing is marked.
             self.assertEqual((self.module.OVERLAY.text, client.marked), ("on the parser.", ""))
+            # The caret moves without a key (a click): macOS says nothing, so the suggestion is
+            # dropped when the caret is seen elsewhere, and Tab cannot take it unseen.
+            fresh.ghost_checked = 0
+            fresh.caret = lambda _client: ((500.0, 300.0), (2.0, 17.0))
+            fresh.check_ghost()
+            self.assertEqual((self.module.OVERLAY.text, fresh.state.ghost), ("", ""))
+            del fresh.caret
+            fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
+            fresh.changed(client)
             # Text after the caret on its line: nothing covers it.
             client.text, client.mark_at = "Thanks for the review  today.", len("Thanks for the review ")
             fresh.changed(client)

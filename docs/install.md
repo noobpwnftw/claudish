@@ -56,7 +56,7 @@ Or step by step:
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
 | Tab | take the model's text: the rest of the sentence, a rewrite (shown first; Tab again puts it in), the highlighted draft (with nothing offered, Tab is the app's) |
-| Enter | compose: send your words as an instruction (they leave your text; the panel shows them), a reply, or the answer to a question; it never inserts the model's text; with nothing composed, the app's |
+| Enter | compose: send your words as an instruction (they stay underlined while the model works), a reply, or the answer to a question; it never inserts the model's text; with nothing composed, the app's |
 | Shift+Enter | compose: keep your words as typed |
 | ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text |
 | Esc | one step back: what you typed → edit (your instruction back at the caret) → dropped; Shift+Esc brings it back |

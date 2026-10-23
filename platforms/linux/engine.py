@@ -168,10 +168,10 @@ class ClaudishEngine(IBus.Engine):
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
 
     def focus_mode(self):
-        """What IBus does with the preedit when focus leaves: your own words for the document are
-        committed; a reply meant for the model (once an instruction is sent) is cleared. The
-        preedit never holds the model's words."""
-        return IBus.PreeditFocusMode.CLEAR if self.composition.sent else IBus.PreeditFocusMode.COMMIT
+        """What IBus does with the preedit when focus leaves: it is committed, as a CJK input
+        method's is. It only ever holds your own words (an instruction, a reply), never the
+        model's."""
+        return IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.around_caret()[1] if self.composition.live else ""
@@ -489,6 +489,10 @@ class ClaudishEngine(IBus.Engine):
 
     def do_reset(self):
         trace("reset")
+        if self.composition.sent:  # a click in the field: the exchange is held, as on a focus change
+            self.composition.leave(self.app)
+            self.render()
+            return
         self.composition.change("")
         self.changed()
         self.refresh_surrounding()

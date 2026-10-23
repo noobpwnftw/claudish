@@ -60,15 +60,18 @@ def save_frames(frames, path):
 def template(text, font_path, size):
     """A macOS input-source template, as the system's own "A": a filled rounded tile with the text
     cut out of it (clear), black elsewhere, so macOS tints it for the menu bar and the input menu.
-    `size` is the canvas height (16 at 1x); the tile is 14/16 of it, a little wider than tall, the
-    text centred on its ink at about two thirds of the tile's height."""
+    `size` is the canvas height (16 at 1x): the tile fills it, as the system's does, a third wider
+    than tall, the text's ink centred at 60% of the tile's height (the "A" letter's share)."""
     work = size * 16  # drawn large, reduced once
-    tall, wide = round(work * 14 / 16), round(work * 18 / 16)
+    tall, wide = work, round(work * 4 / 3)
     image = Image.new("L", (wide, work), 0)
     draw = ImageDraw.Draw(image)
-    top = (work - tall) // 2
-    draw.rounded_rectangle((0, top, wide - 1, top + tall - 1), radius=round(tall * 0.24), fill=255)
-    font = ImageFont.truetype(font_path, round(tall * 0.78))
+    top = 0
+    draw.rounded_rectangle((0, top, wide - 1, top + tall - 1), radius=round(tall * 0.22), fill=255)
+    points = round(tall * 0.78)
+    font = ImageFont.truetype(font_path, points)
+    left, ink_top, width, height = text_box(draw, text, font)
+    font = ImageFont.truetype(font_path, round(points * tall * 0.6 / height))  # ink 60% of the tile
     left, ink_top, width, height = text_box(draw, text, font)
     draw.text(((wide - width) / 2 - left, (work - height) / 2 - ink_top), text, font=font, fill=0)
     alpha = image.resize((round(wide / 16), size), Image.LANCZOS)

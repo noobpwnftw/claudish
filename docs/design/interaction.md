@@ -2,8 +2,8 @@
 
 Status: proposal, 2026-10-22. Owner direction; maintained in ROADMAP as G18–G19.
 **How it looks and the keys are now settled in [visual.md](visual.md)** (four review rounds,
-2026-10-24): choices are not numbered (↑ ↓); Tab takes the model's text (a draft, a rewrite) and Enter talks to the model (an instruction, an answer); a sent instruction leaves your text and the
-panel carries the exchange; a rewrite waits in the panel until Tab; a focus change commits only
+2026-10-24): choices are not numbered (↑ ↓); Tab takes the model's text (a draft, a rewrite) and Enter talks to the model (an instruction, an answer); a sent instruction stays the composition while its
+exchange is open (CJK-style); a rewrite waits in the panel until Tab; a focus change commits only
 your own words. Where this page differs, visual.md is current.
 
 ## Scope: an input method, not a chat app
