@@ -161,7 +161,7 @@ async function ask(revision) {
 
 // What the panel shows: the same description as claudish/composition.py's panel(), so the demo
 // looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
-// Enter on the model's text lights Tab, the key that takes it, until a key changes the panel.
+// Enter on a draft lights its row's Tab, the key that takes it, until a key changes the panel.
 const showing = () => JSON.stringify([state.text, state.reply, state.highlight, state.candidate, state.converted]);
 const nudge = () => state.nudged !== null && state.nudged === showing();
 
@@ -183,7 +183,7 @@ function panel() {
             nudge: nudge(), ...typing};
   }
   if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark,
-                               foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab", nudge: nudge()};
+                               foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab"};
   if (state.editing || hintDue() === 0)
     return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
   return null;
@@ -268,7 +268,8 @@ function key(name, shift = false) {
     }
     // Enter talks to the model: it never inserts the model's text (Tab does), so a reflexive second
     // Enter after sending inserts nothing.
-    if (state.converted || (state.asked === "instruct" && state.candidate)) { state.nudged = showing(); render(); return true; }
+    if (state.asked === "instruct" && state.candidate) { state.nudged = showing(); render(); return true; }  // the row lights Tab
+    if (state.converted) return true;  // the rewrite goes in with Tab, as its footer says
     if (!state.working) {  // the first Enter sends it as an instruction; the next inserts the result
       state.asked = "instruct"; state.working = true; state.failed = false; render(); ask(state.revision);
     }

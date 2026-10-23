@@ -60,7 +60,7 @@ the office manager, with the lab in every skin and the built Windows panel befor
 instruction. All seven: ship with changes. All seven expect to press Enter on drafts out of habit
 (confirm in a Japanese IME, Hanja selection in Korean, OK in Office) for a week or two, and all
 seven preferred a safe Enter to the old timing guard ("timing rules make an IME feel haunted"),
-provided Enter is not silent: adopted as the lit Tab key. Six found "Tab keep · Esc undo" on the
+provided Enter is not silent: adopted as the highlighted row's Tab, lit (the owner kept the footer unlit: "it's 3 keys not 30"). Six found "Tab keep · Esc undo" on the
 rewrite contradictory: now "Tab insert · Esc dismiss". The accessibility consultant measured
 keycap borders under 3:1: raised. Raised and open: the panel crossing the app window's edge,
 truncated "You asked", rebindable keys (Rime), screen-reader announcements, and drafts in the

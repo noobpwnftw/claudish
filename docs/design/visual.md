@@ -138,9 +138,10 @@ an anti-AI writer, an accessibility consultant and an office manager
   Enter after sending inserts nothing (the double-Enter guard is gone).
 - **Round 5 (seven reviewers: five CJK input-method users, accessibility, an office manager;
   2026-10-24)** agreed with the split; every one asked that Enter on the model's text not be a
-  silent dead key. **Enter on a draft, a rewrite or an answer lights Tab**, the key that takes it
-  (on the highlighted row and in the footer: the accent at 20% behind it, an accent border, the
-  text at full contrast), until a key changes the panel. No insert, no resend, no sound, no
+  silent dead key. **Enter on a draft lights the highlighted row's Tab**, the key that takes it
+  (the accent at 20% behind it, an accent border, the text at full contrast), until a key changes
+  the panel. The footer is not lit: it is three keys, not thirty (owner); a rewrite or an answer,
+  which have no row, light nothing. No insert, no resend, no sound, no
   animation. The rewrite's keys are **Tab insert · Esc dismiss** ("keep" meant your own words on
   Shift+Enter; "undo" undid nothing). Keycap borders are 3:1 or more on every skin; macOS draws its
   key glyphs at the text's size and colour. Open: keeping the panel inside the app's window

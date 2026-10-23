@@ -79,7 +79,7 @@ def tile(text, background, foreground, round_=False):
 
 def key_label(key, lit=False):
     """A key's glyph, at the text's size and colour (round 5: the hint's size was too faint to
-    read); lit after Enter on the model's text: the accent, tinted, behind it (kit.css .k-cap.lit)."""
+    read); lit on a draft's row after Enter: the accent, tinted, behind it (kit.css .k-cap.lit)."""
     glyph = label(KEYS.get(key, key), SIZE, NSFontWeightMedium)
     if not lit:
         return glyph
@@ -240,8 +240,7 @@ class Panel:
         if spec["failed"]:
             items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), 12))
         for key, verb in spec["foot"]:
-            lit = bool(spec.get("nudge")) and key == spec_take(spec)  # Enter on the model's text: the key that takes it
-            items.append((key_label(key, lit), KEY_GAP - 2))
+            items.append((key_label(key), KEY_GAP - 2))
             items.append((label(verb, SMALL, color=secondary), 12))
         if spec["tail"]:
             items.append((label(spec["tail"], SMALL, color=secondary), 12))

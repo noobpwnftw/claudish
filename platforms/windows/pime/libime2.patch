@@ -400,10 +400,10 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..d44915b
+index 0000000..c714dbb
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,485 @@
+@@ -0,0 +1,480 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -713,7 +713,7 @@ index 0000000..d44915b
 +                measure(take_, &w, &th);
 +                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;
 +                ID2D1SolidColorBrush* edge = nullptr;
-+                if (spec_.nudge && !colors.contrast)  // lit: the accent, tinted, behind the key (kit.css .k-cap.lit)
++                if (spec_.nudge && !colors.contrast)  // lit after Enter on a draft: the accent, tinted, behind it
 +                    fill(D2D1::RectF(x, y, x + capW, y + px(CAP_H)), px(4), mix(colors.surface, colors.accent, 20));
 +                target->CreateSolidColorBrush(color(colors.contrast || spec_.nudge ? colors.accent : colors.cap), &edge);
 +                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
@@ -794,15 +794,10 @@ index 0000000..d44915b
 +            break;
 +        }
 +        case FootItem::Cap: {
-+            // Lit after Enter on the model's text: the key that takes it (the accent, tinted, behind it).
-+            const bool lit = spec_.nudge && item.text == spec_.take;
 +            ID2D1SolidColorBrush* edge = nullptr;
-+            target->CreateSolidColorBrush(color(lit ? colors.accent : colors.cap), &edge);
++            target->CreateSolidColorBrush(color(colors.cap), &edge);
 +            D2D1_RECT_F r = D2D1::RectF(item.x + 0.5f, mid - px(CAP_H) / 2 + 0.5f, item.x + item.w - 0.5f,
 +                                        mid + px(CAP_H) / 2 - 0.5f);
-+            if (lit && !colors.contrast)
-+                fill(D2D1::RectF(item.x, mid - px(CAP_H) / 2, item.x + item.w, mid + px(CAP_H) / 2), px(4),
-+                     mix(colors.surface, colors.accent, 20));
 +            target->DrawRoundedRectangle(D2D1::RoundedRect(r, px(4), px(4)), edge);
 +            edge->Release();
 +            text(item.layout, item.x + px(CAP_X), mid - item.h / 2, brush);
@@ -891,7 +886,7 @@ index 0000000..d44915b
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..8ef8111
+index 0000000..7713aa2
 --- /dev/null
 +++ b/src/Panel.h
 @@ -0,0 +1,154 @@
@@ -938,7 +933,7 @@ index 0000000..8ef8111
 +    std::wstring failed;  // why a request failed
 +    std::wstring mark;    // a hosted model's name, at the footer's end
 +    std::wstring take = L"Enter";  // the highlighted row's key: Tab takes a draft, Enter confirms a choice
-+    bool nudge = false;   // Enter on the model's text: the key that takes it (take) is lit
++    bool nudge = false;   // Enter on a draft: the highlighted row's key (take) is lit
 +
 +    bool empty() const {
 +        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();

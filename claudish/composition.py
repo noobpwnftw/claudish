@@ -151,7 +151,7 @@ class Composition:
             approval = bool(question.get("permission"))
             if self.reading:  # an answer to read: Tab puts it in, Esc dismisses it
                 shown.update(label=label, body=body, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                             tail="or type to ask more", take="Tab", nudge=self.nudge)
+                             tail="or type to ask more", take="Tab")
                 return shown if not self.reply else dict(shown, replying=True, tail=None,
                                                           foot=[("Enter", "send reply"), ("Esc", "cancel reply")])
             shown.update(label=label, body=body, code=bool(question.get("code")),
@@ -177,7 +177,7 @@ class Composition:
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                         take="Tab", nudge=self.nudge,
+                         take="Tab",
                          mark=self.hosted and "from %s · hosted" % self.hosted)
         elif self.look or self.editing or self.hint_due(now) == 0:  # after F8 or Esc: said at once
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
@@ -232,9 +232,10 @@ class Composition:
 
     @property
     def nudge(self):
-        """Enter was pressed on the model's text (a draft, a rewrite, an answer to read), which only
-        Tab takes: the panel lights its Tab key (round 5: a key that does nothing must say why).
-        It lasts while the panel shows what it showed then; any key that changes it ends it."""
+        """Enter was pressed on the drafts, which only Tab takes: the highlighted row lights its Tab
+        key (round 5: a key that does nothing must say why; the footer's two or three keys need no
+        light, owner). It lasts while the panel shows what it showed then; any key that changes it
+        ends it."""
         return self.nudged is not None and self.nudged == self._showing()
 
     @property
@@ -332,7 +333,6 @@ class Composition:
             if self.reply.strip():
                 return "reply"
             if self.reading:
-                self.nudged = self._showing()
                 return "wait"  # an answer to read goes in with Tab, never with Enter
             return "choose" if self.asks or self.selected else "wait"
         if self.sent and self.reply.strip():
@@ -340,9 +340,11 @@ class Composition:
             # instruction in the same conversation.
             self.change(self.reply.strip())
             return "submit"
-        if self.converted or (self.asked == "instruct" and self.candidate):
+        if self.asked == "instruct" and self.candidate:
             self.nudged = self._showing()
-            return "wait"  # the model's text goes in with Tab: the panel lights it
+            return "wait"  # a draft goes in with Tab: its row lights Tab
+        if self.converted:
+            return "wait"  # the rewrite goes in with Tab, as its footer says
         if self.working:
             return "wait"
         return "submit"

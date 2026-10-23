@@ -206,7 +206,7 @@ async def check(args):
                 count = await choices.count()
                 second = await choices.nth(1).locator(".k-text").text_content()
                 await keys.press("Enter")  # Enter talks to the model: it never inserts a draft
-                await expect(window.locator(".k-cap.lit")).to_have_count(2)  # it lights Tab, on the row and the footer
+                await expect(window.locator(".k-take .k-cap.lit")).to_have_count(1)  # it lights the row's Tab
                 assert await committed_text() == "", "Enter inserted a draft"
                 await keys.press("ArrowDown")  # choices are not numbered: ↓ then Tab
                 await keys.press("Tab")

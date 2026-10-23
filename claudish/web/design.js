@@ -41,7 +41,7 @@ const STATES = [
                   ["2", "I'd love to join, but I won't be able to attend the offsite."],
                   ["3", "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out."]],
            on: 0, foot: ["↑↓: choose", "Tab: insert", "Esc: edit"], take: "Tab"}},
-  {id: "nudged", title: "Enter on a draft", note: "Enter talks to the model and never inserts its text, so here it lights Tab, the key that does, until your next key (round 5: a key that does nothing must say why). No insert, no resend, no sound.",
+  {id: "nudged", title: "Enter on a draft", note: "Enter talks to the model and never inserts its text, so here it lights the row's Tab, the key that does, until your next key (round 5: a key that does nothing must say why). The footer is not lit: it is three keys. No insert, no resend, no sound.",
    before: "Hi Sam, ",
    panel: {thread: [["You asked", "decline the offsite politely"]],
            rows: [["1", "Thank you for the invitation — I'm afraid I can't make the offsite this time."],

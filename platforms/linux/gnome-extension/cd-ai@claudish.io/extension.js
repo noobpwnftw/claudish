@@ -164,7 +164,7 @@ export default class CdAiExtension extends Extension {
             foot.add_child(label(panel.failed, 'cd-failed'));
         for (const [key, verb] of panel.foot) {
             const hint = new St.BoxLayout({style_class: 'cd-hint'});
-            hint.add_child(label(key, panel.nudge && key === (panel.take || 'Enter') ? 'cd-cap cd-lit' : 'cd-cap'));
+            hint.add_child(label(key, 'cd-cap'));
             hint.add_child(label(verb, 'cd-verb'));
             foot.add_child(hint);
         }
