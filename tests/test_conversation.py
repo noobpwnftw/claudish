@@ -283,3 +283,46 @@ class HelpersTests(unittest.TestCase):
             argv = popen.call_args.args[0]
             self.assertEqual(argv[:3], ["tmux", "new-window", "claude"])
             self.assertIn("/run/n.md", argv[3])  # one argument, no shell
+
+
+class ShowTests(unittest.TestCase):
+    """An answer to read: shown as is, inserted or dismissed."""
+
+    def drive(self, choice):
+        model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize: add tokenize.o."})]),
+                         answer("OK"))
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "what does this error mean")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            question = next(e for e in session.events if e["type"] == "question")
+            session.answer(question["id"], choice)
+            thread.join(5)
+        return question, session.events[-1]
+
+    def test_insert_puts_the_answer_at_the_caret(self):
+        question, result = self.drive(0)
+        self.assertEqual(question["text"], "The model says: The linker cannot find tokenize: add tokenize.o.")
+        self.assertEqual([c["label"] for c in question["choices"]], ["Insert it", "Dismiss"])
+        self.assertEqual(result["candidates"], ["The linker cannot find tokenize: add tokenize.o."])
+
+    def test_an_inserted_answer_still_fits_the_box(self):
+        model = Scripted(answer(calls=[("user__show", {"answer": "make clean\nmake"})]), answer("OK"))
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("t"), purpose="terminal",
+                                              screen="$ make\nerror\n$"), "what now")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            session.answer(next(e for e in session.events if e["type"] == "question")["id"], 0)
+            thread.join(5)
+        self.assertEqual(session.events[-1]["candidates"], ["make clean"])  # one line at a prompt
+
+    def test_dismiss_inserts_nothing(self):
+        _, result = self.drive(1)
+        self.assertEqual((result["text"], result["candidates"], result["done"]), ("", [], "read and dismissed"))

@@ -19,6 +19,7 @@ KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs
 TURN_TIMEOUT = 60
 # How a model's own question is shown, and the choice labels only Claudish's own questions use.
 MODEL_ASKS = "The model asks: "
+MODEL_SAYS = "The model says: "
 OWN_LABELS = {"allow", "deny", "allow for this conversation"}
 
 
@@ -102,15 +103,19 @@ class ModelDriver:
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
-        self.handed = None
+        self.handed = self.inserted = None
         result = rewriter.answer(
             "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
             approve=lambda *call: self.approve(session, *call),
             progress=lambda summary: session.emit("progress", text=summary), local=local, serial=False)
         if self.cancelled:
             return
+        if self.inserted:  # an answer you read and chose to insert
+            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"])
+            return
         if self.handed:
-            # The task went to a helper: nothing is inserted, and the instruction is done.
+            # The task went to a helper (or an answer was read): nothing is inserted, and the
+            # instruction is done.
             session.emit("result", text="", candidates=[], done=self.handed,
                          consulted=result["consulted"] + [self.handed])
             return
@@ -127,6 +132,12 @@ class ModelDriver:
                 "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
              "required": ["question"]},
             lambda arguments: self.ask_user(session, arguments))}
+        tools["user__show"] = (
+            "Show the user an answer to read instead of text for the text box, when they asked to understand "
+            "something (\"what does this error mean?\", \"what is the amount due?\"): a few sentences at most. "
+            "They may insert it or dismiss it.",
+            {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
+            lambda arguments: self.show(session, arguments, box))
         from . import handoff
         for title, helper in handoff.helpers(self.rewriter.helper).items():
             def hand_over(arguments, title=title, helper=helper):
@@ -156,6 +167,21 @@ class ModelDriver:
         session.emit("question", id=key, text=text, choices=choices)
         waiter[0].wait()
         return waiter[1] or (1, "cancelled")
+
+    def show(self, session, arguments, box):
+        """An answer to read, shown as is (marked as the model's): Insert puts it at the caret,
+        Dismiss ends the instruction with nothing inserted."""
+        text = str(arguments.get("answer") or "").strip()[:1000]
+        if not text:
+            return "Nothing to show."
+        choice, words = self.question(session, MODEL_SAYS + text,
+                                      [{"label": "Insert it", "legend": "at the caret"},
+                                       {"label": "Dismiss", "legend": "nothing is inserted"}])
+        if words is None and choice == 0:
+            self.inserted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
+        else:
+            self.handed = "read and dismissed"
+        return "Shown to the user. Reply with just: OK"
 
     def ask_user(self, session, arguments):
         """The model's own question, shown as is but marked as the model's: it can never look like

@@ -341,6 +341,10 @@ Several helpers can be named, each its own tool behind its own question, and a
                         "launcher": ["tmux", "new-window", "{command}"]}}}
 ```
 
+When you ask to understand something ("what does this error mean?"), the model
+can show an answer to read instead of text for the box, marked "The model
+says:", with Insert it or Dismiss.
+
 The model can also ask you itself, as a question with choices ("Did you mean
 git status?"); your answer goes back to it.
 

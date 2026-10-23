@@ -105,6 +105,12 @@ permission prompts are **ask** (Allow / Deny); its own questions
 going back keyed by the question (checked live with Claude Code 2.1.308 on
 haiku); and in a terminal its answer is one line, like any insert.
 
+An answer to read ("what does this error mean?") is **ask** too: the model's
+`user__show` puts it in front of you as is ("The model says: …") with Insert
+it or Dismiss; inserted, it still fits the box. Live on Qwen3 30B the model
+chose it for an explanation and a sum, asked about a typo, and wrote a thank-you
+directly.
+
 ## Order of work
 
 Each step keeps the gate green and the prompts measured (the fidelity eval and
