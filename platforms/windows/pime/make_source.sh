@@ -11,7 +11,7 @@ git -C "$work" fetch -q origin "$commit" 2>/dev/null || true
 git -C "$work" checkout -q -f "$commit"
 git -C "$work" clean -qfdx -e libIME2
 git -C "$work" submodule update -q --init libIME2
-git -C "$work/libIME2" checkout -q -f . && git -C "$work/libIME2" clean -qfdx
+git -C "$work/libIME2" reset -q && git -C "$work/libIME2" checkout -q -f . && git -C "$work/libIME2" clean -qfdx
 git -C "$work" apply "$here/pime.patch"
 git -C "$work/libIME2" apply "$here/libime2.patch"
 # Only the text service is rebuilt (the released launcher stays): drop the x86-only launcher block,
