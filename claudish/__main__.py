@@ -1,14 +1,11 @@
 import argparse
 import json
-import os
-import shlex
-import shutil
 import statistics
 import sys
 import time
 from urllib.error import HTTPError
 from .client import suggest
-from . import config, fix
+from . import config
 from .model import Rewriter
 from .server import make_server
 
@@ -40,11 +37,6 @@ def main():
     bench = commands.add_parser("bench")
     bench.add_argument("--runs", type=int, default=10)
     bench.add_argument("--url", default="http://127.0.0.1:18765")
-    fixer = commands.add_parser("fix", help="Suggest a fix for the last failed shell command")
-    fixer.add_argument("--config", metavar="FILE")
-    fixer.add_argument("--profile")
-    fixer.add_argument("--status", type=int, default=1, help="Exit status, with an explicit command")
-    fixer.add_argument("words", nargs="*", metavar="-- COMMAND", help="Fix this command instead of the last failure")
     setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "local")')
@@ -73,8 +65,6 @@ def main():
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
     init = commands.add_parser("init", help="Write a starter config with example profiles")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
-    hook = commands.add_parser("shell-hook", help='Print shell integration: eval "$(claudish shell-hook bash)"')
-    hook.add_argument("shell", choices=sorted(fix.HOOKS))
     # `service ... -- ARGS`: split before argparse, so no flag of ours can be swallowed into ARGS
     # (argparse.REMAINDER once took --dry-run and really installed a unit).
     argv, passthrough = sys.argv[1:], []
@@ -84,16 +74,6 @@ def main():
     if args.command == "textbox-mcp":
         from .textbox_mcp import main as textbox_mcp
         return textbox_mcp()
-    if args.command == "shell-hook":
-        if shutil.which("claudish"):
-            launcher = "claudish"
-        else:  # Running from a checkout: call this Python with the project on its path.
-            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            launcher = "PYTHONPATH=%s %s -m claudish" % (shlex.quote(root), shlex.quote(sys.executable))
-        print(fix.shell_hook(args.shell, launcher))
-        return
-    if args.command == "fix":
-        return fix_command(parser, args)
     if args.command == "setup":
         from . import setup as wizard
         sys.exit(wizard.run(args.profile, args.yes, args.dry_run, args.variant, args.skip))
@@ -184,37 +164,6 @@ def main():
                           "median_ms": statistics.median(latencies),
                           "p95_ms": latencies[min(len(latencies)-1, int(len(latencies)*0.95))],
                           "results": results}, ensure_ascii=False, indent=2))
-
-
-def fix_command(parser, args):
-    if args.words:
-        status, directory, command = args.status, os.getcwd(), " ".join(args.words)
-    else:
-        failure = fix.last_failure()
-        if failure is None:
-            sys.exit('no failed command recorded; add eval "$(claudish shell-hook bash)" to your shell rc')
-        status, directory, command = failure
-    try:
-        _, settings, _, _ = config.resolve(args.config, args.profile)
-    except (OSError, ValueError) as exc:
-        parser.error(str(exc))
-    api_key = os.environ.get(settings["api_key_env"]) if settings["api_key_env"] else None
-    try:
-        # The profile picks the backend; the fix template replaces its rewrite template and context.
-        rewriter = Rewriter(settings["backend"], settings["model_url"], 128, settings["claude_model"],
-                            settings["model"], api_key, settings["timeout"], (fix.SYSTEM, fix.examples()))
-        suggestion = fix.suggest(rewriter, command, status)
-    except ImportError:
-        sys.exit('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
-    except OSError as exc:
-        where = "the Anthropic API" if settings["backend"] == "claude" else settings["model_url"]
-        sys.exit("cannot reach the model at %s (%s); start one with `python scripts/start.py` "
-                 "or choose a profile" % (where, exc))
-    except Exception as exc:
-        sys.exit("fix failed: %s" % exc)
-    if suggestion is None:
-        sys.exit("no fix found for: " + command)
-    print(suggestion)
 
 
 if __name__ == "__main__":

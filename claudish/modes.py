@@ -22,6 +22,13 @@ INSTRUCT_SYSTEM = (
     "context for names, terms, and facts. Refer to people by name, or as they/them unless their "
     "pronouns are given. Output only the text itself, with no preamble or notes."
 )
+# An instruction typed at a terminal prompt (G35): the screen comes with it, and the answer goes
+# where commands are typed. The prose template's voice and examples do not apply there.
+TERMINAL_SYSTEM = (
+    "The user typed an instruction at a terminal prompt; the terminal screen shows what happened "
+    "before it. Reply with the command line that does what they want, ready to run, and nothing "
+    "else: no explanation, no quotes, no code fence."
+)
 INSTRUCT_EXAMPLES = [
     {"role": "user", "content": "decline the meeting politely, propose thursday"},
     {"role": "assistant", "content": "Thank you for the invitation—unfortunately, I can't make that time. "

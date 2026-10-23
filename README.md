@@ -65,7 +65,7 @@ Claudish is an experiment; the [roadmap](ROADMAP.md) says what is next.
 
 - [Install](docs/install.md): setup in detail, the model and service, each OS
 - [Configure](docs/configuration.md): models, profiles, context, MCP, tools, agent sessions
-- [Use](docs/using.md): typing in detail, the browser demos, `claudish fix`
+- [Use](docs/using.md): typing in detail, the browser demos, terminals
 - [Develop](docs/development.md): how it is built and tested; [contributing](CONTRIBUTING.md)
 
 MIT licensed. cd_AI is an independent project, not affiliated with or endorsed by Anthropic.

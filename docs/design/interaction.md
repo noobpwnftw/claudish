@@ -203,7 +203,7 @@ adapter ──/sessions──▶ service ──stdin/stdout (stream-json)──�
   and type digits otherwise.
 - **Terminal.** In a terminal, the result of an instruction is usually a
   command. It lands at the prompt like typed text, and running it is your
-  Enter, never the input method's. `claudish fix` is the first instance of this.
+  Enter, never the input method's (G35: an instruction in a terminal sees its screen).
 
 ### Safety
 
@@ -239,7 +239,7 @@ other app's assistant, Claudish sits underneath all of them and grows by
   `bundleIdentifier`; TSF gives the foreground process. Next comes the field
   as well: IBus content purpose and hints, the window title, the browser URL
   (through accessibility APIs or a small browser extension), and the terminal
-  working directory (through the `claudish fix` shell hook).
+  screen (through the accessibility APIs, G35).
 - **Bind:** profile `bindings` map app patterns to context providers. In time, a
   binding should also choose the default mode, such as instruct in a terminal
   prompt, and its own templates.
@@ -348,9 +348,14 @@ than terminals (chat and mail apps, Electron apps). Consequences:
   Code). Claudish solves the immediate problem or calls up a helper. So the
   prompt states facts (this is a terminal, here is its screen, the result
   lands at the prompt), not rules for the model's answer.
-- **Then `claudish fix` goes:** "fix" typed as an instruction in a terminal does
-  what the command did, with what is on screen as its context, and its shell
-  hook and own prompt retire. Its 30 cases become a test of instruct in terminals.
+- **`claudish fix` is gone** (2026-10-23): "fix" typed as an instruction in a
+  terminal does what the command did, with what is on screen as its context; its
+  shell hook and own prompt are retired, and its 30 cases test instruct in
+  terminals (`benchmarks/evaluate_terminal.py`). The first run showed the
+  framing matters more than the wording: with the screen far back in the system
+  prompt and the prose examples as earlier turns, every model "fixed" the
+  example draft (0/23, even 30B); with the screen in the turn, next to the
+  instruction, and a terminal template, 30B fixed 20/23.
 
 ## Onboarding (G19)
 

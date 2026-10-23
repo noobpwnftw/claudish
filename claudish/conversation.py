@@ -101,12 +101,18 @@ def describe(app, purpose):
 
 
 def terminal(screen):
-    """A terminal's last lines (G35), read when an instruction or a rewrite asked, and what it means
-    for the result: it lands at the prompt, where the user runs it."""
+    """What a terminal means for the result (G35): the text box is its prompt. The screen itself
+    goes in the turn, next to the instruction it explains (see in_terminal)."""
     if not screen:
         return ""
-    return ("\n\n<context name=\"the terminal screen, last lines\">\n%s\n</context>\n"
-            "What you write lands at the terminal prompt, where the user reads it and runs it." % screen)
+    return ("\n\nHere the text box is a terminal's command line: what you write lands at the prompt, "
+            "where the user reads it and runs it.")
+
+
+def in_terminal(screen, text):
+    """The turn for an instruction typed at a terminal prompt: what the terminal shows, then the
+    instruction (\"fix\" is about the screen, not about an earlier draft)."""
+    return "<terminal screen, last lines>\n%s\n</terminal screen>\n\n%s" % (screen, text)
 
 
 def clipped(before, after):
@@ -159,10 +165,15 @@ class ModelDriver:
             image, width, height = capture(rewriter.look_command)
             consulted.append("window picture (%d×%d)" % (width, height))
         context = window(self.before, self.after)
-        system = (spec["system"] + block + describe(self.app, self.purpose) + context
-                  + (AGENT_NOTE if context else "") + terminal(self.screen))
-        turn = [{"role": "user", "content": user_content(prompt, image, "openai")}]
-        messages = ([{"role": "system", "content": system}] + spec["examples"] + self.conversation.messages + turn)
+        from .modes import TERMINAL_SYSTEM
+        system = ((TERMINAL_SYSTEM if self.screen else spec["system"]) + block + describe(self.app, self.purpose)
+                  + context + (AGENT_NOTE if context else "") + terminal(self.screen))
+        # At a terminal prompt the screen goes with the instruction it explains, and the template's
+        # prose examples stay out.
+        said = in_terminal(self.screen, prompt) if self.screen else prompt
+        turn = [{"role": "user", "content": user_content(said, image, "openai")}]
+        examples = [] if self.screen else spec["examples"]
+        messages = ([{"role": "system", "content": system}] + examples + self.conversation.messages + turn)
         max_tokens = spec["max_tokens"] or rewriter.max_tokens
 
         def ask(messages, tools, **sampling):

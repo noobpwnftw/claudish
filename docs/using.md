@@ -1,6 +1,6 @@
 # Use
 
-Typing in detail, the browser demos, and `claudish fix`.
+Typing in detail, the browser demos, and terminals.
 
 ## Typing
 
@@ -91,37 +91,37 @@ multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
 A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 
-## Fix the last failed command
+## In a terminal
 
-A better [thefuck](https://github.com/nvbn/thefuck): `claudish fix` asks your
-configured model to correct the last failed shell command. Add the hook to your
-shell's rc file:
+A terminal prompt is a text box too. Type a command, and if it fails, tap
+Shift, type what you want ("fix", or "undo the last commit but keep the
+changes"), and press Enter: the instruction goes with the last lines of what the
+terminal shows, and the answer is a command line, placed at the prompt like
+typed text. Running it is your Enter. Nothing is installed in the shell.
 
-```sh
-eval "$(claudish shell-hook bash)"    # or zsh; from a checkout: python -m claudish shell-hook bash
-gti log --oneline                     # bash: gti: command not found
-fix                                   # bash: an editable "fix> git log --oneline"; zsh: placed in your prompt
-```
-
-The hook records only failed commands (never Ctrl+C), with their exit status, to
-a private file (mode 600) in `$XDG_RUNTIME_DIR`. Unlike thefuck, nothing is ever
-re-run to capture output. The model sees the command, its exit status, and, for
-an unknown program, the closest installed names by typo distance. The working
-directory is not sent. Nothing runs until you press Enter. `claudish fix -- git
-psuh` fixes a given command. The model comes from your default profile or
-`--profile`.
+cd_AI reads the screen through the accessibility APIs screen readers use (AT-SPI
+on Linux, UI Automation on Windows, the AX API on macOS), only when you press
+Tab or Enter in compose, never on continue's pauses (continue stays quiet in
+terminals), and never at a password prompt. On macOS the service's Python needs
+the Accessibility permission; on Linux the desktop's accessibility bus must run
+(GNOME and KDE run it). A profile's `"read_terminal": false` turns reading off.
+Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
+Terminal.app.
 
 On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
-cases on the Spark: 23 need a fix, and 7 are legitimate commands that failed
-for environmental reasons, which must be left alone.
+cases (23 need a fix, 7 are legitimate commands that failed for environmental
+reasons and should be left alone), "fix" at a terminal showing the failed
+command:
 
-| Model / Q4_K_M | Fixed | Wrong | No fix | Left alone | Harmful | Median |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Qwen2.5 0.5B Instruct | 15 / 23 | 3 | 5 | 6 / 7 | 1 | 38 ms |
-| Qwen2.5 1.5B Instruct | 22 / 23 | 0 | 1 | 7 / 7 | 0 | 54 ms |
+| Model / Q4_K_M | Fixed | Wrong | Left alone | Harmful | Median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Qwen3 30B-A3B Instruct 2507 | 20 / 23 | 3 | 3 / 7 | 4 | 1.0 s |
+| Qwen2.5 1.5B Instruct | 2 / 23 | 21 | 1 / 7 | 6 | 0.7 s |
 
-Reproduce with `python benchmarks/evaluate_fix.py --label NAME` against a model
-server. The bash hook is tested; the zsh hook has not been run yet.
+The cases carry no error output for the legitimate commands, so a model sees
+only the command and guesses; on a real screen it sees what went wrong.
+Reproduce with `python benchmarks/evaluate_terminal.py --label NAME` against a
+model server (the Spark, CPU llama.cpp b11822).
 
 ## Talking to a coding agent in its own chat box
 

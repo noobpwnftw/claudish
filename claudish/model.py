@@ -201,7 +201,9 @@ class Rewriter:
             context = block + describe(app, purpose) + place
             if place:
                 context += AGENT_NOTE + (" The textbox tools (read, search) see all of it." if textbox else "")
-            context += terminal(screen)
+            if screen:
+                from .conversation import in_terminal
+                context += terminal(screen) + "\n\n" + in_terminal(screen, "").rstrip()
             policy = self.toolbox.policy() if self.toolbox else {}
             return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy)
         from .conversation import ModelDriver
@@ -296,10 +298,16 @@ class Rewriter:
         # where the result goes.
         from .conversation import describe, terminal, window
         place = window("", after) if mode == "continue" else window(before, after)
-        system = spec["system"] + block + describe(app, purpose) + place + terminal(screen)
+        from .modes import TERMINAL_SYSTEM
+        base = TERMINAL_SYSTEM if screen and mode == "instruct" else spec["system"]
+        system = base + block + describe(app, purpose) + place + terminal(screen)
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         # What the model is sent: the text itself, or the mode's frame around it (continue).
         sent = spec["frame"].replace("{text}", text) if spec.get("frame") else text
+        if screen:
+            from .conversation import in_terminal
+            sent = in_terminal(screen, text)
+            examples = []  # the template's examples are prose; at a prompt they mislead
         count = spec.get("candidates") or 1
         if self.backend == "rules":
             # Deterministic stand-ins so the demo and tests work without a model.

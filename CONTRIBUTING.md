@@ -26,7 +26,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
   template. **`modes.py`** holds the invocation modes (rewrite, continue,
   instruct); **`context.py`** holds the context providers (file, command, MCP,
   caret text); **`config.py`** loads profiles.
-- **`claudish/fix.py`** is `claudish fix` and the shell hooks.
+- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs (G35).
 - **`platforms/linux/engine.py`** (IBus), **`platforms/windows/claudish/`**
   (PIME/TSF), and **`platforms/macos/controller.py`** (InputMethodKit) translate
   key events. Keep them thin: logic shared by all three belongs in
@@ -59,7 +59,7 @@ Platform coverage beyond Linux:
 Changes to templates or models are measured, not argued: `benchmarks/evaluate.py`
 for fidelity, `benchmarks/judge.py` (a larger local model, calibrated against
 hand labels) for meaning changes the mechanical checks miss, and
-`benchmarks/evaluate_fix.py` for `claudish fix`. Read the outputs, not only
+`benchmarks/evaluate_terminal.py` for instructions typed at a terminal prompt. Read the outputs, not only
 the scores.
 
 ## Common changes

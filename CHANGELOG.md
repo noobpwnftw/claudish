@@ -35,7 +35,6 @@ offers. English goes in. Em dashes come out.
   the window you are typing in (for vision models); read-only MCP tools the model
   may call before drafting; agent sessions whose permission questions arrive as
   choices in the candidate list (first slice).
-- **`claudish fix`:** the last failed shell command, corrected.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/): the
   model runs in the page; nothing you type leaves it.
 

@@ -53,10 +53,14 @@ class ModeTests(unittest.TestCase):
         rewriter = Rewriter(max_tokens=64)
         with patch("claudish.screen.read", return_value=screen) as read:
             _, payload = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal")
-            system = payload["messages"][0]["content"]
+            system, turn = payload["messages"][0]["content"], payload["messages"][-1]["content"]
             self.assertIn("The text box is a terminal in com.apple.Terminal.", system)
-            self.assertIn("zsh: command not found: gti", system)
-            self.assertIn("lands at the terminal prompt", system)
+            self.assertIn("lands at the prompt", system)
+            self.assertIn("the command line", system)  # the terminal template, not the prose one
+            # The screen goes with the instruction it explains; the prose examples stay out.
+            self.assertTrue(turn.startswith("<terminal screen") and turn.endswith("\n\nfix"))
+            self.assertIn("zsh: command not found: gti", turn)
+            self.assertEqual(len(payload["messages"]), 2)
             self.call(rewriter, "ls -la ", "continue", app="com.apple.Terminal")
             self.assertEqual(read.call_count, 1)  # continue's pauses never read the screen
             _, payload = self.call(rewriter, "fix", "instruct", app="kate")  # not a terminal: never read
