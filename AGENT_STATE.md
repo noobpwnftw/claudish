@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-23 (later), `main` at `18e9877`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-23 (latest), `main` at `71993ad`. An interactive session on the Spark; no 24/7 runner.
 
 ## Where things stand
 
@@ -20,6 +20,17 @@ Checkpoint 2026-10-23 (later), `main` at `18e9877`. An interactive session on th
 - **Mode indicators:** IBus InputMode property (GNOME top bar C/AI, verified); PIME C/AI icon
   (taskbar screenshot verified); macOS one input source "cd_AI" with a template cd.tiff icon
   (multi-mode sources didn't show for an unsigned bundle; reverted on the owner's suggestion).
+
+## Architecture (owner's direction: "an universal entrypoint to all AIs at caret")
+
+- docs/design/architecture.md, done (G43): every request = the text box (claudish/turn.py `Box`:
+  kind, app, text around the caret, observations, constraints) + what the user did (mode) + what is
+  available (tools); one loop `Rewriter.answer` for /suggest and sessions; the model answers with
+  complete / replace / insert / ask (`user__ask`); helpers are tools behind a question (G39); a
+  turn whose task went to a helper ends as `done`. Bindings route an app to a profile (G38).
+- Measured: fidelity 38/41 unchanged; terminal set Qwen3 30B 20/23, Qwen 1.5B 7/23 (was 2/23).
+  Live on Qwen3 30B: handoff, "did you mean", clarification, and plain answers all as intended.
+- Owner works hands-off on this: think at the architecture level, never per-situation patches.
 
 ## Since the last checkpoint
 
