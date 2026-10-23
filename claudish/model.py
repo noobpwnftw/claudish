@@ -173,22 +173,33 @@ class Rewriter:
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
-    def route(self, app):
-        """The profile that answers in this app: a binding's "profile" (which AI answers where),
-        else this one. Routed profiles share this service's sessions and conversations."""
+    def route(self, app, mode=None):
+        """Which AI answers here: the app's binding may name a profile, and that profile may name
+        another one for this mode (a small model for continue, a strong one for instructions).
+        Routed profiles share this service's sessions, conversations, and recent requests."""
+        chosen = self
         for binding in self.bindings:
-            if binding.profile and binding.matches(app) and self.loader is not None:
-                if binding.profile not in self.routed:
-                    other = self.loader(binding.profile)
-                    other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
-                    other.url = getattr(self, "url", None)
-                    self.routed[binding.profile] = other
-                    if other.hosted and not self.hosted:
-                        # A local service sending one app's text to a hosted model: said out loud.
-                        print("Text typed in %s goes to profile %r, a hosted model." % (binding.pattern, binding.profile),
-                              flush=True)
-                return self.routed[binding.profile]
-        return self
+            if binding.profile and binding.matches(app):
+                chosen = self.load(binding.profile, "text typed in %s" % binding.pattern)
+                break
+        name = (chosen.modes.get(mode) or {}).get("profile") if mode else None
+        if name and name != getattr(chosen, "profile", None):
+            chosen = self.load(name, "%s requests" % mode)
+        return chosen
+
+    def load(self, name, what):
+        if name == getattr(self, "profile", None) or self.loader is None:
+            return self
+        if name not in self.routed:
+            other = self.loader(name)
+            other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
+            other.url = getattr(self, "url", None)
+            other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
+            self.routed[name] = other
+            if other.hosted and not self.hosted:
+                # A local service sending some text to a hosted model: said out loud.
+                print("%s goes to profile %r, a hosted model." % (what[0].upper() + what[1:], name), flush=True)
+        return self.routed[name]
 
     def sections(self, app=None):
         """The profile's context and the focused app's bindings (a supported text box): [(name, text)]."""

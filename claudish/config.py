@@ -86,9 +86,16 @@ def resolve(path=None, profile=None, overrides=None):
         prompt = load_prompt(prompt_path)
     modes = {}
     for mode, spec in (settings["modes"] or {}).items():
-        if not isinstance(spec, dict) or set(spec) - {"prompt", "max_tokens", "candidates"}:
-            raise ValueError('profile %r: mode %r takes only "prompt", "max_tokens", and "candidates"' % (name, mode))
+        if not isinstance(spec, dict) or set(spec) - {"prompt", "max_tokens", "candidates", "profile"}:
+            raise ValueError('profile %r: mode %r takes only "prompt", "max_tokens", "candidates", and "profile"'
+                             % (name, mode))
         override = {}
+        if spec.get("profile") is not None:
+            # Which AI answers this mode (a small model for continue, a strong one for instructions).
+            if not isinstance(spec["profile"], str) or (known and spec["profile"] not in known):
+                raise ValueError("profile %r: mode %r names profile %r, which is not in the config"
+                                 % (name, mode, spec["profile"]))
+            override["profile"] = spec["profile"]
         if spec.get("prompt"):
             mode_path = Path(spec["prompt"]).expanduser()
             override["system"], override["examples"] = load_prompt(mode_path if mode_path.is_absolute() else base / mode_path)
@@ -101,7 +108,7 @@ def resolve(path=None, profile=None, overrides=None):
                     and 1 <= spec["candidates"] <= 5):
                 raise ValueError("profile %r: mode %r candidates must be 1 to 5" % (name, mode))
             override["candidates"] = spec["candidates"]
-        if mode not in ("rewrite", "continue", "instruct") and "system" not in override:
+        if mode not in ("rewrite", "continue", "instruct") and "system" not in override and "profile" not in override:
             raise ValueError('profile %r: new mode %r needs a "prompt"' % (name, mode))
         modes[mode] = override
     settings["modes"] = modes

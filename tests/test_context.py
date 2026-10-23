@@ -286,3 +286,27 @@ class RoutingTests(unittest.TestCase):
             path = self.config(folder, [{"app": "slack*", "profile": "nope"}])
             with self.assertRaisesRegex(ValueError, "names profile 'nope'"):
                 config.resolve(path)
+
+
+class ModeRoutingTests(unittest.TestCase):
+    def test_a_mode_can_name_the_profile_that_answers_it(self):
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.json"
+            path.write_text(json.dumps({"profile": "main", "profiles": {
+                "main": {"backend": "rules", "modes": {"continue": {"profile": "tiny"}},
+                         "bindings": [{"app": "slack*", "profile": "chat"}]},
+                "tiny": {"backend": "rules", "tone": "plain"},
+                "chat": {"backend": "rules", "modes": {"instruct": {"profile": "strong"}}},
+                "strong": {"backend": "rules"}}}))
+            name, settings, prompt, context = config.resolve(path)
+            main = Rewriter.from_settings(settings, prompt, context, name)
+            main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
+            self.assertEqual(main.route("gedit", "continue").profile, "tiny")  # a small model at every pause
+            self.assertIs(main.route("gedit", "instruct"), main)
+            self.assertEqual(main.route("slack", "rewrite").profile, "chat")  # the app's profile
+            self.assertEqual(main.route("slack", "instruct").profile, "strong")  # and its choice for the mode
+            self.assertIs(main.route("slack", "instruct").sessions, main.sessions)
+            path.write_text(json.dumps({"profiles": {"main": {"backend": "rules", "modes": {"continue": {"profile": "nope"}}}}}))
+            with self.assertRaisesRegex(ValueError, "names profile 'nope'"):
+                config.resolve(path)

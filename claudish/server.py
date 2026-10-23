@@ -104,7 +104,8 @@ def make_server(rewriter, port=18765, token=None):
                     return self.reply(400, {"error": "look is a boolean"})
                 try:
                     purpose = checked_purpose(data.get("purpose"))
-                    session = rewriter.route(app).start_session(text, app, conversation, before, after, look, purpose)
+                    session = rewriter.route(app, "instruct").start_session(text, app, conversation, before, after,
+                                                                            look, purpose)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
                 except RuntimeError as exc:
@@ -246,7 +247,7 @@ def make_server(rewriter, port=18765, token=None):
                 # pictures come only from an input method.
                 return self.reply(403, {"error": "the service token is required"})
             try:
-                answerer = rewriter.route(app) if trusted else rewriter  # which AI answers in this app
+                answerer = rewriter.route(app, mode) if trusted else rewriter  # which AI answers here
                 result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})

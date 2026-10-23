@@ -77,9 +77,19 @@ the same file: its backend, tone, tools, and helper answer for that app.
   "agent": {"backend": "llama", "helper": ["claude", "{prompt}"]}}}
 ```
 
-The service's own profile (`claudish serve --profile`, or the file's
-`"profile"`) holds the bindings; other profiles are loaded when an app first
-needs them.
+A mode can name the profile that answers it, too: continue runs at every pause
+and wants a small, fast model; an instruction is sent on purpose and can wait
+for a strong one.
+
+```json
+{"profiles": {"local": {"backend": "llama", "modes": {
+  "continue": {"profile": "tiny"}, "instruct": {"profile": "claude"}}}}}
+```
+
+The app's binding chooses first, then that profile's choice for the mode. The
+service's own profile (`claudish serve --profile`, or the file's `"profile"`)
+holds the bindings; other profiles are loaded when they are first needed, and a
+hosted one is announced when it is.
 
 ### An agent CLI as the backend
 
