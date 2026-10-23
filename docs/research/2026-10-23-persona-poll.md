@@ -110,7 +110,8 @@ designs and goals before polishing details. Synthetic again: agents in personas.
 
 - Should continue mirror the writer's own voice (the Claudish voice staying in
   rewrite and instruct), as its template already half-says?
-- Should continue start on everywhere, or per app (G38), with long-form editors
-  quiet by default?
+- ~~Should continue start on everywhere, or per app?~~ Owner: on by default.
+  An input method is chosen per app already: switch to the OS keyboard where
+  you want none, or ignore the suggestion. Not a blocker.
 - A second audience on the home page: the accessibility and everyday angle,
   in plain words, next to the joke.

@@ -17,7 +17,8 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 
 Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
 until you take it, and your own words are always one key away. Continue can be
-ignored forever; compose is there when you want it.
+ignored forever; compose is there when you want it. Where you want none of it,
+switch that app to your usual keyboard: input sources are chosen per app.
 
 The model is yours to choose: a small local one by default, any
 OpenAI-compatible server, Claude with your own key, or an agent CLI. It can read

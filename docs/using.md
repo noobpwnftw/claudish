@@ -22,6 +22,13 @@ Typing in detail, the browser demos, and terminals.
 | Tab with a selection (compose) | With nothing composed, rewrite the selected text in place (CJK input methods call this reconversion): it leaves the text while it is rewritten, Tab keeps the rewrite, Esc twice puts your words back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
 | Backspace | Edit the composition and invalidate its candidate |
 
+Where you want no suggestions at all, switch that app to your usual keyboard;
+the system remembers it per app or window once you turn that on: Windows,
+Settings → Time & language → Typing → Advanced keyboard settings → "Let me use a
+different input method for each app window"; macOS, Settings → Keyboard → Input
+Sources → "Automatically switch to a document's input source"; GNOME Tweaks →
+Keyboard → "Switch input sources individually for each window".
+
 Enter commits composition first; press it again to send a newline. This first
 version edits composition at its end. Linux commits original wording before
 forwarding navigation and shortcuts. On Windows, the first navigation key
