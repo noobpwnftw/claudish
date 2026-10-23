@@ -281,8 +281,9 @@ candidate like any other. For Claude Code:
 - Status: tested end to end in the Linux desktop container (real IBus and GTK)
   with a scripted agent that speaks Claude Code's stream-json protocol (the
   message shapes come from the Agent SDK's control protocol), plus the PIME smoke
-  and the macOS doubles. On Windows, a question shows at your next key press
-  (F6). A live run against Claude Code itself is pending.
+  and the macOS doubles, and live against Claude Code (2.1.308). On Windows with
+  Claudish's patched PIME a question shows as it arrives; with a released PIME,
+  at your next key press (F6).
 
 ## Modes
 
