@@ -256,6 +256,11 @@ def scenarios():
        "-e", 'tell application "Terminal" to activate')
     if wait_for(lambda: "command not found: gti" in screen(), timeout=15):
         select_input_method()  # input sources are per document: Terminal's window gets cd_AI too
+        # The input-source helper is a Python process; when it exits, macOS can hand the keyboard to
+        # the other Python app (the test window) while Terminal still looks frontmost. Activate
+        # Terminal again, and only type once it is the app taking keys.
+        sh("osascript", "-e", 'tell application "Terminal" to activate')
+        time.sleep(1.0)
         shift_tap()  # compose
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
