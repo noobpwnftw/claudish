@@ -17,7 +17,7 @@ index c2ae974..4ba6510 100644
 +    dwrite.lib
  )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..dd63622 100644
+index 4a4149f..87074f7 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
 @@ -21,6 +21,8 @@
@@ -39,21 +39,23 @@ index 4a4149f..dd63622 100644
  
      if(service->isImmersive()) { // windows 8 app mode
          margin_ = 10;
-@@ -56,6 +59,7 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+@@ -55,7 +58,8 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+     }
  
      HWND parent = service->compositionWindow(session);
-     create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
-+    roundCorners(hwnd_);
+-    create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
++    // Layered: the panel paints its own rounded corners, border and shadow (PanelPainter::present).
++    create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_LAYERED);
  }
  
  CandidateWindow::~CandidateWindow(void) {
-@@ -182,125 +186,42 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +186,44 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
              break;
          case WM_MOUSEACTIVATE:
              return MA_NOACTIVATE;
 +        case WM_TIMER:  // the spinner turns while something is happening
 +            spin_ += 0.35f;
-+            ::InvalidateRect(hwnd_, NULL, FALSE);
++            painter_.present(hwnd_, spin_);
 +            break;
          default:
              return Window::wndProc(msg, wp, lp);
@@ -67,10 +69,10 @@ index 4a4149f..dd63622 100644
 -    // TODO: check isImmersive_, and draw the window differently
 -    // in Windows 8 app immersive mode to follow windows 8 UX guidelines
      PAINTSTRUCT ps;
-     BeginPaint(hwnd_, &ps);
+-    BeginPaint(hwnd_, &ps);
 -    HDC hDC = ps.hdc;
 -    HFONT oldFont;
-     RECT rc;
+-    RECT rc;
 -
 -    oldFont = (HFONT)SelectObject(hDC, font_);
 -
@@ -110,8 +112,7 @@ index 4a4149f..dd63622 100644
 -        }
 -    }
 -    SelectObject(hDC, oldFont);
-+    GetClientRect(hwnd_, &rc);
-+    painter_.paint(ps.hdc, rc, spin_);
++    BeginPaint(hwnd_, &ps);  // a layered window keeps what present() gave it
      EndPaint(hwnd_, &ps);
  }
  
@@ -119,7 +120,15 @@ index 4a4149f..dd63622 100644
 -    if(items_.empty()) {
 -        resize(margin_ * 2, margin_ * 2);
 -    }
--
++    SIZE size = painter_.layout(panel_);
++    resize(size.cx, size.cy);
++    painter_.present(hwnd_, spin_);
++    if (panel_.busy)
++        ::SetTimer(hwnd_, 1, 80, NULL);
++    else
++        ::KillTimer(hwnd_, 1);
++}
+ 
 -    HDC hDC = ::GetWindowDC(hwnd());
 -    int height = 0;
 -    int width = 0;
@@ -151,12 +160,8 @@ index 4a4149f..dd63622 100644
 -    }
 -    ::SelectObject(hDC, oldFont);
 -    ::ReleaseDC(hwnd(), hDC);
-+    SIZE size = painter_.layout(panel_);
-+    resize(size.cx, size.cy);
-+    if (panel_.busy)
-+        ::SetTimer(hwnd_, 1, 80, NULL);
-+    else
-+        ::KillTimer(hwnd_, 1);
++void CandidateWindow::setPanel(const PanelSpec& panel) {
++    panel_ = panel;
 +}
  
 -    if(items_.empty()) {
@@ -164,8 +169,8 @@ index 4a4149f..dd63622 100644
 -        return;
 -    }
 -    int safeCandPerRow = candPerRow_ > 0 ? candPerRow_ : 1;
-+void CandidateWindow::setPanel(const PanelSpec& panel) {
-+    panel_ = panel;
++int CandidateWindow::textInset() const {
++    return painter_.textInset();
 +}
  
 -    if(items_.size() <= (size_t)safeCandPerRow) {
@@ -188,12 +193,12 @@ index 4a4149f..dd63622 100644
 -        height = itemHeight_ * rowCount + rowSpacing_ * (rowCount - 1) + margin_ * 2;
 -    }
 -    resize(width, height);
-+int CandidateWindow::textInset() const {
-+    return painter_.textInset();
++int CandidateWindow::topInset() const {
++    return painter_.topInset();
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -372,42 +293,9 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +295,9 @@ void CandidateWindow::setUseCursor(bool use) {
          ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
@@ -239,7 +244,7 @@ index 4a4149f..dd63622 100644
  
  
 diff --git a/src/CandidateWindow.h b/src/CandidateWindow.h
-index 2ea3635..8ea44bd 100644
+index 2ea3635..b8ae3d1 100644
 --- a/src/CandidateWindow.h
 +++ b/src/CandidateWindow.h
 @@ -24,6 +24,7 @@
@@ -250,7 +255,7 @@ index 2ea3635..8ea44bd 100644
  
  namespace Ime {
  
-@@ -100,10 +101,14 @@ public:
+@@ -100,10 +101,15 @@ public:
  
      void setUseCursor(bool use);
  
@@ -258,6 +263,7 @@ index 2ea3635..8ea44bd 100644
 +    void setPanel(const PanelSpec& panel);
 +    // The x of the rows' text from the window's left edge, to line it up with the composition.
 +    int textInset() const;
++    int topInset() const;  // the panel's top edge, below its shadow's margin
 +
  protected:
      LRESULT wndProc(UINT msg, WPARAM wp , LPARAM lp);
@@ -266,7 +272,7 @@ index 2ea3635..8ea44bd 100644
      void itemRect(int i, RECT& rect);
  
  protected: // COM object should not be deleted directly. calling Release() instead.
-@@ -123,6 +128,10 @@ private:
+@@ -123,6 +129,10 @@ private:
      int currentSel_;
      bool hasResult_;
      bool useCursor_;
@@ -278,7 +284,7 @@ index 2ea3635..8ea44bd 100644
  
  }
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..ff8b35f 100644
+index 581f89f..11b15a3 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -289,15 +295,7 @@ index 581f89f..ff8b35f 100644
  
  namespace Ime {
  
-@@ -28,6 +29,7 @@ MessageWindow::MessageWindow(TextService* service, EditSession* session):
- 
-     HWND parent = service->compositionWindow(session);
-     create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
-+    roundCorners(hwnd_);
- }
- 
- MessageWindow::~MessageWindow(void) {
-@@ -43,7 +45,15 @@ void MessageWindow::recalculateSize() {
+@@ -43,7 +44,16 @@ void MessageWindow::recalculateSize() {
      ReleaseDC(hwnd_, dc);
  
      SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0,
@@ -308,13 +306,14 @@ index 581f89f..ff8b35f 100644
 +void MessageWindow::setPanel(const PanelSpec& panel) {
 +    panel_ = panel;
 +    SIZE size = painter_.layout(panel_);
++    // A toast is a panel: layered, with its own corners, border and shadow (PanelPainter::present).
++    SetWindowLongPtr(hwnd_, GWL_EXSTYLE, GetWindowLongPtr(hwnd_, GWL_EXSTYLE) | WS_EX_LAYERED);
 +    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, size.cx, size.cy, SWP_NOACTIVATE | SWP_NOMOVE);
-+    if (IsWindowVisible(hwnd_))
-+        InvalidateRect(hwnd_, NULL, TRUE);
++    painter_.present(hwnd_, 0);
  }
  
  void MessageWindow::setText(std::wstring text) {
-@@ -71,40 +81,21 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
+@@ -71,40 +81,19 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
      return 0;
  }
  
@@ -327,10 +326,8 @@ index 581f89f..ff8b35f 100644
 -
 -    // draw a flat black border in Windows 8 app immersive mode
 -    // draw a 3d border in desktop mode
-+    if (!panel_.empty()) {
-+        painter_.paint(ps.hdc, rc, 0);
-+        return;
-+    }
++    if (!panel_.empty())
++        return;  // layered: setPanel() gave it its picture
      HDC hDC = ps.hdc;
      HFONT oldFont = (HFONT)SelectObject(hDC, font_);
 -
@@ -366,7 +363,7 @@ index 581f89f..ff8b35f 100644
  }
  
 diff --git a/src/MessageWindow.h b/src/MessageWindow.h
-index 41e3a33..eabd50f 100644
+index 41e3a33..cf13b5c 100644
 --- a/src/MessageWindow.h
 +++ b/src/MessageWindow.h
 @@ -23,6 +23,7 @@
@@ -377,19 +374,22 @@ index 41e3a33..eabd50f 100644
  
  namespace Ime {
  
-@@ -37,6 +38,11 @@ public:
+@@ -37,6 +38,14 @@ public:
          return text_;
      }
      void setText(std::wstring text);
 +    // Claudish: a panel instead of plain text (the mode switch), drawn like the candidate window.
 +    void setPanel(const PanelSpec& panel);
++    int topInset() const {  // the panel's top edge, below its shadow's margin
++        return painter_.topInset();
++    }
 +    int textInset() const {
 +        return painter_.textInset();
 +    }
  
      TextService* textService() {
          return textService_;
-@@ -49,6 +55,8 @@ protected:
+@@ -49,6 +58,8 @@ protected:
  
  private:
      std::wstring text_;
@@ -400,10 +400,10 @@ index 41e3a33..eabd50f 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..c714dbb
+index 0000000..af9b903
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,546 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -424,6 +424,9 @@ index 0000000..c714dbb
 +static const float PAD = 4, ROW_X = 10, ROW_Y = 5, NUMBER = 12, NUMBER_GAP = 10, TAKE = 48, HEAD_GAP = 2;
 +static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
 +static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
++// The panel's corners and shadow (the lab's Windows skin: --k-radius 8px; --k-shadow 0 8px 16px,
++// 14% black in light, 0 8px 20px, 50% in dark).
++static const float RADIUS = 8, SHADOW_Y = 8, SHADOW_BLUR = 16, SHADOW_BLUR_DARK = 20;
 +
 +static ID2D1Factory* d2d = nullptr;
 +static IDWriteFactory* dwrite = nullptr;
@@ -526,7 +529,7 @@ index 0000000..c714dbb
 +}
 +
 +int PanelPainter::textInset() const {
-+    return (int)(px(PAD) + px(ROW_X));  // the content's left edge goes under the caret
++    return (int)(std::ceil(shadowSide_) + px(PAD) + px(ROW_X));  // the content's left edge goes under the caret
 +}
 +
 +SIZE PanelPainter::layout(const PanelSpec& spec) {
@@ -663,7 +666,12 @@ index 0000000..c714dbb
 +    height_ = y;
 +    if (!foot_.empty() && foot_.back().kind == FootItem::Mark)  // the hosted mark, at the end
 +        foot_.back().x = (std::max)(foot_.back().x, width_ - px(PAD) - px(ROW_X) - foot_.back().w);
-+    SIZE size = { (LONG)std::ceil(width_), (LONG)std::ceil(height_) };
++    const float blur = px(appsUseDarkTheme() ? SHADOW_BLUR_DARK : SHADOW_BLUR);
++    shadowSide_ = blur;
++    shadowTop_ = (std::max)(0.0f, blur - px(SHADOW_Y));
++    shadowBottom_ = blur + px(SHADOW_Y);
++    SIZE size = { (LONG)(std::ceil(shadowSide_) * 2 + std::ceil(width_)),
++                  (LONG)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_)) };
 +    return size;
 +}
 +
@@ -671,7 +679,7 @@ index 0000000..c714dbb
 +    if (spec_.empty() || !ensureFactories())
 +        return;
 +    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-+        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), 96, 96);
++        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
 +    ID2D1DCRenderTarget* target = nullptr;
 +    if (FAILED(d2d->CreateDCRenderTarget(&props, &target)) || FAILED(target->BindDC(dc, &rc))) {
 +        releaseOne(target);
@@ -693,7 +701,37 @@ index 0000000..c714dbb
 +    };
 +
 +    target->BeginDraw();
-+    target->Clear(color(colors.surface));
++    target->Clear(D2D1::ColorF(0, 0, 0, 0));
++    // The shadow: rounded rectangles that grow and fade, under the panel and offset down (a blur
++    // without effects), then the panel itself: its surface, rounded, with a 1 px border. High
++    // contrast draws no shadow, only the border in the text colour.
++    const float left = std::ceil(shadowSide_), top = std::ceil(shadowTop_);
++    const D2D1_RECT_F panel = D2D1::RectF(left, top, left + width_, top + height_);
++    if (!colors.contrast) {
++        const bool dark = appsUseDarkTheme();
++        const int steps = 10;
++        const float blur = shadowSide_, opacity = dark ? 0.5f : 0.14f;
++        ID2D1SolidColorBrush* shade = nullptr;
++        target->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, opacity / steps), &shade);
++        for (int i = 0; i < steps; ++i) {
++            const float grow = blur * (steps - i) / steps - blur / 2;
++            D2D1_RECT_F r = D2D1::RectF(panel.left - grow, panel.top + px(SHADOW_Y) - grow,
++                                        panel.right + grow, panel.bottom + px(SHADOW_Y) + grow);
++            const float radius = (std::max)(0.0f, px(RADIUS) + grow);
++            target->FillRoundedRectangle(D2D1::RoundedRect(r, radius, radius), shade);
++        }
++        shade->Release();
++    }
++    fill(panel, px(RADIUS), colors.surface);
++    {
++        ID2D1SolidColorBrush* edge = nullptr;
++        target->CreateSolidColorBrush(color(colors.contrast ? colors.text
++                                            : mix(colors.surface, appsUseDarkTheme() ? RGB(255, 255, 255) : RGB(0, 0, 0), 10)), &edge);
++        target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(panel.left + 0.5f, panel.top + 0.5f, panel.right - 0.5f,
++                                                                   panel.bottom - 0.5f), px(RADIUS), px(RADIUS)), edge);
++        edge->Release();
++    }
++    target->SetTransform(D2D1::Matrix3x2F::Translation(left, top));  // the content, in the panel's coordinates
 +    for (size_t i = 0; i < turns_.size(); ++i) {  // the label muted, your words in the text colour
 +        const Line& turn = turns_[i];
 +        DWRITE_TEXT_RANGE head = { 0, (UINT32)spec_.thread[i].first.size() };
@@ -823,6 +861,34 @@ index 0000000..c714dbb
 +    releaseOne(target);
 +}
 +
++void PanelPainter::present(HWND hwnd, float spin) {
++    if (spec_.empty())
++        return;
++    const int width = (int)(std::ceil(shadowSide_) * 2 + std::ceil(width_));
++    const int height = (int)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_));
++    BITMAPINFO info = {};
++    info.bmiHeader.biSize = sizeof(info.bmiHeader);
++    info.bmiHeader.biWidth = width;
++    info.bmiHeader.biHeight = -height;
++    info.bmiHeader.biPlanes = 1;
++    info.bmiHeader.biBitCount = 32;
++    void* bits = nullptr;
++    HDC screen = GetDC(nullptr);
++    HDC memory = CreateCompatibleDC(screen);
++    HBITMAP bitmap = CreateDIBSection(memory, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
++    HGDIOBJ old = SelectObject(memory, bitmap);
++    RECT area = { 0, 0, width, height };
++    paint(memory, area, spin);
++    POINT origin = { 0, 0 };
++    SIZE extent = { width, height };
++    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
++    UpdateLayeredWindow(hwnd, screen, nullptr, &extent, memory, &origin, 0, &blend, ULW_ALPHA);  // where it is
++    SelectObject(memory, old);
++    DeleteObject(bitmap);
++    DeleteDC(memory);
++    ReleaseDC(nullptr, screen);
++}
++
 +void GhostPainter::show(HWND hwnd, const std::wstring& text, const RECT& caret) {
 +    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
 +        return;
@@ -886,10 +952,10 @@ index 0000000..c714dbb
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..7713aa2
+index 0000000..7853e7a
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,163 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -904,6 +970,7 @@ index 0000000..7713aa2
 +#include <windows.h>
 +#include <d2d1.h>
 +#include <dwrite.h>
++#include <cmath>
 +#include <string>
 +#include <utility>
 +#include <vector>
@@ -948,11 +1015,18 @@ index 0000000..7713aa2
 +
 +    // The panel's size for this spec; keeps the layout for paint().
 +    SIZE layout(const PanelSpec& spec);
-+    // Paints the last layout into the DC (the window's client area); spin: the spinner's angle.
++    // Paints the last layout into the DC (a premultiplied bitmap of layout()'s size: the shadow,
++    // then the panel); spin: the spinner's angle.
 +    void paint(HDC dc, const RECT& rc, float spin);
-+    // The x of the content's left edge, from the panel's: the window is placed so that it starts
-+    // under the caret.
++    // Paints the last layout and hands it to a layered window (WS_EX_LAYERED), which keeps its
++    // position: the panel draws its own rounded corners, border and shadow, as the design lab
++    // does, since DWM gives a popup none of them without a GPU (a VM) or on Windows 10.
++    void present(HWND hwnd, float spin);
++    // The x of the content's left edge, from the window's: the window is placed so that it starts
++    // under the caret (the shadow's margin included).
 +    int textInset() const;
++    // The panel's top edge, from the window's (the shadow's margin above it).
++    int topInset() const { return (int)std::ceil(shadowTop_); }
 +
 +private:
 +    struct Line {
@@ -981,6 +1055,7 @@ index 0000000..7713aa2
 +    std::vector<float> rowTop_, rowHeight_;
 +    std::vector<FootItem> foot_;
 +    float footTop_ = 0, footHeight_ = 0;
++    float shadowSide_ = 0, shadowTop_ = 0, shadowBottom_ = 0;  // the shadow's margin around the panel
 +    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Enter"
 +
 +    IDWriteTextFormat* text_ = nullptr;
@@ -1046,10 +1121,10 @@ index 0000000..7713aa2
 +#endif
 diff --git a/src/Style.h b/src/Style.h
 new file mode 100644
-index 0000000..0fa6e38
+index 0000000..fda5323
 --- /dev/null
 +++ b/src/Style.h
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,132 @@
 +//
 +//    Claudish: the look of the candidate and message windows, after Windows 11's own popups
 +//    (a rounded corner, the system shadow, the app theme's colours). Header-only, LGPL like
@@ -1136,21 +1211,6 @@ index 0000000..0fa6e38
 +            ::ReleaseDC(NULL, dc);
 +    }
 +    return ::MulDiv(pixels, dpi, 96);
-+}
-+
-+// Windows 11 rounds the window's corners (8 px, as its flyouts) and draws its border and shadow;
-+// earlier versions ignore it and keep a square window with the class's drop shadow.
-+inline void roundCorners(HWND hwnd) {
-+    typedef HRESULT (WINAPI *SetAttribute)(HWND, DWORD, LPCVOID, DWORD);
-+    static HMODULE dwm = ::LoadLibraryW(L"dwmapi.dll");
-+    if (!dwm)
-+        return;
-+    SetAttribute set = (SetAttribute)::GetProcAddress(dwm, "DwmSetWindowAttribute");
-+    if (!set)
-+        return;
-+    const DWORD DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2;
-+    DWORD preference = DWMWCP_ROUND;
-+    set(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
 +}
 +
 +// A font like `base`, `percent` of its size, in the given weight.
@@ -1346,7 +1406,7 @@ index f2c1c09..289d6a1 100644
      void setCompositionCursor(EditSession* session, int pos) const;
  
 diff --git a/src/Window.cpp b/src/Window.cpp
-index cff3d7e..db51646 100644
+index cff3d7e..4680a32 100644
 --- a/src/Window.cpp
 +++ b/src/Window.cpp
 @@ -90,7 +90,7 @@ bool Window::registerClass(HINSTANCE hinstance) {
@@ -1354,7 +1414,7 @@ index cff3d7e..db51646 100644
      WNDCLASSEX wc;
      wc.cbSize         = sizeof(WNDCLASSEX);
 -    wc.style          = CS_IME; // FIXME: is this needed?
-+    wc.style          = CS_IME | CS_DROPSHADOW; // the shadow under popups on Windows 10 (11 draws its own)
++    wc.style          = CS_IME;  // Claudish: no CS_DROPSHADOW, the panel draws its own shadow (Panel.cpp)
      wc.lpfnWndProc    = (WNDPROC)Window::_wndProc;
      wc.cbClsExtra     = 0;
      wc.cbWndExtra     = 0;

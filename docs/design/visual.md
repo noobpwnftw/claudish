@@ -147,6 +147,10 @@ an anti-AI writer, an accessibility consultant and an office manager
   key glyphs at the text's size and colour. Open: keeping the panel inside the app's window
   (all seven noticed it crossing Notepad's edge), the full instruction instead of one line, and
   rebindable keys.
+- **Shadows (owner, 2026-10-24):** every platform draws the panel's own shadow, corners and border
+  from the skin's tokens. Windows did rely on DWM, which gives a popup none of them without a
+  GPU (a VM) or on Windows 10; the panel is now a layered window that paints them (Panel.cpp),
+  as GNOME's stylesheet and macOS's NSPanel already did.
 - **Words:** "Esc edit" after a result or a failure; the mode switch names where Shift goes
   ("Shift continue"); under an answer to read, "or type to ask more".
 - **Panels follow the system theme,** not the app under the caret (a light panel over a dark

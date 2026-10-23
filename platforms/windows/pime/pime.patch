@@ -286,7 +286,7 @@ index feb9813..12eb1d5 100644
  	State state_;
  };
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..b3ce779 100644
+index 28d8286..2b4da3c 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -268,6 +268,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
@@ -337,7 +337,7 @@ index 28d8286..b3ce779 100644
 +		x = pinnedX_;
 +	pinnedX_ = x;
 +	pinnedLine_ = caret.bottom;
-+	candidateWindow_->move(x, caret.bottom + Ime::scaled(6));
++	candidateWindow_->move(x, caret.bottom + Ime::scaled(6) - candidateWindow_->topInset());  // the panel, not its shadow
 +}
 +
 +// Claudish: continue's suggestion, right after the caret (never typed into the app).
@@ -371,7 +371,7 @@ index 28d8286..b3ce779 100644
 +	messageWindow_->setPanel(panel);
 +	RECT caret;
 +	if (caretRect(session, &caret))
-+		messageWindow_->move(caret.left - messageWindow_->textInset(), caret.bottom + Ime::scaled(6));
++		messageWindow_->move(caret.left - messageWindow_->textInset(), caret.bottom + Ime::scaled(6) - messageWindow_->topInset());
 +	messageWindow_->show();
 +	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
 +}
