@@ -59,6 +59,15 @@ def redact(text):
     return text, count
 
 
+def one_line(text):
+    """A draft for a terminal prompt as one physical line: a newline committed at a prompt is a
+    Return, which would run a command the user never pressed Enter for. Code fences go, and only
+    the first line is kept."""
+    lines = [line.strip() for line in (text or "").splitlines()
+             if line.strip() and not line.strip().startswith("```")]
+    return lines[0] if lines else ""
+
+
 def is_terminal(app):
     """Whether the focused app (as an adapter names it) is a terminal."""
     return bool(app) and app.lower() in TERMINALS

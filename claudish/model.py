@@ -241,7 +241,10 @@ class Rewriter:
 
     def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None,
                       screen=None):
-        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose, screen), text)
+        if screen is None:
+            purpose, screen = self.terminal(app, purpose, "instruct")
+        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose, screen), text,
+                                   one_line=purpose == "terminal")
 
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -400,6 +403,9 @@ class Rewriter:
         from .modes import parroted
         for output in outputs:
             output = self.finish(mode, text, output)
+            if purpose == "terminal" and mode != "continue":
+                from .screen import one_line
+                output = one_line(output)  # a newline at a prompt would run it without the user's Enter
             if parroted(mode, text, output, examples):
                 continue
             if output and output not in candidates:

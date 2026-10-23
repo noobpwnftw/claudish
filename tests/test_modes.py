@@ -70,6 +70,16 @@ class ModeTests(unittest.TestCase):
             _, payload = self.call(rewriter, "fix", "instruct", app="gnome-terminal-server")
             self.assertEqual(read.call_count, 1)
             self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+        # A draft for a terminal is one line: a newline at the prompt would run it without Enter.
+        reply = "```bash\ngit status\n```\nThen run git push."
+        with patch("claudish.screen.read", return_value=screen):
+            result, _ = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal", answer=reply)
+        self.assertEqual(result["candidates"], ["git status"])
+        from claudish.sessions import Sessions
+        session = Sessions().start(type("Driver", (), {"run": lambda self, s, p: s.emit(
+            "result", text="ls\nrm -rf /", candidates=["ls\nrm -rf /"])})(), "fix", one_line=True)
+        events, _ = session.wait(0, timeout=2)
+        self.assertEqual((events[-1]["text"], events[-1]["candidates"]), ("ls", ["ls"]))
         rules = Rewriter("rules")
         result = rules.rewrite("fix", mode="instruct", screen=screen)
         self.assertEqual(result["text"], "As requested—fix, having read the terminal.")
@@ -129,10 +139,10 @@ class ModeTests(unittest.TestCase):
         _, payload = self.call(rewriter, "so", "rewrite")
         self.assertEqual(payload["messages"][-1]["content"], "so")  # other modes send the text itself
 
-    def call(self, rewriter, text, mode, **field):
-        reply = {"choices": [{"message": {"content": "the parser change."}, "finish_reason": "stop"}]}
+    def call(self, rewriter, text, mode, answer="the parser change.", **field):
+        reply = {"choices": [{"message": {"content": answer}, "finish_reason": "stop"}]}
         with patch.object(rewriter, "opener") as opener:
-            opener.open.return_value = BytesIO(json.dumps(reply).encode())
+            opener.open.side_effect = lambda *args, **kwargs: BytesIO(json.dumps(reply).encode())
             result = rewriter.rewrite(text, mode=mode, **field)
             return result, json.loads(opener.open.call_args.args[0].data)
 

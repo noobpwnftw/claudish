@@ -17,9 +17,10 @@ KEEP_SECONDS = 600  # a finished session's events stay readable this long
 
 
 class Session:
-    def __init__(self, driver):
+    def __init__(self, driver, one_line=False):
         self.id = uuid.uuid4().hex
         self.driver = driver
+        self.one_line = one_line  # a terminal prompt: drafts are single lines (see screen.one_line)
         self.condition = threading.Condition()
         self.events = []
         self.questions = {}  # open question id -> number of choices
@@ -31,6 +32,11 @@ class Session:
         with self.condition:
             if self.done:
                 return
+            if self.one_line and kind in ("result", "partial"):
+                from .screen import one_line
+                fields["text"] = one_line(fields.get("text"))
+                if "candidates" in fields:
+                    fields["candidates"] = [one_line(c) for c in fields["candidates"] if one_line(c)]
             event = dict(fields, seq=len(self.events), type=kind)
             self.events.append(event)
             if kind == "question":
@@ -70,7 +76,7 @@ class Sessions:
         self.lock = threading.Lock()
         self.live = {}
 
-    def start(self, driver, prompt):
+    def start(self, driver, prompt, one_line=False):
         with self.lock:
             now = time.monotonic()
             for key, session in list(self.live.items()):
@@ -78,7 +84,7 @@ class Sessions:
                     del self.live[key]
             if sum(not s.done for s in self.live.values()) >= MAX_SESSIONS:
                 raise RuntimeError("too many agent sessions; finish or cancel one")
-            session = Session(driver)
+            session = Session(driver, one_line)
             self.live[session.id] = session
         threading.Thread(target=self.run, args=(session, prompt), daemon=True).start()
         return session
