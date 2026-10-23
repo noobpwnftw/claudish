@@ -1,27 +1,45 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index c2ae974..4ba6510 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -40,8 +40,13 @@ add_library(libIME2_static STATIC
+     MessageWindow.h
+     CandidateWindow.h
+     CandidateWindow.cpp
++    Panel.h
++    Panel.cpp
++    Style.h
+ )
+ 
+ target_link_libraries(libIME2_static
+     shlwapi.lib
++    d2d1.lib
++    dwrite.lib
+ )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..3d3948a 100644
+index 4a4149f..dd63622 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
-@@ -21,6 +21,7 @@
+@@ -21,6 +21,8 @@
  #include "DrawUtils.h"
  #include "TextService.h"
  #include "EditSession.h"
 +#include "Style.h"
++#include "Panel.h"
  
  #include <algorithm>
  #include <cassert>
-@@ -41,7 +42,9 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+@@ -41,7 +43,8 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
      currentSel_(0),
      hasResult_(false),
      useCursor_(true),
 -    selKeyWidth_(0) {
 +    selKeyWidth_(0),
-+    smallFont_(NULL),
-+    labelFont_(NULL) {
++    spin_(0.0f) {
  
      if(service->isImmersive()) { // windows 8 app mode
          margin_ = 10;
-@@ -56,9 +59,14 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+@@ -56,6 +59,7 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
  
      HWND parent = service->compositionWindow(session);
      create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
@@ -29,21 +47,22 @@ index 4a4149f..3d3948a 100644
  }
  
  CandidateWindow::~CandidateWindow(void) {
-+    if (smallFont_)
-+        ::DeleteObject(smallFont_);
-+    if (labelFont_)
-+        ::DeleteObject(labelFont_);
- }
- 
- // ITfUIElement
-@@ -188,119 +196,139 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +186,42 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+             break;
+         case WM_MOUSEACTIVATE:
+             return MA_NOACTIVATE;
++        case WM_TIMER:  // the spinner turns while something is happening
++            spin_ += 0.35f;
++            ::InvalidateRect(hwnd_, NULL, FALSE);
++            break;
+         default:
+             return Window::wndProc(msg, wp, lp);
+     }
      return 0;
  }
  
-+// Claudish: the window is drawn after Windows 11's popups (Style.h): an optional header (a question,
-+// "label\nbody" puts a small label above it), the items in one column with their selection keys
-+// muted (a space key shows none), the highlighted row as a soft fill with a small accent bar, and an
-+// optional footer (a short hint). Long items wrap. Drawn off-screen, then copied, so it never flickers.
++// Claudish: the window draws the panel the input method describes (Panel.h, the design lab's
++// Windows 11 mock); the items stay for TSF's candidate list UI element (apps that draw their own).
  void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
 -    // TODO: check isImmersive_, and draw the window differently
 -    // in Windows 8 app immersive mode to follow windows 8 UX guidelines
@@ -68,33 +87,12 @@ index 4a4149f..3d3948a 100644
 -        ::Rectangle(hDC, rc.left, rc.top, rc.right, rc.bottom);
 -        ::SelectObject(hDC, oldPen);
 -        ::DeleteObject(pen);
-+    GetClientRect(hwnd_, &rc);
-+    HDC dc = ::CreateCompatibleDC(ps.hdc);
-+    HBITMAP bitmap = ::CreateCompatibleBitmap(ps.hdc, rc.right, rc.bottom);
-+    HGDIOBJ oldBitmap = ::SelectObject(dc, bitmap);
-+    HGDIOBJ oldFont = ::SelectObject(dc, font_);
-+    Palette colors = currentPalette();
-+    fillRect(dc, rc, colors.background);
-+    ::SetBkMode(dc, TRANSPARENT);
-+
-+    int pad = scaled(PAD), x = pad, width = rc.right - 2 * pad;
-+    int y = pad;
-+    if (!label_.empty()) {
-+        ::SelectObject(dc, labelFont_);
-+        RECT r = { x, y, x + width, y + labelHeight_ };
-+        drawWrapped(dc, label_, r, colors.muted);
-+        y += labelHeight_ + scaled(2);
-     }
+-    }
 -    else {
 -        // draw a 3d border in desktop mode
 -        ::FillSolidRect(ps.hdc, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, GetSysColor(COLOR_WINDOW));
 -        ::Draw3DBorder(hDC, &rc, GetSysColor(COLOR_3DFACE), 0);
-+    if (!header_.empty()) {
-+        ::SelectObject(dc, font_);
-+        RECT r = { x, y, x + width, y + headerHeight_ };
-+        drawWrapped(dc, header_, r, colors.text);
-+        y += headerHeight_ + scaled(GAP);
-     }
+-    }
 -
 -    // paint items
 -    int col = 0;
@@ -110,73 +108,24 @@ index 4a4149f..3d3948a 100644
 -        else {
 -            x += colSpacing_ + selKeyWidth_ + textWidth_;
 -        }
-+    for (int i = 0, n = items_.size(); i < n; ++i) {
-+        paintItem(dc, i, x, y);
-+        y += itemHeights_[i];
-     }
+-    }
 -    SelectObject(hDC, oldFont);
-+    if (!footer_.empty()) {
-+        if (!items_.empty() || !header_.empty())
-+            y += scaled(GAP);
-+        ::SelectObject(dc, smallFont_);
-+        RECT r = { x, y, x + width, y + footerHeight_ };
-+        drawWrapped(dc, footer_, r, colors.muted);
-+    }
-+
-+    ::BitBlt(ps.hdc, 0, 0, rc.right, rc.bottom, dc, 0, 0, SRCCOPY);
-+    ::SelectObject(dc, oldFont);
-+    ::SelectObject(dc, oldBitmap);
-+    ::DeleteObject(bitmap);
-+    ::DeleteDC(dc);
++    GetClientRect(hwnd_, &rc);
++    painter_.paint(ps.hdc, rc, spin_);
      EndPaint(hwnd_, &ps);
  }
  
  void CandidateWindow::recalculateSize() {
 -    if(items_.empty()) {
 -        resize(margin_ * 2, margin_ * 2);
-+    if (smallFont_)
-+        ::DeleteObject(smallFont_);
-+    if (labelFont_)
-+        ::DeleteObject(labelFont_);
-+    smallFont_ = derivedFont(font_, 82, FW_NORMAL);
-+    labelFont_ = derivedFont(font_, 82, FW_SEMIBOLD);
-+
-+    // A header "label\nbody": the label small, above the body.
-+    label_.clear();
-+    header_ = headerText_;
-+    size_t newline = headerText_.find(L'\n');
-+    if (newline != wstring::npos) {
-+        label_ = headerText_.substr(0, newline);
-+        header_ = headerText_.substr(newline + 1);
-     }
- 
-+    if (items_.empty() && header_.empty() && label_.empty() && footer_.empty()) {
-+        resize(0, 0);
-+        return;
-+    }
-+    int pad = scaled(PAD), rowX = scaled(ROW_X), rowY = scaled(ROW_Y), keyGap = scaled(KEY_GAP);
-+    int maxText = scaled(MAX_WIDTH) - 2 * pad;
-     HDC hDC = ::GetWindowDC(hwnd());
+-    }
+-
+-    HDC hDC = ::GetWindowDC(hwnd());
 -    int height = 0;
 -    int width = 0;
-+    HGDIOBJ oldFont = ::SelectObject(hDC, font_);
-+    int widest = items_.empty() ? 0 : scaled(MIN_WIDTH) - 2 * pad, used = 0;
-+
-+    // The selection keys' column: as wide as the widest key; none when every key is a space.
-     selKeyWidth_ = 0;
-+    for (size_t i = 0; i < selKeys_.size() && i < items_.size(); ++i) {
-+        if (selKeys_[i] == L' ')
-+            continue;
-+        SIZE size;
-+        ::GetTextExtentPoint32W(hDC, &selKeys_[i], 1, &size);
-+        selKeyWidth_ = max(selKeyWidth_, (int)size.cx);
-+    }
-+    int keyColumn = selKeyWidth_ ? selKeyWidth_ + keyGap : 0;
-+    int textMax = maxText - 2 * rowX - keyColumn;
-+
-+    itemHeights_.clear();
-     textWidth_ = 0;
-     itemHeight_ = 0;
+-    selKeyWidth_ = 0;
+-    textWidth_ = 0;
+-    itemHeight_ = 0;
 -
 -    HGDIOBJ oldFont = ::SelectObject(hDC, font_);
 -    vector<wstring>::const_iterator it;
@@ -199,43 +148,24 @@ index 4a4149f..3d3948a 100644
 -        int itemHeight = max(candidateSize.cy, selKeySize.cy);
 -        if(itemHeight > itemHeight_)
 -            itemHeight_ = itemHeight;
-+    for (size_t i = 0; i < items_.size(); ++i) {
-+        int h = wrappedHeight(hDC, items_[i], textMax, &used);
-+        textWidth_ = max(textWidth_, used);
-+        itemHeights_.push_back(h + 2 * rowY);
-+        itemHeight_ = max(itemHeight_, h + 2 * rowY);
-     }
-+    widest = max(widest, textWidth_ + keyColumn + 2 * rowX);
-+    headerHeight_ = header_.empty() ? 0 : wrappedHeight(hDC, header_, maxText, &used);
-+    if (!header_.empty())
-+        widest = max(widest, used);
-+    ::SelectObject(hDC, labelFont_);
-+    labelHeight_ = label_.empty() ? 0 : wrappedHeight(hDC, label_, maxText, &used);
-+    if (!label_.empty())
-+        widest = max(widest, used);
-+    ::SelectObject(hDC, smallFont_);
-+    footerHeight_ = footer_.empty() ? 0 : wrappedHeight(hDC, footer_, maxText, &used);
-+    if (!footer_.empty())
-+        widest = max(widest, used);
-     ::SelectObject(hDC, oldFont);
-     ::ReleaseDC(hwnd(), hDC);
+-    }
+-    ::SelectObject(hDC, oldFont);
+-    ::ReleaseDC(hwnd(), hDC);
++    SIZE size = painter_.layout(panel_);
++    resize(size.cx, size.cy);
++    if (panel_.busy)
++        ::SetTimer(hwnd_, 1, 80, NULL);
++    else
++        ::KillTimer(hwnd_, 1);
++}
  
 -    if(items_.empty()) {
 -        resize(0, 0);
 -        return;
 -    }
 -    int safeCandPerRow = candPerRow_ > 0 ? candPerRow_ : 1;
-+    // The texts wrap to the widest line actually used; rows fill the width.
-+    int height = 2 * pad;
-+    if (!label_.empty())
-+        height += labelHeight_ + scaled(2);
-+    if (!header_.empty())
-+        height += headerHeight_ + scaled(GAP);
-+    for (int h : itemHeights_)
-+        height += h;
-+    if (!footer_.empty())
-+        height += footerHeight_ + ((!items_.empty() || !header_.empty()) ? scaled(GAP) : 0);
-+    resize(widest + 2 * pad, height);
++void CandidateWindow::setPanel(const PanelSpec& panel) {
++    panel_ = panel;
 +}
  
 -    if(items_.size() <= (size_t)safeCandPerRow) {
@@ -258,19 +188,16 @@ index 4a4149f..3d3948a 100644
 -        height = itemHeight_ * rowCount + rowSpacing_ * (rowCount - 1) + margin_ * 2;
 -    }
 -    resize(width, height);
-+void CandidateWindow::setHeader(const std::wstring& header) {
-+    headerText_ = header;
-+}
-+
-+void CandidateWindow::setFooter(const std::wstring& footer) {
-+    footer_ = footer;
++int CandidateWindow::textInset() const {
++    return painter_.textInset();
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -373,41 +401,34 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +293,9 @@ void CandidateWindow::setUseCursor(bool use) {
+         ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
- void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
+-void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
 -    RECT textRect = {x, y, 0, y + itemHeight_};
 -    wchar_t selKey[] = L"?. ";
 -    selKey[0] = selKeys_[i];
@@ -295,31 +222,9 @@ index 4a4149f..3d3948a 100644
 -        int width = textRect.right - left;
 -        int height = itemHeight_;
 -        ::BitBlt(hDC, left, top, width, itemHeight_, hDC, left, top, NOTSRCCOPY);
-+    Palette colors = currentPalette();
-+    RECT rc;
-+    GetClientRect(hwnd_, &rc);
-+    RECT row = { x, y, rc.right - x, y + itemHeights_[i] };
-+    int rowX = scaled(ROW_X), rowY = scaled(ROW_Y);
-+    if (useCursor_ && i == currentSel_) {
-+        fillRoundRect(hDC, row, scaled(4), colors.selection);
-+        int bar = scaled(3), barHeight = min((int)(row.bottom - row.top) - 2 * rowY, scaled(16));
-+        RECT accent = { row.left, row.top + (row.bottom - row.top - barHeight) / 2, row.left + bar, 0 };
-+        accent.bottom = accent.top + barHeight;
-+        fillRoundRect(hDC, accent, bar / 2, colors.accent);
-+    }
-+    int textX = row.left + rowX;
-+    ::SelectObject(hDC, font_);
-+    if (selKeyWidth_ && i < (int)selKeys_.size() && selKeys_[i] != L' ') {
-+        RECT key = { textX, row.top + rowY, textX + selKeyWidth_, row.bottom };
-+        ::SetTextColor(hDC, colors.muted);
-+        ::DrawTextW(hDC, &selKeys_[i], 1, &key, DT_CENTER | DT_NOPREFIX);
-     }
-+    if (selKeyWidth_)
-+        textX += selKeyWidth_ + scaled(KEY_GAP);
-+    RECT text = { textX, row.top + rowY, row.right - rowX, row.bottom - rowY };
-+    drawWrapped(hDC, items_.at(i), text, colors.text);
- }
- 
+-    }
+-}
+-
  void CandidateWindow::itemRect(int i, RECT& rect) {
 -    int row, col;
 -    row = i / candPerRow_;
@@ -328,43 +233,52 @@ index 4a4149f..3d3948a 100644
 -    rect.top = margin_ + row * (itemHeight_ + rowSpacing_);
 -    rect.right = rect.left + (selKeyWidth_ + textWidth_);
 -    rect.bottom = rect.top + itemHeight_;
-+    // Rows have their own heights (long items wrap): the whole window is repainted.
++    // The panel is painted whole (Panel.h).
 +    GetClientRect(hwnd_, &rect);
  }
  
  
 diff --git a/src/CandidateWindow.h b/src/CandidateWindow.h
-index 2ea3635..7271e72 100644
+index 2ea3635..8ea44bd 100644
 --- a/src/CandidateWindow.h
 +++ b/src/CandidateWindow.h
-@@ -100,6 +100,11 @@ public:
+@@ -24,6 +24,7 @@
+ #include <string>
+ #include <vector>
+ #include "ComObject.h"
++#include "Panel.h"
+ 
+ namespace Ime {
+ 
+@@ -100,10 +101,14 @@ public:
  
      void setUseCursor(bool use);
  
-+    // Claudish: a header above the items (a question; "label\nbody" shows a small label) and a
-+    // footer below them (a short hint). Either may be empty; the window shows with no items too.
-+    void setHeader(const std::wstring& header);
-+    void setFooter(const std::wstring& footer);
++    // Claudish: what the window draws (Panel.h); the items stay for TSF's candidate list element.
++    void setPanel(const PanelSpec& panel);
++    // The x of the rows' text from the window's left edge, to line it up with the composition.
++    int textInset() const;
 +
  protected:
      LRESULT wndProc(UINT msg, WPARAM wp , LPARAM lp);
      void onPaint(WPARAM wp, LPARAM lp);
-@@ -123,6 +128,13 @@ private:
+-    void paintItem(HDC hDC, int i, int x, int y);
+     void itemRect(int i, RECT& rect);
+ 
+ protected: // COM object should not be deleted directly. calling Release() instead.
+@@ -123,6 +128,10 @@ private:
      int currentSel_;
      bool hasResult_;
      bool useCursor_;
 +
-+    enum { PAD = 8, ROW_X = 8, ROW_Y = 5, KEY_GAP = 10, GAP = 6, MIN_WIDTH = 200, MAX_WIDTH = 480 };
-+    std::wstring headerText_, label_, header_, footer_;
-+    std::vector<int> itemHeights_;
-+    int labelHeight_ = 0, headerHeight_ = 0, footerHeight_ = 0;
-+    HFONT smallFont_;
-+    HFONT labelFont_;
++    PanelSpec panel_;
++    PanelPainter painter_;
++    float spin_;
  };
  
  }
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..754a472 100644
+index 581f89f..ff8b35f 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -383,16 +297,24 @@ index 581f89f..754a472 100644
  }
  
  MessageWindow::~MessageWindow(void) {
-@@ -43,7 +45,7 @@ void MessageWindow::recalculateSize() {
+@@ -43,7 +45,15 @@ void MessageWindow::recalculateSize() {
      ReleaseDC(hwnd_, dc);
  
      SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0,
 -        size.cx + margin_ * 2, size.cy + margin_ * 2, SWP_NOACTIVATE|SWP_NOMOVE);
 +        size.cx + scaled(12) * 2, size.cy + scaled(6) * 2, SWP_NOACTIVATE|SWP_NOMOVE);
++}
++
++void MessageWindow::setPanel(const PanelSpec& panel) {
++    panel_ = panel;
++    SIZE size = painter_.layout(panel_);
++    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, size.cx, size.cy, SWP_NOACTIVATE | SWP_NOMOVE);
++    if (IsWindowVisible(hwnd_))
++        InvalidateRect(hwnd_, NULL, TRUE);
  }
  
  void MessageWindow::setText(std::wstring text) {
-@@ -71,40 +73,17 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
+@@ -71,40 +81,21 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
      return 0;
  }
  
@@ -405,11 +327,15 @@ index 581f89f..754a472 100644
 -
 -    // draw a flat black border in Windows 8 app immersive mode
 -    // draw a 3d border in desktop mode
++    if (!panel_.empty()) {
++        painter_.paint(ps.hdc, rc, 0);
++        return;
++    }
      HDC hDC = ps.hdc;
      HFONT oldFont = (HFONT)SelectObject(hDC, font_);
 -
 +    Palette colors = currentPalette();
-+    fillRect(hDC, rc, colors.background);
++    fillRect(hDC, rc, colors.surface);
      SetBkMode(hDC, TRANSPARENT);
 -    if(isImmersive()) {
 -        SetTextColor(hDC, GetSysColor(COLOR_WINDOWTEXT));
@@ -439,12 +365,615 @@ index 581f89f..754a472 100644
      SelectObject(hDC, oldFont);
  }
  
+diff --git a/src/MessageWindow.h b/src/MessageWindow.h
+index 41e3a33..eabd50f 100644
+--- a/src/MessageWindow.h
++++ b/src/MessageWindow.h
+@@ -23,6 +23,7 @@
+ #include "ImeWindow.h"
+ #include "EditSession.h"
+ #include <string>
++#include "Panel.h"
+ 
+ namespace Ime {
+ 
+@@ -37,6 +38,11 @@ public:
+         return text_;
+     }
+     void setText(std::wstring text);
++    // Claudish: a panel instead of plain text (the mode switch), drawn like the candidate window.
++    void setPanel(const PanelSpec& panel);
++    int textInset() const {
++        return painter_.textInset();
++    }
+ 
+     TextService* textService() {
+         return textService_;
+@@ -49,6 +55,8 @@ protected:
+ 
+ private:
+     std::wstring text_;
++    PanelSpec panel_;
++    PanelPainter painter_;
+ };
+ 
+ }
+diff --git a/src/Panel.cpp b/src/Panel.cpp
+new file mode 100644
+index 0000000..f20ede5
+--- /dev/null
++++ b/src/Panel.cpp
+@@ -0,0 +1,433 @@
++//
++//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
++//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
++//
++
++#include "Panel.h"
++#include "Style.h"
++
++#include <algorithm>
++#include <cmath>
++
++#pragma comment(lib, "d2d1.lib")
++#pragma comment(lib, "dwrite.lib")
++
++namespace Ime {
++
++// The skin's geometry in pixels at 96 DPI (design.css, .host.windows).
++static const float PAD = 4, ROW_X = 10, ROW_Y = 5, NUMBER = 12, NUMBER_GAP = 10, TAKE = 48, HEAD_GAP = 2;
++static const float SIZE = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
++static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
++
++static ID2D1Factory* d2d = nullptr;
++static IDWriteFactory* dwrite = nullptr;
++
++template <class T> static void releaseOne(T*& p) {
++    if (p) {
++        p->Release();
++        p = nullptr;
++    }
++}
++
++static D2D1_COLOR_F color(COLORREF c, float alpha = 1.0f) {
++    return D2D1::ColorF(GetRValue(c) / 255.0f, GetGValue(c) / 255.0f, GetBValue(c) / 255.0f, alpha);
++}
++
++// Segoe UI Variable on Windows 11; Segoe UI where it is missing.
++static const wchar_t* uiFont() {
++    static const wchar_t* chosen = nullptr;
++    if (!chosen) {
++        chosen = L"Segoe UI";
++        IDWriteFontCollection* fonts = nullptr;
++        if (dwrite && SUCCEEDED(dwrite->GetSystemFontCollection(&fonts, FALSE))) {
++            UINT32 index = 0;
++            BOOL exists = FALSE;
++            if (SUCCEEDED(fonts->FindFamilyName(L"Segoe UI Variable Text", &index, &exists)) && exists)
++                chosen = L"Segoe UI Variable Text";
++            fonts->Release();
++        }
++    }
++    return chosen;
++}
++
++PanelPainter::PanelPainter() {
++    scale_ = scaled(1000) / 1000.0f;
++}
++
++PanelPainter::~PanelPainter() {
++    release();
++    releaseOne(text_);
++    releaseOne(small_);
++    releaseOne(label_format_);
++    releaseOne(mono_);
++    releaseOne(tile_);
++}
++
++bool PanelPainter::ensureFactories() {
++    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
++        return false;
++    if (!dwrite && FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
++                                              reinterpret_cast<IUnknown**>(&dwrite))))
++        return false;
++    if (!text_) {
++        const wchar_t* ui = uiFont();
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(SIZE), L"", &text_);
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(SMALL), L"", &small_);
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(SMALL), L"", &label_format_);
++        dwrite->CreateTextFormat(L"Cascadia Mono", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(MONO), L"", &mono_);
++        dwrite->CreateTextFormat(L"Consolas", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(10), L"", &tile_);
++    }
++    return text_ && small_ && label_format_ && mono_ && tile_;
++}
++
++IDWriteTextLayout* PanelPainter::makeLayout(const std::wstring& text, IDWriteTextFormat* format, float maxWidth) {
++    IDWriteTextLayout* layout = nullptr;
++    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, maxWidth, 10000.0f, &layout);
++    return layout;
++}
++
++static void measure(IDWriteTextLayout* layout, float* w, float* h) {
++    DWRITE_TEXT_METRICS m = {};
++    if (layout)
++        layout->GetMetrics(&m);
++    *w = std::ceil(m.widthIncludingTrailingWhitespace);
++    *h = std::ceil(m.height);
++}
++
++void PanelPainter::release() {
++    releaseOne(label_.layout);
++    releaseOne(body_.layout);
++    for (auto& line : rows_)
++        releaseOne(line.layout);
++    for (auto& line : numbers_)
++        releaseOne(line.layout);
++    for (auto& item : foot_)
++        releaseOne(item.layout);
++    releaseOne(take_);
++    rows_.clear();
++    numbers_.clear();
++    rowTop_.clear();
++    rowHeight_.clear();
++    foot_.clear();
++}
++
++int PanelPainter::textInset() const {
++    return (int)(px(PAD) + px(ROW_X) + (spec_.rows.empty() ? 0 : px(NUMBER) + px(NUMBER_GAP)));
++}
++
++SIZE PanelPainter::layout(const PanelSpec& spec) {
++    release();
++    spec_ = spec;
++    SIZE none = { 0, 0 };
++    if (spec.empty() || !ensureFactories())
++        return none;
++    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
++    float widest = (spec.rows.empty() && spec.body.empty()) ? 0 : px(MIN_WIDTH);
++    float y = px(PAD);
++    // The header: a small label, then the content as is.
++    if (!spec.body.empty()) {
++        y += px(ROW_Y) + 1;
++        if (!spec.label.empty()) {
++            label_.layout = makeLayout(spec.label, label_format_, inner);
++            measure(label_.layout, &label_.w, &label_.h);
++            label_.x = px(PAD) + px(ROW_X);
++            label_.y = y;
++            y += label_.h + px(HEAD_GAP);
++            widest = std::max(widest, label_.w + 2 * (px(PAD) + px(ROW_X)));
++        }
++        body_.layout = makeLayout(spec.body, spec.code ? mono_ : text_, inner);
++        measure(body_.layout, &body_.w, &body_.h);
++        body_.x = px(PAD) + px(ROW_X);
++        body_.y = y;
++        y += body_.h + px(ROW_Y);
++        widest = std::max(widest, body_.w + 2 * (px(PAD) + px(ROW_X)));
++    }
++    // The rows: a number, the text (its legend muted); a list with a highlight keeps a trailing
++    // column on every row for the highlighted row's Enter, so every row wraps alike.
++    const bool takes = spec.on >= 0 && spec.on < (int)spec.rows.size();
++    const float textX = px(PAD) + px(ROW_X) + px(NUMBER) + px(NUMBER_GAP);
++    const float textMax = inner - px(NUMBER) - px(NUMBER_GAP) - (takes ? px(TAKE) : 0);
++    for (size_t i = 0; i < spec.rows.size(); ++i) {
++        const PanelRow& row = spec.rows[i];
++        std::wstring words = row.text + (row.legend.empty() ? L"" : L" — " + row.legend);
++        Line line, number;
++        line.layout = makeLayout(words, text_, textMax);
++        measure(line.layout, &line.w, &line.h);
++        number.layout = makeLayout(row.key, text_, px(NUMBER) + 4);
++        measure(number.layout, &number.w, &number.h);
++        float h = std::max(line.h, px(18)) + 2 * px(ROW_Y);
++        rowTop_.push_back(y);
++        rowHeight_.push_back(h);
++        line.x = textX;
++        line.y = y + px(ROW_Y);
++        number.x = px(PAD) + px(ROW_X);
++        number.y = y + px(ROW_Y);
++        rows_.push_back(line);
++        numbers_.push_back(number);
++        widest = std::max(widest, textX + line.w + (takes ? px(TAKE) : 0) + px(ROW_X) + px(PAD));
++        y += h;
++    }
++    if (takes)
++        take_ = makeLayout(L"Enter", small_, 200);
++    // The footer: the AI tile (or a warning mark), what is happening, each key with its verb, the
++    // free words, and a hosted model's name at the end.
++    if (!spec.rows.empty() || !spec.body.empty())
++        y += px(2);
++    footTop_ = y;
++    footHeight_ = px(20) + 2 * px(ROW_Y) - 1;
++    float x = px(PAD) + px(ROW_X);
++    auto add = [&](FootItem::Kind kind, const std::wstring& text, IDWriteTextFormat* format, float gap) {
++        FootItem item;
++        item.kind = kind;
++        item.text = text;
++        if (kind == FootItem::Tile || kind == FootItem::Warn) {
++            item.w = item.h = px(TILE);
++        } else if (kind == FootItem::Spinner) {
++            item.w = item.h = px(12);
++        } else {
++            item.layout = makeLayout(text, format, 1000);
++            measure(item.layout, &item.w, &item.h);
++            if (kind == FootItem::Cap)
++                item.w += 2 * px(CAP_X);
++        }
++        item.x = x;
++        x += item.w + gap;
++        foot_.push_back(item);
++    };
++    add(spec.tile == L"warn" ? FootItem::Warn : FootItem::Tile, spec.tile == L"cd" ? L"cd" : L"AI", nullptr, px(8));
++    if (!spec.status.empty()) {
++        if (spec.busy)
++            add(FootItem::Spinner, L"", nullptr, px(6));
++        add(FootItem::Text, spec.status, small_, px(ITEM_GAP));
++    }
++    if (!spec.failed.empty())
++        add(FootItem::Error, spec.failed, small_, px(ITEM_GAP));
++    for (const auto& key : spec.foot) {
++        add(FootItem::Cap, key.first, small_, px(KEY_GAP));
++        add(FootItem::Verb, key.second, small_, px(ITEM_GAP));
++    }
++    if (!spec.tail.empty())
++        add(FootItem::Verb, spec.tail, small_, px(ITEM_GAP));
++    if (!spec.mark.empty())
++        add(FootItem::Mark, spec.mark, small_, 0);
++    widest = std::max(widest, x - px(ITEM_GAP) + px(ROW_X) + px(PAD));
++    y += footHeight_ + px(PAD);
++    width_ = std::min(px(MAX_WIDTH), widest);
++    height_ = y;
++    if (!foot_.empty() && foot_.back().kind == FootItem::Mark)  // the hosted mark, at the end
++        foot_.back().x = std::max(foot_.back().x, width_ - px(PAD) - px(ROW_X) - foot_.back().w);
++    SIZE size = { (LONG)std::ceil(width_), (LONG)std::ceil(height_) };
++    return size;
++}
++
++void PanelPainter::paint(HDC dc, const RECT& rc, float spin) {
++    if (spec_.empty() || !ensureFactories())
++        return;
++    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
++        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), 96, 96);
++    ID2D1DCRenderTarget* target = nullptr;
++    if (FAILED(d2d->CreateDCRenderTarget(&props, &target)) || FAILED(target->BindDC(dc, &rc))) {
++        releaseOne(target);
++        return;
++    }
++    Palette colors = currentPalette();
++    ID2D1SolidColorBrush *brush = nullptr, *muted = nullptr;
++    target->CreateSolidColorBrush(color(colors.text), &brush);
++    target->CreateSolidColorBrush(color(colors.muted), &muted);
++    auto fill = [&](const D2D1_RECT_F& r, float radius, COLORREF c) {
++        ID2D1SolidColorBrush* b = nullptr;
++        target->CreateSolidColorBrush(color(c), &b);
++        target->FillRoundedRectangle(D2D1::RoundedRect(r, radius, radius), b);
++        b->Release();
++    };
++    auto text = [&](IDWriteTextLayout* layout, float x, float y, ID2D1Brush* b) {
++        if (layout)
++            target->DrawTextLayout(D2D1::Point2F(x, y), layout, b, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
++    };
++
++    target->BeginDraw();
++    target->Clear(color(colors.surface));
++    text(label_.layout, label_.x, label_.y, muted);
++    text(body_.layout, body_.x, body_.y, brush);
++    for (size_t i = 0; i < rows_.size(); ++i) {
++        const bool on = (int)i == spec_.on;
++        const float top = rowTop_[i], h = rowHeight_[i];
++        if (on) {  // a neutral fill, the system accent bar inside it, and the row's own Enter
++            fill(D2D1::RectF(px(PAD), top, width_ - px(PAD), top + h), px(ROW_RADIUS), colors.selection);
++            fill(D2D1::RectF(px(PAD) + px(2), top + px(7), px(PAD) + px(5), top + h - px(7)), px(1.5f), colors.accent);
++            if (take_) {
++                float w, th;
++                measure(take_, &w, &th);
++                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;
++                ID2D1SolidColorBrush* edge = nullptr;
++                target->CreateSolidColorBrush(color(colors.contrast ? colors.accent : colors.cap), &edge);
++                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
++                                                                           y + px(CAP_H) - 0.5f), px(4), px(4)), edge);
++                edge->Release();
++                text(take_, x + px(CAP_X), y + (px(CAP_H) - th) / 2, colors.contrast ? brush : brush);
++            }
++        }
++        ID2D1SolidColorBrush* ink = brush;
++        ID2D1SolidColorBrush* inverse = nullptr;
++        if (on && colors.contrast) {  // high contrast: the highlight's own text colour
++            target->CreateSolidColorBrush(color(colors.accent), &inverse);
++            ink = inverse;
++        }
++        text(numbers_[i].layout, numbers_[i].x, numbers_[i].y, on ? ink : muted);
++        const PanelRow& row = spec_.rows[i];
++        if (!row.legend.empty() && rows_[i].layout) {  // the legend in the muted colour
++            DWRITE_TEXT_RANGE range = { (UINT32)row.text.size(), (UINT32)(row.legend.size() + 3) };
++            rows_[i].layout->SetDrawingEffect(on && colors.contrast ? (IUnknown*)ink : (IUnknown*)muted, range);
++        }
++        text(rows_[i].layout, rows_[i].x, rows_[i].y, ink);
++        releaseOne(inverse);
++    }
++    // The footer.
++    const float mid = footTop_ + footHeight_ / 2;
++    for (const FootItem& item : foot_) {
++        switch (item.kind) {
++        case FootItem::Tile: {
++            D2D1_RECT_F r = D2D1::RectF(item.x, mid - item.h / 2, item.x + item.w, mid + item.h / 2);
++            const bool ai = item.text == L"AI";  // continue's tile is neutral: only compose wears the accent
++            fill(r, px(4), ai ? colors.tile : mix(colors.surface, colors.text, 12));
++            IDWriteTextLayout* glyph = makeLayout(item.text, tile_, item.w);
++            float w, h;
++            measure(glyph, &w, &h);
++            ID2D1SolidColorBrush* ink = nullptr;
++            target->CreateSolidColorBrush(ai ? D2D1::ColorF(1, 1, 1) : color(colors.text), &ink);
++            text(glyph, item.x + (item.w - w) / 2, mid - h / 2, ink);
++            ink->Release();
++            releaseOne(glyph);
++            break;
++        }
++        case FootItem::Warn: {  // a failure reads without colour: a mark, then why
++            ID2D1SolidColorBrush* red = nullptr;
++            target->CreateSolidColorBrush(color(colors.error), &red);
++            target->FillEllipse(D2D1::Ellipse(D2D1::Point2F(item.x + item.w / 2, mid), item.w / 2, item.w / 2), red);
++            red->Release();
++            IDWriteTextLayout* mark = makeLayout(L"!", label_format_, item.w);
++            float w, h;
++            measure(mark, &w, &h);
++            ID2D1SolidColorBrush* surface = nullptr;
++            target->CreateSolidColorBrush(color(colors.surface), &surface);
++            text(mark, item.x + (item.w - w) / 2, mid - h / 2, surface);
++            surface->Release();
++            releaseOne(mark);
++            break;
++        }
++        case FootItem::Spinner: {  // a ring with a turning arc
++            const float r = item.w / 2 - px(1), cx = item.x + item.w / 2;
++            ID2D1SolidColorBrush* faint = nullptr;
++            target->CreateSolidColorBrush(color(colors.muted, 0.35f), &faint);
++            target->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(cx, mid), r, r), faint, px(1.5f));
++            faint->Release();
++            ID2D1PathGeometry* arc = nullptr;
++            if (SUCCEEDED(d2d->CreatePathGeometry(&arc))) {
++                ID2D1GeometrySink* sink = nullptr;
++                arc->Open(&sink);
++                const float a0 = spin, a1 = spin + 1.6f;
++                sink->BeginFigure(D2D1::Point2F(cx + r * std::cos(a0), mid + r * std::sin(a0)), D2D1_FIGURE_BEGIN_HOLLOW);
++                sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(cx + r * std::cos(a1), mid + r * std::sin(a1)),
++                                              D2D1::SizeF(r, r), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
++                sink->EndFigure(D2D1_FIGURE_END_OPEN);
++                sink->Close();
++                sink->Release();
++                target->DrawGeometry(arc, muted, px(1.5f));
++                arc->Release();
++            }
++            break;
++        }
++        case FootItem::Cap: {
++            ID2D1SolidColorBrush* edge = nullptr;
++            target->CreateSolidColorBrush(color(colors.cap), &edge);
++            D2D1_RECT_F r = D2D1::RectF(item.x + 0.5f, mid - px(CAP_H) / 2 + 0.5f, item.x + item.w - 0.5f,
++                                        mid + px(CAP_H) / 2 - 0.5f);
++            target->DrawRoundedRectangle(D2D1::RoundedRect(r, px(4), px(4)), edge);
++            edge->Release();
++            text(item.layout, item.x + px(CAP_X), mid - item.h / 2, brush);
++            break;
++        }
++        case FootItem::Error: {
++            ID2D1SolidColorBrush* red = nullptr;
++            target->CreateSolidColorBrush(color(colors.error), &red);
++            text(item.layout, item.x, mid - item.h / 2, red);
++            red->Release();
++            break;
++        }
++        case FootItem::Text:
++            text(item.layout, item.x, mid - item.h / 2, brush);
++            break;
++        default:  // a verb, the free words, the hosted mark
++            text(item.layout, item.x, mid - item.h / 2, muted);
++        }
++    }
++    target->EndDraw();
++    releaseOne(brush);
++    releaseOne(muted);
++    releaseOne(target);
++}
++
++void GhostPainter::show(HWND hwnd, const std::wstring& text, const RECT& caret) {
++    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
++        return;
++    if (!dwrite && FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
++                                              reinterpret_cast<IUnknown**>(&dwrite))))
++        return;
++    // The UI font at the caret's height (the line is about 1.25 times the font's size).
++    const float size = std::max(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
++    IDWriteTextFormat* format = nullptr;
++    dwrite->CreateTextFormat(uiFont(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                             DWRITE_FONT_STRETCH_NORMAL, size, L"", &format);
++    if (!format)
++        return;
++    IDWriteTextLayout* layout = nullptr;
++    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, 4000, 1000, &layout);
++    float w, h;
++    measure(layout, &w, &h);
++    const int width = std::max(1, (int)w + 2), height = std::max(1, (int)h);
++    // A premultiplied 32-bit bitmap, painted, then handed to the layered window.
++    BITMAPINFO info = {};
++    info.bmiHeader.biSize = sizeof(info.bmiHeader);
++    info.bmiHeader.biWidth = width;
++    info.bmiHeader.biHeight = -height;
++    info.bmiHeader.biPlanes = 1;
++    info.bmiHeader.biBitCount = 32;
++    void* bits = nullptr;
++    HDC screen = GetDC(nullptr);
++    HDC memory = CreateCompatibleDC(screen);
++    HBITMAP bitmap = CreateDIBSection(memory, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
++    HGDIOBJ old = SelectObject(memory, bitmap);
++    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
++        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
++    ID2D1DCRenderTarget* target = nullptr;
++    RECT area = { 0, 0, width, height };
++    if (SUCCEEDED(d2d->CreateDCRenderTarget(&props, &target)) && SUCCEEDED(target->BindDC(memory, &area))) {
++        ID2D1SolidColorBrush* grey = nullptr;
++        target->CreateSolidColorBrush(color(currentPalette().ghost), &grey);
++        target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);  // ClearType needs an opaque background
++        target->BeginDraw();
++        target->Clear(D2D1::ColorF(0, 0, 0, 0));
++        target->DrawTextLayout(D2D1::Point2F(1, 0), layout, grey);
++        target->EndDraw();
++        grey->Release();
++    }
++    releaseOne(target);
++    POINT at = { caret.right, caret.top + ((caret.bottom - caret.top) - height) / 2 }, origin = { 0, 0 };
++    SIZE extent = { width, height };
++    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
++    UpdateLayeredWindow(hwnd, screen, &at, &extent, memory, &origin, 0, &blend, ULW_ALPHA);
++    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
++    SelectObject(memory, old);
++    DeleteObject(bitmap);
++    DeleteDC(memory);
++    ReleaseDC(nullptr, screen);
++    releaseOne(layout);
++    releaseOne(format);
++}
++
++} // namespace Ime
+diff --git a/src/Panel.h b/src/Panel.h
+new file mode 100644
+index 0000000..984347d
+--- /dev/null
++++ b/src/Panel.h
+@@ -0,0 +1,125 @@
++//
++//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
++//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
++//    anti-alias the rounded keycaps and tile, nor draw Segoe UI Variable well). LGPL like the rest
++//    of libIME2.
++//
++
++#ifndef IME_PANEL_H
++#define IME_PANEL_H
++
++#include "Window.h"
++#include <windows.h>
++#include <d2d1.h>
++#include <dwrite.h>
++#include <string>
++#include <utility>
++#include <vector>
++
++namespace Ime {
++
++// What the panel shows: Claudish's Composition.panel(), sent by the input method as JSON.
++struct PanelRow {
++    std::wstring key;
++    std::wstring text;
++    std::wstring legend;
++};
++
++struct PanelSpec {
++    std::wstring label;   // the header: who asks or what this is (small)
++    std::wstring body;    // then the content as is
++    bool code = false;    // the body is a command (monospace)
++    std::vector<PanelRow> rows;
++    int on = -1;          // the highlighted row; -1: none (an approval)
++    std::vector<std::pair<std::wstring, std::wstring>> foot;  // (key, verb)
++    std::wstring tail;    // free words after the keys ("or type a reply")
++    std::wstring tile = L"ai";  // "ai", or "warn" when a request failed
++    std::wstring status;  // what is happening
++    bool busy = false;    // with a spinner
++    std::wstring failed;  // why a request failed
++    std::wstring mark;    // a hosted model's name, at the footer's end
++
++    bool empty() const {
++        return body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
++    }
++};
++
++// Lays out and paints a PanelSpec. Sizes are device pixels (the system DPI).
++class PanelPainter {
++public:
++    PanelPainter();
++    ~PanelPainter();
++
++    // The panel's size for this spec; keeps the layout for paint().
++    SIZE layout(const PanelSpec& spec);
++    // Paints the last layout into the DC (the window's client area); spin: the spinner's angle.
++    void paint(HDC dc, const RECT& rc, float spin);
++    // The x of the rows' text, from the panel's left edge: the window is placed so that it lines up
++    // with the composition's first character.
++    int textInset() const;
++
++private:
++    struct Line {
++        IDWriteTextLayout* layout = nullptr;
++        float x = 0, y = 0, w = 0, h = 0;
++    };
++    struct FootItem {
++        enum Kind { Tile, Warn, Spinner, Text, Error, Cap, Verb, Mark } kind;
++        std::wstring text;
++        IDWriteTextLayout* layout = nullptr;
++        float x = 0, w = 0, h = 0;
++    };
++
++    bool ensureFactories();
++    IDWriteTextLayout* makeLayout(const std::wstring& text, IDWriteTextFormat* format, float maxWidth);
++    void release();
++    float px(float dips) const { return dips * scale_; }
++
++    PanelSpec spec_;
++    float scale_ = 1.0f;
++    float width_ = 0, height_ = 0;
++    Line label_, body_;
++    std::vector<Line> rows_;      // the rows' text
++    std::vector<Line> numbers_;
++    std::vector<float> rowTop_, rowHeight_;
++    std::vector<FootItem> foot_;
++    float footTop_ = 0, footHeight_ = 0;
++    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Enter"
++
++    IDWriteTextFormat* text_ = nullptr;
++    IDWriteTextFormat* small_ = nullptr;
++    IDWriteTextFormat* label_format_ = nullptr;
++    IDWriteTextFormat* mono_ = nullptr;
++    IDWriteTextFormat* tile_ = nullptr;
++};
++
++// Continue's suggestion: cd_AI's own grey text right after the caret, in the UI font at the
++// caret's height, on a transparent layered window that never takes the mouse or the keyboard.
++class GhostPainter {
++public:
++    // Paints text into a layered window placed at the caret rectangle's right end.
++    static void show(HWND hwnd, const std::wstring& text, const RECT& caret);
++};
++
++class GhostWindow : public Window {
++public:
++    explicit GhostWindow(HWND parent) {
++        create(parent, WS_POPUP, WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE);
++    }
++    void show(const std::wstring& text, const RECT& caret) {
++        GhostPainter::show(hwnd_, text, caret);
++    }
++
++protected:
++    LRESULT wndProc(UINT msg, WPARAM wp, LPARAM lp) override {
++        if (msg == WM_MOUSEACTIVATE)
++            return MA_NOACTIVATE;
++        if (msg == WM_NCHITTEST)
++            return HTTRANSPARENT;  // the mouse goes to the app underneath
++        return Window::wndProc(msg, wp, lp);
++    }
++};
++
++} // namespace Ime
++
++#endif
 diff --git a/src/Style.h b/src/Style.h
 new file mode 100644
-index 0000000..807d8e3
+index 0000000..71b8a55
 --- /dev/null
 +++ b/src/Style.h
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,147 @@
 +//
 +//    Claudish: the look of the candidate and message windows, after Windows 11's own popups
 +//    (a rounded corner, the system shadow, the app theme's colours). Header-only, LGPL like
@@ -459,12 +988,19 @@ index 0000000..807d8e3
 +
 +namespace Ime {
 +
++// The Windows 11 skin's tokens (claudish/web/design.css, .host.windows): light and dark, the
++// system accent for the highlighted row's bar, and high contrast's system colours.
 +struct Palette {
-+    COLORREF background;
++    COLORREF surface;
 +    COLORREF text;
-+    COLORREF muted;      // selection keys, the header, the footer
-+    COLORREF selection;  // the highlighted row
-+    COLORREF accent;     // the small bar on the highlighted row
++    COLORREF muted;      // numbers, labels, the footer's words (4.5:1 or more on the surface)
++    COLORREF ghost;      // continue's suggestion (3:1 or more)
++    COLORREF selection;  // the highlighted row's neutral fill
++    COLORREF accent;     // its bar: the system accent
++    COLORREF error;
++    COLORREF cap;        // a keycap's border
++    COLORREF tile;       // the AI tile: Claudish's own colour, the one place it appears
++    bool contrast;       // high contrast: system colours, no fills but the highlight
 +};
 +
 +// The apps' theme (Settings > Personalization > Colors), which is what the app under the caret uses.
@@ -476,10 +1012,42 @@ index 0000000..807d8e3
 +    return value == 0;
 +}
 +
++inline COLORREF mix(COLORREF a, COLORREF b, int percentOfB) {
++    return RGB((GetRValue(a) * (100 - percentOfB) + GetRValue(b) * percentOfB) / 100,
++               (GetGValue(a) * (100 - percentOfB) + GetGValue(b) * percentOfB) / 100,
++               (GetBValue(a) * (100 - percentOfB) + GetBValue(b) * percentOfB) / 100);
++}
++
++// The accent colour the user chose (DWM keeps it as 0xAABBGGRR); Windows 11's default blue if none.
++inline COLORREF systemAccent(bool dark) {
++    DWORD value = 0, size = sizeof(value);
++    if (::RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM", L"AccentColor",
++                       RRF_RT_REG_DWORD, NULL, &value, &size) != ERROR_SUCCESS)
++        return dark ? RGB(0x60, 0xcd, 0xff) : RGB(0x00, 0x5f, 0xb8);
++    COLORREF accent = value & 0xffffff;  // already 0x00BBGGRR, a COLORREF
++    return dark ? mix(accent, RGB(255, 255, 255), 45) : accent;  // as Windows lightens it on dark
++}
++
++inline bool highContrast() {
++    HIGHCONTRASTW contrast = { sizeof(contrast) };
++    return ::SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)
++        && (contrast.dwFlags & HCF_HIGHCONTRASTON);
++}
++
 +inline Palette currentPalette() {
++    const COLORREF tile = RGB(217, 119, 87);
++    if (highContrast()) {
++        COLORREF window = GetSysColor(COLOR_WINDOW), text = GetSysColor(COLOR_WINDOWTEXT);
++        return { window, text, text, GetSysColor(COLOR_GRAYTEXT), GetSysColor(COLOR_HIGHLIGHT),
++                 GetSysColor(COLOR_HIGHLIGHTTEXT), text, text, tile, true };
++    }
 +    if (appsUseDarkTheme())
-+        return { RGB(44, 44, 44), RGB(255, 255, 255), RGB(160, 160, 160), RGB(64, 64, 64), RGB(230, 140, 110) };
-+    return { RGB(249, 249, 249), RGB(26, 26, 26), RGB(112, 112, 112), RGB(232, 232, 232), RGB(217, 119, 87) };
++        return { RGB(44, 44, 44), RGB(255, 255, 255), RGB(197, 197, 197), RGB(139, 139, 139),
++                 mix(RGB(44, 44, 44), RGB(255, 255, 255), 11), systemAccent(true), RGB(255, 153, 164),
++                 RGB(106, 106, 106), tile, false };
++    return { RGB(249, 249, 249), RGB(26, 26, 26), RGB(92, 92, 92), RGB(134, 134, 134),
++             mix(RGB(249, 249, 249), RGB(26, 26, 26), 7), systemAccent(false), RGB(196, 43, 28),
++             RGB(184, 184, 184), tile, false };
 +}
 +
 +// Pixels at 96 DPI to device pixels (the system DPI, as the candidate font's size is computed).
@@ -494,7 +1062,7 @@ index 0000000..807d8e3
 +    return ::MulDiv(pixels, dpi, 96);
 +}
 +
-+// Windows 11 rounds the window's corners and draws its border and shadow (menus' small radius);
++// Windows 11 rounds the window's corners (8 px, as its flyouts) and draws its border and shadow;
 +// earlier versions ignore it and keep a square window with the class's drop shadow.
 +inline void roundCorners(HWND hwnd) {
 +    typedef HRESULT (WINAPI *SetAttribute)(HWND, DWORD, LPCVOID, DWORD);
@@ -504,8 +1072,8 @@ index 0000000..807d8e3
 +    SetAttribute set = (SetAttribute)::GetProcAddress(dwm, "DwmSetWindowAttribute");
 +    if (!set)
 +        return;
-+    const DWORD DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUNDSMALL = 3;
-+    DWORD preference = DWMWCP_ROUNDSMALL;
++    const DWORD DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2;
++    DWORD preference = DWMWCP_ROUND;
 +    set(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
 +}
 +

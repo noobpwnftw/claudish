@@ -23,11 +23,11 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules["textService"] = module
-    # Claudish's PIME (platforms/windows/pime) shows the question, hint and status in the candidate
-    # window's header and footer.
+    # Claudish's PIME (platforms/windows/pime) draws the panel the state describes (and the mode
+    # switch as a brief panel, the toast).
 
     def said(reply, words):
-        return words in json.dumps([reply.get("candidateHeader"), reply.get("candidateFooter")], ensure_ascii=False)
+        return words in json.dumps([reply.get("panel"), reply.get("toast")], ensure_ascii=False)
     root = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory() as temporary:
         target = Path(temporary) / "pime_claudish"
@@ -119,7 +119,7 @@ def main():
             for char in "say hi":
                 key(ord(char.upper()), ord(char))
             reply = shift_tap()
-            assert service.state.mode == "continue" and "continue" in json.dumps(reply.get("showMessage")), reply
+            assert service.state.mode == "continue" and said(reply, "Continue"), reply
             assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
             last = worker_class.return_value.schedule.call_args.args
             assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
@@ -130,8 +130,8 @@ def main():
             assert key(ord("!"), ord("!"), "filterKeyUp")["return"] is True
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
             reply = key(ord("!"), ord("!"), "onKeyUp")
-            assert reply.get("candidateList") == ["Hello—truly."] and reply.get("setSelKeys") == "⇥", reply  # one row, keyed ⇥
-            assert reply.get("showCandidates"), reply
+            # cd_AI's own grey text after the caret; no panel in continue.
+            assert reply.get("ghost", "").strip() == "Hello—truly." and reply.get("panel") is None, reply
             assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
@@ -151,7 +151,7 @@ def main():
             reply = key(0x77)  # F8: send a picture of the window too
             assert service.state.look and said(reply, "window"), reply
             reply = key(0x0D)
-            assert service.state.working and said(reply, "working"), reply
+            assert service.state.working and said(reply, "Working"), reply
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
@@ -176,7 +176,7 @@ def main():
                         "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
             reply = key(0x10)
-            assert reply.get("candidateList") == ["Allow — Bash: git status", "Deny"], reply
+            assert reply.get("candidateList") == ["Allow", "Deny"], reply
             assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
             reply = key(0x31)

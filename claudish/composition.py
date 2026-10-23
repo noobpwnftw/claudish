@@ -144,11 +144,19 @@ class Composition:
         elif self.converted:
             shown.update(label="Your words", body=self.text, foot=[("Tab", "keep"), ("Esc", "undo")],
                          mark=self.hosted and "from %s · hosted" % self.hosted)
-        elif self.hint_due(now) == 0:
+        elif self.look or self.hint_due(now) == 0:  # F8 was a deliberate key: said at once
             shown["foot"] = ([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
         else:
             return None
         return shown
+
+    def toast(self):
+        """The mode switch, briefly at the caret: the mode's tile, its name, and the key back (a
+        panel with only a footer)."""
+        compose = self.mode == "compose"
+        return {"label": None, "body": None, "code": False, "rows": [], "on": -1, "tail": None,
+                "tile": "ai" if compose else "cd", "status": "Compose" if compose else "Continue", "busy": False,
+                "foot": [("Shift", "back" if compose else "compose")], "failed": None, "mark": None}
 
     def hint_due(self, now=None):
         """Seconds until compose's keys show (0: now), or None when they are not waiting: they show

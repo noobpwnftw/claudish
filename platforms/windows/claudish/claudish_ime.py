@@ -2,7 +2,7 @@
 from textService import TextService
 import time
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, split_title
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -84,7 +84,7 @@ class ClaudishTextService(TextService):
         if self.worker:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
-        self.showMessage("cd_AI: " + self.state.mode, 2)
+        self.setToast(self.state.toast(), 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
 
@@ -168,45 +168,32 @@ class ClaudishTextService(TextService):
         return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 
     def publish(self):
-        """The screen from the state, in Claudish's PIME candidate window (platforms/windows/pime):
-        the question as its header, the items, and the one short hint (or what is happening) as its
-        footer, so nothing shows in a passing notice."""
+        """The screen from the state, in Claudish's PIME (platforms/windows/pime): continue's
+        suggestion right after the caret, or the panel Composition.panel() describes (drawn as the
+        design lab's Windows 11 mock), and in compose your words as the composition."""
         if self.state.live:
-            # Your words are in the app already; the suggestion shows in the candidate window
-            # (TSF compositions cannot be greyed), and Tab takes it.
+            # Your words are in the app already; the suggestion is cd_AI's own grey text after the
+            # caret, and Tab takes it.
             self.setCompositionString("")
-            ghost = self.state.ghost.lstrip()
-            self.setSelKeys("⇥")  # one row, its key ⇥: Tab takes it
-            self.setCandidateHeader("")
-            self.setCandidateFooter("")
-            self.setCandidateList([ghost] if ghost else [])
-            self.setShowCandidates(bool(ghost))
+            self.setGhost("" if self.state.inside else self.state.ghost)
+            self.setPanel(None)
+            self.setCandidateList([])
+            self.setShowCandidates(False)
             return
+        self.setGhost("")
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         self.setCompositionString(shown)
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
-        # A list only for an instruction's drafts or an agent's question; rewrite converts in place.
-        question = self.state.question if not self.state.reply else None
-        if question:
-            candidates = [c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
-                          for c in question.get("choices") or []]
-        else:
-            candidates = self.state.candidates if self.state.choosing else []
-        header, footer = "", self.state.hint()
-        if question:  # the question as is, a small label for who asks; an approval highlights nothing
-            label, body = split_title(question.get("text", ""))
-            header = "%s\n%s" % (label, body) if label else body
-            footer = ("Enter: the first · 1–%d · or type a reply" if self.state.asks
-                      else "1–%d · or type a reply") % len(candidates)
-            self.customizeUI(candUseCursor=self.state.asks)
-        else:
-            self.customizeUI(candUseCursor=True)
-        self.setSelKeys("123456789")
-        self.setCandidateHeader(header)
-        self.setCandidateFooter(footer if self.state.text else "")
-        self.setCandidateList(candidates)
-        self.setShowCandidates(bool(candidates or header or (footer and self.state.text)))
+        panel = self.state.panel()
+        self.setPanel(panel)
+        # The rows also go to TSF's candidate list, for apps that draw candidates themselves.
+        self.setCandidateList([row["text"] for row in panel["rows"]] if panel else [])
+        self.setShowCandidates(bool(panel))
+        self.panel_shown = panel
+        due = self.state.hint_due()
+        if due:  # compose's keys show after a pause: call back then
+            self.setTimer(int(due * 1000) + 20)
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
@@ -248,8 +235,8 @@ class ClaudishTextService(TextService):
         before = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
         self.poll_results()
         after = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
-        if after != before:
-            self.publish()
+        if after != before or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
+            self.publish()  # an answer, a question, progress, or the pause for compose's keys
         # Still waiting: an instruction or rewrite that is working, or a suggestion not yet back.
         waiting = self.state.working or (after == before and time.monotonic() < getattr(self, "waiting_until", 0))
         if waiting:
@@ -288,7 +275,7 @@ class ClaudishTextService(TextService):
         if result:
             revision, data = result
             if "text" in data:
-                self.state.offer(revision, data["text"], data.get("candidates", ()))
+                self.state.offer(revision, data["text"], data.get("candidates", ()), data.get("hosted", ""))
             elif "question" in data:
                 self.state.ask(revision, data["question"], data["session"])
             elif "progress" in data or "partial" in data:
@@ -297,7 +284,7 @@ class ClaudishTextService(TextService):
                 if self.state.done(revision):
                     self.showMessage("cd_AI: " + data["done"], 3)  # a helper took the task
             elif "error" in data:
-                self.state.fail(revision)  # the footer says so: Enter retries
+                self.state.fail(revision, data["error"])  # the panel says why: Enter retries
 
     def onKeyDown(self, event):
         keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text),
