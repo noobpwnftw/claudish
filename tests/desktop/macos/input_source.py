@@ -4,6 +4,7 @@ PyObjC), so the rig needs no compiler.
 python input_source.py /path/to/Claudish.app org.claudish.inputmethod.Claudish
 python input_source.py --current
 python input_source.py --select com.apple.keylayout.US
+python input_source.py --enable org.claudish.inputmethod.Claudish
 """
 import ctypes
 import sys
@@ -55,38 +56,26 @@ def main():
         status = carbon.TISSelectInputSource(found[0].__c_void_p__()) if len(found) else -1
         print("select", sys.argv[2], status, "current:", current())
         return 0 if status == 0 else 1
+    if sys.argv[1] == "--enable":
+        # macOS answers with a dialog ("Allow … to enable …?"); the caller waits for it.
+        for source in sources(sys.argv[2]):
+            print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
+        return 0
+    # Register if needed and try to select; never enable, which would ask the user. Each call is a
+    # fresh process: Text Input Sources caches its list per process, so a process that started
+    # before the user clicked Allow keeps seeing the old answer.
     path, bundle_id = sys.argv[1], sys.argv[2]
-
-    def enabled():
-        return any(prop(s, "kTISPropertyInputSourceIsEnabled") and prop(s, "kTISPropertyInputSourceIsSelectCapable")
-                   for s in sources(bundle_id))
-
-    # Registering or enabling a third-party input method makes macOS ask the user ("Allow … to
-    # enable …?"), so do either only when needed, once, and then wait for the answer.
     if not sources(bundle_id):
         print("register:", carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__()))
-
-    def select(tries):
-        for _ in range(tries):
-            for source in sources(bundle_id):
-                if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
-                    if carbon.TISSelectInputSource(source) == 0 and current().startswith(bundle_id):
-                        return True
-            time.sleep(1)
-        return False
-
-    # After the bundle changes macOS can still report it enabled yet refuse to select it until the
-    # user allows it again: so try first, and ask only when that fails.
-    if not (enabled() and select(3)):
+    for _ in range(3):
         for source in sources(bundle_id):
-            print("enable", prop(source, "kTISPropertyInputSourceID"), carbon.TISEnableInputSource(source))
-        print(">>> macOS is asking to enable cd_AI: click Allow on the Mac. Nothing else is needed;"
-              " the test closes System Settings and continues.", flush=True)
-        if not select(180):
-            print("cd_AI could not be selected (no Allow within 3 minutes?); current:", current())
-            return 1
+            if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
+                if carbon.TISSelectInputSource(source) == 0 and current().startswith(bundle_id):
+                    print("current:", current())
+                    return 0
+        time.sleep(0.5)
     print("current:", current())
-    return 0
+    return 1
 
 if __name__ == "__main__":
     sys.exit(main())

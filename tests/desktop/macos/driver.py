@@ -89,6 +89,25 @@ def document():
     return state().get("text", "")
 
 
+def select_input_method():
+    """Select cd_AI, asking macOS to enable it only when selecting fails (after a new build macOS
+    asks the user again: "Allow … to enable cd_AI?"), and wait for the click."""
+    helper = [sys.executable, str(HERE / "input_source.py")]
+    if subprocess.run(helper + [str(TARGET), BUNDLE_ID]).returncode == 0:
+        return True
+    subprocess.run(helper + ["--enable", BUNDLE_ID])
+    print(">>> macOS is asking to enable cd_AI: click Allow on the Mac. Nothing else is needed;"
+          " the test closes System Settings and continues.", flush=True)
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        if subprocess.run(helper + [str(TARGET), BUNDLE_ID], capture_output=True).returncode == 0:
+            subprocess.run(["pkill", "-x", "System Settings"], check=False)
+            return True
+    print("cd_AI was not selected within 3 minutes")
+    return False
+
+
 def front():
     """Bring the test app to the front. The consent dialog leaves System Settings in front, and a
     click on the Mac can leave anything there, so close System Settings and ask the app to activate
@@ -160,7 +179,7 @@ def scenarios():
         # In place: a removed and re-added bundle is a new input source, which macOS asks about again.
         sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
         subprocess.run(["pkill", "-f", str(TARGET)], check=False)  # the next key starts the new build
-    print(sh(sys.executable, str(HERE / "input_source.py"), str(TARGET), BUNDLE_ID, check=False))
+    select_input_method()
     # macOS starts an input method at login; after an update (or a crash) it does not start it again
     # by itself, and keys then reach the app without it. Start it the way login would.
     if subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode:
