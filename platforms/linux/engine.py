@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 """IBus adapter. Run using the system Python that supplies python3-gi."""
+import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -18,6 +20,21 @@ MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
     "ISO_Next_Group", "ISO_Prev_Group")}
 
 
+
+TRACE = os.environ.get("CLAUDISH_TRACE")  # a file path: event kinds, never typed text
+
+
+def trace(*fields):
+    if TRACE:
+        with open(TRACE, "a") as out:
+            out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
+
+
+# The field kinds IBus reports, by the names the service understands.
+PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "email", IBus.InputPurpose.URL: "url",
+            IBus.InputPurpose.NAME: "name", IBus.InputPurpose.NUMBER: "number", IBus.InputPurpose.PHONE: "phone",
+            IBus.InputPurpose.DIGITS: "digits", IBus.InputPurpose.ALPHA: "alpha"}
+
 class ClaudishEngine(IBus.Engine):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,12 +42,14 @@ class ClaudishEngine(IBus.Engine):
         self.suggestions = Suggestions()
         self.sensitive = False
         self.app = None  # The focused program, for bindings ("supported text boxes").
+        self.purpose = None  # The field's kind as the app reports it ("terminal", "email", ...).
         self.timer = GLib.timeout_add(40, self.poll)
 
     def poll(self):
         result = self.suggestions.poll()
         if result:
             revision, data = result
+            trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
             if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
                 self.render()
             elif "question" in data and self.composition.ask(revision, data["question"], data["session"]):
@@ -102,9 +121,11 @@ class ClaudishEngine(IBus.Engine):
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text))
 
     def changed(self):
-        if self.composition.automatic or not self.composition.text:
+        if self.composition.automatic:  # continue: the text so far is the context; what follows the caret too
             self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode,
-                                      app=self.app)
+                                      app=self.app, after=self.around_caret()[1][:500], purpose=self.purpose)
+        elif not self.composition.text:
+            self.suggestions.schedule(self.composition.revision, "")
         self.render()
 
     def around_caret(self):
@@ -167,6 +188,10 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(text))
 
     def do_process_key_event(self, keyval, keycode, state):
+        if not state & IBus.ModifierType.RELEASE_MASK:
+            name = IBus.keyval_name(keyval) or ""
+            trace("key", name if len(name) > 1 else "char", self.composition.mode,
+                  "ghost" if self.composition.ghost else "no-ghost", "rev", self.composition.revision)
         if state & IBus.ModifierType.RELEASE_MASK or self.sensitive:
             return False
         if keyval in MODIFIER_KEYS:
@@ -219,7 +244,8 @@ class ClaudishEngine(IBus.Engine):
                 before, after = self.around_caret()  # the text box, for this turn of its conversation
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
                                           self.composition.mode, immediate=True, app=self.app,
-                                          look=self.composition.look, before=before[-8000:], after=after[:8000])
+                                          look=self.composition.look, before=before[-8000:], after=after[:8000],
+                                          purpose=self.purpose)
                 self.render()
             elif action in ("accept", "keep"):
                 self.finish(action == "accept")
@@ -229,8 +255,10 @@ class ClaudishEngine(IBus.Engine):
             if action == "accept":
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it converts in place when it arrives
+                before, after = self.around_caret()  # where the rewrite goes
                 self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
-                                          immediate=True, app=self.app)
+                                          immediate=True, app=self.app, before=before[-1500:], after=after[:500],
+                                          purpose=self.purpose)
                 self.render()
             elif action == "convert":
                 self.render()
@@ -267,6 +295,9 @@ class ClaudishEngine(IBus.Engine):
 
     def do_set_content_type(self, purpose, hints):
         self.sensitive = purpose in (IBus.InputPurpose.PASSWORD, IBus.InputPurpose.PIN)
+        self.purpose = PURPOSES.get(purpose)
+        # Not prose: suggestions only when asked for (Tab in rewrite, Enter in instruct).
+        self.composition.quiet = self.purpose in ("url", "email", "number", "phone", "digits")
         if self.sensitive:
             self.do_reset()
 
@@ -276,6 +307,7 @@ class ClaudishEngine(IBus.Engine):
         self.refresh_surrounding()
 
     def do_focus_out(self):
+        trace("focus-out")
         # IBus commits the visible preedit through PreeditFocusMode.COMMIT.
         self.do_reset()
 
@@ -292,6 +324,7 @@ class ClaudishEngine(IBus.Engine):
                 pass
 
     def do_reset(self):
+        trace("reset")
         self.composition.change("")
         self.changed()
         self.refresh_surrounding()

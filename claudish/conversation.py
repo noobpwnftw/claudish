@@ -81,6 +81,20 @@ class Conversations:
             conversation.close()
 
 
+# What the input method reported about the field, in words for the model. Free-form text needs none.
+KINDS = {"terminal": "a terminal", "email": "an email address field", "url": "a URL field",
+         "name": "a name field", "number": "a number field", "phone": "a phone number field",
+         "digits": "a digits field", "alpha": "a letters-only field"}
+
+
+def describe(app, purpose):
+    """One line about the text box: its kind and its app, as far as they are known."""
+    kind = KINDS.get(purpose or "")
+    if not (kind or app):
+        return ""
+    return "\n\nThe text box is %s%s." % (kind or "a text field", " in %s" % app if app else "")
+
+
 def clipped(before, after):
     """Whether the text box is longer than the window around the caret."""
     return len(before) > WINDOW_BEFORE or len(after) > WINDOW_AFTER
@@ -103,9 +117,9 @@ def window(before, after, tools=True):
 class ModelDriver:
     """Claudish runs the loop: the model, the profile's tools under the policy, and the conversation."""
 
-    def __init__(self, rewriter, conversation, app=None, before="", after="", look=False):
+    def __init__(self, rewriter, conversation, app=None, before="", after="", look=False, purpose=None):
         self.rewriter, self.conversation = rewriter, conversation
-        self.app, self.before, self.after, self.look = app, before, after, look
+        self.app, self.before, self.after, self.look, self.purpose = app, before, after, look, purpose
         self.pending = {}  # question id -> [event, answer]
         self.cancelled = False
         self.counter = 0
@@ -131,7 +145,8 @@ class ModelDriver:
             image, width, height = capture(rewriter.look_command)
             consulted.append("window picture (%d×%d)" % (width, height))
         context = window(self.before, self.after)
-        system = spec["system"] + block + context + (AGENT_NOTE if context else "")
+        system = (spec["system"] + block + describe(self.app, self.purpose) + context
+                  + (AGENT_NOTE if context else ""))
         turn = [{"role": "user", "content": user_content(prompt, image, "openai")}]
         messages = ([{"role": "system", "content": system}] + spec["examples"] + self.conversation.messages + turn)
         max_tokens = spec["max_tokens"] or rewriter.max_tokens

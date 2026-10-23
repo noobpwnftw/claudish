@@ -142,3 +142,19 @@ Claude Code in VS Code.
 It is not a replacement for the extension: the conversation with the agent stays
 in the agent's own window.
 
+## What cd_AI tells the model about the text box
+
+Every request carries what the input method knows about where you are typing,
+described the same way for every mode:
+
+- **the app** (the program, or the bundle on macOS), which also picks the
+  profile's bindings;
+- **the field's kind** when the app reports it (IBus: terminal, email, URL,
+  number, and so on). URL, email, number, and phone fields get no unasked
+  suggestions; Tab and Enter still work there;
+- **the text around the caret**: for continue, the text before it (the
+  suggestion's start) and after it; for rewrite, where your phrase goes; for
+  instruct, a window of the text box, with the rest available as retrieval.
+
+Windows (PIME) reports only the app so far; macOS reports no field kind.
+

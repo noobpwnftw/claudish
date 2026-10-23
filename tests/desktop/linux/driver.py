@@ -59,10 +59,15 @@ def settle(seconds=0.6):
     time.sleep(seconds)  # Debounce (180 ms) + engine poll (40 ms) + request.
 
 
+TRACE = Path("/tmp/claudish-engine-trace.log")
+
+
 def check(name, actual, expected):
     ok = actual == expected
+    if not ok and TRACE.exists():
+        print("".join(TRACE.read_text().splitlines(True)[-25:]), end="", flush=True)
     results.append((name, ok, actual, expected))
-    print("%s %-44s %r" % ("PASS" if ok else "FAIL", name, actual) + ("" if ok else " (expected %r)" % expected),
+    print("%s %-44s %r" % ("PASS" if ok else "FAIL", name, actual) + ("" if ok else " (expected %r)" % (expected,)),
           flush=True)
 
 
@@ -133,7 +138,7 @@ def scenarios():
         pass
     check("continue: the suggestion waits after the caret", state().get("preedit"), expected)
     key("Tab")  # takes the rest
-    wait_for(lambda: state()["entry"], what="continuation")
+    wait_for(lambda: state()["entry"].endswith("naturally."), what="continuation")  # not just any text: it had some
     check("continue: Tab takes the ghost text", state()["entry"], "Thanks for the review and then some—naturally.")
     key("ctrl+a", "BackSpace")
     type_text("Only my words")
@@ -262,7 +267,7 @@ def surrounding_context(service):
     import threading
     service.terminate()
     service.wait(timeout=5)
-    received = []
+    received, bodies = [], []
 
     class Stub(http.server.BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -277,6 +282,7 @@ def surrounding_context(service):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             if self.path == "/suggest":
                 received.append(body.get("text"))
+                bodies.append(body)
                 reply = {"text": body["text"] + "and then some.", "candidates": [body["text"] + "and then some."]}
                 self.send_response(200)
             else:  # no agent sessions here
@@ -298,6 +304,27 @@ def surrounding_context(service):
         type_text(" We ship ")
         wait_for(lambda: received, what="a continue request")
         check("continue begins from the text already there", received[-1], "Pasted words. We ship ")
+
+        # A rewrite knows where it goes: the text box around the caret, and the app.
+        focus("view")
+        key("ctrl+a", "BackSpace")
+        type_text("Dear Ana, ")
+        key("F7", "F7")  # continue -> instruct -> rewrite
+        type_text("thanks")
+        key("Tab")
+        wait_for(lambda: bodies and bodies[-1].get("mode") == "rewrite", what="a rewrite request")
+        sent = bodies[-1]
+        check("a rewrite is sent with the text around it", (sent["text"], sent.get("before"), sent.get("app")),
+              ("thanks", "Dear Ana, ", "app.py"))
+        key("Escape", "Escape")
+
+        # An email address field is not prose: nothing is suggested unasked.
+        focus("email")
+        key("F7")  # rewrite -> continue
+        count = len(bodies)
+        type_text("ana at example dot com ")
+        time.sleep(1.0)
+        check("an email field gets no unasked suggestions", len(bodies) - count, 0)
     finally:
         stub.shutdown()
         stub.server_close()
@@ -323,7 +350,8 @@ def main():
     session = dict(line.strip().split("=", 1) for line in
                    (Path.home() / ".config/environment.d/90-claudish-ibus.conf").read_text().splitlines() if "=" in line)
     print("Session environment from install.py:", session, flush=True)
-    os.environ.update(session, DISPLAY=":99", GTK_IM_MODULE="ibus", XMODIFIERS="@im=ibus", QT_IM_MODULE="ibus")
+    os.environ.update(session, DISPLAY=":99", GTK_IM_MODULE="ibus", XMODIFIERS="@im=ibus", QT_IM_MODULE="ibus",
+                      CLAUDISH_TRACE=str(TRACE))  # event kinds from the engine, printed when a check fails
     background("Xvfb", ":99", "-screen", "0", "1024x768x24", "-nolisten", "tcp")
     wait_for(lambda: subprocess.run(["xdpyinfo"], capture_output=True).returncode == 0, what="Xvfb")
     # A "supported text box": a binding for the test app (IBus reports it as gtk3-im:app.py) runs a

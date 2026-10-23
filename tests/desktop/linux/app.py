@@ -10,18 +10,19 @@ from gi.repository import GLib, Gtk
 STATE, COMMANDS = sys.argv[1], sys.argv[2]
 window = Gtk.Window(title="Claudish test app")
 box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-entry, other, password = Gtk.Entry(), Gtk.Entry(), Gtk.Entry()
+entry, other, password, email = Gtk.Entry(), Gtk.Entry(), Gtk.Entry(), Gtk.Entry()
 password.set_visibility(False)
 password.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+email.set_input_purpose(Gtk.InputPurpose.EMAIL)
 view = Gtk.TextView()
 view.set_size_request(600, 200)
-widgets = {"entry": entry, "other": other, "password": password, "view": view}
+widgets = {"entry": entry, "other": other, "password": password, "email": email, "view": view}
 for widget in widgets.values():
     box.pack_start(widget, False, False, 0)
 window.add(box)
 # The input method's preedit (the composition, or continue's grey suggestion), as the app sees it.
 preedits = {}
-for name in ("entry", "other", "password"):
+for name in ("entry", "other", "password", "email"):
     widgets[name].connect("preedit-changed", lambda widget, text, name=name: preedits.__setitem__(name, text))
 view.connect("preedit-changed", lambda widget, text: preedits.__setitem__("view", text))
 window.connect("destroy", Gtk.main_quit)

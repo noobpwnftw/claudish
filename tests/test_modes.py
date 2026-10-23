@@ -34,6 +34,20 @@ class ModeTests(unittest.TestCase):
         self.assertFalse(modes.parroted("continue", done, done + "Let's merge it today.", examples))
         self.assertFalse(modes.parroted("rewrite", "x", "x the budget—this week got away from me.", examples))
 
+    def test_every_mode_is_told_about_the_text_box(self):
+        rewriter = Rewriter(max_tokens=64)
+        _, payload = self.call(rewriter, "this is important", "rewrite", before="Dear Ana,\n\n", after="\n\nBest, Sam",
+                               app="thunderbird", purpose="email")
+        system = payload["messages"][0]["content"]
+        self.assertIn("The text box is an email address field in thunderbird.", system)
+        self.assertIn("Dear Ana,\n\n▮\n\nBest, Sam", system)  # where the rewrite goes
+        _, payload = self.call(rewriter, "Thanks for the review ", "continue", after=" Cheers.", app="kate")
+        system = payload["messages"][0]["content"]
+        self.assertIn("The text box is a text field in kate.", system)
+        self.assertIn("▮ Cheers.", system)  # continue: what follows the caret; the text itself is the frame
+        _, payload = self.call(rewriter, "this is important", "rewrite")
+        self.assertNotIn("text box", payload["messages"][0]["content"])  # nothing known: nothing added
+
     def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
         rewriter = Rewriter(max_tokens=64)
         _, payload = self.call(rewriter, "hello ", "continue")
@@ -41,11 +55,11 @@ class ModeTests(unittest.TestCase):
         _, payload = self.call(rewriter, "so", "rewrite")
         self.assertEqual(payload["messages"][-1]["content"], "so")  # other modes send the text itself
 
-    def call(self, rewriter, text, mode):
+    def call(self, rewriter, text, mode, **field):
         reply = {"choices": [{"message": {"content": "the parser change."}, "finish_reason": "stop"}]}
         with patch.object(rewriter, "opener") as opener:
             opener.open.return_value = BytesIO(json.dumps(reply).encode())
-            result = rewriter.rewrite(text, mode=mode)
+            result = rewriter.rewrite(text, mode=mode, **field)
             return result, json.loads(opener.open.call_args.args[0].data)
 
     def test_each_mode_sends_its_template_and_budget(self):

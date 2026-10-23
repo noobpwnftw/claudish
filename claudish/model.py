@@ -167,25 +167,26 @@ class Rewriter:
             raise RuntimeError("model returned no text")
         return output, usage
 
-    def make_driver(self, app=None, conversation=None, before="", after="", look=False):
+    def make_driver(self, app=None, conversation=None, before="", after="", look=False, purpose=None):
         """The driver for an instruction: the profile's agent (session_command), else the model
         driver, which runs it as a turn in the text box's conversation."""
         if self.session_command:
             from .agent import AgentProcess, ClaudeCodeDriver
             if not conversation:
                 return ClaudeCodeDriver(self.session_command)  # a process for this turn only
-            from .conversation import AGENT_NOTE, window
+            from .conversation import AGENT_NOTE, describe, window
             from .textbox import Textbox
             kept = self.conversations.get(conversation)
             kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
             kept.agent = kept.agent or AgentProcess(self.session_command, self.textbox_config(kept))
-            context = window(before, after, tools=bool(kept.agent.mcp_config))
-            if context:
+            place = window(before, after, tools=bool(kept.agent.mcp_config))
+            context = describe(app, purpose) + place
+            if place:
                 context += AGENT_NOTE + (" The textbox tools (read, search) see all of it."
                                          if kept.agent.mcp_config else "")
             return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context)
         from .conversation import ModelDriver
-        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look)
+        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose)
 
     def textbox_config(self, conversation):
         """--mcp-config for an agent: Claudish's textbox server, when the MCP SDK is here to run it."""
@@ -199,8 +200,8 @@ class Rewriter:
             "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
                     "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}}}
 
-    def start_session(self, text, app=None, conversation=None, before="", after="", look=False):
-        return self.sessions.start(self.make_driver(app, conversation, before, after, look), text)
+    def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None):
+        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose), text)
 
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
@@ -225,8 +226,10 @@ class Rewriter:
             raise
         return data["choices"][0], data.get("usage", {})
 
-    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False):
-        """look: attach a picture of the focused window (instruct only; the user asked for it with F8)."""
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None):
+        """look: attach a picture of the focused window (instruct only; the user asked for it with F8).
+        before/after: the text box around the caret, where the result goes (continue: the text is
+        what comes before, so only after adds); purpose: the field's kind."""
         started = time.perf_counter()
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
@@ -248,7 +251,11 @@ class Rewriter:
             block, consulted = "", []
         if image is not None:
             consulted = consulted + ["window picture (%d×%d)" % (width, height)]
-        system = spec["system"] + block
+        # The text box, described the same way for every mode: its kind and app, and the text around
+        # where the result goes.
+        from .conversation import describe, window
+        place = window("", after) if mode == "continue" else window(before, after)
+        system = spec["system"] + block + describe(app, purpose) + place
         examples, max_tokens = spec["examples"], spec["max_tokens"] or self.max_tokens
         # What the model is sent: the text itself, or the mode's frame around it (continue).
         sent = spec["frame"].replace("{text}", text) if spec.get("frame") else text

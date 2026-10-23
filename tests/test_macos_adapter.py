@@ -126,7 +126,8 @@ class Worker:
         self.answered = (session, question, choice)
         self.answered_text = (session, question, text)
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after=""):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
+                 purpose=None):
         self.result = None
         self.modes.append(mode)
         self.sent = (text, before, after)
@@ -424,6 +425,21 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 36,
                                       modifierFlags=lambda: 0, characters=lambda: "\r"), client)
             self.assertEqual(fresh.worker.sent, ("say hi", "Dear Ana,\n\n", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_a_rewrite_knows_where_it_goes(self):
+        client = TextClient("Dear Ana,\n\n")
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "rewrite"
+            for char in "thanks":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
+                                          modifierFlags=lambda: 0, characters=lambda c=char: c), client)
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48,
+                                      modifierFlags=lambda: 0, characters=lambda: "\t"), client)
+            self.assertEqual(fresh.worker.sent, ("thanks", "Dear Ana,\n\n", ""))
         finally:
             fresh.inputControllerWillClose()
 

@@ -13,12 +13,14 @@ OPENER = build_opener(ProxyHandler({}))
 
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None, look=False):
+def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None, look=False,
+            before="", after="", purpose=None):
+    """before/after: the text box around the caret (where the result goes); purpose: the field's
+    kind as the input method reports it ("terminal", "email", ...)."""
     body = {"text": text, "mode": mode}
-    if app:
-        body["app"] = app
-    if look:
-        body["look"] = True
+    for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
+        if value:
+            body[key] = value
     request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"),
                       headers={"Content-Type": "application/json"})
     with OPENER.open(request, timeout=timeout) as response:
@@ -50,9 +52,10 @@ class Suggestions:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
-    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after=""):
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
+                 purpose=None):
         with self.condition:
-            self.pending = (revision, text, mode, app, look, immediate, before, after,
+            self.pending = (revision, text, mode, app, look, immediate, before, after, purpose,
                             time.monotonic() + (0 if immediate else self.debounce))
             self.results.clear()
             self.condition.notify()
@@ -96,10 +99,12 @@ class Suggestions:
                 return True
             return False
 
-    def session(self, revision, text, app, look=False, before="", after=""):
+    def session(self, revision, text, app, look=False, before="", after="", purpose=None):
         """Run an instruction as a turn in this text box's conversation; False if the service has
         no sessions (an older service)."""
         body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
+        if purpose:
+            body["purpose"] = purpose
         if app:
             body["app"] = app
         try:
@@ -140,7 +145,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, app, look, immediate, before, after, due = self.pending
+                revision, text, mode, app, look, immediate, before, after, purpose, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -150,9 +155,10 @@ class Suggestions:
                 continue
             try:
                 # A sent instruction runs as an agent session when the profile has an agent.
-                if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after):
+                if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after, purpose):
                     continue
-                result = suggest(text, self.endpoint, mode=mode, app=app, look=look)
+                result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,
+                                 purpose=purpose)
             except Exception as exc:
                 result = {"error": str(exc)}
             self.deliver(revision, result)

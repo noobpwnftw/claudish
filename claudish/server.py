@@ -10,6 +10,13 @@ TEXTBOX_LIMIT = 200_000  # an instruction's text box, each side of the caret (th
 BODY_LIMIT = 8 * TEXTBOX_LIMIT + 65536  # both sides, in UTF-8 and JSON escapes
 
 
+def checked_purpose(purpose):
+    """The field's kind as the input method reports it ("terminal", "email", ...), or None."""
+    if purpose is not None and not (isinstance(purpose, str) and purpose.isidentifier() and len(purpose) <= 32):
+        raise ValueError("purpose must be a short name")
+    return purpose
+
+
 def make_server(rewriter, port=18765):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -82,7 +89,8 @@ def make_server(rewriter, port=18765):
                 if not isinstance(look, bool):
                     return self.reply(400, {"error": "look is a boolean"})
                 try:
-                    session = rewriter.start_session(text, app, conversation, before, after, look)
+                    purpose = checked_purpose(data.get("purpose"))
+                    session = rewriter.start_session(text, app, conversation, before, after, look, purpose)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
                 except RuntimeError as exc:
@@ -200,10 +208,11 @@ def make_server(rewriter, port=18765):
                 look = data.get("look", False)  # F8: the user asked for a picture of the focused window
                 if not isinstance(look, bool) or (look and mode != "instruct"):
                     raise ValueError("look is a boolean, for instruct only")
+                purpose = checked_purpose(data.get("purpose"))
             except (ValueError, UnicodeError):
                 return self.reply(400, {"error": "invalid text request"})
             try:
-                result = rewriter.rewrite(text, before, after, mode, app, look)
+                result = rewriter.rewrite(text, before, after, mode, app, look, purpose)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
             self.reply(200, result)

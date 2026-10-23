@@ -49,7 +49,7 @@ class WorkerTests(unittest.TestCase):
         started, release, finished = threading.Event(), threading.Event(), threading.Event()
         calls = []
 
-        def transport(text, endpoint, mode="rewrite", app=None, look=False):
+        def transport(text, endpoint, mode="rewrite", app=None, look=False, **field):
             calls.append(text)
             if text == "old":
                 started.set()

@@ -205,8 +205,11 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def changed(self, client):
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
-        if self.worker is not None and (self.state.automatic or not self.state.text):
-            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client))
+        if self.worker is not None and self.state.automatic:  # continue: what follows the caret too
+            self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client),
+                                 after=self.around_caret(client)[1][:500])
+        elif self.worker is not None and not self.state.text:
+            self.worker.schedule(self.state.revision, "")
         if self.state.question and not self.state.reply:  # the agent's choices, while you have not typed
             self.panel.updateCandidates()
             self.panel.show_(kIMKLocateCandidatesBelowHint)
@@ -347,8 +350,9 @@ class ClaudishInputController(IMKInputController):
                 self.finish(client, suggested=True)
             elif action == "request":  # rewrite: ask now; it converts in place when it arrives
                 if self.worker is not None:
+                    before, after = self.around_caret(client)  # where the rewrite goes
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
-                                         app=self.app(client))
+                                         app=self.app(client), before=before[-1500:], after=after[:500])
             elif action == "convert":
                 self.changed(client)
             return action != "pass"

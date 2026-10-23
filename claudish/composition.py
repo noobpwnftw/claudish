@@ -22,6 +22,7 @@ class Composition:
         self.look = False  # F8 in instruct: send a picture of the focused window with the instruction
         self.taken = False  # continue: a suggestion was just taken; wait for the next key
         self.converted = False  # rewrite: Tab showed the rewrite in place of your words
+        self.quiet = False  # the field is not prose (a URL, an email address, a number): nothing unasked
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.reply = ""  # your own words in answer to it, typed instead of a number
         self.status = ""  # what the agent is doing, or its draft so far
@@ -44,7 +45,7 @@ class Composition:
         """Ask on this pause? Only continue, and only at a word boundary (after a space or
         punctuation), so a pause mid-word never splits it ("rev" + " iew"). Rewrite asks on Tab and
         instruct on Enter: you ask for them, so nothing is sent while you type."""
-        if self.mode == "continue":
+        if self.mode == "continue" and not self.quiet:
             return bool(self.text) and not self.text[-1].isalnum() and not self.taken
         return False
 
