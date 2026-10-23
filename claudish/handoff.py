@@ -22,6 +22,14 @@ UNSUPERVISED = ("--dangerously-skip-permissions", "bypasspermissions", "--yolo",
 UNSAFE = re.compile(r"[\"$`!%^&|<>;'\r\n]")
 
 
+NAMES = {"claude": "Claude Code", "codex": "Codex"}
+
+
+def display_name(name):
+    """A helper's name as people know it ("claude" is Claude Code)."""
+    return NAMES.get(str(name).lower(), str(name))
+
+
 def helpers(setting):
     """{name: command} from a profile's "helper": one command, or named commands; only the ones
     that can be offered (installed, supervised)."""

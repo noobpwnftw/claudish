@@ -59,10 +59,11 @@ class ServiceTests(unittest.TestCase):
         partial = self.until(session, "partial")
         self.assertTrue(partial["text"].startswith("Checking"))
         question = self.until(session, "question")
-        self.assertEqual([c["label"] for c in question["choices"]], ["Allow", "Deny"])
-        self.assertEqual(question["choices"][0]["legend"], "Show the working tree status")
+        self.assertEqual([c["label"] for c in question["choices"]], ["Deny", "Allow"])  # the safe choice first
+        self.assertEqual((question["label"], question["body"], question["code"]),
+                         ("Claude Code wants to run", "git status", True))
         self.assertEqual(self.call("/sessions/%s/answer" % session, {"question": question["id"], "choice": 5})[0], 400)
-        self.assertEqual(self.call("/sessions/%s/answer" % session, {"question": question["id"], "choice": 0})[0], 200)
+        self.assertEqual(self.call("/sessions/%s/answer" % session, {"question": question["id"], "choice": 1})[0], 200)
         result = self.until(session, "result")
         self.assertEqual(result["text"], "The branch is clean—nothing to commit.")
         _, data = self.call("/sessions/%s?after=0" % session)

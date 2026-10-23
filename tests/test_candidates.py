@@ -166,28 +166,47 @@ class ModeFeelTests(unittest.TestCase):
         state.inside, state.quiet = False, True  # a number field
         self.assertFalse(state.automatic)
 
-    def test_hints_are_short_and_only_when_a_key_needs_saying(self):
+    def test_the_panel_is_the_labs_and_the_keys_wait_for_a_pause(self):
+        """Composition.panel() is what every adapter draws (docs/design/visual.md): one header,
+        rows with the highlighted one, one footer of keys with their verbs."""
         state = Composition()
-        self.assertEqual(state.hint(), "")  # continue: quiet
+        self.assertIsNone(state.panel())  # continue: no panel; the suggestion speaks for itself
         state.mode = "compose"
-        self.assertEqual(state.hint(), "")
         state.change("say hi")
-        self.assertEqual(state.hint(), "Tab: rewrite · Enter: ask AI")
+        typed = state.typed_at
+        self.assertIsNone(state.panel(typed + 0.2))  # typing: only the composition
+        self.assertAlmostEqual(state.hint_due(typed + 0.2), 0.8)
+        self.assertEqual(state.panel(typed + 1.0)["foot"], [("Tab", "rewrite"), ("Enter", "ask")])  # a pause
+        self.assertEqual(state.hint(typed + 1.0), "Tab rewrite · Enter ask")
         state.submit()
-        self.assertEqual(state.hint(), "working…")
-        state.offer(state.revision, "Hi!", ["Hello!", "Hey!"])
-        self.assertEqual(state.hint(), "1–3: pick · Esc: back")
+        working = state.panel()
+        self.assertEqual((working["status"], working["busy"], working["foot"]), ("Working", True, [("Esc", "stop")]))
+        state.offer(state.revision, "Hi!", ["Hello!", "Hey!"], hosted="Claude")
+        drafts = state.panel()
+        self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
+        self.assertEqual((drafts["foot"], drafts["mark"]), ([("1–3", "pick"), ("Esc", "back")], "from Claude · hosted"))
         state.change("this is important")
         state.tab()
         state.offer(state.revision, "This is crucial.")
-        self.assertEqual(state.hint(), "Tab: keep · Esc: undo")
+        rewritten = state.panel()  # your words, as large, until you keep it
+        self.assertEqual((rewritten["label"], rewritten["body"], rewritten["mark"]), ("Your words", "this is important", ""))
         state.change("x")
+        state.submit()
+        state.fail(state.revision, "Connection refused")
+        failed = state.panel()
+        self.assertEqual((failed["tile"], failed["failed"]), ("warn", "The model is offline"))
+        state.change("y")
         state.submit()
         state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
                                    "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
-        self.assertEqual(state.hint(), "The model asks: Did you mean git status? · 1–2")
-        for hint in ("Tab: rewrite · Enter: ask AI", "1–3: pick · Esc: back", "Tab: keep · Esc: undo"):
-            self.assertLessEqual(len(hint), 30)
+        asked = state.panel()  # no label sent: split from the text
+        self.assertEqual((asked["label"], asked["body"], asked["on"], asked["tail"]),
+                         ("The model asks", "Did you mean git status?", 0, "or type a reply"))
+        state.ask(state.revision, {"id": "p", "text": "Allow Bash?", "permission": True, "label": "Claude Code wants to run",
+                                   "body": "git push", "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
+        approval = state.panel()  # nothing highlighted; typed words only refuse
+        self.assertEqual((approval["body"], approval["code"], approval["on"], approval["tail"]),
+                         ("git push", True, -1, "or type why not"))
 
     def test_a_leading_space_is_the_apps_not_the_compositions(self):
         state = Composition()

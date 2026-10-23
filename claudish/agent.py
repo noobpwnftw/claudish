@@ -243,10 +243,16 @@ class ClaudeCodeDriver:
             return self.next_question(request_id)
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}
+        # What is approved is the body, in full; the safe choice is 1 (a reflexive 1 never
+        # approves) and nothing is highlighted (docs/design/visual.md).
+        tool_input = body.get("input") if isinstance(body.get("input"), dict) else {}
+        command = tool_input.get("command")
+        label = "Claude Code wants to run" if isinstance(command, str) else "Claude Code wants to use %s" % tool
+        shown = command if isinstance(command, str) else (
+            body.get("description") or summarize(body.get("tool_name", "tool"), body.get("input")))
         session.emit("question", id=request_id, text=body.get("title") or "Allow %s?" % tool, permission=True,
-                     choices=[{"label": "Allow", "legend": body.get("description")
-                               or summarize(body.get("tool_name", "tool"), body.get("input"))},
-                              {"label": "Deny", "legend": "the agent continues without it"}])
+                     label=label, body=str(shown)[:400], code=isinstance(command, str),
+                     choices=[{"label": "Deny", "legend": "the agent continues without it"}, {"label": "Allow"}])
 
     def next_question(self, request_id):
         """Show the agent's next unanswered question; when all are answered, send the answers."""
@@ -255,7 +261,8 @@ class ClaudeCodeDriver:
         if len(asked["answers"]) < len(questions):
             current = questions[len(asked["answers"])]
             self.session.emit("question", id="%s#%d" % (request_id, len(asked["answers"])),
-                              text=str(current.get("question") or ""),
+                              text=str(current.get("question") or ""), label="Claude Code asks",
+                              body=str(current.get("question") or ""),
                               choices=[{"label": str(option.get("label") or ""),
                                         "legend": str(option.get("description") or "")}
                                        for option in current.get("options") or [] if isinstance(option, dict)])
@@ -278,7 +285,7 @@ class ClaudeCodeDriver:
         if question not in self.pending:
             return
         tool_input = self.pending.pop(question)
-        if text is None and choice == 0:
+        if text is None and choice == 1:  # Allow is 2 on screen: the safe choice comes first
             decision = {"behavior": "allow", "updatedInput": tool_input}
         else:  # Deny, or free text: the user's words go back to the agent as the reason
             decision = {"behavior": "deny", "message": text or "The user declined this tool call."}
@@ -288,7 +295,7 @@ class ClaudeCodeDriver:
     def cancel(self):
         self.cancelled = True
         for question in list(self.pending):  # a waiting permission request is denied
-            self.answer(question, 1)
+            self.answer(question, 0)
         for request_id in list(self.asks):  # and the agent's own question goes unanswered
             del self.asks[request_id]
             self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,

@@ -128,8 +128,8 @@ class PolicyTests(unittest.TestCase):
         with patch.object(self.rewriter, "chat", model):
             session, thread = run(ModelDriver(self.rewriter, conversation), "what does PR 3 do")
             question = self.question(session)
-            self.assertEqual([c["label"] for c in question["choices"]], ["Allow", "Deny", "Allow for this conversation"])
-            self.assertIn("pull_request_diff(number=3)", question["choices"][0]["legend"])
+            self.assertEqual([c["label"] for c in question["choices"]], ["Deny", "Allow", "Allow for this conversation"])
+            self.assertIn("pull_request_diff(number=3)", question["body"])  # what is approved, in full
             session.answer(question["id"], 2)
             thread.join(15)
             self.assertEqual(session.events[-1]["text"], "PR 3 retries the upload.")
@@ -208,10 +208,11 @@ class AskAndHelperTests(unittest.TestCase):
         with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch", return_value=True) as launch, \
                 patch.dict(os.environ, {"XDG_RUNTIME_DIR": folder}):
-            asked, result = self.drive(model, [0], helper=["claude", "{prompt}"], before="Hi team, the build ")
-        # The whole task is in the question: nothing the helper is told is hidden.
-        self.assertEqual(asked[0]["text"], "Send this task to claude? Find why the build fails and fix it")
-        self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No"])
+            asked, result = self.drive(model, [1], helper=["claude", "{prompt}"], before="Hi team, the build ")
+        # The whole task is in the question: nothing the helper is told is hidden. The safe choice
+        # is 1 (No): a reflexive 1 never hands anything over.
+        self.assertEqual((asked[0]["label"], asked[0]["body"]), ("Hand off to Claude Code", "Find why the build fails and fix it"))
+        self.assertEqual([c["label"] for c in asked[0]["choices"]], ["No", "Yes"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
         template, note, launcher, session, window = launch.call_args.args
@@ -227,7 +228,7 @@ class AskAndHelperTests(unittest.TestCase):
         model = Scripted(answer(calls=[("helper__claude", {"task": "fix the build"})]), answer("make clean && make"))
         with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch") as launch:
-            asked, result = self.drive(model, [1], helper=["claude", "{prompt}"])
+            asked, result = self.drive(model, [0], helper=["claude", "{prompt}"])  # 1 on screen: No
         launch.assert_not_called()
         self.assertEqual(result["text"], "make clean && make")
         self.assertIn("denied by the user", model.sent[1]["messages"][-1]["content"])
@@ -373,7 +374,7 @@ class HandleTests(unittest.TestCase):
                 deadline = time.monotonic() + 5
                 while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
                     time.sleep(0.01)
-                session.answer(next(e for e in session.events if e["type"] == "question")["id"], 0)
+                session.answer(next(e for e in session.events if e["type"] == "question")["id"], 1)  # Yes
                 thread.join(5)
             helper_session = launch.call_args.args[3]
             self.assertTrue(helper_session)  # Claude Code is started with an id Claudish chose

@@ -1,20 +1,24 @@
 """cd_AI's own panel and suggestion overlay on macOS (the visual pass, G45; docs/design/visual.md).
 
-The stock IMKCandidates panel is a fixed, tall list with tiny numbers; IMK also drops colour from
-marked text, so continue's suggestion looked typed. This draws both: a panel at the caret sized to
-its content (an instruction's drafts, a question as is, an answer to read, one short hint), and the
-suggestion as grey text right after the caret. Non-activating panels: the app keeps the keyboard.
+The panel draws Composition.panel()'s description as the design lab does (claudish/web/design.html,
+macOS skin): an optional header (a small label, then the content as is), numbered rows (the
+highlighted one a neutral fill with the system accent bar and its own ↩), and one footer (the AI
+tile or a warning mark, what is happening, each key with its verb, a hosted model's name). The
+overlay draws continue's suggestion right after the caret, in the system font at the caret's
+height. Non-activating panels: the app keeps the keyboard; a click on a row picks it.
 """
-from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsMake, NSFont, NSFontWeightRegular,
-                    NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel, NSScreen, NSTextField, NSView,
-                    NSVisualEffectView)
+import objc
+from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsMake, NSFont, NSFontWeightBold,
+                    NSFontWeightMedium, NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
+                    NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
-from claudish.composition import split_title
-
-PADDING, ROW_GAP, WIDTH, MIN_WIDTH, RADIUS = 12, 4, 440, 220, 10
+PAD, ROW_X, ROW_Y, KEY_GAP, RADIUS, ROW_RADIUS = 5, 9, 4, 6, 12, 7
+SIZE, SMALL, MIN_WIDTH, MAX_WIDTH, TAKE = 14, 12, 240, 440, 30
 BORDERLESS, NONACTIVATING = 0, 1 << 7  # NSWindowStyleMask values
 POPUP_LEVEL = 101  # NSPopUpMenuWindowLevel: above the app's own windows
 MATERIAL_MENU, BLENDING_BEHIND, STATE_ACTIVE = 5, 0, 1
+ACCENT = (217 / 255, 119 / 255, 87 / 255)  # Claudish's: the AI tile only
+KEYS = {"Enter": "↩", "Esc": "⎋", "Tab": "⇥", "Shift": "⇧"}  # macOS menus' glyphs
 
 
 def rounded_mask(radius):
@@ -32,7 +36,7 @@ def rounded_mask(radius):
     return image
 
 
-def label(text, size=14, weight=NSFontWeightRegular, color=None, mono=False, width=None):
+def label(text, size=SIZE, weight=NSFontWeightRegular, color=None, mono=False, width=None):
     field = NSTextField.labelWithString_(text)
     field.setFont_(NSFont.monospacedSystemFontOfSize_weight_(size, weight) if mono
                    else NSFont.systemFontOfSize_weight_(size, weight))
@@ -44,8 +48,50 @@ def label(text, size=14, weight=NSFontWeightRegular, color=None, mono=False, wid
     return field
 
 
+class Box(NSView):
+    """A rounded rectangle in a colour, drawn by AppKit (a layer's CGColor needs Quartz's bridge)."""
+
+    def drawRect_(self, rect):
+        self.color.set()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(self.bounds(), self.radius, self.radius).fill()
+
+
+def box(color, radius):
+    view = Box.alloc().initWithFrame_(NSMakeRect(0, 0, 1, 1))
+    view.color, view.radius = color, radius
+    return view
+
+
+def tile(text, background, foreground, round_=False):
+    """The footer's mark: the AI tile, or a warning mark when a request failed."""
+    view = box(background, 9 if round_ else 4)
+    view.setFrame_(NSMakeRect(0, 0, 18, 18))
+    glyph = label(text, 12 if round_ else 10, NSFontWeightBold, foreground, mono=not round_)
+    size = glyph.fittingSize()
+    glyph.setFrame_(NSMakeRect((18 - size.width) / 2, (18 - size.height) / 2, size.width, size.height))
+    view.addSubview_(glyph)
+    return view
+
+
+class Row(NSView):
+    """A row the mouse can pick: a click calls back with its number."""
+
+    def initWithFrame_(self, frame):
+        self = objc.super(Row, self).initWithFrame_(frame)
+        if self is not None:
+            self.picked = None
+        return self
+
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    def mouseDown_(self, event):
+        if self.picked is not None:
+            self.picked()
+
+
 class Panel:
-    """The list next to the caret: show(rect, title, items, selected, hint), hide()."""
+    """The panel next to the caret: show(rect, spec, pick), hide()."""
 
     def __init__(self):
         self.window = None
@@ -68,65 +114,53 @@ class Panel:
         window.setContentView_(effect)
         self.window, self.effect = window, effect
 
-    def show(self, rect, title=None, items=(), selected=0, hint=""):
-        """rect: the caret's line in screen coordinates ((x, y), (w, h)), as IMK reports it."""
+    def show(self, rect, spec, pick=None):
+        """rect: the caret's line in screen coordinates ((x, y), (w, h)); spec: Composition.panel();
+        pick(number): a click on a row."""
         if self.window is None:
             self.build()
         for view in list(self.effect.subviews()):
             view.removeFromSuperview()
-        rows = []  # (view, x, height) from the top
-        inner = WIDTH - 2 * PADDING
-        if title:
-            header, body = split_title(title)
-            if header:
-                rows.append((label(header, 11, NSFontWeightSemibold, color=NSColor.secondaryLabelColor()), PADDING))
-            rows.append((label(body, 14, width=inner), PADDING))
-        for index, text in enumerate(items):
-            row = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, WIDTH - 12, 10))
-            number = label(str(index + 1), 11, mono=True,
-                           color=NSColor.alternateSelectedControlTextColor() if index == selected
-                           else NSColor.tertiaryLabelColor())
-            body = label(text, 14, width=inner - 28,
-                         color=NSColor.alternateSelectedControlTextColor() if index == selected else None)
-            rows.append(((row, number, body, index == selected), 6))
-        if hint:
-            rows.append((label(hint, 11, color=NSColor.secondaryLabelColor()), PADDING))
-        # Sizes: every label at its fitting size, the panel as wide as its widest line.
-        widest, heights = (MIN_WIDTH if items or title else 0), []
-        for row, x in rows:
-            if isinstance(row, tuple):
-                _, number, body, _ = row
-                size = body.fittingSize()
-                widest = max(widest, size.width + 28 + 2 * PADDING)
-                heights.append(max(size.height, 18) + 8)
-            else:
-                size = row.fittingSize()
-                widest = max(widest, size.width + 2 * PADDING)
-                heights.append(size.height)
-        width = min(WIDTH, widest)
-        height = PADDING * 2 + sum(heights) + ROW_GAP * max(0, len(rows) - 1)
-        y = height - PADDING
-        for (row, x), h in zip(rows, heights):
+        inner = MAX_WIDTH - 2 * PAD - 2 * ROW_X
+        secondary = NSColor.secondaryLabelColor()
+        blocks = []  # (kind, views, height), laid out top to bottom
+        widest = MIN_WIDTH if spec["rows"] or spec["body"] else 0
+        if spec["body"]:
+            views = []
+            if spec["label"]:
+                views.append(label(spec["label"], SMALL, NSFontWeightSemibold, secondary, width=inner))
+            views.append(label(spec["body"], SIZE - 1 if spec["code"] else SIZE, mono=spec["code"], width=inner))
+            widest = max([widest] + [v.fittingSize().width + 2 * (PAD + ROW_X) for v in views])
+            blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1) + 2 * ROW_Y + 1))
+        takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's ↩
+        text_width = inner - 20 - (TAKE if takes else 0)
+        for index, row in enumerate(spec["rows"]):
+            on = index == spec["on"]
+            number = label(row["key"], SIZE, NSFontWeightMedium if on else NSFontWeightRegular,
+                           NSColor.labelColor() if on else secondary)
+            legend = " — " + row["legend"] if row.get("legend") else ""
+            text = label(row["text"] + legend, SIZE, width=text_width)
+            if legend:  # the legend in the secondary colour
+                words = text.attributedStringValue().mutableCopy()
+                words.addAttribute_value_range_("NSColor", secondary, (len(row["text"]), len(legend)))
+                text.setAttributedStringValue_(words)
+            size = text.fittingSize()
+            widest = max(widest, size.width + 20 + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
+            blocks.append(("row", (number, text, on, index + 1), max(size.height, 18) + 2 * ROW_Y))
+        foot = self.footer(spec, secondary)
+        widest = max(widest, sum(self.size(v).width + gap for v, gap in foot) + 2 * (PAD + ROW_X))
+        blocks.append(("foot", foot, 20 + 2 * ROW_Y - 1))
+        width = min(MAX_WIDTH, widest)
+        height = 2 * PAD + sum(h for _, _, h in blocks) + (2 if len(blocks) > 1 else 0)
+        y = height - PAD
+        for kind, views, h in blocks:
+            if kind == "foot" and len(blocks) > 1:
+                y -= 2
             y -= h
-            if isinstance(row, tuple):
-                view, number, body, chosen = row
-                view.setFrame_(NSMakeRect(6, y, width - 12, h))
-                if chosen:
-                    view.setWantsLayer_(True)
-                    view.layer().setCornerRadius_(6)
-                    view.layer().setBackgroundColor_(NSColor.selectedContentBackgroundColor().CGColor())
-                number.setFrame_(NSMakeRect(PADDING - 6, (h - number.fittingSize().height) / 2,
-                                            20, number.fittingSize().height))
-                body.setFrame_(NSMakeRect(PADDING - 6 + 22, 4, width - 12 - PADDING - 22, h - 8))
-                view.addSubview_(number)
-                view.addSubview_(body)
-                self.effect.addSubview_(view)
-            else:
-                row.setFrame_(NSMakeRect(x, y, width - 2 * PADDING, h))
-                self.effect.addSubview_(row)
-            y -= ROW_GAP
+            getattr(self, "place_" + kind)(views, y, h, width, pick)
         (cx, cy), (cw, ch) = rect
-        frame = NSMakeRect(cx, cy - height - 6, width, height)  # below the caret's line
+        # Under the caret's line, the rows' text aligned with your words (as input methods place it).
+        frame = NSMakeRect(cx - PAD - ROW_X, cy - height - 6, width, height)
         screen = NSScreen.mainScreen().visibleFrame()
         if frame.origin.y < screen.origin.y:  # no room below: above the line
             frame.origin.y = cy + ch + 6
@@ -135,18 +169,93 @@ class Panel:
         self.window.invalidateShadow()  # the shadow follows the rounded mask, not the square window
         self.window.orderFrontRegardless()
 
+    @staticmethod
+    def size(view):
+        return view.frame().size if isinstance(view, (NSProgressIndicator, Box)) else view.fittingSize()
+
+    def footer(self, spec, secondary):
+        """[(view, gap after)]: the mark, what is happening, each key with its verb, the tail, and a
+        hosted model's name at the end."""
+        items = []
+        if spec["tile"] == "warn":  # a failure reads without colour: a mark, then why
+            items.append((tile("!", NSColor.systemRedColor(), NSColor.whiteColor(), round_=True), 8))
+        else:
+            items.append((tile("AI", NSColor.colorWithSRGBRed_green_blue_alpha_(*ACCENT, 1), NSColor.whiteColor()), 8))
+        if spec["status"]:
+            if spec["busy"]:
+                spinner = NSProgressIndicator.alloc().initWithFrame_(NSMakeRect(0, 0, 12, 12))
+                spinner.setStyle_(1)  # NSProgressIndicatorStyleSpinning
+                spinner.setControlSize_(2)  # mini
+                spinner.setIndeterminate_(True)
+                spinner.startAnimation_(None)
+                items.append((spinner, 6))
+            items.append((label(spec["status"], SMALL), 12))
+        if spec["failed"]:
+            items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), 12))
+        for key, verb in spec["foot"]:
+            items.append((label(KEYS.get(key, key), SMALL + 1, NSFontWeightMedium, secondary), KEY_GAP - 2))
+            items.append((label(verb, SMALL, color=secondary), 12))
+        if spec["tail"]:
+            items.append((label(spec["tail"], SMALL, color=secondary), 12))
+        if spec["mark"]:
+            items.append((label(spec["mark"], SMALL, color=secondary), 0))
+        return items
+
+    def place_head(self, views, y, h, width, pick):
+        top = y + h - ROW_Y - 1
+        for view in views:
+            size = view.fittingSize()
+            top -= size.height
+            view.setFrame_(NSMakeRect(PAD + ROW_X, top, width - 2 * (PAD + ROW_X), size.height))
+            self.effect.addSubview_(view)
+            top -= 2
+
+    def place_row(self, parts, y, h, width, pick):
+        number, text, on, picked = parts
+        row = Row.alloc().initWithFrame_(NSMakeRect(PAD, y, width - 2 * PAD, h))
+        if pick is not None:
+            row.picked = lambda: pick(picked)
+        if on:  # a neutral fill, the system accent bar inside it, and the row's own ↩
+            fill = box(NSColor.labelColor().colorWithAlphaComponent_(0.07), ROW_RADIUS)
+            fill.setFrame_(NSMakeRect(0, 0, width - 2 * PAD, h))
+            row.addSubview_(fill)
+            bar = box(NSColor.controlAccentColor(), 1.5)
+            bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
+            row.addSubview_(bar)
+            take = label(KEYS["Enter"], SMALL + 1, NSFontWeightMedium, NSColor.secondaryLabelColor())
+            size = take.fittingSize()
+            take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
+            row.addSubview_(take)
+        size = number.fittingSize()
+        number.setFrame_(NSMakeRect(ROW_X, h - ROW_Y - size.height, 12, size.height))
+        text.setFrame_(NSMakeRect(ROW_X + 20, ROW_Y, text.fittingSize().width, h - 2 * ROW_Y))
+        row.addSubview_(number)
+        row.addSubview_(text)
+        self.effect.addSubview_(row)
+
+    def place_foot(self, items, y, h, width, pick):
+        x = PAD + ROW_X
+        for index, (view, gap) in enumerate(items):
+            size = self.size(view)
+            if index == len(items) - 1 and gap == 0 and index:  # the hosted mark, at the end
+                x = max(x, width - PAD - ROW_X - size.width)
+            view.setFrame_(NSMakeRect(x, y + (h - size.height) / 2, size.width, size.height))
+            self.effect.addSubview_(view)
+            x += size.width + gap
+
     def hide(self):
         if self.window is not None:
             self.window.orderOut_(None)
 
 
 class Overlay:
-    """Continue's suggestion: grey text right after the caret, in the app's font, never typed."""
+    """Continue's suggestion: cd_AI's own grey text right after the caret, in the system font at
+    the caret's height (docs/design/visual.md), never typed."""
 
     def __init__(self):
         self.window = None
 
-    def show(self, rect, text, font=None):
+    def show(self, rect, text):
         if self.window is None:
             self.window = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 NSMakeRect(0, 0, 10, 10), BORDERLESS | NONACTIVATING, NSBackingStoreBuffered, False)
@@ -157,11 +266,11 @@ class Overlay:
             self.window.setHasShadow_(False)
             self.field = NSTextField.labelWithString_("")
             self.window.setContentView_(self.field)
+        (cx, cy), (cw, ch) = rect
         self.field.setStringValue_(text)
-        self.field.setFont_(font or NSFont.systemFontOfSize_(13))
+        self.field.setFont_(NSFont.systemFontOfSize_(max(11.0, round(ch / 1.25))))
         self.field.setTextColor_(NSColor.placeholderTextColor())
         size = self.field.fittingSize()
-        (cx, cy), (cw, ch) = rect
         self.window.setFrame_display_(NSMakeRect(cx + cw, cy + (ch - size.height) / 2, size.width, size.height), True)
         self.window.orderFrontRegardless()
 

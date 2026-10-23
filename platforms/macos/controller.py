@@ -6,9 +6,8 @@ import traceback
 import objc
 from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlagsChanged, NSEventTypeKeyDown
 from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
-from AppKit import NSAttributedString, NSColor, NSForegroundColorAttributeName
 from Foundation import NSNotFound, NSTimer
-from InputMethodKit import IMKInputController, kIMKLocateCandidatesBelowHint
+from InputMethodKit import IMKInputController
 
 from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
@@ -48,23 +47,6 @@ objc.registerMetaDataForSelector(b"NSObject", b"attributesForCharacterIndex:line
                                  {"arguments": {3: {"type_modifier": objc._C_OUT}}})
 
 
-class Shown:
-    """The panel as the controller's call sites use it (they were written for IMKCandidates): show
-    and update draw cd_AI's own panel from the state; hide hides it."""
-
-    def __init__(self, controller):
-        self.controller = controller
-
-    def show_(self, where=None):
-        self.controller.show_panel()
-
-    def updateCandidates(self):
-        pass
-
-    def hide(self):
-        PANEL.hide()
-
-
 class ClaudishInputController(IMKInputController):
     def initWithServer_delegate_client_(self, server, delegate, client):
         self = objc.super(ClaudishInputController, self).initWithServer_delegate_client_(
@@ -79,7 +61,7 @@ class ClaudishInputController(IMKInputController):
         global PANEL, OVERLAY
         if PANEL is None:
             PANEL, OVERLAY = Panel(), Overlay()
-        self.panel = Shown(self)
+        self.drawn = None  # the panel as last drawn (Composition.panel()), redrawn when it changes
         return self
 
     def activateServer_(self, sender):
@@ -112,7 +94,7 @@ class ClaudishInputController(IMKInputController):
             self.worker.close()
             self.worker = None
         self.state.change("")
-        self.panel.hide()
+        self.hide_panel()
         OVERLAY.hide()
 
     def recognizedEvents_(self, sender):
@@ -135,7 +117,8 @@ class ClaudishInputController(IMKInputController):
             trace("result", sorted(result[1]), "current" if result[0] == self.state.revision else "stale")
         if result:
             revision, data = result
-            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
+            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ()),
+                                                   data.get("hosted", "")):
                 if self.state.converted:  # the rewrite you asked for with Tab, in place of your words
                     client = self.client()
                     if client is not None:
@@ -146,45 +129,31 @@ class ClaudishInputController(IMKInputController):
                     if client is not None:
                         self.show_ghost(client)
                     return
-                if self.state.choosing:  # an instruction's drafts; rewrite converts in place on Tab
-                    self.panel.updateCandidates()
-                    self.panel.show_(kIMKLocateCandidatesBelowHint)
-            elif "question" in data and self.state.ask(revision, data["question"], data["session"]):
-                self.panel.updateCandidates()  # the choices, numbered by the panel
-                self.panel.show_(kIMKLocateCandidatesBelowHint)
+            elif "question" in data:
+                self.state.ask(revision, data["question"], data["session"])
             elif "progress" in data or "partial" in data:
                 self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "done" in data and self.state.done(revision):
-                self.panel.hide()  # a helper took the task: nothing to insert
-                client = self.client()
+                client = self.client()  # a helper took the task: nothing to insert
                 if client is not None:
                     client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
             elif "error" in data:
-                self.state.fail(revision)
+                self.state.fail(revision, data["error"])
+        if self.state.panel() != self.drawn:  # an answer, a question, progress, or the pause for the keys
+            self.show_panel()
 
-    def candidates_(self, sender):
-        if self.state.question:
-            return [c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "")
-                    for c in self.state.question.get("choices") or []]
-        if self.state.choosing:
-            return list(self.state.candidates)
-        return [self.state.candidate] if self.state.candidate else []
-
-    def candidateSelected_(self, candidate):
-        if self.active and self.state.question:  # a click on one of the agent's choices
-            lines = self.candidates_(None)
-            if str(candidate) in lines:
-                chosen = self.state.answer_choice(lines.index(str(candidate)) + 1)
-                if chosen and self.worker is not None:
-                    self.worker.answer(*chosen)
-                    self.panel.hide()
+    @objc.python_method
+    def pick(self, number):
+        """A click on a row of the panel: the same as its number key."""
+        if not self.active:
             return
-        if not (self.active and self.state.candidate):
-            return
-        if self.state.choosing and str(candidate) in self.state.candidates:
-            self.commit_pick(self.client(), self.state.candidates.index(str(candidate)) + 1)
-        elif str(candidate) == self.state.candidate:
-            self.finish(self.client(), suggested=True)
+        if self.state.question and not self.state.reply:
+            chosen = self.state.answer_choice(number)
+            if chosen and self.worker is not None:
+                self.worker.answer(*chosen)
+            self.show_panel()
+        elif self.state.choosing or self.state.candidate:
+            self.commit_pick(self.client(), number)
 
     @objc.python_method
     def commit_pick(self, client, number):
@@ -194,7 +163,7 @@ class ClaudishInputController(IMKInputController):
             return
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")
-        self.panel.hide()
+        self.hide_panel()
         if client is not None:
             client.insertText_replacementRange_(text, (NSNotFound, 0))
 
@@ -239,67 +208,31 @@ class ClaudishInputController(IMKInputController):
         return (200, 400), (0, 18)
 
     @objc.python_method
-    def font(self, client):
-        """The app's font just before the caret (from its own text), so the suggestion reads as the
-        same text; None when the app does not say."""
-        try:
-            selected = client.selectedRange()
-            location = selected.location if hasattr(selected, "location") else selected[0]
-            if location < 1:
-                return None
-            found = client.attributedSubstringFromRange_((location - 1, 1))
-            return found.attribute_atIndex_effectiveRange_("NSFont", 0, None)[0] if found is not None else None
-        except Exception:
-            trace("font failed", traceback.format_exc().splitlines()[-1])
-            return None
-
-    @objc.python_method
     def show_ghost(self, client):
-        """Continue's suggestion: grey, after the caret, never looking typed. Drawn by our overlay
-        when nothing follows on the line (IMK drops marked text's colour); with text after the caret
-        an overlay would cover it, so there it stays marked text."""
+        """Continue's suggestion: cd_AI's own grey text right after the caret (docs/design/visual.md).
+        Continue asks only at the end of a line (inside), so it never covers the app's text."""
         ghost = self.state.ghost
-        after = self.around_caret(client)[1] if ghost else ""
-        if ghost and not after.split("\n", 1)[0].strip():
-            client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
-            OVERLAY.show(self.caret(client), ghost, self.font(client))
-            trace("ghost overlay", len(ghost))
+        if not ghost or self.state.inside:  # text after the caret on its line: nothing to cover it with
+            OVERLAY.hide()
             return
-        OVERLAY.hide()
-        client.setMarkedText_selectionRange_replacementRange_(self.grey(ghost), (0, 0), (NSNotFound, 0))
+        OVERLAY.show(self.caret(client), ghost)
+        trace("ghost overlay", len(ghost))
 
     @objc.python_method
     def show_panel(self, client=None):
-        """The panel at the caret: a question with its choices, an instruction's drafts, or the one
-        short hint while composing (docs/design/visual.md); nothing in continue."""
-        state = self.state
+        """The panel at the caret, as Composition.panel() describes it; nothing in continue."""
+        spec = self.state.panel()
         client = client if client is not None else self.client()
-        if state.live or not state.text or client is None:
-            PANEL.hide()
+        if not spec or client is None:
+            self.hide_panel()
             return
-        rect = self.caret(client)
-        if state.question and not state.reply:
-            choices = state.question.get("choices") or []
-            PANEL.show(rect, title=state.question.get("text", ""),
-                       items=[c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "") for c in choices],
-                       selected=0 if state.asks else -1,  # an approval highlights nothing: only a number answers it
-                       hint=("Enter: the first · 1–%d · or type a reply" if state.asks else "1–%d · or type a reply")
-                       % len(choices))
-        elif state.choosing:
-            PANEL.show(rect, items=list(state.candidates), hint=state.hint())
-        elif state.hint():
-            PANEL.show(rect, hint=state.hint())
-        else:
-            PANEL.hide()
+        PANEL.show(self.caret(client), spec, self.pick)
+        self.drawn = spec
 
     @objc.python_method
-    def grey(self, text):
-        """Continue's suggestion as marked text in the secondary label color, so it reads as an
-        offer rather than typed text (apps that draw marked text their own way may ignore it)."""
-        if not text:
-            return text
-        return NSAttributedString.alloc().initWithString_attributes_(
-            text, {NSForegroundColorAttributeName: NSColor.secondaryLabelColor()})
+    def hide_panel(self):
+        PANEL.hide()
+        self.drawn = None
 
     @objc.python_method
     def switch_mode(self, client):
@@ -374,7 +307,7 @@ class ClaudishInputController(IMKInputController):
         elif self.worker is not None and not self.state.text:
             self.worker.schedule(self.state.revision, "")
         if self.state.live:  # the only thing shown is the suggestion, with the caret before it
-            self.panel.hide()
+            self.hide_panel()
             self.show_ghost(client)
             return
         OVERLAY.hide()
@@ -422,7 +355,7 @@ class ClaudishInputController(IMKInputController):
             self.state.change("")
             if self.worker is not None:
                 self.worker.schedule(self.state.revision, "")
-            self.panel.hide()
+            self.hide_panel()
             OVERLAY.hide()
             if client is not None:
                 client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
@@ -430,7 +363,7 @@ class ClaudishInputController(IMKInputController):
         text = self.state.commit(suggested)
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")
-        self.panel.hide()
+        self.hide_panel()
         if text and client is not None:
             # Inserting replaces the client's existing marked text.
             client.insertText_replacementRange_(text, (NSNotFound, 0))
@@ -474,7 +407,7 @@ class ClaudishInputController(IMKInputController):
             chosen = self.state.answer_choice(int(chars))
             if chosen and self.worker is not None:
                 self.worker.answer(*chosen)
-                self.panel.hide()
+            self.show_panel(client)
             return True
         if self.state.choosing and not self.state.question and len(chars) == 1 and "1" <= chars <= "9":
             self.commit_pick(client, int(chars))
@@ -484,11 +417,6 @@ class ClaudishInputController(IMKInputController):
             return True
         if self.state.live:
             return self.live_key(client, key, chars)
-        if key == 97 and self.state.text:  # F6
-            if self.state.choosing:
-                self.panel.updateCandidates()
-                self.panel.show_(kIMKLocateCandidatesBelowHint)
-            return True
         if key in (36, 76) and flags & NSEventModifierFlagShift and self.state.text:
             kept = self.state.keep()  # Shift+Enter: as it is, and keep composing
             self.changed(client)
@@ -501,14 +429,12 @@ class ClaudishInputController(IMKInputController):
                 chosen = self.state.answer_choice(1)
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
-                self.panel.hide()
                 self.changed(client)
                 return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
                 if self.worker is not None:
                     self.worker.answer(session, question, text=words)
-                self.panel.hide()
                 self.changed(client)
                 return True
             if action == "submit":
@@ -528,7 +454,6 @@ class ClaudishInputController(IMKInputController):
                 chosen = self.state.answer_choice(1)
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
-                self.panel.hide()
                 self.changed(client)
                 return True
             if action == "accept":

@@ -255,7 +255,7 @@ def make_server(rewriter, port=18765, token=None):
                 result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted)
             except Exception as exc:
                 return self.reply(503, {"error": str(exc)})
-            self.reply(200, result)
+            self.reply(200, dict(result, hosted=answerer.hosted_name))  # the panel says where it came from
 
     class Server(ThreadingHTTPServer):
         daemon_threads = True

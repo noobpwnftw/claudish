@@ -12,6 +12,19 @@ MODES = ("continue", "compose")
 # insert (and the next Enter send) a draft nobody read.
 ENTER_GUARD_SECONDS = 0.3
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
+# Compose's keys show when you pause this long, not while you type (docs/design/visual.md): a fluent
+# typist sees only the composition; a hesitant one always sees the keys.
+HINT_PAUSE_SECONDS = 1.0
+
+
+def failure(error):
+    """Why a request failed, in a few plain words for the panel."""
+    error = str(error or "").lower()
+    if any(word in error for word in ("refused", "unreachable", "offline", "connect", "not running")):
+        return "The model is offline"
+    if "timed out" in error or "timeout" in error:
+        return "The model took too long"
+    return "The request failed"
 
 
 def split_title(text):
@@ -46,9 +59,13 @@ class Composition:
         self.reply = ""  # your own words in answer to it, typed instead of a number
         self.status = ""  # what the agent is doing, or its draft so far
         self.offered_at = 0.0  # when the latest result arrived (time.monotonic)
+        self.typed_at = 0.0  # when the composition last changed (time.monotonic): the hints wait for a pause
+        self.error = ""  # why the last request failed, in plain words
+        self.hosted = ""  # the hosted model the shown result came from ("Claude"); "" when local
 
     def change(self, text):
         self.reply = ""
+        self.typed_at = time.monotonic()
         self.text = text
         self.candidate = ""
         self.candidates = []
@@ -58,6 +75,7 @@ class Composition:
         self.adopted = False
         self.asked = None
         self.working = self.failed = False
+        self.error = self.hosted = ""
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
         self.revision += 1
@@ -86,33 +104,72 @@ class Composition:
             return self.reply
         return self.candidate if self.converted else self.text
 
-    def hint(self):
-        """The one short line shown with the composition, the same words in every adapter: only a
-        key that does something you might not guess, or what is happening. "" when nothing needs
-        saying (continue says nothing; its suggestion speaks for itself)."""
-        if self.live:
-            return ""
-        if self.question:
-            if self.reply:
-                return "Enter: reply · Esc: clear"
-            return "%s · 1–%d" % (self.question.get("text", ""), len(self.question.get("choices") or []))
-        if self.working:
+    def panel(self, now=None):
+        """What the panel next to the caret shows, the same for every adapter and the demo
+        (docs/design/visual.md; drawn as in claudish/web/design.html), or None when nothing shows:
+        {"label", "body", "code"}: the header (who asks or what this is, then the content as is);
+        "rows": [{"key", "text", "legend"}] with "on" the highlighted one (-1: none, an approval);
+        "foot": [(key, verb)], then "tail" (free words); "tile": "ai" or "warn"; "status" with
+        "busy"; "failed" (why); "mark" (a hosted model's name). Continue shows no panel: its
+        suggestion speaks for itself. Compose's keys wait for a pause (hint_due)."""
+        if self.live or not (self.text or self.question):
+            return None
+        shown = {"label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [], "tail": None,
+                 "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None}
+        question = self.question
+        if question and self.reply:
+            shown["foot"] = [("Enter", "reply"), ("Esc", "clear")]
+        elif question:
+            choices = question.get("choices") or []
+            label, body = question.get("label"), question.get("body")
+            if body is None:
+                label, body = split_title(question.get("text", ""))
+            shown.update(label=label, body=body, code=bool(question.get("code")), on=0 if self.asks else -1,
+                         rows=[{"key": str(i + 1), "text": c.get("label", ""), "legend": c.get("legend") or None}
+                               for i, c in enumerate(choices)],
+                         foot=[("1–%d" % len(choices), "pick")] if len(choices) > 1 else [("1", "pick")],
+                         tail="or type a reply" if self.asks else "or type why not")
+        elif self.working:
             status = " ".join((self.status or "").split())
-            return (status[:77] + "…" if len(status) > 80 else status) or (
-                "rewriting…" if self.asked == "rewrite" else "working…")
-        if self.failed:
-            return "failed · Enter: retry · Esc: back"
-        if self.choosing:
-            return "1–%d: pick · Esc: back" % len(self.candidates)
-        if self.converted:
-            return "Tab: keep · Esc: undo"
-        if self.asked == "instruct" and self.candidate:
-            return "Enter: insert · Esc: back"
-        if self.look:
-            return "with this window · F8: without"
-        if self.text:
-            return "Tab: rewrite · Enter: ask AI"
-        return ""
+            shown.update(status=(status[:77] + "…" if len(status) > 80 else status)
+                         or ("Rewriting" if self.asked == "rewrite" else "Working"),
+                         busy=True, foot=[("Esc", "stop")])
+        elif self.failed:
+            shown.update(tile="warn", failed=self.error or "The request failed", foot=[("Enter", "retry"), ("Esc", "back")])
+        elif self.choosing or (self.asked == "instruct" and self.candidate):
+            readings = self.candidates or [self.candidate]
+            shown.update(rows=[{"key": str(i + 1), "text": c, "legend": None} for i, c in enumerate(readings)], on=0,
+                         foot=([("1–%d" % len(readings), "pick")] if len(readings) > 1 else []) + [("Esc", "back")],
+                         mark=self.hosted and "from %s · hosted" % self.hosted)
+        elif self.converted:
+            shown.update(label="Your words", body=self.text, foot=[("Tab", "keep"), ("Esc", "undo")],
+                         mark=self.hosted and "from %s · hosted" % self.hosted)
+        elif self.hint_due(now) == 0:
+            shown["foot"] = ([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
+        else:
+            return None
+        return shown
+
+    def hint_due(self, now=None):
+        """Seconds until compose's keys show (0: now), or None when they are not waiting: they show
+        on a pause, so adapters redraw once then."""
+        if self.live or not self.text or self.question or self.working or self.failed or self.converted \
+                or self.candidate:
+            return None
+        waited = (time.monotonic() if now is None else now) - self.typed_at
+        return max(0.0, HINT_PAUSE_SECONDS - waited)
+
+    def hint(self, now=None):
+        """The panel as one line of plain words, for a window that can only show text (IBus's
+        auxiliary text where cd_AI's own panel is not drawn): "Tab rewrite · Enter ask"."""
+        shown = self.panel(now)
+        if not shown:
+            return ""
+        words = [w for w in (shown["label"] and shown["body"] and "%s: %s" % (shown["label"], shown["body"])
+                             or shown["body"], shown["status"] and shown["status"] + ("…" if shown["busy"] else ""),
+                             shown["failed"]) if w]
+        words += ["%s %s" % key for key in shown["foot"]] + [w for w in (shown["tail"], shown["mark"]) if w]
+        return " · ".join(words)
 
     @property
     def asks(self):
@@ -197,10 +254,11 @@ class Composition:
     def submit(self):
         self.asked, self.working, self.failed = "instruct", True, False
 
-    def fail(self, revision):
+    def fail(self, revision, error=None):
         if revision == self.revision and self.working:
             self.working, self.failed = False, True
             self.question, self.status = None, ""
+            self.error = failure(error)
 
     def done(self, revision):
         """The instruction was carried out elsewhere (a helper took the task): nothing is inserted,
@@ -301,9 +359,11 @@ class Composition:
         self.change(self.text)
         return True
 
-    def offer(self, revision, text, alternatives=()):
+    def offer(self, revision, text, alternatives=(), hosted=""):
+        """A result arrived. hosted: the hosted model that wrote it ("Claude"), said in the panel."""
         if revision != self.revision or not self.text:
             return False
+        self.hosted = hosted or ""
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.offered_at = time.monotonic()

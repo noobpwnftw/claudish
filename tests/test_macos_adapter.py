@@ -104,13 +104,17 @@ class Panel:
     """cd_AI's panel (platforms/macos/panel.py): records what it shows."""
 
     def __init__(self):
-        self.visible, self.shown = False, {}
+        self.visible, self.spec, self.pick = False, None, None
 
-    def show(self, rect, title=None, items=(), selected=0, hint=""):
-        self.visible, self.shown = True, {"title": title, "items": list(items), "hint": hint}
+    def show(self, rect, spec, pick=None):
+        self.visible, self.spec, self.pick = True, spec, pick
 
     def hide(self):
-        self.visible = False
+        self.visible, self.spec = False, None
+
+    @property
+    def rows(self):
+        return [row["text"] for row in self.spec["rows"]] if self.spec else []
 
 
 class Overlay:
@@ -119,7 +123,7 @@ class Overlay:
     def __init__(self):
         self.text = ""
 
-    def show(self, rect, text, font=None):
+    def show(self, rect, text):
         self.text = text
 
     def hide(self):
@@ -276,8 +280,10 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((self.controller.worker.modes[-1], self.controller.worker.immediate), ("rewrite", True))
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
         self.controller.pollSuggestions_(None)  # it arrives: in place of your words, no list
-        self.assertEqual(self.module.PANEL.shown["items"], [])  # only the hint
-        self.assertEqual(self.module.PANEL.shown["hint"], "Tab: keep · Esc: undo")
+        # In place of your words; the panel keeps yours, as large, until you keep it.
+        self.assertEqual((self.module.PANEL.rows, self.module.PANEL.spec["label"], self.module.PANEL.spec["body"]),
+                         ([], "Your words", "draft!"))
+        self.assertEqual(self.module.PANEL.spec["foot"], [("Tab", "keep"), ("Esc", "undo")])
         self.assertEqual((self.client.marked, self.client.commits), ("A considered draft.", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")
@@ -293,9 +299,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(36)  # send
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
-        self.assertEqual(self.module.PANEL.shown["items"], ["Hello.", "Hi there."])
+        self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
         self.assertTrue(self.key(53))  # Esc: the drafts close, the instruction stays to refine
-        self.assertEqual((state.text, state.candidates, self.module.PANEL.shown["items"]), ("say hi", [], []))
+        self.assertEqual((state.text, state.candidates, self.module.PANEL.rows), ("say hi", [], []))
         self.assertEqual(self.client.marked, "say hi")
         self.type_text(", warmly")  # refine and send again: a follow-up in the same conversation
         self.key(36)
@@ -364,7 +370,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(36))
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
-        self.assertEqual(self.controller.candidates_(None), ["Hello.", "Hi there."])
+        self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
         self.assertTrue(self.key(19, "2"))
         self.assertEqual(self.client.commits, ["Hi there."])
         self.assertEqual(state.text, "")
@@ -373,11 +379,13 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
         self.assertTrue(self.key(36))  # send: the agent starts working
-        question = {"id": "perm-1", "text": "Allow Bash?", "choices": [
-            {"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
+        question = {"id": "perm-1", "text": "Allow Bash?", "permission": True, "label": "Claude Code wants to run",
+                    "body": "git status", "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}
         worker.result = (state.revision, {"question": question, "session": "s1"})
         self.controller.pollSuggestions_(None)
-        self.assertEqual(self.controller.candidates_(None), ["Allow — Bash: git status", "Deny"])
+        spec = self.module.PANEL.spec  # what is approved in full; nothing highlighted
+        self.assertEqual((spec["label"], spec["body"], self.module.PANEL.rows, spec["on"]),
+                         ("Claude Code wants to run", "git status", ["Deny", "Allow"], -1))
         self.assertTrue(self.key(19, "2"))
         self.assertEqual(worker.answered, ("s1", "perm-1", 1))
         self.assertIsNone(state.question)
@@ -426,16 +434,17 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.activateServer_(None)
         self.assertTrue(self.key(0, "y"))
 
-    def test_host_commit_and_mouse_candidate_selection(self):
+    def test_host_commit_and_a_click_on_a_row(self):
         self.type_text("plain")
         self.controller.commitComposition_(None)
         self.assertEqual(self.client.commits[-1], "plain")
-        self.type_text("more")
-        self.controller.state.offer(self.controller.state.revision, "More, thoughtfully.")
-        self.controller.candidateSelected_("stale candidate")
-        self.assertEqual(len(self.client.commits), 1)
-        self.controller.candidateSelected_("More, thoughtfully.")
-        self.assertEqual(self.client.commits[-1], "More, thoughtfully.")
+        self.key(0, "x")  # compose (see setUp), then an instruction with two readings
+        state, worker = self.controller.state, self.controller.worker
+        self.key(36)
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.module.PANEL.pick(2)  # a click on the second row
+        self.assertEqual(self.client.commits[-1], "Hi there.")
 
     def test_continue_starts_from_the_text_box_and_the_suggestion_is_grey(self):
         client = TextClient("Thanks for the review ")
@@ -451,12 +460,10 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.changed(client)
             # Nothing follows on the line: our overlay draws it grey after the caret, nothing is marked.
             self.assertEqual((self.module.OVERLAY.text, client.marked), ("on the parser.", ""))
-            # Text after the caret (an overlay would cover it): grey marked text instead.
+            # Text after the caret on its line: nothing covers it.
             client.text, client.mark_at = "Thanks for the review  today.", len("Thanks for the review ")
             fresh.changed(client)
-            self.assertEqual(self.module.OVERLAY.text, "")
-            self.assertEqual((client.marked.text, client.marked.attributes),
-                             ("on the parser.", {"NSColor": "secondaryLabelColor"}))
+            self.assertEqual((self.module.OVERLAY.text, client.marked), ("", ""))
         finally:
             fresh.inputControllerWillClose()
 

@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 
+from .handoff import display_name as handoff_name
 from .textbox import Textbox
 
 IDLE_SECONDS = 1800
@@ -112,7 +113,8 @@ class ModelDriver:
         if self.cancelled:
             return
         if self.inserted:  # an answer you read and chose to insert
-            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"])
+            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"],
+                         hosted=rewriter.hosted_name)
             return
         if self.handed:
             # The task went to a helper (or an answer was read): nothing is inserted, and the
@@ -120,7 +122,8 @@ class ModelDriver:
             session.emit("result", text="", candidates=[], done=self.handed,
                          consulted=result["consulted"] + [self.handed])
             return
-        session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"])
+        session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"],
+                     hosted=rewriter.hosted_name)
 
     def own_tools(self, session, box):
         """Claudish's tools for an instruction: a question to the user (shown as is, the answer goes
@@ -172,17 +175,19 @@ class ModelDriver:
                 hand_over, "write", lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
-    def question(self, session, text, choices, kind="ask"):
+    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False):
         """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
         model's own question or an answer to read: Enter takes the first choice) or "permission"
-        (an approval: only a number answers it, so Enter never approves anything)."""
+        (an approval: only a number answers it, so Enter never approves anything, and its safe
+        choice is listed first). label and body: how the panel shows it (who asks, then what)."""
         if self.cancelled:
             return 1, "cancelled"
         self.counter += 1
         key = "question-%d" % self.counter
         waiter = [threading.Event(), None]
         self.pending[key] = waiter
-        session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission")
+        session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
+                     label=label, body=text if body is None else body, code=code)
         waiter[0].wait()
         return waiter[1] or (1, "cancelled")
 
@@ -194,7 +199,8 @@ class ModelDriver:
             return "Nothing to show."
         choice, words = self.question(session, MODEL_SAYS + text,
                                       [{"label": "Insert it", "legend": "at the caret"},
-                                       {"label": "Dismiss", "legend": "nothing is inserted"}])
+                                       {"label": "Dismiss", "legend": "nothing is inserted"}],
+                                      label=MODEL_SAYS.rstrip(": "), body=text)
         if words is None and choice == 0:
             self.inserted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
         else:
@@ -208,8 +214,9 @@ class ModelDriver:
         from .screen import redact
         labels = [str(c)[:80] for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
         labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
-        choice, words = self.question(session, MODEL_ASKS + str(arguments.get("question") or "")[:200],
-                                      [{"label": label} for label in labels])
+        asked = str(arguments.get("question") or "")[:200]
+        choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],
+                                      label=MODEL_ASKS.rstrip(": "), body=asked)
         if words is not None:
             return "The user answered: " + redact(words)[0]
         return "The user chose: " + labels[choice] if 0 <= choice < len(labels) else "No answer."
@@ -222,22 +229,27 @@ class ModelDriver:
         shown = ", ".join("%s=%s" % (k, str(v)[:40]) for k, v in arguments.items())
         if asked:
             # The whole task, in the question itself: nothing the helper will be told is hidden.
+            # The safe choice is 1 (No): a reflexive 1 never hands anything over.
             what = str(arguments.get("task") or shown)
             choice, text = self.question(session, "%s %s" % (asked, what),
-                                         [{"label": "Yes", "legend": "it opens in a new window"},
-                                          {"label": "No", "legend": "answer it here instead"}], kind="permission")
-            return (False, text) if text is not None else (choice == 0, None)
-        legend = "%s.%s(%s)" % (server, tool, shown)
-        choices = [{"label": "Allow", "legend": legend}, {"label": "Deny", "legend": "the model continues without it"}]
+                                         [{"label": "No", "legend": "answer it here"},
+                                          {"label": "Yes", "legend": "it opens in a new window"}], kind="permission",
+                                         label="Hand off to %s" % handoff_name(tool), body=what)
+            return (False, text) if text is not None else (choice == 1, None)
+        call = "%s.%s(%s)" % (server, tool, shown)
+        choices = [{"label": "Deny", "legend": "the model continues without it"}, {"label": "Allow"}]
         if kind == "write":
             choices.append({"label": "Allow for this conversation", "legend": "%s.%s from now on" % (server, tool)})
         choice, text = self.question(session, ("Destructive: allow %s.%s?" if kind == "destructive"
-                                               else "Allow %s.%s?") % (server, tool), choices, kind="permission")
+                                               else "Allow %s.%s?") % (server, tool), choices, kind="permission",
+                                     label="The model wants to %s" % ("change something with" if kind == "destructive"
+                                                                       else "use"),
+                                     body=call, code=True)
         if text is not None:
             return False, text  # your words go back to the model as the reason
         if choice == 2:
             self.conversation.approved.add((server, tool))
-        return choice in (0, 2), None
+        return choice in (1, 2), None
 
     def answer(self, question, choice=None, text=None):
         waiter = self.pending.pop(question, None)

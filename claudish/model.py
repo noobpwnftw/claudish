@@ -248,6 +248,17 @@ class Rewriter:
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         self.claude = Claude(claude_model) if backend == "claude" else None
 
+    @property
+    def hosted_name(self):
+        """Who answered, when it is a hosted model, as the panel names it ("Claude"); "" when local."""
+        if not self.hosted:
+            return ""
+        if self.backend == "claude":
+            return "Claude"
+        if self.backend == "command":
+            return str(self.command[0]).rsplit("/", 1)[-1].capitalize() if self.command else "a hosted model"
+        return urlsplit(self.endpoint).hostname or "a hosted model"
+
     def route(self, app, mode=None):
         """Which AI answers here: the app's binding may name a profile, and that profile may name
         another one for this mode (a small model for continue, a strong one for instructions).
