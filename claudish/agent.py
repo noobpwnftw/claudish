@@ -243,7 +243,7 @@ class ClaudeCodeDriver:
             return self.next_question(request_id)
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}
-        session.emit("question", id=request_id, text=body.get("title") or "Allow %s?" % tool,
+        session.emit("question", id=request_id, text=body.get("title") or "Allow %s?" % tool, permission=True,
                      choices=[{"label": "Allow", "legend": body.get("description")
                                or summarize(body.get("tool_name", "tool"), body.get("input"))},
                               {"label": "Deny", "legend": "the agent continues without it"}])

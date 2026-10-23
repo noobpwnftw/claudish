@@ -309,6 +309,12 @@ class ClaudishTextService(TextService):
         if key == 0x0D:
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
+            if action == "choose":  # the first choice of a question that is not an approval
+                chosen = self.state.answer_choice(1)
+                if chosen and self.worker:
+                    self.worker.answer(*chosen)
+                self.publish()
+                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
                 if self.worker:
@@ -356,6 +362,12 @@ class ClaudishTextService(TextService):
             return bool(self.state.text)
         if key == 0x09:
             action = self.state.tab()
+            if action == "choose":
+                chosen = self.state.answer_choice(1)
+                if chosen and self.worker:
+                    self.worker.answer(*chosen)
+                self.publish()
+                return True
             if action == "request":  # rewrite: ask now; it converts in place when it arrives
                 if self.worker:
                     before, after = self.around()  # where the rewrite goes

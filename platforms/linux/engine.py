@@ -94,6 +94,8 @@ class ClaudishEngine(IBus.Engine):
                       for c in state.question["choices"]] if state.question else state.candidates)
             for line in lines:
                 table.append_candidate(IBus.Text.new_from_string(line))
+            # An approval highlights nothing: only a number answers it (Enter never approves).
+            table.set_cursor_visible(not (state.question and not state.asks))
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
@@ -240,6 +242,12 @@ class ClaudishEngine(IBus.Engine):
             return True
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
+            if action == "choose":  # the first choice of a question that is not an approval
+                chosen = self.composition.answer_choice(1)
+                if chosen:
+                    self.suggestions.answer(*chosen)
+                self.render()
+                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.composition.answer_text()
                 self.suggestions.answer(session, question, text=words)
@@ -261,6 +269,12 @@ class ClaudishEngine(IBus.Engine):
             if not self.composition.live and not self.composition.text:
                 around = self.take_selection()  # a selection: rewrite it in place
             action = self.composition.tab()
+            if action == "choose":
+                chosen = self.composition.answer_choice(1)
+                if chosen:
+                    self.suggestions.answer(*chosen)
+                self.render()
+                return True
             if action == "accept":
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it converts in place when it arrives

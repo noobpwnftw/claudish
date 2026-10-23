@@ -99,12 +99,21 @@ class Composition:
             return "Tab: rewrite · Enter: ask AI"
         return ""
 
+    @property
+    def asks(self):
+        """A question that Enter (or Tab) answers with its first choice: the model's own question or
+        an answer to read. An approval (permission) is answered only with a number."""
+        return bool(self.question) and not self.reply and not self.question.get("permission")
+
     def tab(self):
         """What Tab does: "pass" (the app's), "request" (ask for the rewrite; it takes your words'
         place as it arrives), "wait" (asked already), "convert" (show it in place of your words),
-        or "accept" (the rewrite shown, or an instruction's first draft)."""
+        "accept" (the rewrite shown, or an instruction's first draft), or "choose" (the first
+        choice of a question that is not an approval)."""
         if not self.text:
             return "pass"
+        if self.asks:
+            return "choose"
         if self.converted or (self.asked == "instruct" and self.candidate):
             return "accept"
         if self.asked == "rewrite" and self.candidate:
@@ -147,12 +156,14 @@ class Composition:
 
     def enter(self):
         """What Enter does now: "pass" (the app's), "submit" (send it as an instruction), "wait",
-        "accept" (the rewrite shown, or the first draft), or "reply" (an agent asked, and you typed
-        your answer)."""
+        "accept" (the rewrite shown, or the first draft), "reply" (an agent asked, and you typed
+        your answer), or "choose" (the first choice of a question that is not an approval)."""
         if not self.text:
             return "pass"
         if self.question:
-            return "reply" if self.reply.strip() else "wait"
+            if self.reply.strip():
+                return "reply"
+            return "choose" if self.asks else "wait"
         if self.asked == "instruct" and self.candidate and time.monotonic() - self.offered_at < ENTER_GUARD_SECONDS:
             return "wait"
         if self.converted or (self.asked == "instruct" and self.candidate):

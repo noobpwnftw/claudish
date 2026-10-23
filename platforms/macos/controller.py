@@ -282,7 +282,9 @@ class ClaudishInputController(IMKInputController):
             choices = state.question.get("choices") or []
             PANEL.show(rect, title=state.question.get("text", ""),
                        items=[c.get("label", "") + (" — " + c["legend"] if c.get("legend") else "") for c in choices],
-                       hint="1–%d · or type a reply" % len(choices))
+                       selected=0 if state.asks else -1,  # an approval highlights nothing: only a number answers it
+                       hint=("Enter: the first · 1–%d · or type a reply" if state.asks else "1–%d · or type a reply")
+                       % len(choices))
         elif state.choosing:
             PANEL.show(rect, items=list(state.candidates), hint=state.hint())
         elif state.hint():
@@ -493,6 +495,13 @@ class ClaudishInputController(IMKInputController):
         if key in (36, 76):  # Return, keypad Enter
             # Instruct holds the text until Enter sends it; the next Enter inserts the result.
             action = self.state.enter()
+            if action == "choose":  # the first choice of a question that is not an approval
+                chosen = self.state.answer_choice(1)
+                if chosen and self.worker is not None:
+                    self.worker.answer(*chosen)
+                self.panel.hide()
+                self.changed(client)
+                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
                 if self.worker is not None:
@@ -513,6 +522,13 @@ class ClaudishInputController(IMKInputController):
             if not self.state.live and not self.state.text:
                 self.take_selection(client)  # a selection: rewrite it in place
             action = self.state.tab()
+            if action == "choose":
+                chosen = self.state.answer_choice(1)
+                if chosen and self.worker is not None:
+                    self.worker.answer(*chosen)
+                self.panel.hide()
+                self.changed(client)
+                return True
             if action == "accept":
                 self.finish(client, suggested=True)
             elif action == "request":  # rewrite: ask now; it converts in place when it arrives

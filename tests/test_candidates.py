@@ -143,6 +143,20 @@ class ModeFeelTests(unittest.TestCase):
         state.offered_at -= 1  # a moment later, Enter takes the first draft
         self.assertEqual(state.enter(), "accept")
 
+    def test_enter_takes_the_first_choice_of_a_question_but_never_approves(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("fix")
+        state.submit()
+        state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
+                                   "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
+        self.assertEqual((state.enter(), state.tab()), ("choose", "choose"))  # as with drafts
+        state.answer_choice(1)
+        state.ask(state.revision, {"id": "p", "text": "Allow notes.delete?", "permission": True,
+                                   "choices": [{"label": "Allow"}, {"label": "Deny"}]}, "s")
+        self.assertEqual(state.enter(), "wait")  # an approval needs a number
+        self.assertEqual(state.tab(), "wait")
+
     def test_hints_are_short_and_only_when_a_key_needs_saying(self):
         state = Composition()
         self.assertEqual(state.hint(), "")  # continue: quiet
@@ -220,7 +234,8 @@ class AgentReplyTests(unittest.TestCase):
         state.change("is my branch clean")
         state.submit()
         revision = state.revision
-        state.ask(revision, {"id": "q1", "text": "Allow Bash?", "choices": [{"label": "Allow"}, {"label": "Deny"}]}, "s1")
+        state.ask(revision, {"id": "q1", "text": "Allow Bash?", "choices": [{"label": "Allow"}, {"label": "Deny"}],
+                             "permission": True}, "s1")
         self.assertEqual(state.enter(), "wait")  # nothing typed yet: Enter waits
         for char in "use 2 diffs":
             state.insert(char)

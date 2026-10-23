@@ -172,15 +172,17 @@ class ModelDriver:
                 hand_over, "write", lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
-    def question(self, session, text, choices):
-        """A question at the caret; (choice index, your own words) once answered."""
+    def question(self, session, text, choices, kind="ask"):
+        """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
+        model's own question or an answer to read: Enter takes the first choice) or "permission"
+        (an approval: only a number answers it, so Enter never approves anything)."""
         if self.cancelled:
             return 1, "cancelled"
         self.counter += 1
         key = "question-%d" % self.counter
         waiter = [threading.Event(), None]
         self.pending[key] = waiter
-        session.emit("question", id=key, text=text, choices=choices)
+        session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission")
         waiter[0].wait()
         return waiter[1] or (1, "cancelled")
 
@@ -223,14 +225,14 @@ class ModelDriver:
             what = str(arguments.get("task") or shown)
             choice, text = self.question(session, "%s %s" % (asked, what),
                                          [{"label": "Yes", "legend": "it opens in a new window"},
-                                          {"label": "No", "legend": "answer it here instead"}])
+                                          {"label": "No", "legend": "answer it here instead"}], kind="permission")
             return (False, text) if text is not None else (choice == 0, None)
         legend = "%s.%s(%s)" % (server, tool, shown)
         choices = [{"label": "Allow", "legend": legend}, {"label": "Deny", "legend": "the model continues without it"}]
         if kind == "write":
             choices.append({"label": "Allow for this conversation", "legend": "%s.%s from now on" % (server, tool)})
         choice, text = self.question(session, ("Destructive: allow %s.%s?" if kind == "destructive"
-                                               else "Allow %s.%s?") % (server, tool), choices)
+                                               else "Allow %s.%s?") % (server, tool), choices, kind="permission")
         if text is not None:
             return False, text  # your words go back to the model as the reason
         if choice == 2:
