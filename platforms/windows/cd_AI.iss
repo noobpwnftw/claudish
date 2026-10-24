@@ -51,7 +51,7 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\PIME\arm64\PIMETextServi
 Filename: "{sys}\schtasks.exe"; Parameters: "/end /tn claudish"; Flags: runhidden; RunOnceId: "EndService"
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopProcesses"
 Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn claudish /f"; Flags: runhidden; RunOnceId: "DeleteService"
-Filename: "{app}\python\python.exe"; Parameters: "-c ""import ctypes; ctypes.windll.input.InstallLayoutOrTip('0409:@TEXT_SERVICE@@PROFILE@', 1)"""; Flags: runhidden; RunOnceId: "LeaveInputSources"
+Filename: "{app}\python\python.exe"; Parameters: "-c ""import ctypes; ctypes.windll.input.InstallLayoutOrTip('0409:@TEXT_SERVICE_ESCAPED@@PROFILE_ESCAPED@', 1)"""; Flags: runhidden; RunOnceId: "LeaveInputSources"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x86\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX86"
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x64\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX64"
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\arm64\PIMETextService.dll"""; Check: IsArm64; Flags: runhidden; RunOnceId: "UnregisterArm64"

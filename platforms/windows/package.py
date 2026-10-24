@@ -87,7 +87,10 @@ def main():
             python_for(arch, payload / ("python-" + arch), wheels)
     pime(args.pime_root, payload / "PIME")
     script = (HERE / "cd_AI.iss").read_text(encoding="utf-8")
-    for key, value in (("VERSION", version), ("TEXT_SERVICE", TEXT_SERVICE), ("PROFILE", profile)):
+    # In the script's sections a { opens one of Inno's constants: the GUIDs' are doubled there.
+    for key, value in (("TEXT_SERVICE_ESCAPED", TEXT_SERVICE.replace("{", "{{")),
+                       ("PROFILE_ESCAPED", profile.replace("{", "{{")),
+                       ("VERSION", version), ("TEXT_SERVICE", TEXT_SERVICE), ("PROFILE", profile)):
         script = script.replace("@%s@" % key, value)
     (payload / "cd_AI.iss").write_text(script, encoding="utf-8")
     shutil.copy(HERE / "claudish/icon.ico", payload / "icon.ico")
