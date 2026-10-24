@@ -75,7 +75,7 @@
           <li><b>Nothing goes anywhere by itself.</b> It never sends, posts, or saves for you. Every suggestion waits for your key, and Esc brings back what you typed.</li>
           <li><b>Fewer keystrokes.</b> Tab finishes a sentence, and a few words become a whole reply: kind to tired hands and sore wrists.</li>
           <li><b>Your tone.</b> Claudish's own voice, polished and fond of em dashes, is the default. Choose fix, plain, or describe your own.</li>
-          <li><b>Private by default.</b> A small model runs on your own computer. Password fields are never touched, and a hosted model is used only if you add your key.</li>
+          <li><b>Your model, your key.</b> cd_AI ships no model: it uses the one you point it at, a frontier model with your own key or one on your own computer. Password fields are never touched.</li>
         </ul>
       </section>
 
@@ -120,7 +120,7 @@
 1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop.
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
 3. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
-4. Run `python -m claudish setup --yes`. It downloads a verified llama.cpp build and a 491 MB model, writes a config, registers the input method, and starts Claudish at login.
+4. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts Claudish at login. It ships no model: it is set up for Claude with my own key. Install the extra with `pip install "claudish-ime[claude]"` and ask me to put my key in the ANTHROPIC_API_KEY environment variable myself; never ask me to paste it to you, and never write it into a file. (If I want a small local model instead, `--profile local` downloads one.)
 5. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
 7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: tapping Shift switches between continue and compose; Tab takes the model's text (a suggestion, a rewrite once shown, a draft); in compose, Enter sends my words as an instruction and Shift+Enter keeps them as they are; Esc steps back.
