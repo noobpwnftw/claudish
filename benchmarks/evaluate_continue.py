@@ -39,7 +39,7 @@ def check(case, offered, slop=False):
     if len(offered.split()) > (45 if slop else 20):
         failures.append("long")
     words = set(re.findall(r"[a-z]+", offered.lower()))
-    if words & set(case.get("avoid", [])):  # a pronoun the text never gave (they/them by default)
+    if words & set(case.get("avoid", [])):  # a pronoun the case names as one the text never gave
         failures.append("pronoun")
     return failures
 
