@@ -16,14 +16,21 @@ is set up for Claude with your own API key, since good slop needs a frontier mod
    python3 -m pip install --user -e ".[claude]"
    ```
 
-2. **Give it your key** where Claudish's login service can read it, never in Claudish's config.
-   Run `ant auth login`, or set `ANTHROPIC_API_KEY` in your user environment (a service started
-   at login does not read your shell profile):
+2. **Give it your key.** Claudish runs as a background service started at login, so it cannot see
+   a key you `export` in a terminal or put in your shell profile. It never stores keys in its own
+   config either. Either of these works:
 
-   - Linux: a line `ANTHROPIC_API_KEY=sk-ant-…` in `~/.config/environment.d/anthropic.conf`,
-     read at your next login.
-   - Windows: `setx ANTHROPIC_API_KEY sk-ant-…`, read by programs started after it.
-   - macOS: `ant auth login` (a launch agent sees neither your shell profile nor `export`).
+   - **The Anthropic CLI** (any OS): `ant auth login` saves your credentials in Anthropic's own
+     folder (`~/.config/anthropic/` on Linux and macOS, `%APPDATA%\Anthropic\` on Windows), and
+     the Anthropic SDK inside Claudish finds them there by itself. Nothing else to set.
+   - **An environment variable for your user account**, which the service picks up from your
+     next login:
+     - Linux: create `~/.config/environment.d/anthropic.conf` containing the line
+       `ANTHROPIC_API_KEY=sk-ant-…`, then log out and back in.
+     - Windows: run `setx ANTHROPIC_API_KEY "sk-ant-…"` in a terminal. It saves the variable to
+       your account (not just that terminal); log out and back in so the service starts with it.
+     - macOS: services started at login do not get variables from your shell, and macOS has no
+       simple equivalent; use the Anthropic CLI.
 
 3. **Run setup:**
 
