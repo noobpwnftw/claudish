@@ -47,6 +47,8 @@ class TextClient(Client):
         self.mark_at += len(text)
 
     def setMarkedText_selectionRange_replacementRange_(self, text, selection, replacement):
+        if replacement[0] == 2**63 - 1 and self.chosen and not self.marked_text():
+            replacement = self.chosen  # with nothing marked, marked text replaces the selection (AppKit)
         if replacement[0] != 2**63 - 1:  # replaces part of the app's text (the selection)
             start, length = replacement
             self.text, self.mark_at, self.chosen = self.text[:start] + self.text[start + length:], start, None
@@ -477,6 +479,19 @@ class MacOSAdapterTests(unittest.TestCase):
                 self.assertFalse(self.key(0, char))  # straight in: the app types it
             self.assertFalse(self.key(53, "\x1b"))
         self.assertEqual((self.controller.state.text, self.client.marked, self.module.PANEL.visible), ("", "", False))
+
+    def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
+        client = TextClient("keep this word")
+        client.chosen = (5, 4)  # "this", selected in the app
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 14,
+                                                            modifierFlags=lambda: 1 << 18, characters=lambda: "e"), client)
+            self.assertEqual(client.whole(), "keep this word")
+        finally:
+            fresh.inputControllerWillClose()
 
     def test_without_a_caret_the_panel_goes_by_the_pointer_not_a_corner(self):
         client = TextClient("x")

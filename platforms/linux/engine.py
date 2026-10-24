@@ -14,6 +14,25 @@ from claudish.composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
+# Dead keys (an accent, then the letter it goes on): IBus hands the engine the keysym, so composing
+# them is the engine's job, as IBusEngineSimple does. keysym name -> (combining mark, spacing accent).
+DEAD_KEYS = {"dead_grave": ("\u0300", "`"), "dead_acute": ("\u0301", "´"), "dead_circumflex": ("\u0302", "^"),
+             "dead_tilde": ("\u0303", "~"), "dead_macron": ("\u0304", "¯"), "dead_breve": ("\u0306", "˘"),
+             "dead_abovedot": ("\u0307", "˙"), "dead_diaeresis": ("\u0308", "¨"), "dead_abovering": ("\u030a", "˚"),
+             "dead_doubleacute": ("\u030b", "˝"), "dead_caron": ("\u030c", "ˇ"), "dead_cedilla": ("\u0327", "¸"),
+             "dead_ogonek": ("\u0328", "˛")}
+
+
+def with_accent(dead, char):
+    """The character a dead key and the next key make: é from ´ and e, the accent alone before a
+    space or the same dead key, else the accent and then the character."""
+    mark, spacing = DEAD_KEYS[dead]
+    if char in (" ", spacing):
+        return spacing
+    import unicodedata
+    composed = unicodedata.normalize("NFC", char + mark)
+    return composed if len(composed) == 1 else spacing + char
+
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
     "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R",
@@ -280,10 +299,19 @@ class ClaudishEngine(IBus.Engine):
         return False
 
     def finish(self, suggested=False):
+        self.dead = None  # an accent waiting for its letter goes with the composition
         if self.composition.live:  # nothing is held back in continue mode: just start over
             self.composition.change("")
             self.changed()
             self.refresh_surrounding()
+            return
+        if self.composition.sent and not suggested:
+            # A shortcut or another key ends the composition: what it shows goes in, and the
+            # exchange is held for this app, its work going on, as on a focus change (and on macOS).
+            words = self.composition.leave(self.app)
+            self.render()
+            if words:
+                self.commit_text(IBus.Text.new_from_string(words))
             return
         text = self.composition.commit(suggested)
         self.changed()
@@ -408,7 +436,23 @@ class ClaudishEngine(IBus.Engine):
             self.composition.backspace()
             self.changed()
             return True
+        name = IBus.keyval_name(keyval) or ""
+        if name in DEAD_KEYS:  # an accent waits for its letter
+            if getattr(self, "dead", None):
+                char = DEAD_KEYS[self.dead][1] if name == self.dead else None
+                self.dead = None if char else name
+                if char:
+                    self.composition.insert(char)
+                    self.changed()
+            else:
+                self.dead = name
+            return True
         char = IBus.keyval_to_unicode(keyval)
+        if getattr(self, "dead", None) and char:
+            char, self.dead = with_accent(self.dead, char), None
+            if len(char) > 1:  # no such letter: the accent, then the key
+                self.composition.insert(char[0])
+                char = char[1:]
         if char and self.composition.passes(char):
             self.commit_text(IBus.Text.new_from_string(char))
             return True

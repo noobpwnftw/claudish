@@ -120,6 +120,22 @@ try:
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.text
     assert commits[-1] == "as is"  # nothing new was inserted
+    # Dead keys compose in the composition: ´ then e is é; ´ then space is the accent.
+    for char in "caf":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.do_process_key_event(ord("e"), 0, 0)
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_circumflex"), 0, 0)
+    assert engine.do_process_key_event(ord(" "), 0, 0)
+    assert engine.composition.text == "café^", engine.composition.text
+    assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.text
+    # A shortcut while an instruction is out: your words go in, and the exchange is held to come back to.
+    for char in "fix it":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and engine.composition.sent
+    assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
+    assert commits[-1] == "fix it" and engine.composition.held is not None and not engine.composition.text
+    engine.composition.held = None
     # The indicator's menu picks a mode, as a Shift tap does.
     engine.do_property_activate("mode.continue", IBus.PropState.CHECKED)
     assert engine.composition.mode == "continue"

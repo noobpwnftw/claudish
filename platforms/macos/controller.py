@@ -66,6 +66,18 @@ def marked(text):
         text, {"NSUnderline": 1, "NSUnderlineColor": NSColor.textColor()})
 
 
+
+def unmark(client):
+    """Clear cd_AI's marked text, if there is any: with nothing marked, empty marked text replaces
+    the app's selection (NSTextInputClient), which would delete a selected word."""
+    try:
+        found = client.markedRange()
+        length = found.length if hasattr(found, "location") else tuple(found)[1]
+    except Exception:
+        length = 1  # cannot tell: clear it
+    if length:
+        client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+
 class ClaudishInputController(IMKInputController):
     def initWithServer_delegate_client_(self, server, delegate, client):
         self = objc.super(ClaudishInputController, self).initWithServer_delegate_client_(
@@ -217,7 +229,7 @@ class ClaudishInputController(IMKInputController):
             elif "done" in data and self.state.done(revision):
                 client = self.client()  # a helper took the task: nothing to insert
                 if client is not None:
-                    client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+                    unmark(client)
             elif "error" in data:
                 self.state.fail(revision, data["error"])
         self.check_ghost()
@@ -471,7 +483,7 @@ class ClaudishInputController(IMKInputController):
             self.hide_panel()
             OVERLAY.hide()
             if client is not None:
-                client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+                unmark(client)
             return
         if self.state.sent and not suggested:
             # The app ends the composition (a click, a focus change): what it shows (your
@@ -483,7 +495,7 @@ class ClaudishInputController(IMKInputController):
                 if words:
                     client.insertText_replacementRange_(words, (NSNotFound, 0))
                 else:
-                    client.setMarkedText_selectionRange_replacementRange_("", (0, 0), (NSNotFound, 0))
+                    unmark(client)
             return
         # Your own words, never the model's unless you asked for them (a rewrite waits for Tab).
         text = self.state.commit(suggested)
