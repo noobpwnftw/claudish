@@ -31,9 +31,11 @@ SolidCompression=yes
 CloseApplications=no
 
 [Files]
-Source: "PIME\*"; DestDir: "{commonpf32}\PIME"; Flags: recursesubdirs ignoreversion
-Source: "python-x64\*"; DestDir: "{app}\python"; Check: not IsArm64; Flags: recursesubdirs ignoreversion
-Source: "python-arm64\*"; DestDir: "{app}\python"; Check: IsArm64; Flags: recursesubdirs ignoreversion
+; The text service's DLLs are loaded in every app that takes text: in use, they are replaced at the
+; next restart (as input methods' installers do), which an update asks for.
+Source: "PIME\*"; DestDir: "{commonpf32}\PIME"; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
+Source: "python-x64\*"; DestDir: "{app}\python"; Check: not IsArm64; Flags: recursesubdirs ignoreversion restartreplace
+Source: "python-arm64\*"; DestDir: "{app}\python"; Check: IsArm64; Flags: recursesubdirs ignoreversion restartreplace
 Source: "vc_redist.x86.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Registry]
@@ -56,6 +58,16 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{commonpf32}\PIME\arm64\PIM
 [Code]
 function InstallLayoutOrTip(Tip: String; Flags: DWORD): BOOL;
   external 'InstallLayoutOrTip@input.dll stdcall';
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+begin
+  { An update: cd_AI's service and PIME's launcher let go of their files first. }
+  ExecAsOriginalUser(ExpandConstant('{sys}\schtasks.exe'), '/end /tn claudish', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im PIMELauncher.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Result := '';
+end;
 
 procedure AsYou(Arguments: String; Wait: TExecWait);
 var
