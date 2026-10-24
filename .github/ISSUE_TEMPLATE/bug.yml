@@ -1,0 +1,38 @@
+name: Bug report
+description: Something cd_AI did that it should not, or did not do.
+labels: [bug]
+body:
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Version and setup
+      description: "OS version; on Linux the desktop and session (GNOME on Wayland, KDE on X11, ...); the input framework version (`ibus version`, or the macOS or Windows version)."
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Application
+      description: The app you typed in.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Keys, expected, actual
+      description: The keys you pressed, what you expected, and what you got. A made-up phrase that reproduces it works.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: claudish doctor --json
+      description: "The output of `python -m claudish doctor --json` (on macOS: `~/Library/Input\\ Methods/Claudish.app/Contents/MacOS/Claudish doctor --json`)."
+      render: json
