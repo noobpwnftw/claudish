@@ -309,8 +309,10 @@ def main():
             back.state.change("decline politely")
             back.state.submit()
             back.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            back.worker.poll.return_value = (back.state.held.revision, {"text": "A draft."})  # it came meanwhile
             reply = back.handleRequest({"method": "onSetFocus", "document": "7"})
-            assert said(reply, "Shift+Esc"), reply
+            back.worker.poll.return_value = None
+            assert said(reply, "a draft is ready") and said(reply, "Shift+Esc"), reply
             worker_class.side_effect = None
             replaying.stop()
         sys.path.remove(temporary)

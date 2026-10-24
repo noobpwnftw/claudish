@@ -642,6 +642,7 @@ class ClaudishTextService(TextService):
         held for this text box says so at once, rather than at the next key."""
         keylog("onSetFocus", getattr(self, "document", None))
         self.follow_document()
+        self.poll_results()  # what came while the app was in the background: the pill says it
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
             self.setToast(pill, 3)
