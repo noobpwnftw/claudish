@@ -18,6 +18,7 @@ KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs
 # A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
 # it may take far longer than a suggestion while typing (the profile's timeout, if longer).
 TURN_TIMEOUT = 60
+QUESTION_SECONDS = 300  # a question nobody answers, as for an agent's (agent.py)
 # How a model's own question is shown, and the choice labels only Claudish's own questions use.
 MODEL_ASKS = "The model asks: "
 MODEL_SAYS = "The model says: "
@@ -110,8 +111,10 @@ class ModelDriver:
             result = rewriter.answer(
                 "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
                 approve=lambda *call: self.approve(session, *call),
-                progress=lambda summary: session.emit("progress", text=summary), local=local, serial=False)
+                progress=lambda summary: self.progress(session, summary), local=local, serial=False)
         except RuntimeError:
+            if self.cancelled:
+                return
             if not (self.inserted or self.handed):
                 raise
             result = {"consulted": []}  # the model said nothing after an answer was chosen or a helper opened
@@ -192,7 +195,9 @@ class ModelDriver:
         self.pending[key] = waiter
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
                      label=label, body=text if body is None else body, code=code, read=read)
-        waiter[0].wait()
+        if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the session's slot is not held forever
+            self.pending.pop(key, None)
+            return 1, "no answer"
         return waiter[1] or (1, "cancelled")
 
     def show(self, session, arguments, box):
@@ -258,6 +263,12 @@ class ModelDriver:
         if waiter:
             waiter[1] = (choice, text)
             waiter[0].set()
+
+    def progress(self, session, summary):
+        """Each tool call, as it happens; after Esc the loop stops at the next one."""
+        if self.cancelled:
+            raise RuntimeError("cancelled")
+        session.emit("progress", text=summary)
 
     def cancel(self):
         self.cancelled = True

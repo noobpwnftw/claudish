@@ -41,6 +41,9 @@ def user_content(text, image, style):
     return [picture, {"type": "text", "text": "The picture is the window I am typing in.\n\n" + text}]
 
 
+FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
+
+
 class Claude:
     """Opt-in hosted backend: typed text is sent to the Anthropic API."""
 
@@ -54,12 +57,21 @@ class Claude:
         self.client = anthropic.Anthropic(timeout=10.0, max_retries=0, **({"api_key": saved} if saved else {}))
         self.model = model
 
+    def options(self):
+        """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), and
+        server-side refusal fallbacks where the API offers them."""
+        options = {}
+        if not self.model.startswith(("claude-3", "claude-haiku-4", "claude-sonnet-4-5",
+                                      "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0")):
+            options["output_config"] = {"effort": "low"}
+        if self.model in FALLBACK_MODELS:
+            options.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        return options
+
     def converse(self, messages, tools=None, max_tokens=1024):
         """One Messages API call for the tool loop: (an OpenAI-shaped reply, usage)."""
         system, conversation = claude_messages(messages)
-        options = {}
-        if not self.model.startswith("claude-haiku"):
-            options = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+        options = self.options()
         if tools:
             options["tools"] = [{"name": tool["function"]["name"], "description": tool["function"].get("description", ""),
                                  "input_schema": tool["function"].get("parameters") or {"type": "object", "properties": {}}}
@@ -76,7 +88,7 @@ class Claude:
             # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
             response = self.client.with_options(timeout=60.0).beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
                                                         system=system, messages=conversation,
-                                                        output_config={"effort": "low"}, **options)
+                                                        **options)
         except TypeError as exc:
             if "authentication" not in str(exc):
                 raise
@@ -94,14 +106,12 @@ class Claude:
         return {"message": reply, "finish_reason": finish}, usage
 
     def rewrite(self, text, system, examples, image=None):
-        options = {}
-        if not self.model.startswith("claude-haiku"):  # Haiku has no server-side fallback.
-            options = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+        options = self.options()
         try:
             response = self.client.beta.messages.create(
                 model=self.model, max_tokens=2048, system=system,
                 messages=examples + [{"role": "user", "content": user_content(text, image, "claude")}],
-                output_config={"effort": "low"}, **options)
+                **options)
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
                 raise
@@ -312,7 +322,7 @@ class Rewriter:
             kept.agent = kept.agent or AgentProcess(self.session_command + self.agent_arguments(),
                                                     self.agent_mcp_config(kept))
             # The same description of the text box a model gets, and the same observations.
-            box = self.box("instruct", app, purpose, before, after, screen=screen)
+            box = self.box("instruct", app, purpose, before, after, look, screen=screen)
             words = self.modes["instruct"]["box"]
             context = box.describe("instruct", retrieval=bool(textbox), words=words)
             if textbox and (box.before or box.after):
@@ -328,7 +338,13 @@ class Rewriter:
         """--mcp-config for an agent: the profile's tool servers (as configured for Claudish, not the
         agent's own), and Claudish's textbox server when the MCP SDK is here to run it."""
         import importlib.util
-        servers = dict(self.toolbox.configs) if self.toolbox else {}
+        servers = {}
+        for name, server in (self.toolbox.configs.items() if self.toolbox else ()):
+            server = dict(server)
+            for field in ("env", "headers"):  # "$NAME" from this environment: the agent reads values
+                if isinstance(server.get(field), dict):
+                    server[field] = {key: os.path.expandvars(value) for key, value in server[field].items()}
+            servers[name] = server
         url = getattr(self, "url", None)
         if url and importlib.util.find_spec("mcp") is not None:
             package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -443,8 +459,9 @@ class Rewriter:
             if output and output not in candidates:
                 candidates.append(output)
         if not candidates:
+            record["outcome"] = "nothing offered"
             raise RuntimeError("the model offered nothing for this %s" % mode)
-        record.update(outcome="answered" if candidates else "nothing offered", candidates=candidates,
+        record.update(outcome="answered", candidates=candidates,
                       consulted=consulted, elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
         if conversation is not None:
             # The conversation keeps this turn: the instruction as typed (without what was observed),
@@ -470,8 +487,9 @@ class Rewriter:
 
         def ask(messages, offered, **sampling):
             nonlocal usage
-            payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False,
-                       "cache_prompt": True}
+            payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False}
+            if self.local:
+                payload["cache_prompt"] = True  # llama.cpp's; a hosted API may refuse fields it does not know
             payload.update(sampling)
             if offered:
                 payload["tools"] = offered

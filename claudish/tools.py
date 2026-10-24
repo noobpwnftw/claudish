@@ -103,8 +103,13 @@ class Toolbox:
                 portal = stack.enter_context(start_blocking_portal())
                 for name, trust, deny, provider in self.servers:
                     limit = max(1.0, self.timeout - spent)
-                    session = stack.enter_context(portal.wrap_async_context_manager(opened(provider, limit)))
-                    for tool in timed(portal.call, listed, session, max(1.0, self.timeout - spent)):
+                    try:  # a server that does not start is left out, as a context provider is
+                        session = stack.enter_context(portal.wrap_async_context_manager(opened(provider, limit)))
+                        tools = timed(portal.call, listed, session, max(1.0, self.timeout - spent))
+                    except Exception as exc:
+                        consulted.append("%s (unavailable: %s)" % (name, type(exc).__name__))
+                        continue
+                    for tool in tools:
                         kind = classify(tool, trust, deny)
                         if kind == "denied" or (kind != "read" and approve is None):
                             continue  # side effects are only offered when someone can approve them

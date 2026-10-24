@@ -62,6 +62,20 @@ class ToolLoopTests(unittest.TestCase):
         self.assertIsNone(seen[-1][1])  # the last turn gets no tools: it must answer
         self.assertEqual(text, "Out of steps—here is what I have.")
 
+    def test_a_server_that_does_not_start_is_left_out(self):
+        from claudish.tools import Toolbox
+        servers = dict(SERVER, broken={"command": "claudish-no-such-server"})
+        toolbox = Toolbox(["broken", "notes"], servers, timeout=30)
+        seen = []
+
+        def ask(messages, tools):
+            seen.append(tools)
+            return {"content": "Answered anyway."}
+        text, consulted, _ = toolbox.run(ask, [{"role": "user", "content": "how is CI"}])
+        self.assertEqual(text, "Answered anyway.")
+        self.assertEqual([t["function"]["name"] for t in seen[0]], ["notes__ci_status"])
+        self.assertTrue(consulted[0].startswith("broken (unavailable"), consulted)
+
     def test_config_errors(self):
         from claudish.tools import Toolbox
         with self.assertRaisesRegex(ValueError, "not in"):

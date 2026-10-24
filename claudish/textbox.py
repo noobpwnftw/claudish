@@ -23,13 +23,14 @@ class Textbox:
         query = str(query).strip()
         if not query:
             return "error: an empty query"
-        lower = self.text.lower()
-        spots = [m.start() for m in re.finditer(re.escape(query.lower()), lower)]
+        # Matched in the text itself, ignoring case: offsets stay the text's own (lowercasing can
+        # change a string's length, as Turkish İ does).
+        spots = [m.start() for m in re.finditer(re.escape(query), self.text, re.IGNORECASE)]
         if not spots:
             words = set(re.findall(r"\w+", query.lower())) - {"the", "a", "an", "of", "to", "and", "in", "is"}
             scored = {}
             for word in words:
-                for m in re.finditer(r"\b%s" % re.escape(word), lower):
+                for m in re.finditer(r"\b%s" % re.escape(word), self.text, re.IGNORECASE):
                     scored.setdefault(m.start() // SNIPPET, set()).add(word)
             spots = [block * SNIPPET for block, hits in sorted(scored.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
         if not spots:
