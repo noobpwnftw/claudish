@@ -19,6 +19,13 @@ macOS the Download button (.pkg, ad-hoc signed; Open Anyway in Privacy & Securit
 26.6) first and a curl one-liner second; a settings window, not a wizard; avoid feature creep.
 G57-G60 tabled.
 
+## Release 0.1.0
+
+Not released: the reviewers' last round (docs/research/2026-10-24-release-review.md) leaves one
+blocker, a rewrite through Claude with a valid Anthropic API key, which only the owner can run
+(docs/release.md, on branch agent/release-0.1.0 with the download-first README and site and the
+release notes). Everything else they raised is fixed or labelled.
+
 ## Checks (owner, 2026-10-24)
 
 The gate is `python scripts/check.py`, about six seconds, every step under 5 s. Test workflows that
