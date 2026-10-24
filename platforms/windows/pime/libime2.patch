@@ -283,6 +283,19 @@ index 2ea3635..b8ae3d1 100644
  };
  
  }
+diff --git a/src/ImeModule.cpp b/src/ImeModule.cpp
+index 4e3c48e..2ba0913 100644
+--- a/src/ImeModule.cpp
++++ b/src/ImeModule.cpp
+@@ -356,7 +356,7 @@ HRESULT ImeModule::unregisterServer() {
+         if(::IsWindows8OrGreater()) {
+             // Windows 8 support
+             categoryMgr->UnregisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, textServiceClsid_);
+-            categoryMgr->RegisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, textServiceClsid_);
++            categoryMgr->UnregisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, textServiceClsid_);  // Claudish: was RegisterCategory, which left the TIP key behind
+         }
+ 
+         categoryMgr->Release();
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
 index 581f89f..e7125dc 100644
 --- a/src/MessageWindow.cpp
