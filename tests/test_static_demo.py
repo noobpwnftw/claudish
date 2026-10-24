@@ -44,7 +44,7 @@ class SiteBuildTests(unittest.TestCase):
         self.assertIn(':root[data-theme="dark"]{', css)  # the demo's tokens, both themes
         self.assertIn("Content-Security-Policy", page)
         prompt = re.search(r'<pre id="prompt-text">(.*?)</pre>', page, re.S).group(1)
-        self.assertTrue(prompt.rstrip().endswith("Make no mistakes."))
+        self.assertIn("tapping Shift switches to continue", prompt)  # it ends on the keys
         # Every command the prompt tells an agent to run must exist.
         for command in re.findall(r"`python -m claudish ([^`]+)`", prompt):
             words = command.split()

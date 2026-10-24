@@ -142,7 +142,7 @@ function render() {
 const DRAWN = [
   ["The suggestion after the caret", "a layered overlay window in Claudish's PIME, at the TSF caret rect", "cd_AI's overlay panel (panel.py), at IMK's caret rect", "the extension's label at the IBus cursor location"],
   ["The composition (plain underline)", "TSF composition", "IMK marked text", "IBus preedit (Wayland text-input)"],
-  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D-Bus"],
+  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D\u2011Bus"],
   ["The mode switch", "the same overlay window", "the same overlay panel", "the extension's label"],
   ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's color scheme"],
 ];
@@ -153,7 +153,7 @@ function feasibility() {
                  el("p", "", "Every element has to be drawable on every platform. Where one cannot be, the design changes for all of them."));
   const table = el("table");
   const head = el("tr");
-  ["", "Windows 11", "macOS", "GNOME (X11 and Wayland)"].forEach((h) => head.append(el("th", "", h)));
+  ["", "Windows\u00a011", "macOS", "GNOME (X11 and Wayland)"].forEach((h) => head.append(el("th", "", h)));
   table.append(head);
   for (const [what, ...ways] of DRAWN) {
     const row = el("tr");

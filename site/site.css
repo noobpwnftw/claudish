@@ -65,7 +65,7 @@ tr:first-child td{border-top:0}
 .copy{border:1px solid var(--key-border);background:transparent;color:var(--label);border-radius:3px;padding:6px 12px;font-size:12px;cursor:pointer}
 .copy:hover{background:var(--chip-hover)}
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:13px;line-height:1.7}
-.prompt pre{padding:18px 20px;color:var(--output-text)}
+.prompt pre{padding:18px 20px;color:var(--output-text);overflow-wrap:break-word}
 .by-hand{margin-top:34px}
 .commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg);white-space:pre;overflow-wrap:normal;overflow-x:auto}
 code{font-family:var(--mono);font-size:12px}

@@ -84,3 +84,4 @@ body.solo .shell{padding:0;max-width:none}
 .drawn tr:first-child th{font-family:var(--mono);font-size:11px;letter-spacing:.8px;color:var(--muted);font-weight:400}
 .drawn td{color:var(--label);text-wrap:pretty}
 @media(max-width:650px){.drawn table{font-size:12px}.drawn th,.drawn td{overflow-wrap:break-word;padding-right:8px}.host .k-foot{flex-wrap:wrap}}
+.platforms a{white-space:nowrap}@media(max-width:420px){.platforms a{padding:6px 9px;font-size:11px;letter-spacing:.3px}}
