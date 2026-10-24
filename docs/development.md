@@ -55,10 +55,11 @@ the rigs; it is not part of the shipped source.
 ## Current evidence and next checks
 
 As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
-release. The merge gate runs 268 unit tests, both adapter smokes and the settings browser check.
+release. The merge gate runs 269 unit tests, both adapter smokes and the settings browser check.
 The browser check includes subscription startup/failure/retry, a first rewrite and stale example
 responses, including a delayed Settings session before controls become usable. CLI protocol tests
-use stand-ins; they do not establish account access. Separate browser runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
+use stand-ins; they do not establish account access. Concurrent HTTP saves also check that a
+slow model selection preserves a tone saved from another window. Separate browser runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
 2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
 at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
 

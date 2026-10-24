@@ -290,23 +290,26 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return None
             from . import settings
             path = config_path or settings.config.default_path()
-            before = path.read_bytes() if path.is_file() else None
-            try:
-                shown = settings.apply(data, config_path)
-            except ValueError as exc:
-                return self.reply(400, {"error": str(exc)})
-            except Exception as exc:  # the keychain, the disk: said on the page, not a dropped connection
-                return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
-            if reload is not None:
+            # A model/key check can be slow. Keep another window's save (and hand-edit reloads)
+            # out of its read/modify/write and rollback, so accepted changes are not lost.
+            with rebuilding:
+                before = path.read_bytes() if path.is_file() else None
                 try:
-                    swap()
-                except Exception as exc:  # it would not start at the next login either: put it back
-                    if before is None:
-                        path.unlink(missing_ok=True)
-                    else:
-                        path.write_bytes(before)
-                    return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
-            return self.reply(200, dict(shown, service=self.health()))
+                    shown = settings.apply(data, config_path)
+                except ValueError as exc:
+                    return self.reply(400, {"error": str(exc)})
+                except Exception as exc:  # the keychain, the disk: said on the page, not a dropped connection
+                    return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
+                if reload is not None:
+                    try:
+                        swap()
+                    except Exception as exc:  # it would not start at the next login either: put it back
+                        if before is None:
+                            path.unlink(missing_ok=True)
+                        else:
+                            path.write_bytes(before)
+                        return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
+                return self.reply(200, dict(shown, service=self.health()))
 
         def post_ticket(self):
             """`claudish settings` asks for a ticket to put in the page's

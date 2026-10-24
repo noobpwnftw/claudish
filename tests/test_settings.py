@@ -266,6 +266,40 @@ class ServiceTests(Home):
         self.assertIn("nothing changed", answer["error"])
         self.assertEqual(self.path.read_bytes(), before)
 
+    def test_a_slow_model_change_keeps_a_concurrent_tone_change(self):
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError
+        config.write_starter()
+        self.call("/health")  # take up the initial config before either window saves
+        checking, proceed = threading.Event(), threading.Event()
+
+        def check_server(*args, **kwargs):
+            checking.set()
+            if not proceed.wait(1):
+                raise RuntimeError("the model check was not released")
+            return None
+
+        with patch.object(settings, "check_server", check_server), \
+                patch.object(settings, "server_models", return_value=["rig-model"]), \
+                ThreadPoolExecutor(max_workers=2) as workers:
+            model = workers.submit(self.call, "/settings", {
+                "choice": "server", "server": {"url": "http://127.0.0.1:1234", "model": "rig-model"}})
+            try:
+                self.assertTrue(checking.wait(1), "the model check did not start")
+                tone = workers.submit(self.call, "/settings", {"tone": "bard"})
+                try:
+                    tone.result(timeout=0.1)
+                except TimeoutError:
+                    pass  # a save may wait for the first window's model check
+            finally:
+                proceed.set()
+            self.assertEqual(model.result(timeout=1)[0], 200)
+            self.assertEqual(tone.result(timeout=1)[0], 200)
+        written = self.written()
+        self.assertEqual(written["profile"], "ollama")
+        self.assertEqual(written["profiles"]["ollama"]["model"], "rig-model")
+        self.assertEqual(written["profiles"]["ollama"].get("tone"), "bard")
+        self.assertEqual(self.call("/settings/state")[1]["tone"], "bard")
+
     def test_a_refused_change_says_why_and_changes_nothing(self):
         status, answer = self.call("/settings", {"server": {"url": "nope", "model": "x"}})
         self.assertEqual(status, 400)
