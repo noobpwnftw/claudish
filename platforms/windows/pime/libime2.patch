@@ -1256,7 +1256,7 @@ index 0000000..dadfca2
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..14559ab 100644
+index ea37cdc..1f891d5 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1369,7 +1369,22 @@ index ea37cdc..14559ab 100644
      return S_OK;
  }
  
-@@ -911,6 +1000,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -803,6 +892,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+     // grabbed by others, we're ``forced'' to terminate current composition.
+     // If we end the composition by calling ITfComposition::EndComposition() ourselves,
+     // this event is not triggered.
++    // Claudish: a composition the input method asked to clear (an instruction sent to the model) is
++    // emptied with the write cookie TSF gives here, so the app keeps nothing of it.
++    if (clearOnTerminate_ && pComposition) {
++        ComPtr<ITfRange> range;
++        if (pComposition->GetRange(&range) == S_OK && range)
++            range->SetText(ecWrite, 0, L"", 0);
++        clearOnTerminate_ = false;
++    }
+     onCompositionTerminated(true);
+     composition_ = nullptr;
+     return S_OK;
+@@ -911,6 +1008,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
@@ -1410,10 +1425,21 @@ index ea37cdc..14559ab 100644
      HWND hwnd = NULL;
      ComPtr<ITfContextView> view;
 diff --git a/src/TextService.h b/src/TextService.h
-index f2c1c09..0babc07 100644
+index f2c1c09..1743fa9 100644
 --- a/src/TextService.h
 +++ b/src/TextService.h
-@@ -137,9 +137,17 @@ public:
+@@ -125,6 +125,10 @@ public:
+     // text composition handling
+     bool isComposing() const;
+ 
++    // Claudish: when the app ends the composition itself (a focus change), clear its text instead of
++    // leaving it in the document.
++    void setClearOnTerminate(bool clear) { clearOnTerminate_ = clear; }
++
+     // is keyboard disabled for the context (nullptr means current context)
+     bool isKeyboardDisabled(ITfContext* context = nullptr) const;
+     
+@@ -137,9 +141,17 @@ public:
      void endComposition(ITfContext* context);
      bool compositionRect(EditSession* session, RECT* rect) const;
      bool selectionRect(EditSession* session, RECT* rect) const;
@@ -1431,6 +1457,14 @@ index f2c1c09..0babc07 100644
      void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
      void setCompositionCursor(EditSession* session, int pos) const;
  
+@@ -281,6 +293,7 @@ private:
+     DWORD langBarSinkCookie_;
+ 
+     ComPtr<ITfComposition> composition_; // acquired when starting composition, released when ending composition
++    bool clearOnTerminate_ = false;
+     ComPtr<ITfLangBarMgr> langBarMgr_;
+     std::vector<ComPtr<LangBarButton>> langBarButtons_;
+     std::vector<PreservedKey> preservedKeys_;
 diff --git a/src/Window.cpp b/src/Window.cpp
 index cff3d7e..4680a32 100644
 --- a/src/Window.cpp

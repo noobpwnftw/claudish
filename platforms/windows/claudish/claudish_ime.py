@@ -367,6 +367,9 @@ class ClaudishTextService(TextService):
             self.setShowCandidates(False)
             return
         self.setGhost("")
+        # A sent instruction is not text for the app: if the app ends the composition (a focus change),
+        # Claudish's PIME clears it; words still being typed stay, as a CJK preedit does.
+        self.setClearOnEnd(self.state.sent)
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         self.setCompositionString(shown)
         # TSF cursor offsets count UTF-16 code units.

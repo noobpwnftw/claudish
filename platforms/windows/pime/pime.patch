@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..d319547 100644
+index 7829c72..60b7a5f 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -59,7 +59,16 @@ index 7829c72..d319547 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -101,6 +110,70 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -96,11 +105,79 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+ 	}
+ 	bool success = jsonValueOr<bool>(msg, "success", false);
+ 	if (success) {
++		// Claudish: whether a composition the app ends itself is cleared rather than left in the text.
++		auto clearIt = msg.find("clearOnEnd");
++		if (clearIt != msg.end() && clearIt->is_boolean())
++			textService_->setClearOnTerminate(clearIt->get<bool>());
+ 		updateStatus(msg, session);
+ 	}
  	return success;
  }
  
@@ -130,7 +139,7 @@ index 7829c72..d319547 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +205,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +209,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -146,7 +155,7 @@ index 7829c72..d319547 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -190,6 +272,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -190,6 +276,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->setCompositionString(session, L"", 0);
  				endComposition = true;
  			}
@@ -159,7 +168,7 @@ index 7829c72..d319547 100644
  		}
  		else {
  			if (!textService_->isComposing()) {
-@@ -329,6 +417,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +421,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  
  		updateComposition(msg, session, endComposition);
  
@@ -176,7 +185,7 @@ index 7829c72..d319547 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +443,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +447,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -285,7 +294,7 @@ index 7829c72..d319547 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +552,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +556,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -299,7 +308,7 @@ index 7829c72..d319547 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +561,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +565,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -317,7 +326,7 @@ index 7829c72..d319547 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +665,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +669,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -325,7 +334,7 @@ index 7829c72..d319547 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +698,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +702,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -333,7 +342,7 @@ index 7829c72..d319547 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +738,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +742,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -362,7 +371,7 @@ index 7829c72..d319547 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1028,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1032,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -651,7 +660,7 @@ index 5c89d15..5f1fe75 100644
  
  	HMENU popupMenu_;
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..d89e685 100644
+index 400c374..3686d26 100644
 --- a/python/textService.py
 +++ b/python/textService.py
 @@ -90,12 +90,20 @@ class TextService:
@@ -710,7 +719,7 @@ index 400c374..d89e685 100644
      def onKeyboardStatusChanged(self, opened):
          pass
  
-@@ -249,6 +271,20 @@ class TextService:
+@@ -249,6 +271,25 @@ class TextService:
          self.showCandidates = show
          self.currentReply["showCandidates"] = show
  
@@ -723,6 +732,11 @@ index 400c374..d89e685 100644
 +        """Claudish's PIME: a panel shown briefly at the caret (a mode switch), drawn like the
 +        candidate window; it hides after duration seconds."""
 +        self.currentReply["toast"] = {"panel": panel, "duration": duration}
++
++    def setClearOnEnd(self, clear):
++        """Claudish's PIME: when the app ends the composition itself (a focus change), clear it
++        rather than leave it in the text."""
++        self.currentReply["clearOnEnd"] = bool(clear)
 +
 +    def setGhost(self, text):
 +        """Claudish's PIME: continue's suggestion, drawn right after the caret; "" hides it."""

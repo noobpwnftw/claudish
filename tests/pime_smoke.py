@@ -183,8 +183,10 @@ def main():
             assert worker_class.return_value.schedule.call_count == calls
             reply = key(0x77)  # F8: send a picture of the window too
             assert service.state.look and said(reply, "window"), reply
+            assert reply.get("clearOnEnd") is False, reply  # words being typed: a focus change keeps them
             reply = key(0x0D)
             assert service.state.working and said(reply, "working"), reply
+            assert reply.get("clearOnEnd") is True, reply  # sent: a focus change clears it from the text
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
