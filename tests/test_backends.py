@@ -97,14 +97,14 @@ class ClaudeBackendTests(unittest.TestCase):
                 rewriter.rewrite("Ship it.")
         self.assertEqual(self.sdk.calls, [])
 
-    def test_health_reports_hosted_backend(self):
-        for backend, hosted in [("claude", True), ("rules", False)]:
+    def test_health_reports_the_backend(self):
+        for backend in ("claude", "rules"):
             server = make_server(Rewriter(backend), 0)
             thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
             thread.start()
             try:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
-                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "hosted": hosted, "routes": {},
+                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "routes": {},
                                                        "profile": None, "modes": ["rewrite", "continue", "instruct"],
                                                        "timeout": 3})
             finally:

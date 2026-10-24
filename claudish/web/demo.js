@@ -21,7 +21,6 @@ const SAMPLES = [
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
-let hosted = false;
 let backend = "";
 let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 
@@ -119,7 +118,7 @@ async function ask(revision) {
   if (revision !== state.revision) return;
   const text = state.text, mode = live() ? "continue" : state.asked, started = performance.now();
   const controller = new AbortController();
-  const limit = setTimeout(() => controller.abort(), Math.max(hosted ? 15000 : 5000, serviceTimeout * 1000 + 2000));
+  const limit = setTimeout(() => controller.abort(), Math.max(15000, serviceTimeout * 1000 + 2000));
   setStatus("");  // the panel says what is happening
   try {
     let data;
@@ -651,7 +650,6 @@ async function checkConnection() {
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
     serviceTimeout = Number(data.timeout) || 3;
-    hosted = Boolean(data.hosted);
     backend = data.backend;
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),

@@ -231,7 +231,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             self.reply(404, {"error": "not found"})
 
         def health(self):
-            return {"service": "cd_AI", "backend": rewriter.backend, "hosted": rewriter.hosted,
+            return {"service": "cd_AI", "backend": rewriter.backend,
                     "profile": getattr(rewriter, "profile", None),
                     # Which app goes to which profile (the AI that answers there).
                     "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},

@@ -421,7 +421,7 @@ class Rewriter:
         consulted, usage, new = list(box.consulted), {}, []
         from .screen import redact
         record = {"time": time.time(), "profile": getattr(self, "profile", None), "backend": self.backend,
-                  "model": self.model or (self.claude.model if self.claude else None), "hosted": self.hosted,
+                  "model": self.model or (self.claude.model if self.claude else None),
                   "mode": mode, "app": box.app, "kind": box.kind, "system": redact(prompt)[0], "turn": redact(said)[0],
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
         self.recent.append(record)
@@ -469,7 +469,7 @@ class Rewriter:
             conversation.remember([{"role": "user", "content": text}] + new
                                   + [{"role": "assistant", "content": candidates[0]}])
         return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
-                "profile": getattr(self, "profile", None), "hosted": self.hosted,
+                "profile": getattr(self, "profile", None),
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}
