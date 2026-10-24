@@ -8,8 +8,9 @@ import sys
 import time
 
 from AppKit import (NSAlert, NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
-                    NSImage, NSMenu, NSMenuItem, NSRunningApplication, NSWindow, NSWindowStyleMaskClosable,
-                    NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable, NSWindowStyleMaskTitled)
+                    NSBezierPath, NSColor, NSGraphicsContext, NSImage, NSMenu, NSMenuItem, NSRunningApplication,
+                    NSShadow, NSWindow, NSWindowStyleMaskClosable, NSWindowStyleMaskMiniaturizable,
+                    NSWindowStyleMaskResizable, NSWindowStyleMaskTitled)
 from Foundation import NSData, NSObject, NSURL, NSURLRequest
 from WebKit import WKWebView, WKWebViewConfiguration
 
@@ -42,6 +43,27 @@ def menus(app):
     app.setMainMenu_(bar)
 
 
+def dock_icon(artwork):
+    """The artwork on Apple's icon grid, as every other Dock icon: a rounded square 824 of 1024
+    points wide, centred, with a soft shadow below."""
+    icon = NSImage.alloc().initWithSize_((1024, 1024))
+    icon.lockFocus()
+    shadow = NSShadow.alloc().init()
+    shadow.setShadowOffset_((0, -10))
+    shadow.setShadowBlurRadius_(24)
+    shadow.setShadowColor_(NSColor.colorWithWhite_alpha_(0, 0.3))
+    shape = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(((100, 100), (824, 824)), 185, 185)
+    NSGraphicsContext.saveGraphicsState()
+    shadow.set()
+    NSColor.whiteColor().setFill()
+    shape.fill()
+    NSGraphicsContext.restoreGraphicsState()
+    shape.addClip()
+    artwork.drawInRect_(((100, 100), (824, 824)))
+    icon.unlockFocus()
+    return icon
+
+
 def already_open():
     """True when a settings window is open already (it is brought forward instead)."""
     try:
@@ -63,9 +85,9 @@ def show():
     app.setActivationPolicy_(NSApplicationActivationPolicyRegular)  # a Dock icon and menus while it is open
     from importlib.resources import files
     picture = files("claudish").joinpath("web", "favicon.png").read_bytes()  # cd_AI's icon, as on the page
-    icon = NSImage.alloc().initWithData_(NSData.dataWithBytes_length_(picture, len(picture)))
-    if icon is not None:
-        app.setApplicationIconImage_(icon)
+    artwork = NSImage.alloc().initWithData_(NSData.dataWithBytes_length_(picture, len(picture)))
+    if artwork is not None:
+        app.setApplicationIconImage_(dock_icon(artwork))
     menus(app)
     for attempt in range(20):  # just installed, the service may still be starting
         try:

@@ -157,6 +157,15 @@ def check(name, actual, expected):
           flush=True)
 
 
+# The input method is the bundle's executable with no arguments; with arguments it is cd_AI's
+# command line, such as the rules service cycle.sh runs from the same bundle.
+INPUT_METHOD = "/Contents/MacOS/Claudish$"
+
+
+def input_method_running():
+    return not subprocess.run(["pgrep", "-f", INPUT_METHOD], capture_output=True).returncode
+
+
 def wait_for(predicate, timeout=8):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -202,17 +211,16 @@ def scenarios():
         sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
         # Stop the old build, as the package does; until it has exited it still counts as running
         # below, and the first keys would reach the app with no input method.
-        subprocess.run(["killall", "Claudish"], check=False, capture_output=True)
-        wait_for(lambda: subprocess.run(["pgrep", "-x", "Claudish"], capture_output=True).returncode, timeout=10)
+        subprocess.run(["pkill", "-f", INPUT_METHOD], check=False)
+        wait_for(lambda: not input_method_running(), timeout=10)
         print("note: macOS keeps the old bundle's name and icon (and sometimes the input method) until"
               " you log out and in", flush=True)
     select_input_method()
     # macOS starts an input method at login; after an update (or a crash) it does not start it again
     # by itself, and keys then reach the app without it. Start it the way login would.
-    if subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode:
+    if not input_method_running():
         sh("open", "-g", str(TARGET))
-        wait_for(lambda: not subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")],
-                                            capture_output=True).returncode, timeout=10)
+        wait_for(input_method_running, timeout=10)
     fresh_document()
     current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
     check("cd_AI is the selected input source", current.startswith(BUNDLE_ID), True)
@@ -228,7 +236,7 @@ def scenarios():
     type_text("ls -la")
     time.sleep(0.5)
     check("continue: keys go straight in", document(), "ls -la")
-    running = not subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode
+    running = input_method_running()
     check("cd_AI is running (the keys went through it)", running, True)
     key("Down")  # the context starts over
     fresh_document()
