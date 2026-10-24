@@ -12,9 +12,9 @@ from .server import make_server
 
 
 def main():
-    parser = argparse.ArgumentParser(description="cd_AI — Claudish input method")
+    parser = argparse.ArgumentParser(prog="claudish", description="cd_AI — Claudish input method")
     commands = parser.add_subparsers(dest="command", required=True)
-    serve = commands.add_parser("serve")
+    serve = commands.add_parser("serve", help="Run the service the input methods talk to (the login service runs this)")
     serve.add_argument("--config", metavar="FILE", help="Profiles file (default: %s, if present)"
                        % config.default_path())
     serve.add_argument("--profile", help="Profile to use from the config file")
@@ -32,10 +32,10 @@ def main():
                        help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
     serve.add_argument("--port", type=int, default=18765)
     serve.add_argument("--max-tokens", type=int)
-    rewrite = commands.add_parser("rewrite")
+    rewrite = commands.add_parser("rewrite", help="Rewrite TEXT through the running service and print the result")
     rewrite.add_argument("text")
     rewrite.add_argument("--url", default="http://127.0.0.1:18765")
-    bench = commands.add_parser("bench")
+    bench = commands.add_parser("bench", help="Time rewrites through the running service")
     bench.add_argument("--runs", type=int, default=10)
     bench.add_argument("--url", default="http://127.0.0.1:18765")
     setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "

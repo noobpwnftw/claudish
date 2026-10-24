@@ -348,6 +348,14 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
         self.assertEqual(self.client.commits, ["Hi—€"])
 
+    def test_ctrl_shift_is_a_chord_not_a_tap(self):
+        self.controller.shift.typed_at = 0  # long after any key: only the chord decides
+        for flags in ((1 << 17) | (1 << 18), 1 << 18):  # Shift down, then up, with Control held
+            event = types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda f=flags: f,
+                                          characters=lambda: "")
+            self.controller.handleEvent_client_(event, self.client)
+        self.assertEqual(self.controller.state.mode, "compose")
+
     def test_a_shift_tap_switches_mode_and_keeps_what_you_typed(self):
         self.type_text("thank the team")
         state = self.controller.state

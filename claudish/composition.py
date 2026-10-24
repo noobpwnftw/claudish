@@ -644,21 +644,22 @@ class Composition:
 class ShiftTap:
     """Shift pressed and released alone, quickly: the mode switch. Any other key while it is held
     (a capital letter, Shift+arrow), a long hold (Shift+click), or a Shift pressed right after
-    another key (rolled typing, as Korean ㅃ or a fast capital) is not a tap."""
+    another key (rolled typing, as Korean ㅃ or a fast capital) is not a tap. Nor is Shift with Ctrl,
+    Alt or Win/Cmd held (Ctrl+Shift and Alt+Shift switch keyboard layouts): chord, at press or release."""
 
     def __init__(self):
         self.down_at = None
         self.typed_at = 0.0
 
-    def press(self, now):
-        self.down_at = None if now - self.typed_at < ROLLED_SHIFT_SECONDS else now
+    def press(self, now, chord=False):
+        self.down_at = None if chord or now - self.typed_at < ROLLED_SHIFT_SECONDS else now
 
     def other(self):
         self.down_at = None
         self.typed_at = time.monotonic()
 
-    def release(self, now):
+    def release(self, now, chord=False):
         """True when this release ends a tap."""
-        tapped = self.down_at is not None and now - self.down_at <= SHIFT_TAP_SECONDS
+        tapped = not chord and self.down_at is not None and now - self.down_at <= SHIFT_TAP_SECONDS
         self.down_at = None
         return tapped

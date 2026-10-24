@@ -451,6 +451,7 @@ function flash(name) {
 // Input from the hidden textarea.
 sink.addEventListener("keydown", (event) => {
   if (event.isComposing) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) shiftDownAt = null;  // Ctrl+Shift, Alt+Shift: a chord, not a tap
   if (event.ctrlKey || event.metaKey) {
     if (event.altKey) return;
     settle();  // a shortcut ends a composition: your words go in first
@@ -480,7 +481,8 @@ let typedAt = -Infinity;
 const ROLLED_SHIFT_MS = 300;
 sink.addEventListener("keyup", (event) => {
   if (event.key !== "Shift") return;
-  const tapped = shiftDownAt !== null && performance.now() - shiftDownAt <= SHIFT_TAP_MS;
+  const chord = event.ctrlKey || event.altKey || event.metaKey;
+  const tapped = !chord && shiftDownAt !== null && performance.now() - shiftDownAt <= SHIFT_TAP_MS;
   shiftDownAt = null;
   if (tapped) { stopTyping(); switchMode(); }
 });

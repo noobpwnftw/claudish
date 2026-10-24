@@ -54,6 +54,16 @@ class CompositionTests(unittest.TestCase):
         state.insert("x")
         self.assertIn(("Tab", "rewrite"), state.panel()["foot"])
 
+    def test_shift_with_ctrl_alt_or_win_is_a_chord_not_a_tap(self):
+        from claudish.composition import ShiftTap
+        shift = ShiftTap()
+        shift.press(10.0)
+        self.assertTrue(shift.release(10.1))  # alone and quick: a tap
+        shift.press(20.0, chord=True)  # Ctrl+Shift, Alt+Shift: the layout-switch chords
+        self.assertFalse(shift.release(20.1))
+        shift.press(30.0)  # Ctrl let go of before Shift, or pressed during it
+        self.assertFalse(shift.release(30.1, chord=True))
+
     def test_edit_focus_and_commit_invalidate_old_results(self):
         state = Composition()
         state.insert("x")

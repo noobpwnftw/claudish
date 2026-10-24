@@ -321,9 +321,11 @@ class ClaudishEngine(IBus.Engine):
     def do_process_key_event(self, keyval, keycode, state):
         # A Shift tap switches mode (continue <-> compose), as Shift switches English and pinyin.
         if keyval in (IBus.KEY_Shift_L, IBus.KEY_Shift_R) and not self.sensitive:
+            chord = bool(state & (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
+                                  IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK))
             if not state & IBus.ModifierType.RELEASE_MASK:
-                self.shift.press(time.monotonic())
-            elif self.shift.release(time.monotonic()):
+                self.shift.press(time.monotonic(), chord)
+            elif self.shift.release(time.monotonic(), chord):
                 self.switch_mode()
             return False
         if not state & IBus.ModifierType.RELEASE_MASK:

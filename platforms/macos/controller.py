@@ -6,7 +6,7 @@ import traceback
 
 import objc
 from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlagsChanged, NSEventTypeKeyDown
-from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
+from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagOption, NSEventModifierFlagShift
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
@@ -537,9 +537,11 @@ class ClaudishInputController(IMKInputController):
             return False
         if self.active and event.type() == NSEventTypeFlagsChanged:
             if event.keyCode() in (56, 60):  # left or right Shift, pressed or released
+                chord = bool(event.modifierFlags() & (NSEventModifierFlagControl | NSEventModifierFlagOption |
+                                                      NSEventModifierFlagCommand))
                 if event.modifierFlags() & NSEventModifierFlagShift:
-                    self.shift.press(time.monotonic())
-                elif self.shift.release(time.monotonic()):
+                    self.shift.press(time.monotonic(), chord)
+                elif self.shift.release(time.monotonic(), chord):
                     self.switch_mode(client)
             else:
                 self.shift.other()

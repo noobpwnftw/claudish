@@ -46,6 +46,13 @@ try:
     engine.do_process_key_event(ord("X"), 0, IBus.ModifierType.SHIFT_MASK)
     engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.RELEASE_MASK)
     assert engine.composition.mode == "compose" and engine.composition.text == "hello-worldX"
+    # Ctrl+Shift (a layout-switch chord) is not a tap.
+    engine.do_process_key_event(IBus.KEY_Control_L, 0, 0)
+    engine.shift.typed_at = 0  # Shift long after the Ctrl press: not rolled typing, only the chord counts
+    engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.CONTROL_MASK)
+    engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.RELEASE_MASK)
+    engine.do_process_key_event(IBus.KEY_Control_L, 0, IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.RELEASE_MASK)
+    assert engine.composition.mode == "compose", "Ctrl+Shift switched modes"
     engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
     # AltGr, Num Lock, and similar keys alone must not end the phrase.
     for keyval in (IBus.KEY_ISO_Level3_Shift, IBus.KEY_Num_Lock, IBus.KEY_Meta_L, IBus.KEY_Hyper_L):
