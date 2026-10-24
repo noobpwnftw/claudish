@@ -45,11 +45,13 @@ def progress(label):
     return lambda received, total: sys.stderr.write("\r  %s: %d/%d MB" % (label, received >> 20, total >> 20))
 
 
-def step_config():
+def step_config(name):
+    """The starter config, with the profile being set up as its default (so serve and doctor agree)."""
     path = config.default_path()
     if path.is_file():
         return "done", str(path), None
-    return "todo", "write %s with profiles: %s" % (path, ", ".join(config.STARTER["profiles"])), config.write_starter
+    return "todo", "write %s with profiles: %s (default %s)" % (path, ", ".join(config.STARTER["profiles"]), name), \
+        lambda: config.write_starter(profile=name)
 
 
 def step_tone(name, settings, tone):
@@ -154,14 +156,14 @@ def step_service(name, settings):
     what = "the local model and service" if local else "`claudish serve --profile %s`" % name
     if settings.get("api_key_env"):
         what += "; it will need %s in the service manager's environment, not just your shell" % settings["api_key_env"]
-    return "todo", "start %s at every login" % what, lambda: service.run("install", serve=not local, extra=extra)
+    return "todo", "start %s at every login" % what, lambda: service.run("install", local=local, extra=extra)
 
 
 def plan(profile=None, variant="cpu", skip=(), tone=None):
     """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
     name, settings = chosen_profile(profile)
     local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
-    steps = [("Config", step_config), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
+    steps = [("Config", lambda: step_config(name)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
     if local:  # optional: a local model, downloaded here (claudish setup --profile local)
         steps += [("llama.cpp", lambda: step_llama(settings, variant)), ("Model", step_model)]
     else:

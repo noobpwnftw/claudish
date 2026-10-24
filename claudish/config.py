@@ -132,11 +132,12 @@ STARTER = {
 }
 
 
-def write_starter(path=None):
-    """Write the starter config; never overwrite an existing one. Returns the path."""
+def write_starter(path=None, profile=None):
+    """Write the starter config, with profile (one of its profiles) as the default; never overwrite
+    an existing one. Returns the path."""
     path = Path(path or default_path())
     if path.exists():
         raise FileExistsError("%s already exists; edit it, or move it aside to start over" % path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(STARTER, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(dict(STARTER, profile=profile or STARTER["profile"]), indent=2) + "\n", encoding="utf-8")
     return path

@@ -16,7 +16,7 @@ for _ in range(40):
 else: print('down')"; }
 for i in $(seq 60); do docker exec "$id" test -S /run/user/1001/bus 2>/dev/null && break; sleep 0.5; done
 echo "before: $(health)"
-as_tester python3 -m claudish service install --serve -- --backend rules
+as_tester python3 -m claudish service install -- --backend rules
 echo "after install: $(health)"
 docker exec "$id" systemctl restart user@1001.service   # a fresh login session for the user
 for i in $(seq 40); do docker exec "$id" test -S /run/user/1001/bus 2>/dev/null && break; sleep 0.25; done

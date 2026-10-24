@@ -52,8 +52,9 @@ def main():
     doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
     service = commands.add_parser("service", help="Start Claudish at login (systemd, logon task, launchd)")
     service.add_argument("action", choices=["install", "uninstall", "status"])
-    service.add_argument("--serve", action="store_true",
-                         help="Run `claudish serve ARGS` instead of the local stack (scripts/start.py ARGS)")
+    service.add_argument("--local", action="store_true",
+                         help="Run the optional local stack (a local model and the service: scripts/start.py ARGS) "
+                              "instead of `claudish serve ARGS`")
     service.add_argument("--dry-run", action="store_true", help="Show what would be written and run")
     mcp = commands.add_parser("mcp", help="Import MCP servers from Claude and list their tools")
     mcp.add_argument("action", choices=["import", "list"])
@@ -95,7 +96,7 @@ def main():
         sys.exit(checkup.main(args.json))
     if args.command == "service":
         from . import service as manager
-        sys.exit(manager.run(args.action, args.serve, passthrough, args.dry_run))
+        sys.exit(manager.run(args.action, args.local, passthrough, args.dry_run))
     if args.command == "mcp":
         from . import mcp_setup
         sys.exit(mcp_setup.import_servers(dry_run=args.dry_run, replace=args.replace) if args.action == "import"

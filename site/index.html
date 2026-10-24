@@ -119,17 +119,20 @@
 
 1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop.
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
-3. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
-4. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts Claudish at login. It ships no model: it is set up for Claude with my own key. Install the extra with `pip install "claudish-ime[claude]"` and ask me to put my key in the ANTHROPIC_API_KEY environment variable myself; never ask me to paste it to you, and never write it into a file. (If I want a small local model instead, `--profile local` downloads one.)
-5. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
-6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
-7. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: tapping Shift switches between continue and compose; Tab takes the model's text (a suggestion, a rewrite once shown, a draft); in compose, Enter sends my words as an instruction and Shift+Enter keeps them as they are; Esc steps back.
+3. Install it with the Claude SDK: `python -m pip install --user -e ".[claude]"`.
+4. cd_AI ships no model: it is set up for Claude with my own API key. Check whether I have one where a service started at login can read it (`ant auth login`, or ANTHROPIC_API_KEY in my user environment). If not, show me how to set it for this OS (docs/install.md, Quick start) and wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
+5. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
+6. Run `python -m claudish setup --yes`. It writes a config, checks the model, registers the input method, and starts Claudish at login.
+7. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
+8. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
+9. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Enter sends my words as an instruction, Shift+Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.
 
 Make no mistakes.</pre>
         </div>
         <h3 class="by-hand">Or by hand</h3>
         <pre class="commands">git clone https://github.com/noobpwnftw/claudish
 cd claudish
+python3 -m pip install --user -e ".[claude]"
 python3 -m claudish setup</pre>
         <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
       </section>

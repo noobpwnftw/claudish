@@ -1,7 +1,8 @@
 """`claudish service install|uninstall|status`: start the service at login, without a terminal.
 
 Linux: a systemd user unit. Windows: a logon task (pythonw, no console). macOS: a launchd agent.
-By default the local stack (scripts/start.py: model and service); with --serve, `claudish serve ARGS`.
+By default `claudish serve ARGS` (the config's profile); with --local, the optional local stack
+(scripts/start.py: a local model and the service).
 """
 import os
 import platform
@@ -16,11 +17,11 @@ NAME = "claudish"
 LABEL = "com.claudish.service"
 
 
-def command(serve, extra):
+def command(local, extra):
     """The argv the service manager runs."""
-    if serve:
-        return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
-    return [sys.executable, str(ROOT / "scripts" / "start.py")] + list(extra)
+    if local:
+        return [sys.executable, str(ROOT / "scripts" / "start.py")] + list(extra)
+    return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
 
 
 def systemd_unit(argv):
@@ -75,9 +76,9 @@ def paths():
             "Darwin": home / ("Library/LaunchAgents/%s.plist" % LABEL)}
 
 
-def plan(action, serve=False, extra=()):
+def plan(action, local=False, extra=()):
     """[(description, kind, payload)]: "write" (path, text), "run" (argv), or "remove" (path)."""
-    system, argv = platform.system(), command(serve, extra)
+    system, argv = platform.system(), command(local, extra)
     if system == "Linux":
         unit = paths()["Linux"]
         if action == "install":
@@ -109,8 +110,8 @@ def plan(action, serve=False, extra=()):
     raise SystemExit("no service manager support for %s" % system)
 
 
-def run(action, serve=False, extra=(), dry_run=False):
-    steps = plan(action, serve, extra)
+def run(action, local=False, extra=(), dry_run=False):
+    steps = plan(action, local, extra)
     for description, kind, payload in steps:
         if dry_run:
             shown = payload[0] if kind == "write" else payload if kind == "remove" else subprocess.list2cmdline(payload)

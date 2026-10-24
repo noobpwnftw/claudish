@@ -37,13 +37,15 @@ agent, or:
 ```sh
 git clone https://github.com/noobpwnftw/claudish
 cd claudish
+python3 -m pip install --user -e ".[claude]"
 python3 -m claudish setup
 ```
 
-Setup shows each step and asks before doing it, skips what is already done, and
-ends with `claudish doctor`. It sets up Claude by default: put your key in
-`ANTHROPIC_API_KEY` and `pip install "claudish-ime[claude]"`. Then log out and back in, and add **cd_AI — Claudish**
-in your input sources. Details for each OS: [docs/install.md](docs/install.md).
+It is set up for Claude with your own key: run `ant auth login`, or set `ANTHROPIC_API_KEY` in
+your user environment, where a service started at login can read it ([how, per
+OS](docs/install.md#quick-start)). Setup shows each step and asks before doing it, skips what is
+already done, and ends with `claudish doctor`. Then log out and back in, and add **cd_AI —
+Claudish** in your input sources. A local model instead: `claudish setup --profile local`.
 
 ## Keys
 

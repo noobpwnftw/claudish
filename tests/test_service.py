@@ -37,11 +37,11 @@ class SafetyTests(unittest.TestCase):
 
     def test_cli_keeps_flags_before_the_separator(self):
         from claudish import __main__ as cli
-        argv = ["claudish", "service", "install", "--serve", "--dry-run", "--", "--backend", "rules"]
+        argv = ["claudish", "service", "install", "--local", "--dry-run", "--", "--backend", "rules"]
         with patch.object(sys, "argv", argv), patch.object(service, "run", return_value=0) as run:
             with self.assertRaises(SystemExit):
                 cli.main()
-        run.assert_called_once_with("install", True, ["--backend", "rules"], True)
+        run.assert_called_once_with("install", True, ["--backend", "rules"], True)  # local, then dry run
 
     def test_dry_run_runs_and_writes_nothing_on_every_os(self):
         for system in ("Linux", "Windows", "Darwin"):
@@ -53,14 +53,14 @@ class SafetyTests(unittest.TestCase):
                     patch("claudish.service.subprocess.run", side_effect=AssertionError("ran a command")), \
                     patch("builtins.print"):
                 for action in ("install", "uninstall"):
-                    self.assertEqual(service.run(action, serve=True, extra=["--backend", "rules"], dry_run=True), 0)
+                    self.assertEqual(service.run(action, extra=["--backend", "rules"], dry_run=True), 0)
                 self.assertEqual(list(Path(directory).rglob("*")), [], system)
 
     def test_plans_name_the_right_service_manager(self):
         for system, tool in (("Linux", "systemctl"), ("Windows", "schtasks"), ("Darwin", "launchctl")):
             with patch("claudish.service.platform.system", return_value=system), \
                     patch("claudish.service.os.getuid", create=True, return_value=501):
-                steps = service.plan("install", serve=True, extra=["--backend", "rules"])
+                steps = service.plan("install", extra=["--backend", "rules"])
             commands = [payload for _, kind, payload in steps if kind == "run"]
             self.assertTrue(all(c[0] == tool for c in commands), system)
 

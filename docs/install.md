@@ -1,101 +1,95 @@
 # Install
 
-How to set up Claudish step by step, run the model and service, and register the input method on each OS. The short version is in the [README](../README.md#install).
+How to set up Claudish, give it a model, and register the input method on each OS. The short
+version is in the [README](../README.md#install).
 
 ## Quick start
 
-**One command:** with Python 3.10+, from this checkout:
+You need Python 3.10+, git, and a model to point it at. cd_AI ships no model: out of the box it
+is set up for Claude with your own API key, since good slop needs a frontier model.
 
-```sh
-python -m claudish setup
-```
-
-It shows each step and asks before doing it: write a config, import MCP servers
-from your Claude setup, check your model, register the input method, start
-Claudish at login, then run `doctor`. Steps already done are skipped, so it is
-safe to run again. `--dry-run` shows the plan and `--yes` does it all.
-
-cd_AI ships no model. Setup's default profile is `claude`, a frontier model with
-your own key (`ANTHROPIC_API_KEY`, and `pip install "claudish-ime[claude]"`):
-good slop needs one. `--profile ollama` (or a profile of your own) uses any
-OpenAI-compatible server. `--profile local` is the optional local model: setup
-downloads a pinned llama.cpp build and Qwen2.5 0.5B (both SHA-256 verified) and
-runs them at login. Continue suggests only with a local model, or with a model a
-profile routes to it ([configuration](configuration.md#modes)); without one,
-continue types as is, and with no model at all compose says "no model is set up". Installing the input method on
-Windows and macOS needs an administrator, so setup prints that command. Verified
-end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-systemd`).
-
-Or step by step:
-
-1. **Try it in your browser.** With Python 3.10+:
+1. **Get it**, with the Claude SDK:
 
    ```sh
-   python scripts/download_llama.py
-   python scripts/download_model.py small
-   python scripts/start.py
+   git clone https://github.com/noobpwnftw/claudish
+   cd claudish
+   python3 -m pip install --user -e ".[claude]"
    ```
 
-   Open http://127.0.0.1:18765, then switch between Rewrite, Continue, and
-   Instruct. Each mode has its own sample phrases. No model handy? `python -m
-   claudish serve --backend rules` runs the demo with simple stand-ins.
-2. **Pick a brain.** `python -m claudish init` writes `~/.config/claudish/config.json`
-   with four profiles: `claude` (the default, your API key), `ollama` (any
-   OpenAI-compatible server), `local` (a local model, optional), and `agent` (an
-   agent CLI such as `claude -p`). Choose one with `python -m claudish serve --profile NAME`.
-3. **Install the input method** for [Linux](#linux-input-method),
-   [Windows](#windows-input-method), or [macOS](#macos-input-method), and add
-   **cd_AI — Claudish** in your input sources.
-4. **Start it at login.** `python -m claudish service install` runs the local
-   stack (model and service) at every login: a systemd user unit on Linux, a logon
-   task on Windows (no console window), a launch agent on macOS. Use
-   `service install --serve -- --profile claude` for another profile, `service
-   status` and `service uninstall` to inspect or remove it, and `--dry-run` to see
-   what it would do.
-5. **Check the setup.** `python -m claudish doctor` walks the whole chain (model,
-   service, config, the input method's registration on your OS, and context
-   sources) and prints a fix for anything wrong. On Linux, for example, it
-   catches a session that started before the installer's search-path change
-   ("log out and back in"); on Windows on ARM, PIME's missing x86 runtime.
-6. **Learn the keys:** Shift switches mode; in compose, Tab takes the model's text, Enter
-   talks to the model, Shift+Enter keeps your words, Esc steps back. The full table is in the
-   [README](../README.md#keys); the design behind it is
-   [design/design.md](design/design.md).
+2. **Give it your key** where Claudish's login service can read it, never in Claudish's config.
+   Run `ant auth login`, or set `ANTHROPIC_API_KEY` in your user environment (a service started
+   at login does not read your shell profile):
 
-## Start the model and service
+   - Linux: a line `ANTHROPIC_API_KEY=sk-ant-…` in `~/.config/environment.d/anthropic.conf`,
+     read at your next login.
+   - Windows: `setx ANTHROPIC_API_KEY sk-ant-…`, read by programs started after it.
+   - macOS: `ant auth login` (a launch agent sees neither your shell profile nor `export`).
 
-Python 3.10+ runs the service. It has no pip runtime dependencies. Run commands
-from this project directory.
+3. **Run setup:**
 
-Both download scripts use only the standard library and verify before installing;
-an interrupted download leaves nothing behind, and a verified file is not
-downloaded again. `download_llama.py` fetches a pinned
-[llama.cpp](https://github.com/ggml-org/llama.cpp/releases) release build
-(`b11822`, 12–24 MB) for your OS and CPU into `.tools/`, checked against the
-SHA-256 GitHub publishes for it: the CPU build runs everywhere and uses Metal on
-Apple silicon; `--variant vulkan` uses most GPUs on Linux and Windows.
-`download_model.py` fetches the pinned upstream revision of the model into
-`models/`, checked against the tested file's size and SHA-256. Set `HF_ENDPOINT`
-to use a mirror.
+   ```sh
+   python3 -m claudish setup
+   ```
+
+   It shows each step and asks before doing it: write a config (profile `claude`), import MCP
+   servers from your Claude setup, check the model, register the input method, start Claudish
+   at login, then run `doctor`. Steps already done are skipped, so it is safe to run again.
+   `--dry-run` shows the plan and `--yes` does it all. Installing the input method on Windows
+   and macOS needs an administrator, so setup prints that command.
+
+4. **Log out and back in**, add **cd_AI — Claudish** in your input sources, and type: Tab asks
+   for the rewrite, Enter sends an instruction. The keys are in the [README](../README.md#keys).
+
+Verified end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-systemd`).
+
+**Another model:** `python3 -m claudish init` writes `~/.config/claudish/config.json` with
+profiles to start from: `claude` (the default), `ollama` (any OpenAI-compatible server, local or
+hosted), `local` (below), and `agent` (an agent CLI such as `claude -p`). Run setup with
+`--profile NAME`, or see [configuration](configuration.md). With no model at all, compose says
+"no model is set up" and nothing you type is lost.
+
+**Continue** (a Shift tap) types straight into the app. It suggests the rest of a sentence only
+with a local model, or with a model a profile routes to it ([configuration](configuration.md#modes)),
+because it asks at every pause.
+
+**Start at login by hand:** `python3 -m claudish service install` runs `claudish serve` with
+the config's profile at every login: a systemd user unit on Linux, a logon task on Windows (no
+console window), a launch agent on macOS. Pass `-- --profile NAME` for another profile, `--local`
+for the local model below; `service status` and `service uninstall` inspect or remove it, and
+`--dry-run` shows what it would do. `python3 -m claudish doctor` walks the whole chain (model,
+service, config, the input method's registration, context sources) and prints a fix for anything
+wrong.
+
+**Try it without installing the input method:** `python3 -m claudish serve` and open
+http://127.0.0.1:18765, or `--backend rules` for simple stand-ins with no model.
+
+## A local model (optional)
+
+For a model on your own machine (free per keystroke, private, and what lets continue suggest at
+every pause; small models make weak slop):
 
 ```sh
-python scripts/download_llama.py
-python scripts/download_model.py small
-python scripts/start.py
+python3 -m claudish setup --profile local
 ```
 
-`start.py` uses `llama-server` from your `PATH` first, then the downloaded build;
-pass `--server /path/to/llama-server` (`llama-server.exe` on Windows) to use
-your own build, for example one with CUDA. On the Spark's CPU, the downloaded
-CPU build takes a median 82 ms per short rewrite (4 threads, warm). The service listens on `127.0.0.1:18765`; the model listens
-on `127.0.0.1:18766`. Ctrl+C stops both processes. Nothing is installed at startup.
-
-This checkout already contains both GGUF models and a CUDA-enabled llama.cpp
-build under the ignored `models/` and `.tools/` directories. On this Spark:
+Setup downloads a pinned [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) release
+build (`b11822`, 12–24 MB, the CPU build; Metal on Apple silicon; `--variant vulkan` for most GPUs
+on Linux and Windows) into `.tools/` and Qwen2.5 0.5B Instruct (491 MB) into `models/`, both
+checked against their published SHA-256, and runs them at login. The same by hand:
 
 ```sh
+python3 scripts/download_llama.py
+python3 scripts/download_model.py small
 python3 scripts/start.py
 ```
+
+Both download scripts use only the standard library; an interrupted download leaves nothing
+behind, and a verified file is not downloaded again. Set `HF_ENDPOINT` to use a mirror.
+`start.py` uses `llama-server` from your `PATH` first, then the downloaded build; pass
+`--server /path/to/llama-server` (`llama-server.exe` on Windows) to use your own, for example
+with CUDA. The service listens on `127.0.0.1:18765`, the model on `127.0.0.1:18766`; Ctrl+C stops
+both. Any other model works through llama.cpp or an OpenAI-compatible server
+([configuration](configuration.md)).
 
 ## Linux input method
 
@@ -188,16 +182,10 @@ its icon, and sometimes the old code).
 
 Log out/in, then add Claudish under **System Settings → Keyboard → Text Input →
 Edit → +** (look under English). Choose it using the Input menu or your configured
-input-source shortcut. Start the service separately:
-
-```sh
-python3 scripts/download_model.py small
-python3 scripts/start.py --server /path/to/llama-server
-```
-
-Use a macOS llama.cpp build; Apple Silicon builds can use Metal. Mac inference
-performance has not been measured. Alternatively, forward the Spark's service
-to the Mac's `127.0.0.1:18765` over SSH and leave inference running on the Spark.
+input-source shortcut. The service is what setup started at login (`python3 -m claudish service
+status`), or start it by hand with `python3 -m claudish serve`. For a local model on the Mac,
+see [A local model](#a-local-model-optional): the downloaded CPU build uses Metal on Apple
+silicon.
 
 The candidate panel refreshes automatically, and the keys are the same as on the
 other platforms (above). Navigation keys and Command or

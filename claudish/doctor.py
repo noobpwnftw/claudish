@@ -97,7 +97,7 @@ def check_service(state):
 def check_managed():
     from . import service
     status, detail = service.managed()
-    return status, detail, "claudish service install   (add --serve -- --profile NAME for a non-local profile)" \
+    return status, detail, "claudish service install   (add -- --profile NAME for another profile, --local for the local model)" \
         if status == "warn" else None
 
 

@@ -93,7 +93,7 @@ class SetupTests(unittest.TestCase):
         self.llama.install.assert_called_once()
         self.models.fetch.assert_called_once()
         self.assertEqual(self.ime.call_args.args[0][1], str(self.home / "platforms/linux/install.py"))
-        self.service_run.assert_called_once_with("install", serve=False, extra=[])
+        self.service_run.assert_called_once_with("install", local=True, extra=[])
         self.assertIn("Log out and back in", out)
         setup.doctor.main.assert_called_once()
 
@@ -121,7 +121,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(states["Model"], "done")
         self.assertNotIn("llama.cpp", states)
         self.quiet("claude", yes=True)
-        self.service_run.assert_called_once_with("install", serve=True, extra=["--profile", "claude"])
+        self.service_run.assert_called_once_with("install", local=False, extra=["--profile", "claude"])
 
     def test_a_service_running_by_hand_is_not_doubled(self):
         with patch("claudish.setup.doctor.fetch_json", return_value={"backend": "llama"}):
@@ -144,6 +144,7 @@ class SetupTests(unittest.TestCase):
         self.ime.assert_called_once()  # later steps still run
         self.service_run.assert_not_called()
         self.assertIn("the model needs setting up first (Model)", out)
+        self.assertEqual(config.resolve()[0], "local")  # the profile set up is the config's default
 
 
 if __name__ == "__main__":
