@@ -1,8 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-24, `main` at `1218e2a`: templates are data, cd_AI starts in compose, the
-panel anchors at the composition's start; G53 (choosing models) is running. An interactive session
-on the Spark; no 24/7 runner.
+Checkpoint 2026-10-24, `main` at `ff4876c`. An interactive session on the Spark; no 24/7 runner.
 
 ## Settled
 
@@ -15,26 +13,30 @@ per-platform duct tape; the CJK input-method reviewers weigh most on keys.
 
 ## Current task
 
-G53, choosing the models by a careful evaluation (owner: no hunches; English only, cd_AI is the
-English input method). Owner's leaning, pending the results: compose by default (done) with a
-frontier model behind it, taking the latency. Runs in the scratchpad (not in the repo): 14 models
-(13 local + Claude Haiku via `claude -p`) x 3 template sets on 80 rewrite and 86 continue cases;
-judged by Gemma 4 26B + Qwen2.5-14B (rewrite, 94% agreement with hand labels when both must pass)
-and Gemma 4 26B + Qwen3-30B (continue, 91% with the checks); `benchmarks/compare.py` picks a
-template per model on the dev half and scores the test half. Latency: GB10, CPU-only 4 threads,
-and wllama in Chromium (`benchmarks/browser_latency.py`). Next: the report in benchmarks/, then
-the defaults follow it.
+Next up, in order: G54 (slop becomes the shipped voice), G55 (Gemma 4 E4B as the local model),
+G56 (onboarding as a funnel, then a reviewer poll on it). Owner direction today: cd_AI is a slop
+keyboard on day 1 and a framework you discover by day 3; compose by default; no model ships
+(Claude with your own key by default, a local model is an optional extra step for savvy users);
+continue suggests only with a local or routed model; English only; the site stays a mix of slop
+and serious; the `ant` CLI is left to savvy users.
 
 ## Verified (latest)
 
-- `1218e2a`: gate `check.py --model` 10/10, CI 5/5; desktop rigs Linux 41/41, GNOME 16/16 (the
-  anchor checks), Windows 15/15 + terminal 4/4, macOS 11/11.
-- Templates refactor (`6b53191`): every prompt byte-identical to before, across tones, modes and
-  box kinds.
+- `ff4876c` (G53 report): gate `check.py --model` 10/10. `378ef93` (install steps): gate, CI 5/5,
+  the systemd container test (setup --profile local end to end). `6f21847` (no model ships): gate,
+  CI 5/5. `05ff8bb` (compose default): Linux 41/41, GNOME 13/13, Windows 15/15 + 4/4, macOS 11/11.
+  `1218e2a` (panel anchors at the composition's start): GNOME 16/16, Windows 15/15, macOS 11/11.
+- G53 (benchmarks/README.md, Choosing the models): slop rewrite Gemma 4 26B 95%, E4B 93%, 12B 93%,
+  Qwen3-30B 83%, Claude Haiku 80%, E2B 61%, everything under 2B at most 44%; continue Qwen3-30B 96%,
+  Gemma 12B 94%, E4B 91%, E2B 83%. CPU alone (4 threads): E2B 1.5 s, E4B 3–4 s, 0.5B 0.25 s.
 
 ## Open, waiting, or parked
 
 - Decided: the summon key is a toggle in a native settings UI (G47, G52). Dropped: keeping the panel inside the app's window.
+- Waiting on the owner: deleting 130 old remote branches on GitHub (merged long ago; deletion needs
+  the owner's OK); the two unmerged local branches (agent/handoff: parked, superseded;
+  agent/macos-typing: an experimental CI job, superseded by the Mac VM rig).
+- Owned processes: the Mac VM runs `claudish serve --backend rules` for its rig (nohup, port 18765).
 - Parked: the Claude API tool loop against the live API (needs a key); G30 (needs releases); G21
   (a trained model); an upstream PIME proposal (a public post: owner's OK).
 - Known: Linux GTK reports no selection (Qt does); macOS Terminal keeps Tab from continue's
@@ -53,10 +55,11 @@ the defaults follow it.
   patched PIME, built there with VS Build Tools. Loop: `vm.sh sync` (the last commit), `vm.sh pime`
   and `vm.sh run jobs/build-pime.ps1 900` when the patches change, `vm.sh run jobs/deploy.ps1
   300`, `vm.sh run jobs/typing.ps1 400`; `gallery.sh OUT`; `vmscreen.sh OUT.png`.
-- Models in `models/` (untracked): Qwen 0.5B/1.5B/14B, Qwen3-30B-A3B, Qwen2.5-VL-3B, Gemma 4
-  (E2B, E4B, 12B, 26B-A4B; QAT Q4_0, Apache-2.0; thinking off with `--chat-template-kwargs
-  '{"enable_thinking":false}'`), Gemma 3 270M/1B, Qwen3.5 0.8B/2B, LFM2.5 350M/1.2B. Extras venv
-  `.tools/claude-venv`; browser venv `.tools/browser-venv`.
+- Models in `models/` (untracked, 49 GB): Qwen2.5 0.5B and SmolLM2 135M (the gate's presets),
+  Gemma 4 E2B/E4B/12B/26B-A4B (QAT Q4_0, Apache-2.0; thinking off with `--chat-template-kwargs
+  '{"enable_thinking":false}'`; the 26B is the judge), Qwen3-30B-A3B (tool and agent checks),
+  Qwen2.5-VL-3B with its mmproj (window pictures). Extras venv `.tools/claude-venv`; browser venv
+  `.tools/browser-venv`; the CUDA llama.cpp build in `.tools/build`.
 - claudish.io: site/ plus the static demo at /demo/, deployed by .github/workflows/pages.yml on
   every push to main.
 - Merge rule: clean `check.py --model` on the merged result, a `ci/*` run for Windows/macOS
