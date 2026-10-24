@@ -70,6 +70,10 @@ the service at every login, and opens cd_AI's settings in your browser (the key,
 ENG in the taskbar. An update also asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one.
 
+cd_AI is an **English (United States)** input source (ENG in the taskbar) and types with the US
+keyboard layout, as English (United States) does. On a Japanese (JIS) keyboard its symbols follow
+the US positions: Shift+2 types @, and Shift+7 types &.
+
 It is not signed: SmartScreen shows "Windows protected your PC"; **More info → Run anyway** lets it
 through.
 
