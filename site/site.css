@@ -44,6 +44,7 @@ h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 10px}
 .small{font-size:13px}
 .card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:11px;letter-spacing:.3px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label);text-wrap:balance}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1;text-wrap:balance}.io-key{margin:0 0 0 auto;align-self:flex-end}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.voices{margin-top:22px}.voices .io-label{width:76px}
 .card{border:1px solid var(--line);border-radius:6px;background:var(--editor-bg);display:flex;flex-direction:column;overflow:hidden}
 .card-body{padding:22px 22px 18px}.card-body p{font-size:14px;line-height:1.65;color:var(--muted);margin:0}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start}

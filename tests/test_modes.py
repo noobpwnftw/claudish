@@ -28,11 +28,12 @@ class ModeTests(unittest.TestCase):
 
     def test_continue_never_offers_its_examples_or_what_is_already_there(self):
         examples = modes.defaults()["continue"]["examples"]
-        done = "Sorry for the slow reply on the budget—this week got away from me. "
-        self.assertTrue(modes.parroted("continue", done, done + "the budget—this week got away from me.", examples))
-        self.assertTrue(modes.parroted("continue", done, done + "I hope this finds you well—a quick update on the release.", examples))
+        first, second = examples[1]["content"], examples[3]["content"]  # the template's example answers
+        done = "Sorry for the slow reply on %s " % first
+        self.assertTrue(modes.parroted("continue", done, done + first, examples))
+        self.assertTrue(modes.parroted("continue", done, done + second, examples))
         self.assertFalse(modes.parroted("continue", done, done + "Let's merge it today.", examples))
-        self.assertFalse(modes.parroted("rewrite", "x", "x the budget—this week got away from me.", examples))
+        self.assertFalse(modes.parroted("rewrite", "x", "x " + first, examples))
         # Nonsense in, the template's example out ("tttt" -> the meeting decline): not an answer.
         instruct = modes.defaults()["instruct"]["examples"]
         example = instruct[1]["content"]
@@ -103,26 +104,35 @@ class ModeTests(unittest.TestCase):
         self.assertTrue(payload["messages"][0]["content"].endswith("Write it for the caret."))
         self.assertEqual(rewriter.modes["instruct"]["box"]["kinds"], modes.TEMPLATES["box"]["kinds"])
 
-    def test_the_tone_is_claudish_unless_a_profile_sets_another(self):
+    def test_the_tone_is_corporate_slop_unless_a_profile_sets_another(self):
         claudish = Rewriter(max_tokens=64)
-        self.assertIn("em dash", claudish.modes["rewrite"]["system"])
+        self.assertIn("corporate slop", claudish.modes["rewrite"]["system"])
         self.assertTrue(claudish.modes["instruct"]["examples"])
+        for tone, word in (("salesman", "salesman"), ("critic", "critic"), ("bard", "bard")):
+            named = Rewriter(max_tokens=64, tone=tone)  # each with its own wording and examples, in every mode
+            for mode in ("rewrite", "continue", "instruct"):
+                self.assertIn(word, named.modes[mode]["system"])
+                self.assertTrue(named.modes[mode]["examples"])
+            self.assertIn("a no stays a no", named.modes["rewrite"]["system"])  # the meaning is guarded in every voice
         plain = Rewriter(max_tokens=64, tone="plain and concise")
         for mode in ("rewrite", "continue", "instruct"):
             self.assertIn("plain and concise", plain.modes[mode]["system"])
-            self.assertNotIn("em dash", plain.modes[mode]["system"])
+            self.assertNotIn("slop", plain.modes[mode]["system"])
             self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its voice
-        fix = Rewriter(max_tokens=64, tone="fix")  # corrects, keeps your words
-        self.assertIn("Keep their words", fix.modes["rewrite"]["system"])
-        self.assertIn("plain, natural", fix.modes["instruct"]["system"])
+        proofread = Rewriter(max_tokens=64, tone="proofread")  # corrects, keeps your words
+        self.assertIn("Keep their words", proofread.modes["rewrite"]["system"])
+        self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
         custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
-        self.assertIn("plain, natural", custom.modes["continue"]["system"])  # the tone, where it names nothing
+        self.assertIn("in the same language, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
             _, settings, _, _ = config.resolve(path, "work")
             self.assertIn("formal British", Rewriter.from_settings(settings).modes["instruct"]["system"])
+            path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "fix"}}}))
+            with self.assertRaisesRegex(ValueError, '"fix" is now "proofread"'):
+                config.resolve(path, "work")
 
     def test_a_terminal_screen_is_trimmed_to_its_last_lines(self):
         from claudish import screen
@@ -170,11 +180,11 @@ class ModeTests(unittest.TestCase):
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
         self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"])
-        self.assertEqual(payload["max_tokens"], 24)
+        self.assertEqual(payload["max_tokens"], 48)  # to the end of a sentence, in the voice
         _, payload = self.call(rewriter, "decline politely", "instruct")
         self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"], 400))
         _, payload = self.call(rewriter, "so", "rewrite")
-        self.assertEqual(payload["max_tokens"], 64)
+        self.assertEqual(payload["max_tokens"], 160)  # the voice's paragraph, past the profile's 64
         with self.assertRaisesRegex(ValueError, "unknown mode"):
             rewriter.rewrite("so", mode="sing")
 

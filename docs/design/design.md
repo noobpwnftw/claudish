@@ -21,6 +21,10 @@ one-line instructions answered at the caret, with context carried between invoca
 text box. No chat window, transcript, history, slash menus, or supervised long tasks. The test for
 new work: does it make one turn at the caret better?
 
+What the model is told, the voice included, is data (`claudish/templates.json`, amended per
+profile): corporate slop by default, or a salesman, a critic, a bard, proofread, or a voice of
+your own. Every voice keeps the message, names and numbers.
+
 ## Two modes, one key grammar
 
 A Shift tap (Shift pressed and released alone, not right after another key) switches mode, as

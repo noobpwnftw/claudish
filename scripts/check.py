@@ -99,7 +99,7 @@ def model_checks(args):
         run("model rewrite", [sys.executable, "-m", "claudish", "rewrite", "This is very important."])
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "eval.json"
-            if run("fidelity eval", [sys.executable, "benchmarks/evaluate.py", "--label", args.preset,
+            if run("fidelity eval", [sys.executable, "benchmarks/evaluate.py", "--slop", "--label", args.preset,
                                      "--output", str(report)]).returncode == 0:
                 data = json.loads(report.read_text(encoding="utf-8"))
                 results[-1] = ("fidelity eval", "PASS", "%d/%d pass checks, median %.0f ms" % (

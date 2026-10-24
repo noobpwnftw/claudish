@@ -15,6 +15,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import config, doctor, mcp_setup, service
+from .modes import TEMPLATES
+
+TONES = list(TEMPLATES["tones"]["named"])
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,12 +58,13 @@ def step_config(name):
 
 
 def step_tone(name, settings, tone):
-    """The voice: Claudish's by default (polished, em dashes); "plain", "fix" (correct spelling and
-    grammar, keep your words), or any words, with --tone."""
+    """The voice: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
+    few words of your own, with --tone."""
     current = settings.get("tone")
     if not tone or tone == current:
-        return "done", "%s (change with --tone plain, --tone fix, or your own words)" % (
-            "Claudish's voice: polished, with em dashes" if not current else repr(current)), None
+        return "done", "%s (change with --tone %s, or your own words)" % (
+            "corporate, the default" if not current else repr(current),
+            ", ".join(n for n in TONES if n != "corporate")), None
 
     def write():
         path = config.default_path()

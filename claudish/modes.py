@@ -18,22 +18,32 @@ def load(path):
     if not isinstance(data, dict) or set(data) - SECTIONS:
         raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))
     for name, mode in (data.get("modes") or {}).items():
-        if not isinstance(mode, dict) or set(mode) - MODE_KEYS:
-            raise ValueError("%s: mode %r takes only %s" % (where, name, ", ".join(sorted(MODE_KEYS))))
-        if name not in TEMPLATES["modes"] and not mode.get("system"):
-            raise ValueError('%s: new mode %r needs a "system"' % (where, name))
-        if "system" in mode and not (isinstance(mode["system"], str) and mode["system"].strip()):
-            raise ValueError("%s: mode %r needs a non-empty system" % (where, name))
-        if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
-                   for pair in mode.get("examples", [])):
-            raise ValueError("%s: mode %r examples must be [input, answer] string pairs" % (where, name))
-        for key, low, high in (("max_tokens", 1, None), ("candidates", 1, 5)):
-            value = mode.get(key)
-            if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and value >= low
-                                          and (high is None or value <= high)):
-                raise ValueError("%s: mode %r %s must be an integer%s" % (
-                    where, name, key, " from %d to %d" % (low, high) if high else ""))
+        check_mode(where, name, mode, name in TEMPLATES["modes"])
+    for name, tone in ((data.get("tones") or {}).get("named") or {}).items():
+        if not isinstance(tone, dict) or set(tone) - {"about", "modes"}:
+            raise ValueError('%s: tone %r takes only "about" and "modes"' % (where, name))
+        for mode_name, mode in (tone.get("modes") or {}).items():
+            check_mode("%s, tone %r," % (where, name), mode_name, mode, False)
     return data
+
+
+def check_mode(where, name, mode, known):
+    """A mode's templates in a templates file (known: a shipped mode, which may name only part)."""
+    if not isinstance(mode, dict) or set(mode) - MODE_KEYS:
+        raise ValueError("%s: mode %r takes only %s" % (where, name, ", ".join(sorted(MODE_KEYS))))
+    if not known and not mode.get("system"):
+        raise ValueError('%s: mode %r needs a "system"' % (where, name))
+    if "system" in mode and not (isinstance(mode["system"], str) and mode["system"].strip()):
+        raise ValueError("%s: mode %r needs a non-empty system" % (where, name))
+    if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
+               for pair in mode.get("examples", [])):
+        raise ValueError("%s: mode %r examples must be [input, answer] string pairs" % (where, name))
+    for key, low, high in (("max_tokens", 1, None), ("candidates", 1, 5)):
+        value = mode.get(key)
+        if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and value >= low
+                                      and (high is None or value <= high)):
+            raise ValueError("%s: mode %r %s must be an integer%s" % (
+                where, name, key, " from %d to %d" % (low, high) if high else ""))
 
 
 def merged(override=None):
@@ -59,18 +69,24 @@ def defaults(override=None, tone=None):
 
     max_tokens None means the backend's default. candidates: how many readings to offer (an
     instruction is sent on purpose and awaited, so it offers a short list; while you type, one).
-    tone: a voice other than Claudish's ("plain", "fix", or your words), which replaces each
-    mode's voice and its examples (they teach Claudish's); a mode's own system in the profile's
-    templates wins over it, and is used as written in any box (custom)."""
+    tone: a voice other than the default: a named one (templates "tones": salesman, critic, bard,
+    proofread, ...), which brings its own wording and examples, or a few words of your own
+    ("warm and friendly"), which fill the "voice" wording without examples (the default's teach
+    its own voice). A mode's own system in the profile's templates wins over the tone, and is
+    used as written in any box (custom)."""
     words = merged(override)
     own = (override or {}).get("modes") or {}
     specs = {}
     for name, mode in words["modes"].items():
         system, examples = mode["system"], mode.get("examples", [])
         custom = "system" in (own.get(name) or {})
-        if tone and not custom and name in words["tones"]["voice"]:
-            voice = words["tones"]["voice"][name].replace("{tone}", words["tones"]["named"].get(tone, tone))
-            system, examples = (words["tones"]["fix"] if tone == "fix" and name == "rewrite" else voice), []
+        named = words["tones"]["named"]
+        if tone and not custom and tone in named:
+            voice = (named[tone].get("modes") or {}).get(name)
+            if voice:
+                system, examples = voice["system"], voice.get("examples", [])
+        elif tone and not custom and name in words["tones"]["voice"]:
+            system, examples = words["tones"]["voice"][name].replace("{tone}", tone), []
         specs[name] = {"system": system, "plain": mode.get("plain") or system,
                        "examples": messages(examples, mode.get("frame")), "max_tokens": mode.get("max_tokens"),
                        "candidates": mode.get("candidates") or 1, "custom": custom, "box": words["box"]}

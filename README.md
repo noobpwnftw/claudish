@@ -3,7 +3,14 @@
 English goes in. Em dashes come out.
 
 An input method that puts a language model at the caret of every app, on Linux,
-Windows, and macOS. Switch to it like a keyboard language, and keep typing.
+Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
+
+> **ok** → Absolutely! This is a fantastic opportunity to align on our shared vision, unlock
+> meaningful synergies, and move forward with clarity, confidence, and a renewed sense of purpose.
+>
+> **nah** → While I appreciate the perspective you've brought to the table, I believe it's
+> important to acknowledge that this particular direction may not align with our broader
+> strategic objectives—at least not at this stage of our journey.
 
 **[Try it in your browser →](https://claudish.io/demo/)** The model runs in the page; nothing you type leaves it.
 
@@ -28,6 +35,15 @@ local model that makes slop as well as anything we tried (it wants a GPU or Appl
 for it. The model can read
 context (files, commands, MCP servers) and, when you ask, look things up or run an
 agent whose questions arrive as choices.
+
+## Make it yours
+
+The slop is manufactured, and the factory is yours. Every word cd_AI says to a model is in one
+file you can read and change: `claudish templates` prints it, and `claudish init` writes a
+`templates.json` of your own to edit. Pick another voice (`salesman`, `critic`, `bard`, or
+`proofread`, which only fixes your typos), or write one. Then give it context: files, commands
+and MCP servers per app, tools it may call, an agent to hand a task to
+([configuration](docs/configuration.md)).
 
 ## Install
 

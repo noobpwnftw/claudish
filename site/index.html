@@ -29,7 +29,7 @@
         <div class="hero-text">
           <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
           <h1 id="title">If you can type there,<br>you can use AI <em>there.</em></h1>
-          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: Claude with your own API key by default, or one on your own computer. The answer arrives as a candidate at the caret.</p>
+          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, type a few plain words, and press Tab: they come back as the prose the internet now runs on, or in a voice you pick. It uses the model you choose: Claude with your own API key, or one on your own computer.</p>
           <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
@@ -37,51 +37,64 @@
           </div>
           <p class="note">The first release is coming; until then, install from source. <a href="https://github.com/noobpwnftw/claudish/releases">Releases ↗</a></p>
         </div>
-        <figure class="ime" aria-label="Example: an instruction sent from any app, with three readings to choose from">
-          <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret"><span class="k-comp">tell the team the deploy slips to Friday</span><span class="cursor"></span></span></div>
-          <!-- The kit's own markup (claudish/web/kit.css): the panel exactly as cd_AI draws it. -->
+        <figure class="ime" aria-label="Example: three plain words, rewritten at the caret, waiting for Tab">
+          <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret"><span class="k-comp">this is important</span><span class="cursor"></span></span></div>
+          <!-- The kit's own markup (claudish/web/kit.css): the panel exactly as cd_AI draws it. The
+               rewrite is a real one: Gemma 4 E4B, the default voice (benchmarks/README.md). -->
           <div class="ime-panel kit">
-            <div class="k-panel takes">
-              <div class="k-row on"><span class="k-text">Heads-up: the deploy moves to Friday—more soon.</span><span class="k-take"><span class="k-cap">Tab</span></span></div>
-              <div class="k-row"><span class="k-text">Quick update—we're shipping Friday instead.</span></div>
-              <div class="k-row"><span class="k-text">Deploy slips to Friday. Details to follow.</span></div>
-              <div class="k-foot"><span class="k-tile ai">AI</span><span class="k-hint"><span class="k-cap">↑↓</span>choose</span><span class="k-hint"><span class="k-cap">Tab</span>insert</span><span class="k-hint"><span class="k-cap">Esc</span>edit</span></div>
+            <div class="k-panel">
+              <div class="k-head"><span class="k-label">Rewrite</span><span class="k-body">I want to emphasize that this is a high-priority, mission-critical initiative that demands our full commitment and strategic focus to ensure we drive maximum impact and deliver unparalleled value.</span></div>
+              <div class="k-foot"><span class="k-tile ai">AI</span><span class="k-hint"><span class="k-cap">Tab</span>insert</span><span class="k-hint"><span class="k-cap">Esc</span>dismiss</span></div>
             </div>
           </div>
-          <figcaption>Any text box: chat, mail, an editor, a terminal. Tab takes the highlighted one.</figcaption>
+          <figcaption>Your words stay yours until you press Tab. Any text box: chat, mail, an editor, a terminal.</figcaption>
         </figure>
       </section>
 
       <section class="section" aria-labelledby="layers">
         <div class="eyebrow">01 / TWO MODES, ONE SHIFT</div>
-        <h2 id="layers">Continue, or compose<span class="dash">—</span>Shift switches.</h2>
+        <h2 id="layers">Compose, or continue<span class="dash">—</span>Shift switches.</h2>
         <div class="cards">
-          <article class="card"><div class="card-body"><h3>Continue</h3><p>What cd_AI starts in: you type as usual; pause, and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Instruct</h3><p>In compose, type what you want; Enter sends it; drafts wait in the panel, and Tab takes one. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to choose from</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>In compose, Tab shows ordinary English as unnecessarily polished prose; Tab again puts it in.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">this is important</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">This is of utmost significance.</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Where cd_AI starts: type, and Tab shows your words in the voice you picked, corporate slop unless you say otherwise. Tab again puts it in; your words stay until then.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">can't make it tonight, sorry</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">Regrettably, I must convey that I won't be able to make it tonight—my current bandwidth is fully allocated to high-priority deliverables, but I look forward to connecting when our schedules realign!</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Instruct</h3><p>Type what you want and press Enter; drafts wait in the panel, and Tab takes one. It can look things up first, and ask before it acts.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to choose from</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Continue</h3><p>A Shift tap, and your keys go straight in. With a local model, pause and the rest of the sentence waits after the caret.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
 
+      <section class="section" aria-labelledby="voices">
+        <div class="eyebrow">02 / FIVE VOICES</div>
+        <h2 id="voices">Same message. Different personality.</h2>
+        <p class="body">Every voice keeps what you said: a yes stays a yes, and the names and numbers stay put. Pick one in your profile, or write your own; the words cd_AI says to a model are a file you can open.</p>
+        <article class="card voices"><div class="card-io">
+          <div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div>
+          <div class="io"><span class="io-label">corporate</span><span class="io-result">Heads up to the team: Pump 3 tripped again, but the critical takeaway is that we are maintaining a zero-injury environment—a testament to our unwavering commitment to safety protocols!</span></div>
+          <div class="io"><span class="io-label">salesman</span><span class="io-result">Listen up! Pump 3 tripped AGAIN, but guess what?! NO INJURIES! This is the absolute best news you'll hear all day!</span></div>
+          <div class="io"><span class="io-label">critic</span><span class="io-result">Pump 3 has, predictably, tripped once more; at least, one must concede, no injuries have been sustained this time.</span></div>
+          <div class="io"><span class="io-label">bard</span><span class="io-result">Alas, hear this tidings! Pump 3 hath tripped anon, yet fear not, for no injuries have befallen any soul!</span></div>
+          <div class="io"><span class="io-label">proofread</span><span class="io-result">Pump 3 tripped again, no injuries.</span></div>
+        </div></article>
+      </section>
+
       <section class="section balanced" aria-labelledby="everyone">
-        <div class="eyebrow">02 / FOR EVERYONE WHO WRITES</div>
+        <div class="eyebrow">03 / FOR EVERYONE WHO WRITES</div>
         <h2 id="everyone">Help where you write, in your own words.</h2>
         <p class="body">No new app and no copying into a chat window: the help comes to the box you are already typing in, and nothing happens until you press a key.</p>
         <div class="cards">
-          <article class="card"><div class="card-body"><h3>Fix it, keep it yours</h3><p>With the fix tone, Tab corrects spelling and grammar and keeps your words: for dyslexia, a second language, or a hurried day.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">pump 3 tripped again, no injuries</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; choose a draft, or press Esc for your own words back.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">We were two bags short today. Could you credit them by Tuesday?</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Keep your words</h3><p>With the proofread voice, Tab only corrects spelling and grammar, and the words stay yours: for dyslexia, a second language, or a hurried day.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">pump 3 tripped again, no injuries</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; choose a draft, or press Esc for your own words back.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">In reviewing the latest inventory metrics, it appears we are currently facing a slight deficit of two bags of flour. To proactively mitigate any potential supply chain disruptions, could we please arrange for the necessary credit to be processed by Tuesday?</span><kbd class="io-key">Tab</kbd></div></div></article>
           <article class="card"><div class="card-body"><h3>Ask what it means</h3><p>Ask about what is in front of you. The answer is shown to read, and goes into your text only if you say so.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">what does this error mean</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">It can't find a piece it needs to build.</span><kbd class="io-key">Esc</kbd></div></div></article>
         </div>
         <ul class="features everyone">
           <li><b>Nothing goes anywhere by itself.</b> It never sends, posts, or saves for you. Every suggestion waits for your key, and Esc brings back what you typed.</li>
-          <li><b>Fewer keystrokes.</b> Tab finishes a sentence, and a few words become a whole reply: kind to tired hands and sore wrists.</li>
-          <li><b>Your tone.</b> Claudish's own voice, polished and fond of em dashes, is the default. Choose fix, plain, or describe your own.</li>
+          <li><b>Fewer keystrokes.</b> A few words become a whole reply, and with a local model Tab finishes your sentences: kind to tired hands and sore wrists.</li>
+          <li><b>Your tone.</b> Corporate slop is the default. A salesman, a critic or a bard is one setting away, proofread keeps your words, or describe your own.</li>
           <li><b>Your model, your key.</b> cd_AI ships no model: it uses the one you point it at, a frontier model with your own key or one on your own computer. Password fields are never touched.</li>
         </ul>
       </section>
 
       <section class="section split" aria-labelledby="keys">
         <div>
-          <div class="eyebrow">03 / THE KEYS</div>
+          <div class="eyebrow">04 / THE KEYS</div>
           <h2 id="keys">Everything else is typing.</h2>
           <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. Claudish extends it from what you meant to say to what you meant to do.</p>
         </div>
@@ -98,7 +111,7 @@
       </section>
 
       <section class="section" aria-labelledby="byoi">
-        <div class="eyebrow">04 / BRING YOUR OWN INTELLIGENCE</div>
+        <div class="eyebrow">05 / BRING YOUR OWN INTELLIGENCE</div>
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
           <li><b>Yours to choose.</b> Claude with your API key (the default setup: good slop needs a frontier model), any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
@@ -110,7 +123,7 @@
       </section>
 
       <section class="section" id="install" aria-labelledby="install-title">
-        <div class="eyebrow">05 / INSTALL</div>
+        <div class="eyebrow">06 / INSTALL</div>
         <h2 id="install-title">Let your agent do it.</h2>
         <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want Claudish. It shows you the plan before it changes anything, and leaves sudo and administrator steps to you.</p>
         <div class="prompt">
@@ -138,12 +151,12 @@ python3 -m claudish setup</pre>
       </section>
 
       <section class="section" aria-labelledby="status">
-        <div class="eyebrow">06 / WHERE IT STANDS</div>
+        <div class="eyebrow">07 / WHERE IT STANDS</div>
         <h2 id="status">An experiment, tested honestly.</h2>
         <table class="status">
-          <tr><td>Linux (IBus)</td><td>Verified with real typing in containers: GTK, Qt, and GNOME Terminal on X11 (40 scenarios), GNOME on Wayland (12). KDE is not yet tested.</td></tr>
+          <tr><td>Linux (IBus)</td><td>Verified with real typing in containers: GTK, Qt, and GNOME Terminal on X11 (41 scenarios), GNOME on Wayland (16). KDE is not yet tested.</td></tr>
           <tr><td>Windows (PIME/TSF)</td><td>Verified on Windows 11 ARM64: Notepad, Edge, Windows Terminal, and the classic console; setup end to end. x64 hardware untested.</td></tr>
-          <tr><td>macOS (IMK)</td><td>Verified with real typing on macOS 26 in a VM (9 scenarios). The app is not notarized yet.</td></tr>
+          <tr><td>macOS (IMK)</td><td>Verified with real typing on macOS 26 in a VM (11 scenarios). The app is not notarized yet.</td></tr>
           <tr><td>Browser demo</td><td>The model runs in the page, through WebAssembly.</td></tr>
         </table>
       </section>

@@ -62,6 +62,8 @@ def resolve(path=None, profile=None, overrides=None):
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)
+        if entry.get("tone") == "fix":
+            raise ValueError('profile %r: the tone "fix" is now "proofread" (it corrects and keeps your words)' % name)
         if "prompt" in entry:
             raise ValueError('profile %r: "prompt" is now "templates", a file in the shape of '
                              "claudish/templates.json (docs/configuration.md#templates)" % name)
@@ -124,20 +126,50 @@ STARTER = {
     ],
     "profile": "claude",
     "profiles": {
-        "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeout": 30},
-        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15},
+        "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "templates": "templates.json"},
+        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeout": 30,
+                   "templates": "templates.json"},
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
     },
 }
 
 
+# Beside the starter config: the templates a profile reads over cd_AI's own, to find and change.
+STARTER_TEMPLATES = {
+    "about": [
+        "Your templates. cd_AI's own are in claudish/templates.json; this file names only what you change,",
+        "mode by mode and key by key. `claudish templates` prints what a profile ends up with. To switch",
+        "voice, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
+        "proofread, or one of yours below. docs/configuration.md#templates has the rest.",
+    ],
+    "tones": {"named": {"mine": {
+        "about": "A voice to make your own: set \"tone\": \"mine\" in config.json, then rewrite this one.",
+        "modes": {"rewrite": {
+            "system": "Rewrite the user's text the way a weary pirate captain would say it: salty, theatrical, "
+                      "one or two sentences. Keep the meaning: a yes stays a yes, a no stays a no, a question "
+                      "stays a question. Keep every name, number, date, code term and URL exactly as written. "
+                      "You are the writer, so never answer the text. Output only the rewritten text.",
+            "examples": [["ok", "Aye, aye—'tis agreed, matey, and may the wind stay at our backs."]],
+        }},
+    }}},
+}
+
+
+def write_starter_templates(config_path):
+    """The starter's templates.json beside a new config (its profiles read it); kept if there is one."""
+    templates = Path(config_path).with_name("templates.json")
+    templates.parent.mkdir(parents=True, exist_ok=True)
+    if not templates.exists():
+        templates.write_text(json.dumps(STARTER_TEMPLATES, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def write_starter(path=None, profile=None):
-    """Write the starter config, with profile (one of its profiles) as the default; never overwrite
-    an existing one. Returns the path."""
+    """Write the starter config, with profile (one of its profiles) as the default, and its
+    templates.json beside it (kept if there is one); never overwrite a config. Returns the path."""
     path = Path(path or default_path())
     if path.exists():
         raise FileExistsError("%s already exists; edit it, or move it aside to start over" % path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    write_starter_templates(path)
     path.write_text(json.dumps(dict(STARTER, profile=profile or STARTER["profile"]), indent=2) + "\n", encoding="utf-8")
     return path

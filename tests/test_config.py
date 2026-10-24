@@ -68,6 +68,18 @@ class ConfigTests(unittest.TestCase):
         self.assertNotIn("sk-ant-very-secret", str(error.exception))
 
 
+    def test_the_starter_brings_its_templates_to_change(self):
+        from claudish.model import Rewriter
+        path = config.write_starter()
+        self.assertTrue(path.with_name("templates.json").is_file())  # beside it, for the profiles to read
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["profiles"]["claude"]["tone"] = "mine"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        _, settings, templates, _ = config.resolve()
+        mine = Rewriter.from_settings(dict(settings, backend="rules"), templates)
+        self.assertIn("pirate", mine.modes["rewrite"]["system"])  # the starter's own tone
+        self.assertIn("corporate slop", mine.modes["instruct"]["system"])  # what it does not name stays cd_AI's
+
     def test_starter_config_is_valid_and_never_overwrites(self):
         path = config.write_starter()
         self.assertEqual(path, self.root / "claudish/config.json")

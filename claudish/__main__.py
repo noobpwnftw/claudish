@@ -3,6 +3,7 @@ import json
 import statistics
 import sys
 import time
+from pathlib import Path
 from urllib.error import HTTPError
 from .client import suggest
 from . import config
@@ -41,8 +42,8 @@ def main():
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
     setup.add_argument("--yes", action="store_true", help="Do every step without asking")
-    setup.add_argument("--tone", help='The voice: "plain", "fix" (correct, keep your words), or your own words '
-                       "(default: Claudish's, polished with em dashes)")
+    setup.add_argument("--tone", help="The voice: corporate (the default slop), salesman, critic, bard, proofread "
+                       "(corrects, keeps your words), or a few words of your own")
     setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
     setup.add_argument("--variant", choices=["cpu", "vulkan"], default="cpu", help="llama.cpp build to download")
     setup.add_argument("--skip", action="append", default=[], metavar="STEP",
@@ -71,8 +72,11 @@ def main():
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
     recent.add_argument("--clear", action="store_true", help="Forget them now")
     recent.add_argument("--url", default="http://127.0.0.1:18765")
-    init = commands.add_parser("init", help="Write a starter config with example profiles")
+    init = commands.add_parser("init", help="Write a starter config with example profiles, and templates.json")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
+    words = commands.add_parser("templates", help="Print the words cd_AI says to a model, as a profile ends up with them")
+    words.add_argument("--config", metavar="FILE", help="Profiles file (default: %s, if present)" % config.default_path())
+    words.add_argument("--profile", help="Profile to show (default: the config's)")
     # `service ... -- ARGS`: split before argparse, so no flag of ours can be swallowed into ARGS
     # (argparse.REMAINDER once took --dry-run and really installed a unit).
     argv, passthrough = sys.argv[1:], []
@@ -112,9 +116,28 @@ def main():
             path = config.write_starter(args.config)
         except (OSError, FileExistsError) as exc:
             sys.exit(str(exc))
-        print("Wrote %s with profiles: %s (default: %s)." % (
+        print("Wrote %s with profiles: %s (default: %s)," % (
             path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
+        print("and %s: the words cd_AI says to a model, yours to change (claudish templates shows them)."
+              % path.with_name("templates.json"))
         print("Try one: claudish serve --profile ollama   (or claude, agent)")
+        return
+    if args.command == "templates":
+        from . import modes as invocation
+        try:
+            name, settings, templates, _ = config.resolve(args.config, args.profile)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
+        specs = invocation.defaults(templates, settings.get("tone"))
+        pairs = lambda messages: [[a["content"], b["content"]] for a, b in zip(messages[0::2], messages[1::2])]
+        print(json.dumps({
+            "profile": name, "tone": settings.get("tone") or "corporate (the default)",
+            "from": [str(Path(invocation.__file__).with_name("templates.json"))] + (
+                [str(Path(args.config or config.default_path()).parent / Path(settings["templates"]).expanduser())]
+                if settings.get("templates") else []),
+            "modes": {mode: {"system": spec["system"], "examples": pairs(spec["examples"]),
+                             "max_tokens": spec["max_tokens"], "candidates": spec["candidates"]}
+                      for mode, spec in specs.items()}}, ensure_ascii=False, indent=2))
         return
     if args.command == "serve":
         # Only real flags override the profile; other profile keys (and args.command, the

@@ -255,7 +255,7 @@ class RoutingTests(unittest.TestCase):
             main.loader = load
             slack = main.route("slack")
             self.assertEqual(slack.profile, "plain")
-            self.assertIn("plain, natural", slack.modes["rewrite"]["system"])  # its tone, not main's
+            self.assertIn("in plain English", slack.modes["rewrite"]["system"])  # its tone, not main's
             self.assertIs(main.route("gedit"), main)
             self.assertIs(main.route("slack"), slack)  # built once
             self.assertEqual(loaded, ["plain"])

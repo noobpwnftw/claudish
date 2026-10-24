@@ -365,22 +365,29 @@ git status?"); your answer goes back to it.
 
 ### Tone
 
-Claudish's voice (polished, slightly verbose, fond of em dashes) is the default
-and the point. A profile can speak in another one:
+cd_AI's default voice is corporate slop: "ok" becomes a paragraph about shared vision and
+synergies, with the message, names and numbers kept. A profile can pick another voice:
 
 ```json
-{"profiles": {"work": {"backend": "llama", "tone": "plain and concise"}}}
+{"profiles": {"work": {"backend": "claude", "tone": "critic"}}}
 ```
 
-Two tones are named: `"plain"` (plain, natural English) and `"fix"`, where Tab
-corrects spelling, typos, grammar, and capitals and keeps your words, their
-order, and your voice (for dyslexia, a second language, or a phone keyboard);
-continue and instruct are plain then. Any other words work too ("warm and
-friendly", "formal British"). The tone replaces the voice in the rewrite,
-continue, and instruct templates, and Claudish's own examples, which teach its
-voice, are left out. `claudish setup --tone fix` sets it for you. A mode's own
-`"system"` in the profile's templates wins over the tone. Instructions typed in a
-terminal always get a command line.
+| Tone | Sounds like | "nah" becomes, roughly |
+| --- | --- | --- |
+| `corporate` (the default) | LinkedIn and consultant slop | "…may not align with our broader strategic objectives—at least not at this stage of our journey." |
+| `salesman` | a breathless closer | "…believe me, it hurts, because I love a deal—but this offer just isn't right for us today!" |
+| `critic` | haughty, world-weary, faintly disappointed | "No. I have considered it, briefly and against my better judgement, and the answer remains no." |
+| `bard` | an Elizabethan bard at the playhouse | "Nay, good friend, it cannot be; my answer standeth firm: no." |
+| `proofread` | you, with the typos fixed | "nah" |
+
+`proofread` corrects spelling, typos, grammar and capitals and keeps your words, their order
+and your voice (for dyslexia, a second language, a phone keyboard); continue and instruct are
+plain then. Every named tone keeps the meaning (a yes stays a yes, a no stays a no) and the names,
+numbers and code. Any other few words work too ("warm and friendly", "plain and concise"); they
+replace the voice in each template, without examples. `claudish setup --tone critic` sets it for
+you. The tones are templates like the rest ([Templates](#templates)): change one, or add your own
+under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
+over the tone. Instructions typed in a terminal always get a command line.
 
 ## Modes
 
@@ -416,5 +423,16 @@ same shape and names only what it changes, mode by mode and key by key:
 
 Name it in a profile (`"templates": "words.json"`, relative to the config file)
 or pass `claudish serve --templates words.json`. A mode's own `system` is used
-as written in every box, without the `plain` one. The evaluation's variants
-(`benchmarks/eval/templates/`) are templates files too.
+as written in every box, without the `plain` one. A tone of your own goes under
+`"tones"`, and a profile picks it by name (`"tone": "pirate"`):
+
+```json
+{"tones": {"named": {"pirate": {"about": "Arr.", "modes": {
+  "rewrite": {"system": "Rewrite the user's text as a pirate would say it. Keep the meaning, names and numbers.",
+              "examples": [["ok", "Aye, aye—'tis agreed, matey!"]]}}}}}}
+```
+
+`claudish init` writes such a file beside the config, `templates.json`, with a tone to start
+from, and points the profiles at it. `claudish templates` prints what a profile ends up with: the
+shipped templates, your file over them, and the tone, as the model is told it. The evaluation's
+variants (`benchmarks/eval/templates/`) are templates files too.

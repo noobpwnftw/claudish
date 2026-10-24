@@ -72,10 +72,10 @@ class SetupTests(unittest.TestCase):
                                                 "Starts at login": "todo"})
 
     def test_tone_is_set_for_the_profile(self):
-        status, out = self.quiet(yes=True, tone="fix")
+        status, out = self.quiet(yes=True, tone="proofread")
         self.assertEqual(status, 0, out)
         _, settings, _, _ = config.resolve()
-        self.assertEqual(settings["tone"], "fix")
+        self.assertEqual(settings["tone"], "proofread")
         self.assertEqual(self.states()["Tone"], "done")  # the default profile keeps it
 
     def test_dry_run_changes_nothing(self):
