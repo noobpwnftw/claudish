@@ -11,15 +11,17 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
-from urllib.request import ProxyHandler, build_opener
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler, Request, build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE = "http://127.0.0.1:18765"
 
 
-def fetch_json(url, timeout=2):
+def fetch_json(url, timeout=2, key=None):
     opener = build_opener(ProxyHandler({})) if urlsplit(url).hostname in ("127.0.0.1", "localhost") else build_opener()
-    with opener.open(url, timeout=timeout) as response:
+    request = Request(url, headers={"Authorization": "Bearer " + key} if key else {})
+    with opener.open(request, timeout=timeout) as response:
         return json.load(response)
 
 
@@ -49,7 +51,7 @@ def check_backend(state):
     backend = settings["backend"]
     if backend == "none":
         return "warn", "no model is set up: compose says so, continue only types", \
-            "`claudish setup` (Claude with your own key), or a profile for any OpenAI-compatible server (docs/configuration.md)"
+            "`claudish setup` (Claude by default), or a profile for any OpenAI-compatible server (docs/configuration.md)"
     if backend == "rules":
         return "ok", "rules backend (no model)", None
     if backend == "claude":
@@ -69,9 +71,19 @@ def check_backend(state):
             return "ok", "agent command %s" % program, None
         return "fail", "agent command %r not found" % program, "install it, or give its full path in the profile's \"command\""
     url = settings["model_url"]
+    from .keys import server_key
+    key = (os.environ.get(settings["api_key_env"]) if settings.get("api_key_env") else None) or server_key(url)
     try:
-        fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"))
+        fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
         return "ok", "model server reachable at %s" % url, None
+    except HTTPError as exc:
+        if exc.code == 503:
+            return "warn", "the model server at %s is still loading its model" % url, "wait a moment, then check again"
+        if exc.code in (401, 403):
+            return "fail", "the model server at %s did not accept the key" % url, \
+                "save its key in cd_AI's settings (`claudish settings`)"
+        return "fail", "the model server at %s answered %d" % (url, exc.code), \
+            "start your model server, or fix the profile's model_url"
     except Exception as exc:
         fix = ("start it: `python scripts/start.py` (or `python scripts/run_model.py`)"
                if backend == "llama" else "start your model server, or fix the profile's model_url")

@@ -213,7 +213,11 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 if not self.settings_trusted():
                     return self.reply(403, {"error": "the service token is required"})
                 from . import settings
-                return self.reply(200, dict(settings.state(config_path), service=self.health()))
+                try:
+                    shown = settings.state(config_path)
+                except (OSError, ValueError) as exc:  # a config file that does not read: say which
+                    return self.reply(500, {"error": "cd_AI could not read its config (%s)" % (exc,)})
+                return self.reply(200, dict(shown, service=self.health()))
             if self.path == "/recent":
                 if not self.trusted():
                     return self.reply(403, {"error": "the service token is required"})
@@ -248,6 +252,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 shown = settings.apply(data, config_path)
             except ValueError as exc:
                 return self.reply(400, {"error": str(exc)})
+            except Exception as exc:  # the keychain, the disk: said on the page, not a dropped connection
+                return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
             if reload is not None:
                 try:
                     swap()

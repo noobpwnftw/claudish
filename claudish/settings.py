@@ -180,7 +180,11 @@ def apply(changes, path=None):
                     profiles[name].pop("tone", None)
                 else:
                     profiles[name]["tone"] = tone
-    if set(changes) - {"key"}:
+    if "key" in changes and "choice" not in changes and not path.is_file():
+        # The page already shows Claude chosen: with no config yet, the key makes it so.
+        profiles.setdefault("claude", dict(config.STARTER["profiles"]["claude"]))
+        data["profile"] = "claude"
+    if set(changes) - {"key"} or not path.is_file():
         if not path.is_file():
             config.write_starter_templates(path)
         path.parent.mkdir(parents=True, exist_ok=True)

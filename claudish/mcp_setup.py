@@ -107,6 +107,8 @@ def import_servers(path=None, dry_run=False, replace=False):
 
 
 def list_servers():
+    from .doctor import marks
+    shown = marks()
     from .context import list_server
     try:
         data = json.loads(Path(config.default_path()).read_text(encoding="utf-8"))
@@ -121,10 +123,10 @@ def list_servers():
         try:
             listing = list_server(server)
         except Exception as exc:
-            print("✗ %s: %s" % (name, exc))
+            print("%s %s: %s" % (shown["fail"], name, exc))
             status = 1
             continue
-        print("✓ %s: %d tools, %d resources" % (name, len(listing["tools"]), len(listing["resources"])))
+        print("%s %s: %d tools, %d resources" % (shown["ok"], name, len(listing["tools"]), len(listing["resources"])))
         for tool, summary in listing["tools"]:
             print("    tool %-28s %s" % (tool, summary[:70]))
         for uri in listing["resources"]:
@@ -133,6 +135,8 @@ def list_servers():
 
 
 def context_test(app, profile=None, show=False):
+    from .doctor import marks
+    shown = marks()
     name, settings, _, context = config.resolve(profile=profile)
     bindings = [b for b in settings.get("bindings") or [] if b.matches(app)]
     providers = [("profile", p) for p in (context.providers if context else [])] + \
@@ -150,10 +154,10 @@ def context_test(app, profile=None, show=False):
     for origin, provider in providers:
         text = provider.get()
         if text is None:
-            print("✗ %-28s (%s) %s" % (provider.name, origin, getattr(provider, "error", "failed")))
+            print("%s %-28s (%s) %s" % (shown["fail"], provider.name, origin, getattr(provider, "error", "failed")))
             status = 1
         else:
-            print("✓ %-28s (%s) %d characters" % (provider.name, origin, len(text)))
+            print("%s %-28s (%s) %d characters" % (shown["ok"], provider.name, origin, len(text)))
             if show:
                 print("    " + text[:300].replace("\n", "\n    "))
     return status

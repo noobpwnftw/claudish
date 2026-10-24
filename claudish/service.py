@@ -81,14 +81,16 @@ def paths():
 
 
 def plan(action, local=False, extra=()):
-    """[(description, kind, payload)]: "write" (path, text), "run" (argv), or "remove" (path)."""
+    """[(description, kind, payload)]: "write" (path, text), "run" (argv), "stop" (argv; may find
+    nothing to stop), or "remove" (path)."""
     system, argv = platform.system(), command(local, extra)
     if system == "Linux":
         unit = paths()["Linux"]
         if action == "install":
             return [("write the systemd user unit", "write", (unit, systemd_unit(argv))),
                     ("reload systemd", "run", ["systemctl", "--user", "daemon-reload"]),
-                    ("enable and start it", "run", ["systemctl", "--user", "enable", "--now", NAME])]
+                    ("enable it", "run", ["systemctl", "--user", "enable", NAME]),
+                    ("start it, or restart it with these settings", "run", ["systemctl", "--user", "restart", NAME])]
         if action == "uninstall":
             return [("stop and disable it", "run", ["systemctl", "--user", "disable", "--now", NAME]),
                     ("remove the unit", "remove", unit),
@@ -105,7 +107,8 @@ def plan(action, local=False, extra=()):
     if system == "Darwin":
         agent, domain = paths()["Darwin"], "gui/%d" % os.getuid()
         if action == "install":
-            return [("write the launch agent", "write", (agent, launchd_plist(argv))),
+            return [("stop a running one", "stop", ["launchctl", "bootout", "%s/%s" % (domain, LABEL)]),
+                    ("write the launch agent", "write", (agent, launchd_plist(argv))),
                     ("load it", "run", ["launchctl", "bootstrap", domain, str(agent)])]
         if action == "uninstall":
             return [("unload it", "run", ["launchctl", "bootout", "%s/%s" % (domain, LABEL)]),
@@ -135,8 +138,8 @@ def run(action, local=False, extra=(), dry_run=False):
             if action == "status":
                 print((result.stdout or result.stderr).strip() or ("active" if result.returncode == 0 else "inactive"))
                 return result.returncode
-            # Stopping something that is not running is fine during uninstall.
-            if result.returncode != 0 and action != "uninstall":
+            # Stopping something that is not running is fine.
+            if result.returncode != 0 and action != "uninstall" and kind != "stop":
                 raise SystemExit("%s failed: %s" % (description, (result.stderr or result.stdout).strip()))
         print("%s: done" % description)
     if action == "install" and not dry_run:

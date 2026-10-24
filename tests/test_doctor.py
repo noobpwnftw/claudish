@@ -115,5 +115,32 @@ class GeneralChecks(unittest.TestCase):
             self.assertEqual(doctor.check_service({})[0], "fail")
 
 
+class ModelServerChecks(unittest.TestCase):
+    """An OpenAI-compatible server: asked with its saved key; loading and a refused key say so."""
+
+    def check(self, error=None, key="sk-saved"):
+        from urllib.error import HTTPError
+        sent = {}
+
+        def fetch(url, timeout=2, key=None):
+            sent["key"] = key
+            if error:
+                raise HTTPError(url, error, "", {}, None)
+            return {"data": []}
+        settings = {"backend": "openai", "model_url": "https://api.example.com", "api_key_env": None}
+        with patch.object(doctor, "fetch_json", fetch), patch("claudish.keys.server_key", return_value=key):
+            status, detail, _ = doctor.check_backend({"settings": settings})
+        return status, detail, sent["key"]
+
+    def test_the_saved_key_is_sent(self):
+        self.assertEqual(self.check()[0::2], ("ok", "sk-saved"))
+
+    def test_loading_and_a_refused_key_are_named(self):
+        self.assertEqual(self.check(503)[0], "warn")
+        status, detail, _ = self.check(401)
+        self.assertEqual(status, "fail")
+        self.assertIn("did not accept the key", detail)
+
+
 if __name__ == "__main__":
     unittest.main()

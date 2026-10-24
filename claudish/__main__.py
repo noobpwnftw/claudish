@@ -94,6 +94,8 @@ def main():
             try:
                 url = settings_url(args.url) + ("&first=1" if args.first else "")
                 break
+            except HTTPError as exc:  # it answered: retrying will not change that
+                sys.exit("cd_AI's service at %s answered %d: %s" % (args.url, exc.code, exc.reason))
             except OSError:
                 time.sleep(0.5)
         else:
@@ -121,7 +123,8 @@ def main():
     if args.command == "recent":
         if args.clear:
             from .client import call
-            call(args.url, "/recent/clear", {})
+            with reachable(args.url):
+                call(args.url, "/recent/clear", {})
             return print("Cleared.")
         return show_recent(args.url, args.full)
     if args.command == "textbox-mcp":
@@ -228,14 +231,16 @@ def main():
             server.server_close()
             server.rewriter.conversations.close()
     elif args.command == "rewrite":
-        print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
+        with reachable(args.url):
+            print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
     else:
         if args.runs < 1:
             parser.error("--runs must be positive")
         samples = ["We should use a smaller model.", "This is very important.",
                    "Let's explore the options.", "The test failed because the file was missing."]
         try:
-            suggest(samples[0], args.url)  # Warmup excluded from measured samples.
+            with reachable(args.url):
+                suggest(samples[0], args.url)  # Warmup excluded from measured samples.
         except HTTPError:
             pass
         results = []
@@ -254,6 +259,23 @@ def main():
                           "median_ms": statistics.median(latencies),
                           "p95_ms": latencies[min(len(latencies)-1, int(len(latencies)*0.95))],
                           "results": results}, ensure_ascii=False, indent=2))
+
+
+class reachable:
+    """Around a call to the service: when nothing answers, say so and exit, not a traceback.
+    An HTTP error (the service answered) goes on to the caller."""
+
+    def __init__(self, url):
+        self.url = url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, error, trace):
+        if isinstance(error, OSError) and not isinstance(error, HTTPError):
+            sys.exit("cd_AI's service is not running at %s. Start it with `claudish service install` "
+                     "(or `claudish serve`)." % self.url)
+        return False
 
 
 def show_recent(url, full=False):

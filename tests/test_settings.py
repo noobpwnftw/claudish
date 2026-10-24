@@ -103,7 +103,10 @@ class SettingsTests(Home):
             state = settings.apply({"key": " sk-ant-good "})
         self.assertEqual((state["key"], keys.stored()), ("saved", "sk-ant-good"))
         self.assertEqual(stat.S_IMODE(keys.key_file("anthropic").stat().st_mode), 0o600)
-        self.assertFalse(self.path.exists())  # the key alone writes no config
+        written = self.path.read_text()  # with no config yet, the key makes Claude the model
+        self.assertEqual(json.loads(written)["profile"], "claude")
+        self.assertNotIn("sk-ant-good", written)
+        self.assertEqual(config.resolve()[1]["backend"], "claude")
         with self.assertRaises(ValueError):
             settings.apply({"key": "sk-ant one two"})
 
