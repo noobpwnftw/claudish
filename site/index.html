@@ -135,7 +135,7 @@
 3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
 4. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
 5. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts Claudish at login.
-6. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
+6. If setup says a step needs me (sudo on Linux; on Windows, cd_AI-setup.exe as administrator), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
 7. cd_AI ships no model: it is set up for Claude with my own API key. Run `python -m claudish settings`: it opens cd_AI's settings in my browser, where I paste the key myself (cd_AI checks it with Anthropic and keeps it where its service reads it). Wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
 8. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
 9. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Enter sends my words as an instruction, Shift+Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.
