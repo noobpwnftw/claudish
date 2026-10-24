@@ -56,6 +56,10 @@ Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x86\PIMETex
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x64\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX64"
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\arm64\PIMETextService.dll"""; Check: IsArm64; Flags: runhidden; RunOnceId: "UnregisterArm64"
 
+[UninstallDelete]
+; What cd_AI wrote there while it ran (Python's caches): the folder is cd_AI's alone.
+Type: filesandordirs; Name: "{app}"
+
 [Code]
 function InstallLayoutOrTip(Tip: String; Flags: DWORD): BOOL;
   external 'InstallLayoutOrTip@input.dll stdcall';
