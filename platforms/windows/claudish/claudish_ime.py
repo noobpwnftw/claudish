@@ -1,4 +1,4 @@
-"""PIME/TSF adapter. Shared files are copied here by install.ps1."""
+"""PIME/TSF adapter. Shared files are copied here by package.py (platforms/windows)."""
 from textService import TextService
 import json
 import os

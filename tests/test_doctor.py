@@ -68,29 +68,27 @@ class WindowsChecks(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        self.root = Path(directory.name)
+        self.root = Path(directory.name)  # the installer's folder: <app>\\python, <app>\\PIME
         (self.root / "PIME/python/input_methods/claudish").mkdir(parents=True)
-        (self.root / "PIME/python/textService.py").write_text("")
-        (self.root / "Windows/SysWOW64").mkdir(parents=True)
+        (self.root / "python").mkdir()
 
-    def run_checks(self, pipes, tasklist=""):
-        env = {"ProgramFiles(x86)": str(self.root), "WINDIR": str(self.root / "Windows")}
-        with patch.dict(os.environ, env), patch("claudish.doctor.platform.machine", return_value="ARM64"), \
-                patch("claudish.doctor.os.listdir", return_value=pipes), \
-                patch("claudish.doctor.subprocess.run", return_value=subprocess.CompletedProcess([], 0, tasklist, "")):
+    def run_checks(self, pipes):
+        with patch.object(sys, "executable", str(self.root / "python" / "python.exe")), \
+                patch("claudish.doctor.os.listdir", return_value=pipes):
             return by_name(doctor.check_ime_windows())
 
-    def test_arm64_without_x86_runtime_and_a_crashed_launcher(self):
-        results = self.run_checks([], tasklist="PIMELauncher.exe   1896")
-        self.assertEqual(results["x86 VC++ runtime"][0], "fail")
-        self.assertIn("vc_redist.x86", results["x86 VC++ runtime"][1])
-        self.assertEqual(results["PIME launcher"][0], "fail")
+    def test_installed_and_its_launcher_serving_beside_a_pime(self):
+        results = self.run_checks(["Docker\\PIME\\Launcher", "Docker\\cd_AI\\Launcher"])
+        self.assertEqual({name: status for name, (status, _) in results.items()}, {"Input method": "ok", "Launcher": "ok"})
 
-    def test_healthy(self):
-        (self.root / "Windows/SysWOW64/vcruntime140.dll").write_text("")
-        results = self.run_checks(["Docker\\PIME\\Launcher"])
-        self.assertEqual({name: status for name, (status, _) in results.items()},
-                         {"Input method": "ok", "x86 VC++ runtime": "ok", "PIME launcher": "ok"})
+    def test_a_pime_launcher_is_not_cd_ais(self):
+        results = self.run_checks(["Docker\\PIME\\Launcher"])  # PIME's own, beside cd_AI
+        self.assertEqual(results["Launcher"][0], "fail")
+
+    def test_not_installed(self):
+        with patch.object(sys, "executable", "/nowhere/python/python.exe"), \
+                patch.dict(os.environ, {"ProgramFiles": str(self.root / "elsewhere")}):
+            self.assertEqual(by_name(doctor.check_ime_windows())["Input method"][0], "fail")
 
 
 class GeneralChecks(unittest.TestCase):

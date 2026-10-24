@@ -142,43 +142,31 @@ def check_ime_linux():
     return results
 
 
+def windows_pime():
+    """cd_AI's PIME: beside the Python running this (the installer's <app>\\python and <app>\\PIME),
+    else where the installer puts it."""
+    beside = Path(sys.executable).resolve().parent.parent / "PIME"
+    if beside.is_dir():
+        return beside
+    return Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "cd_AI" / "PIME"
+
+
 def check_ime_windows():
-    pime = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "PIME"
-    if not (pime / "python" / "textService.py").is_file():
-        return [("Input method", "fail", "PIME (with its Python backend) is not installed",
-                 "install PIME from https://github.com/EasyIME/PIME, then run platforms\\windows\\install.ps1")]
-    results = []
-    plugin = pime / "python" / "input_methods" / "claudish"
-    results.append(("Input method", "ok", "installed in %s" % plugin, None) if plugin.is_dir() else
-                   ("Input method", "fail", "the Claudish plugin is not installed in PIME",
-                    "run platforms\\windows\\install.ps1 as administrator"))
-    if platform.machine().upper() in ("ARM64", "AARCH64"):
-        windows = Path(os.environ.get("WINDIR", r"C:\Windows"))
-        if not (windows / "SysWOW64" / "vcruntime140.dll").is_file():
-            results.append(("x86 VC++ runtime", "fail",
-                            "missing on ARM64: PIME's x86 launcher fails with 0xc000007b, so input methods type plain text",
-                            "install https://aka.ms/vs/17/release/vc_redist.x86.exe (EasyIME/PIME#983)"))
-        else:
-            results.append(("x86 VC++ runtime", "ok", "present", None))
-    # A launcher that failed to start (0xc000007b) stays in the process list behind its error dialog,
-    # so require the named pipe a working launcher serves (\\.\pipe\<user>\PIME\Launcher).
+    pime = windows_pime()
+    if not (pime / "python" / "input_methods" / "claudish").is_dir():
+        return [("Input method", "fail", "cd_AI's input method is not installed",
+                 "install it with cd_AI-setup.exe (docs/install.md#windows-input-method)")]
+    results = [("Input method", "ok", "installed in %s" % pime, None)]
+    # cd_AI's launcher serves its own pipe (\\.\pipe\<user>\cd_AI\Launcher), beside any PIME's.
     try:
         pipes = os.listdir("\\\\.\\pipe\\")
     except OSError:
         pipes = []
-    if any("PIME" in name and "Launcher" in name for name in pipes):
-        results.append(("PIME launcher", "ok", "serving its pipe", None))
+    if any(name.endswith("cd_AI\\Launcher") for name in pipes):
+        results.append(("Launcher", "ok", "serving its pipe", None))
     else:
-        try:
-            listed = "PIMELauncher.exe" in subprocess.run(["tasklist", "/FI", "IMAGENAME eq PIMELauncher.exe"],
-                                                         capture_output=True, text=True, timeout=5).stdout
-        except (OSError, subprocess.TimeoutExpired):
-            listed = False
-        results.append(("PIME launcher", "fail",
-                        "a PIMELauncher process exists but serves no pipe (it crashed on start)" if listed else "not running",
-                        "%sstart \"%s\" or sign out and back in"
-                        % ("install the x86 VC++ runtime (above), then " if any(r[1] == "fail" for r in results)
-                           else "", pime / "PIMELauncher.exe")))
+        results.append(("Launcher", "fail", "cd_AI's launcher is not running",
+                        "start \"%s\" or sign out and back in" % (pime / "PIMELauncher.exe")))
     return results
 
 

@@ -152,41 +152,16 @@ PIME (below, built from source): `python platforms\windows\package.py` writes
 `dist\windows\cd_AI-setup.exe`. Verified on Windows 11 ARM64: a first install, a restart, and "ok"
 + Tab in Notepad rewritten through the model API the settings point at.
 
-**By hand** (development): install [PIME](https://github.com/EasyIME/PIME) **with its Python backend** first.
-PIME supplies the native Windows Text Services Framework component. Claudish
-provides a Python service loaded by that component, rather than a keyboard hook.
-
-In an administrator PowerShell:
-
-```powershell
-.\platforms\windows\install.ps1
-# For a different PIME location:
-.\platforms\windows\install.ps1 -PimeRoot 'C:\Program Files (x86)\PIME'
-```
-
-cd_AI needs Claudish's own PIME ([platforms/windows/pime](../platforms/windows/pime/README.md)):
-it shows answers as they arrive, tells cd_AI the text around the caret, and draws cd_AI's
-candidate window. A released PIME is not supported. Until Claudish ships its build, it is built
-from source with the Visual Studio C++ tools.
-
-This copies the plugin and shared modules into PIME's input-method directory
-and re-registers its existing x86/x64 DLLs so it can enumerate the new profile.
-Sign out/in and select **cd_AI — Claudish** using Win+Space. Run the model and
-service in a normal user terminal. The plugin uses PIME's embedded Python;
-the model/service use your separate Python 3.10+ installation.
-
-**Windows on ARM:** use a PIME build with ARM64X support (newer than
-2.0.0-beta3; the [AppVeyor master builds](https://ci.appveyor.com/project/EasyIME/pime)
-have it), and install the
-[x86 VC++ runtime](https://aka.ms/vs/17/release/vc_redist.x86.exe). PIME's launcher is
-an x86 program; without that runtime it finds an ARM64 `vcruntime140.dll` on your
-`PATH` (Python for ARM64 puts one there) and fails with error `0xc000007b`, so every
-PIME input method types plain text. Verified on Windows 11 ARM64 (build 26100) in
-classic Notepad: 9 typing scenarios.
-
-To remove Claudish, remove its input profile in Windows settings, then remove
-`PIME\python\input_methods\claudish`. Keep PIME itself if you use other PIME input
-methods.
+**Building it** (development). cd_AI's PIME ([platforms/windows/pime](../platforms/windows/pime/README.md))
+is PIME with Claudish's patches: it shows answers as they arrive, tells cd_AI the text around the
+caret, draws cd_AI's panel, and has names of its own (its CLSID, its home beside its DLL, its
+launcher's pipe), so it is a part of cd_AI rather than a PIME of its own. On Linux,
+`platforms/windows/pime/make_source.sh pime-src.zip` prepares the patched source. On Windows with
+the Visual Studio 2022 C++ tools (`buildtools.ps1` installs them), `build-pime.ps1` builds the text
+service for x86, x64 and ARM64 and the launcher (Rust, installed on first use) into a tree of a
+released PIME's files (its Python and the rest); `python platforms\windows\package.py` then makes
+`cd_AI-setup.exe` from that tree. The installer removes cleanly: Settings → Apps → cd_AI → Uninstall
+(the text service's DLLs, loaded in running apps, go at the next restart).
 
 ## macOS input method
 

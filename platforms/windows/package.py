@@ -49,7 +49,7 @@ def python_for(arch, target, wheels):
 
 
 def pime(pime_root, target):
-    """The installed PIME with cd_AI as its only input method (as install.ps1 puts cd_AI there)."""
+    """build-pime.ps1's tree with cd_AI as its only input method, its shared modules beside it."""
     shutil.copytree(pime_root, target, ignore=shutil.ignore_patterns("Uninstall.exe", "__pycache__"))
     methods = target / "python/input_methods"
     for other in methods.iterdir():
