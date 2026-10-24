@@ -82,6 +82,9 @@ def main():
             assert service.state.mode == "continue"
             typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
             assert typed == "ls -la", typed
+            for _ in range(2):  # TSF's test, then the key itself: the same answer, and the suggestion goes
+                reply = key(0x08, method="filterKeyDown")
+                assert reply["return"] is False and reply.get("ghost") == "" and service.state.text == "", reply
             assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
             shift_tap()  # compose: what you type is held
             assert service.state.mode == "compose"

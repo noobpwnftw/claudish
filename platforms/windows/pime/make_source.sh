@@ -2,6 +2,8 @@
 # PIME (EasyIME/PIME) at the pinned commit with Claudish's patches applied, zipped for a Windows
 # build (build-pime.ps1, beside this file, on Windows). Usage: make_source.sh OUT.zip
 set -e
+[ -n "$1" ] || { echo "usage: make_source.sh OUT.zip" >&2; exit 2; }
+out="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"  # the zip is written from inside the checkout
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../.." && pwd)
 work="$root/.tools/pime-src"
@@ -24,7 +26,7 @@ text = re.sub(r'# only build the following components for 32-bit x86 platform.*?
               '', text, flags=re.S)
 open(path, "w").write(text)
 PY
-rm -f "$1"
-(cd "$work" && zip -qr "$1" CMakeLists.txt version.txt PIMETextService PIMELauncher libIME2 json python/textService.py \
+rm -f "$out"
+(cd "$work" && zip -qr "$out" CMakeLists.txt version.txt PIMETextService PIMELauncher libIME2 json python/textService.py \
   -x '*/.git/*' 'PIMELauncher/target/*' 'PIMELauncher/cargo_check.log')
-echo "PIME $(echo "$commit" | cut -c1-7) + patches -> $1"
+echo "PIME $(echo "$commit" | cut -c1-7) + patches -> $out"

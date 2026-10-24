@@ -17,7 +17,7 @@ index c2ae974..4ba6510 100644
 +    dwrite.lib
  )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..87074f7 100644
+index 4a4149f..c4a47c0 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
 @@ -21,6 +21,8 @@
@@ -29,18 +29,28 @@ index 4a4149f..87074f7 100644
  
  #include <algorithm>
  #include <cassert>
-@@ -41,7 +43,8 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+@@ -36,26 +38,14 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+     ImeWindow(service),
+     shown_(false),
+     candPerRow_(1),
+-    textWidth_(0),
+-    itemHeight_(0),
      currentSel_(0),
      hasResult_(false),
      useCursor_(true),
 -    selKeyWidth_(0) {
-+    selKeyWidth_(0),
+-
+-    if(service->isImmersive()) { // windows 8 app mode
+-        margin_ = 10;
+-        rowSpacing_ = 8;
+-        colSpacing_ = 12;
+-    }
+-    else { // desktop mode
+-        margin_ = 5;
+-        rowSpacing_ = 4;
+-        colSpacing_ = 8;
+-    }
 +    spin_(0.0f) {
- 
-     if(service->isImmersive()) { // windows 8 app mode
-         margin_ = 10;
-@@ -55,7 +58,8 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
-     }
  
      HWND parent = service->compositionWindow(session);
 -    create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
@@ -49,7 +59,7 @@ index 4a4149f..87074f7 100644
  }
  
  CandidateWindow::~CandidateWindow(void) {
-@@ -182,125 +186,44 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +172,44 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
              break;
          case WM_MOUSEACTIVATE:
              return MA_NOACTIVATE;
@@ -198,7 +208,7 @@ index 4a4149f..87074f7 100644
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -372,42 +295,9 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +281,9 @@ void CandidateWindow::setUseCursor(bool use) {
          ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
@@ -244,7 +254,7 @@ index 4a4149f..87074f7 100644
  
  
 diff --git a/src/CandidateWindow.h b/src/CandidateWindow.h
-index 2ea3635..b8ae3d1 100644
+index 2ea3635..83bfe33 100644
 --- a/src/CandidateWindow.h
 +++ b/src/CandidateWindow.h
 @@ -24,6 +24,7 @@
@@ -272,7 +282,18 @@ index 2ea3635..b8ae3d1 100644
      void itemRect(int i, RECT& rect);
  
  protected: // COM object should not be deleted directly. calling Release() instead.
-@@ -123,6 +129,10 @@ private:
+@@ -112,17 +118,16 @@ protected: // COM object should not be deleted directly. calling Release() inste
+ private:
+     BOOL shown_;
+ 
+-    int selKeyWidth_;
+-    int textWidth_;
+-    int itemHeight_;
+     int candPerRow_;
+-    int colSpacing_;
+-    int rowSpacing_;
+     std::vector<wchar_t> selKeys_;
+     std::vector<std::wstring> items_;
      int currentSel_;
      bool hasResult_;
      bool useCursor_;
@@ -421,10 +442,10 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..41eb1b4
+index 0000000..4349075
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,537 @@
+@@ -0,0 +1,533 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
@@ -632,8 +653,8 @@ index 0000000..41eb1b4
 +    }
 +    if (takes)
 +        take_ = makeLayout(spec.take, small_, 200);
-+    // The footer: the AI tile (or a warning mark), what is happening, each key with its verb, the
-+    // free words, and a hosted model's name at the end.
++    // The footer: the AI tile (or a warning mark), what is happening, each key with its verb, and
++    // the free words.
 +    if (!spec.rows.empty() || !spec.body.empty())
 +        y += px(2);
 +    footTop_ = y;
@@ -672,14 +693,10 @@ index 0000000..41eb1b4
 +    }
 +    if (!spec.tail.empty())
 +        add(FootItem::Verb, spec.tail, small_, gap);
-+    if (!spec.mark.empty())
-+        add(FootItem::Mark, spec.mark, small_, 0);
 +    widest = (std::max)(widest, x - gap + (bare_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)));
 +    y += footHeight_ + (bare_ ? px(TOAST_Y) : px(PAD));
 +    width_ = (std::min)(px(MAX_WIDTH), widest);
 +    height_ = y;
-+    if (!foot_.empty() && foot_.back().kind == FootItem::Mark)  // the hosted mark, at the end
-+        foot_.back().x = (std::max)(foot_.back().x, width_ - px(PAD) - px(ROW_X) - foot_.back().w);
 +    const float blur = px(appsUseDarkTheme() ? SHADOW_BLUR_DARK : SHADOW_BLUR);
 +    shadowSide_ = blur;
 +    shadowTop_ = (std::max)(0.0f, blur - px(SHADOW_Y));
@@ -771,7 +788,7 @@ index 0000000..41eb1b4
 +                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
 +                                                                           y + px(CAP_H) - 0.5f), px(4), px(4)), edge);
 +                edge->Release();
-+                text(take_, x + px(CAP_X), y + (px(CAP_H) - th) / 2, colors.contrast ? brush : brush);
++                text(take_, x + px(CAP_X), y + (px(CAP_H) - th) / 2, brush);
 +            }
 +        }
 +        ID2D1SolidColorBrush* ink = brush;
@@ -863,7 +880,7 @@ index 0000000..41eb1b4
 +        case FootItem::Text:
 +            text(item.layout, item.x, mid - item.h / 2, brush);
 +            break;
-+        default:  // a verb, the free words, the hosted mark
++        default:  // a verb, the free words
 +            text(item.layout, item.x, mid - item.h / 2, muted);
 +        }
 +    }
@@ -964,10 +981,10 @@ index 0000000..41eb1b4
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..ff42f31
+index 0000000..ae062af
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,167 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1005,11 +1022,10 @@ index 0000000..ff42f31
 +    int on = -1;          // the highlighted row; -1: none (an approval)
 +    std::vector<std::pair<std::wstring, std::wstring>> foot;  // (key, verb)
 +    std::wstring tail;    // free words after the keys ("or type a reply")
-+    std::wstring tile = L"ai";  // "ai", or "warn" when a request failed
++    std::wstring tile = L"ai";  // "ai"; "warn" when a request failed; "cd" in continue (a toast)
 +    std::wstring status;  // what is happening
 +    bool busy = false;    // with a spinner
 +    std::wstring failed;  // why a request failed
-+    std::wstring mark;    // a hosted model's name, at the footer's end
 +    std::wstring take = L"Enter";  // the highlighted row's key: Tab takes a draft, Enter confirms a choice
 +    bool nudge = false;   // Enter on a draft: the highlighted row's key (take) is lit
 +
@@ -1047,7 +1063,7 @@ index 0000000..ff42f31
 +        float x = 0, y = 0, w = 0, h = 0;
 +    };
 +    struct FootItem {
-+        enum Kind { Tile, Warn, Spinner, Text, Error, Cap, Verb, Mark } kind;
++        enum Kind { Tile, Warn, Spinner, Text, Error, Cap, Verb } kind;
 +        std::wstring text;
 +        IDWriteTextLayout* layout = nullptr;
 +        float x = 0, w = 0, h = 0;
@@ -1086,11 +1102,10 @@ index 0000000..ff42f31
 +    static void show(HWND hwnd, const std::wstring& text, const RECT& caret);
 +};
 +
-+// Its own window class: no drop shadow and no frame (the IME windows' class has CS_DROPSHADOW,
-+// right for the panel, wrong for text drawn after the caret).
++// Its own window class, without a frame: text drawn after the caret, not a panel.
 +class GhostWindow {
 +public:
-+    explicit GhostWindow(HWND parent) {
++    explicit GhostWindow(HWND parent): parent_(parent) {
 +        static ATOM atom = 0;
 +        HINSTANCE instance = (HINSTANCE)GetModuleHandleW(nullptr);
 +        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -1106,8 +1121,12 @@ index 0000000..ff42f31
 +                                L"ClaudishGhost", L"", WS_POPUP, 0, 0, 1, 1, parent, nullptr, instance, nullptr);
 +    }
 +    ~GhostWindow() {
-+        if (hwnd_)
++        if (hwnd_ && IsWindow(hwnd_))
 +            DestroyWindow(hwnd_);
++    }
++    // Usable for this owner: the window is there (Windows destroys an owned popup with its owner).
++    bool alive(HWND parent) const {
++        return hwnd_ && IsWindow(hwnd_) && parent_ == parent;
 +    }
 +    void show(const std::wstring& text, const RECT& caret) {
 +        if (hwnd_)
@@ -1127,6 +1146,7 @@ index 0000000..ff42f31
 +        return DefWindowProcW(hwnd, msg, wp, lp);
 +    }
 +    HWND hwnd_ = nullptr;
++    HWND parent_ = nullptr;
 +};
 +
 +} // namespace Ime

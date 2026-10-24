@@ -61,9 +61,6 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\arm64\PIMETextSe
 Type: filesandordirs; Name: "{app}"
 
 [Code]
-function InstallLayoutOrTip(Tip: String; Flags: DWORD): BOOL;
-  external 'InstallLayoutOrTip@input.dll stdcall';
-
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
@@ -71,7 +68,7 @@ begin
   { An update: cd_AI's service and launcher let go of their files first (only cd_AI's). }
   ExecAsOriginalUser(ExpandConstant('{sys}\schtasks.exe'), '/end /tn claudish', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-       '-NoProfile -Command "Get-Process pythonw,PIMELauncher -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''' +
+       '-NoProfile -Command "Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''' +
        ExpandConstant('{app}') + '\*'' } | Stop-Process -Force"', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Result := '';
 end;
@@ -120,11 +117,17 @@ begin
   Remove(ExpandConstant('{app}'), True);
 end;
 
-procedure AsYou(Arguments: String; Wait: TExecWait);
-var
-  Code: Integer;
+{ cd_AI's Python as the person installing, not the administrator who approved it: their config,
+  their input sources. The exit code, when waited for. }
+function AsYouCode(Arguments: String; Wait: TExecWait): Integer;
 begin
-  ExecAsOriginalUser(ExpandConstant('{app}\python\python.exe'), Arguments, '', SW_HIDE, Wait, Code);
+  if not ExecAsOriginalUser(ExpandConstant('{app}\python\python.exe'), Arguments, '', SW_HIDE, Wait, Result) then
+    Result := -1;
+end;
+
+procedure AsYou(Arguments: String; Wait: TExecWait);
+begin
+  AsYouCode(Arguments, Wait);
 end;
 
 procedure CurStepChanged(Step: TSetupStep);
@@ -135,9 +138,11 @@ begin
   if Step = ssPostInstall then
   begin
     { A first install has no config yet (init writes one; an update keeps it). }
-    First := not FileExists(ExpandConstant('{%USERPROFILE}\.config\claudish\config.json'));
+    First := AsYouCode('-c "import sys; from claudish import config; sys.exit(0 if config.default_path().is_file() else 3)"',
+                       ewWaitUntilTerminated) = 3;
     { cd_AI in your input sources (English), next to the keyboard you have. }
-    InstallLayoutOrTip('0409:@TEXT_SERVICE@@PROFILE@', 0);
+    AsYou('-c "import ctypes; ctypes.windll.input.InstallLayoutOrTip(''0409:@TEXT_SERVICE@@PROFILE@'', 0)"',
+          ewWaitUntilTerminated);
     ExecAsOriginalUser(ExpandConstant('{app}\PIME\PIMELauncher.exe'), '', '', SW_HIDE, ewNoWait, Code);
     AsYou('-m claudish init', ewWaitUntilTerminated);
     AsYou('-m claudish service install', ewWaitUntilTerminated);

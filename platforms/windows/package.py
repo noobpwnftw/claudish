@@ -50,7 +50,17 @@ def python_for(arch, target, wheels):
 
 def pime(pime_root, target):
     """build-pime.ps1's tree with cd_AI as its only input method, its shared modules beside it."""
-    shutil.copytree(pime_root, target, ignore=shutil.ignore_patterns("Uninstall.exe", "__pycache__"))
+    # Only the Python backend: registration and the launcher go through every backend in
+    # backends.json, so another backend's input methods would be registered as cd_AI's.
+    skipped = shutil.ignore_patterns("Uninstall.exe", "__pycache__")
+
+    def ignore(folder, names):
+        top = {"node", "go-backend"} if Path(folder) == Path(pime_root) else set()
+        return set(skipped(folder, names)) | (top & set(names))
+    shutil.copytree(pime_root, target, ignore=ignore)
+    backends = json.loads((target / "backends.json").read_text(encoding="utf-8"))
+    (target / "backends.json").write_text(json.dumps([b for b in backends if b.get("name") == "python"], indent=4),
+                                          encoding="utf-8")
     methods = target / "python/input_methods"
     for other in methods.iterdir():
         if other.is_dir() and other.name != "claudish":

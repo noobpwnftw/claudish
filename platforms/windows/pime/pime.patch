@@ -39,16 +39,18 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..8b02912 100644
+index 7829c72..c854708 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
-@@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
+@@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
  	guid_{ uuidToString(langProfileGuid) } {
  }
  
-+std::unordered_map<UINT_PTR, Client*> Client::timers_;
++// Per thread: a thread timer fires in the thread that set it, and each app thread has its own clients.
++thread_local std::unordered_map<UINT_PTR, Client*> Client::timers_;
 +
  Client::~Client(void) {
++	*alive_ = false;  // an edit session already queued for this client does nothing
 +	if (timerId_) {
 +		KillTimer(NULL, timerId_);
 +		timers_.erase(timerId_);
@@ -57,7 +59,7 @@ index 7829c72..8b02912 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -101,6 +108,71 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -101,6 +110,70 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	return success;
  }
  
@@ -75,7 +77,6 @@ index 7829c72..8b02912 100644
 +	spec.tail = text("tail");
 +	spec.status = text("status");
 +	spec.failed = text("failed");
-+	spec.mark = text("mark");
 +	if (!text("take").empty())
 +		spec.take = text("take");
 +	if (!text("tile").empty())
@@ -129,7 +130,7 @@ index 7829c72..8b02912 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +204,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +205,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -137,7 +138,7 @@ index 7829c72..8b02912 100644
 +	if (toastIt != msg.end() && toastIt->is_object()) {
 +		auto panelIt = toastIt->find("panel");
 +		auto durationIt = toastIt->find("duration");
-+		if (panelIt != toastIt->end())
++		if (panelIt != toastIt->end() && session != nullptr)
 +			textService_->showToast(session, panelFromJson(*panelIt),
 +			                        durationIt != toastIt->end() && durationIt->is_number_integer() ? durationIt->get<int>() : 2);
 +	}
@@ -145,7 +146,7 @@ index 7829c72..8b02912 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -190,6 +271,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -190,6 +272,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->setCompositionString(session, L"", 0);
  				endComposition = true;
  			}
@@ -158,7 +159,24 @@ index 7829c72..8b02912 100644
  		}
  		else {
  			if (!textService_->isComposing()) {
-@@ -345,6 +432,76 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +417,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+ 
+ 		updateComposition(msg, session, endComposition);
+ 
++		updateGhost(msg, session);  // Claudish: after the commit, so it follows the character just typed
++	}
++	else {
++		// Claudish: without an edit session (a key's test, a command), hiding needs none.
++		auto ghostIt = msg.find("ghost");
++		if (ghostIt != msg.end() && ghostIt->is_string() && ghostIt->get<string>().empty())
++			textService_->hideGhost();
++		auto showIt = msg.find("showCandidates");
++		if (showIt != msg.end() && showIt->is_boolean() && !showIt->get<bool>())
++			textService_->hideCandidates();
+ 	}
+ 
+ 	updateLanguageButtons(msg);
+@@ -345,6 +443,86 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -207,7 +225,10 @@ index 7829c72..8b02912 100644
 +	if (!context) {
 +		return;
 +	}
-+	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this](Ime::EditSession* session, TfEditCookie) {
++	auto alive = alive_;
++	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive](Ime::EditSession* session, TfEditCookie) {
++		if (!*alive)
++			return;
 +		json req = createRpcRequest("onTimer");
 +		addSurroundingText(req, session);
 +		json ret;
@@ -232,10 +253,17 @@ index 7829c72..8b02912 100644
 +	request["inputScopes"] = textService_->inputScopes(session);
 +	// Which text box: the TSF context, so the input method can keep one conversation per field.
 +	request["document"] = std::to_string(reinterpret_cast<uintptr_t>(static_cast<ITfContext*>(session->context())));
++}
++
++// Claudish: continue's suggestion after the caret.
++void Client::updateGhost(json& msg, Ime::EditSession* session) {
++	auto ghostIt = msg.find("ghost");
++	if (ghostIt != msg.end() && ghostIt->is_string())
++		textService_->showGhost(session, utf8ToUtf16(ghostIt->get<string>().c_str()));
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +509,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +530,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -249,7 +277,7 @@ index 7829c72..8b02912 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +518,22 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +539,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -260,11 +288,6 @@ index 7829c72..8b02912 100644
 +	if (hasPanel) {
 +		textService_->setPanel(panelFromJson(*panelIt));
 +	}
-+	const auto& ghostVal = msg["ghost"];
-+	if (ghostVal.is_string()) {
-+		textService_->showGhost(session, utf8ToUtf16(ghostVal.get<string>().c_str()));
-+	}
-+
  	const auto& candidateListVal = msg["candidateList"];
 +	if (!candidateListVal.is_array() && hasPanel && panelIt->is_object()) {
 +		textService_->updateCandidates(session);
@@ -272,7 +295,7 @@ index 7829c72..8b02912 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +627,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +643,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -280,7 +303,7 @@ index 7829c72..8b02912 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +660,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +676,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -288,7 +311,36 @@ index 7829c72..8b02912 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -804,7 +975,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -529,10 +716,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+-	if (handleRpcResponse(ret)) {
+-		return jsonValueOr<bool>(ret, "return", false);
++	if (!ret.is_object() || !jsonValueOr<bool>(ret, "success", false)) {
++		return false;
+ 	}
+-	return false;
++	bool result = jsonValueOr<bool>(ret, "return", false);
++	// Claudish: a command (the input indicator) may commit words or show a toast, which need an edit
++	// session; the reply is applied in one, as a key's is.
++	if (auto context = textService_->currentContext()) {
++		auto alive = alive_;
++		auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive, ret](Ime::EditSession* session, TfEditCookie) mutable {
++			if (*alive)
++				updateStatus(ret, session);
++		});
++		HRESULT sessionResult;
++		if (SUCCEEDED(context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &sessionResult))) {
++			return result;
++		}
++	}
++	updateStatus(ret, nullptr);
++	return result;
+ }
+ 
+ bool Client::sendOnMenu(std::string button_id, json& result) {
+@@ -804,7 +1006,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -298,7 +350,7 @@ index 7829c72..8b02912 100644
  	return pipeName;
  }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
-index feb9813..12eb1d5 100644
+index feb9813..e9b33b6 100644
 --- a/PIMETextService/PIMEClient.h
 +++ b/PIMETextService/PIMEClient.h
 @@ -92,6 +92,10 @@ public:
@@ -312,11 +364,12 @@ index feb9813..12eb1d5 100644
  private:
  	void startAsyncConnect();
  	static std::wstring getPipeName(const wchar_t* baseName);
-@@ -119,6 +123,11 @@ private:
+@@ -119,6 +123,12 @@ private:
  	void updateKeyboardStatus(nlohmann::json& msg);
  	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
  	void updateUI(nlohmann::json& data);
 +	void updateTimer(nlohmann::json& msg);
++	void updateGhost(nlohmann::json& msg, Ime::EditSession* session);
 +	// "textBefore"/"textAfter"/"textSelected": the text around the composition or the caret, and
 +	// the selection; "inputScopes": the kind of field.
 +	void addSurroundingText(nlohmann::json& request, Ime::EditSession* session);
@@ -324,12 +377,13 @@ index feb9813..12eb1d5 100644
  	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
  
  private:
-@@ -128,6 +137,8 @@ private:
+@@ -128,6 +138,9 @@ private:
  	std::shared_ptr<AsyncConnector> connector_;
  	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
  	unsigned int nextSeqNum_;
 +	UINT_PTR timerId_ = 0;
-+	static std::unordered_map<UINT_PTR, Client*> timers_;
++	static thread_local std::unordered_map<UINT_PTR, Client*> timers_;
++	std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);  // false once destroyed
  	bool isActivated_;
  	State state_;
  };
@@ -385,10 +439,25 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..ef45425 100644
+index 28d8286..9c1cf51 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
-@@ -268,6 +268,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -94,6 +94,14 @@ void TextService::onDeactivate() {
+ void TextService::onFocus() {
+ }
+ 
++// virtual
++void TextService::onKillFocus() {
++	// Claudish: the app lost the keyboard: the panel, the suggestion and a toast belong to its text box.
++	hideCandidates();
++	hideGhost();
++	hideMessage();
++}
++
+ // virtual
+ bool TextService::filterKeyDown(Ime::KeyEvent& keyEvent) {
+ 	// if (keyEvent.isKeyToggled(VK_CAPITAL))
+@@ -268,6 +276,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	candidateWindow_->setUseCursor(candUseCursor_);
  	candidateWindow_->setCandPerRow(candPerRow_);
@@ -398,7 +467,7 @@ index 28d8286..ef45425 100644
  
  	// the items in the candidate list should not exist the
  	// number of available keys used to select them.
-@@ -280,9 +283,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -280,9 +291,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	RECT textRect;
  	// get the position of composition area from TSF
@@ -412,7 +481,7 @@ index 28d8286..ef45425 100644
  	}
  
  	if (validCandidateListElementId_) {
-@@ -297,9 +301,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
+@@ -297,9 +309,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
      if (candidateWindow_) {
          RECT textRect;
          // get the position of composition area from TSF
@@ -424,7 +493,7 @@ index 28d8286..ef45425 100644
          }
      }
  }
-@@ -346,6 +349,34 @@ void TextService::hideCandidates() {
+@@ -346,6 +357,35 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -446,8 +515,9 @@ index 28d8286..ef45425 100644
 +		hideGhost();
 +		return;
 +	}
-+	if (!ghostWindow_)
-+		ghostWindow_ = std::make_unique<Ime::GhostWindow>(compositionWindow(session));
++	HWND owner = compositionWindow(session);
++	if (!ghostWindow_ || !ghostWindow_->alive(owner))  // a window of its own per owner, which may close
++		ghostWindow_ = std::make_unique<Ime::GhostWindow>(owner);
 +	ghostWindow_->show(text, caret);
 +}
 +
@@ -459,7 +529,7 @@ index 28d8286..ef45425 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,14 +400,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -369,14 +409,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -490,7 +560,7 @@ index 28d8286..ef45425 100644
      }
  }
  
-@@ -429,6 +472,7 @@ void TextService::closeClient() {
+@@ -429,6 +481,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -499,7 +569,7 @@ index 28d8286..ef45425 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 5c89d15..80f00ad 100644
+index 5c89d15..2f05e2a 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -511,7 +581,15 @@ index 5c89d15..80f00ad 100644
  #include <LibIME2/src/EditSession.h>
  #include <LibIME2/src/LangBarButton.h>
  #include "PIMEImeModule.h"
-@@ -122,6 +124,16 @@ public:
+@@ -46,6 +48,7 @@ public:
+ 	virtual void onDeactivate();
+ 
+ 	virtual void onFocus();
++	virtual void onKillFocus();
+ 
+ 	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
+ 	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
+@@ -122,6 +125,16 @@ public:
  		updateFont_ = true;
  	}
  
@@ -528,7 +606,7 @@ index 5c89d15..80f00ad 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +178,9 @@ private:
+@@ -166,6 +179,9 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;

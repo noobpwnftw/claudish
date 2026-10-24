@@ -205,11 +205,10 @@ class ClaudishTextService(TextService):
                 return bool(self.state.ghost)
             if event.isPrintableChar():
                 return True
-            if event.keyCode == 0x08:
-                if self.state.text:
-                    self.state.backspace()
-                self.publish()
-            elif event.keyCode not in (0x10, 0x14, 0x77):
+            # Backspace, Enter, navigation: the app's. The context starts over from the app's text at
+            # the next key (this runs twice per key, in TSF's test and again for the key itself, so
+            # it changes nothing that a second run would change again).
+            if event.keyCode not in (0x10, 0x14, 0x77):
                 self.drop_live()
             return False
         # Shift+Esc with nothing composed: the instruction Esc dropped comes back.
