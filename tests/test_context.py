@@ -236,6 +236,18 @@ class RoutingTests(unittest.TestCase):
             "plain": {"backend": "rules", "tone": "plain"}}}))
         return path
 
+    def test_a_routing_binding_keeps_its_context(self):
+        import tempfile
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            Path(folder, "glossary.md").write_text("PR: pull request")
+            path = self.config(folder, [{"app": "slack*", "profile": "plain",
+                                         "context": [{"type": "file", "name": "glossary", "path": "glossary.md"}]}])
+            name, settings, prompt, context = config.resolve(path)
+            main = Rewriter.from_settings(settings, prompt, context, name)
+            main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
+            self.assertEqual([title for title, _ in main.route("slack").sections("slack")], ["glossary"])
+
     def test_a_binding_routes_an_app_to_its_profile(self):
         import tempfile
         from claudish import config

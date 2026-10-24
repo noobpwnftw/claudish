@@ -282,6 +282,7 @@ class Rewriter:
             other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
             other.url = getattr(self, "url", None)
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
+            other.bindings = self.bindings  # the service's: a binding's context reaches the profile it routes to
             self.routed[name] = other
         return self.routed[name]
 

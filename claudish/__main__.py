@@ -63,7 +63,7 @@ def main():
     mcp.add_argument("--replace", action="store_true", help="Overwrite servers already in the config")
     context_cmd = commands.add_parser("context", help="Show what context an app would get")
     context_cmd.add_argument("action", choices=["test"])
-    context_cmd.add_argument("--app", required=True, help='App name as the input method reports it, e.g. "firefox"')
+    context_cmd.add_argument("--app", required=True, help='App name as the input method reports it, e.g. "thunderbird"')
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")

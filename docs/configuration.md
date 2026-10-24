@@ -36,38 +36,30 @@ Change what the model is told with a templates file, for any backend (see
 [Templates](#templates)): `claudish serve --templates FILE`, or a profile's
 `"templates"`.
 
-### Supported text boxes
+### Apps: bindings
 
 The input method knows which app has focus. On Linux, IBus reports the program
-(`gtk3-im:firefox` arrives as `firefox`). On macOS it is the bundle identifier
-(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`).
-`bindings` attach context to apps:
+(`gtk3-im:thunderbird` arrives as `thunderbird`). On macOS it is the bundle identifier
+(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`). A binding
+matches apps by a case-insensitive glob and sets, for them, which profile answers
+(its backend, tone, tools and helper) and context the model gets there every time:
 
 ```json
-{"profiles": {"work": {"backend": "claude", "bindings": [
-  {"app": "firefox*", "context": [{"type": "mcp", "name": "PR diff", "command": ["github-mcp-server", "stdio"],
-                                   "tool": "get_pull_request_diff", "arguments": {"owner": "me", "repo": "app", "pullNumber": 42}}]},
-  {"app": "com.apple.Terminal", "context": [{"type": "command", "command": ["git", "status", "--short"]}]}
-]}}}
-```
-
-In a bound app, Claudish reads that context and the model or agent works with
-it. Everywhere else it is a plain input method. Patterns are case-insensitive
-globs. Every response lists what was `consulted`.
-
-A binding can also say **which AI answers** there, by naming another profile of
-the same file: its backend, tone, tools, and helper answer for that app.
-
-```json
-{"profile": "local", "profiles": {
-  "local": {"backend": "llama", "bindings": [
-    {"app": "slack*", "profile": "plain"},
-    {"app": "firefox*", "profile": "claude"},
+{"profile": "claude", "profiles": {
+  "claude": {"backend": "claude", "tools": ["github"], "bindings": [
+    {"app": "thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
+    {"app": "slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
     {"app": "gnome-terminal-server", "profile": "agent"}]},
-  "plain": {"backend": "llama", "tone": "plain"},
-  "claude": {"backend": "claude"},
-  "agent": {"backend": "llama", "helper": ["claude", "{prompt}"]}}}
+  "proofread": {"backend": "claude", "tone": "proofread"},
+  "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
 ```
+
+A binding holds what is true of an app every time: who answers there, a style
+guide, a glossary. What changes from one request to the next comes with the
+request: the text around the caret, a terminal's last lines, the window's
+picture (F8), and the tools the model calls for what you asked ("summarize PR
+1234 for the standup" reads that PR). Elsewhere, the service's own profile
+answers with its own context. Every response lists what was `consulted`.
 
 A mode can name the profile that answers it, too: continue runs at every pause
 and wants a small, fast model; an instruction is sent on purpose and can wait
@@ -170,10 +162,10 @@ starts the configured stdio server, calls one tool or reads one resource, and
 caches the text:
 
 ```json
-{"type": "mcp", "name": "PR diff", "command": ["github-mcp-server", "stdio"],
+{"type": "mcp", "name": "style guide", "command": ["github-mcp-server", "stdio"],
  "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"},
- "tool": "get_pull_request_diff", "arguments": {"owner": "me", "repo": "app", "pullNumber": 42},
- "ttl": 120, "timeout": 15}
+ "tool": "get_file_contents", "arguments": {"owner": "me", "repo": "app", "path": "docs/STYLE.md"},
+ "ttl": 3600, "timeout": 15}
 ```
 
 `"$NAME"` values in `env` are read from your environment. Use `"resource": "uri"` instead of `"tool"` to read a resource.
@@ -183,7 +175,7 @@ Already using MCP servers with Claude? Bring them along:
 ```sh
 python -m claudish mcp import            # from Claude Desktop, Claude Code (~/.claude.json), and ./.mcp.json
 python -m claudish mcp list              # connect to each server; show its tools and resources
-python -m claudish context test --app firefox --show   # what a binding would read in that app
+python -m claudish context test --app thunderbird --show   # what a binding would read in that app
 ```
 
 Imported servers land under `"mcp_servers"` in your config and are used by name:

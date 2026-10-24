@@ -4,7 +4,7 @@ Providers come only from the user's config file, never from a request:
   {"type": "file", "path": "~/notes/style.md"}
   {"type": "command", "command": ["git", "-C", "~/repo", "diff", "main...HEAD"], "ttl": 30}
   {"type": "mcp", "command": ["github-mcp-server", "stdio"], "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},
-   "tool": "get_pull_request_diff", "arguments": {"owner": "o", "repo": "r", "pullNumber": 1}}
+   "tool": "get_file_contents", "arguments": {"owner": "o", "repo": "r", "path": "docs/STYLE.md"}}
 The request may add the text around the caret ("before"/"after").
 """
 import os
@@ -218,7 +218,7 @@ class Context:
 
 
 class Binding:
-    """A kind of text box, by app pattern ("firefox*", "com.apple.Terminal"): the context it adds,
+    """A kind of text box, by app pattern ("thunderbird*", "com.apple.Terminal"): the context it adds,
     and the profile that answers there (which AI: its backend, tone, tools, and helper)."""
 
     def __init__(self, spec, base=Path.cwd(), servers=None):
