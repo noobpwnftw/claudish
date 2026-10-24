@@ -142,7 +142,10 @@ sources. It asks for an administrator once; the rest is yours: a starter config,
 every login, and cd_AI's settings in your browser (your key, the voice). Then sign out and back in,
 or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
-"Windows protected your PC"; **More info → Run anyway** lets it through.
+"Windows protected your PC"; **More info → Run anyway** lets it through. cd_AI brings its own build
+of PIME (its text service), in PIME's own folder: where PIME is already installed with other input
+methods (Chewing, Rime), the installer stops rather than replace them. Uninstalling cd_AI takes it
+out of your input sources too. Tested on ARM64; x64 not yet.
 
 Until there is a download, it is built on Windows with Python 3.10+ and Inno Setup 6, over cd_AI's
 PIME (below, built from source): `python platforms\windows\package.py` writes
@@ -192,7 +195,7 @@ through [PyObjC](https://pyobjc.readthedocs.io/en/latest/apinotes/InputMethodKit
 The builder uses py2app to bundle Python, the adapter, and its shared modules
 into `Claudish.app`. The model runs in a separate process as on Windows/Linux.
 
-**The installer.** Until there is a release to download, build it on a Mac with Python 3.10+
+**The installer** (Apple silicon; Intel Macs are not supported yet). Until there is a release to download, build it on a Mac with Python 3.10+
 from python.org:
 
 ```sh
@@ -204,7 +207,7 @@ open dist/macos/cd_AI.pkg
 
 `cd_AI.pkg` installs for you alone (`~/Library/Input Methods`, no administrator password) and does
 the rest: a starter config, the service at every login, and cd_AI added to your input sources and
-selected. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
+enabled; which input source you use stays your choice. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
 the end: paste your Claude key, pick a voice. Then **log out and back in**, as after installing or
 updating any macOS input method: until then macOS keeps its old list of input sources (and, after
 an update, the old cd_AI). **Settings…** in the input menu opens the settings again.

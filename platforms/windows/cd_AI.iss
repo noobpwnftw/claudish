@@ -59,14 +59,52 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{commonpf32}\PIME\arm64\PIM
 function InstallLayoutOrTip(Tip: String; Flags: DWORD): BOOL;
   external 'InstallLayoutOrTip@input.dll stdcall';
 
+{ Another PIME, with input methods of its own (Chewing, Rime...): cd_AI would replace it, and
+  uninstalling cd_AI would take those input methods away. Its own PIME has only cd_AI. }
+function ForeignPime(): Boolean;
+var
+  Found: TFindRec;
+  Methods: String;
+begin
+  Result := False;
+  Methods := ExpandConstant('{commonpf32}\PIME\python\input_methods\');
+  if FileExists(ExpandConstant('{commonpf32}\PIME\Uninstall.exe')) then
+    Result := True
+  else if FindFirst(Methods + '*', Found) then
+  begin
+    try
+      repeat
+        if (Found.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and (Found.Name <> '.') and (Found.Name <> '..')
+           and (Found.Name <> 'claudish') and (Found.Name <> '__pycache__') then
+          Result := True;
+      until Result or not FindNext(Found);
+    finally
+      FindClose(Found);
+    end;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
 begin
+  if ForeignPime() then
+  begin
+    Result := 'PIME is installed here with input methods of its own. cd_AI installs its own build of ' +
+              'PIME in its place, which would remove them. To use cd_AI, uninstall PIME first.';
+    exit;
+  end;
   { An update: cd_AI's service and PIME's launcher let go of their files first. }
   ExecAsOriginalUser(ExpandConstant('{sys}\schtasks.exe'), '/end /tn claudish', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im PIMELauncher.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Result := '';
+end;
+
+procedure CurUninstallStepChanged(Step: TUninstallStep);
+begin
+  { Out of your input sources too, so Win+Space lists no cd_AI that is gone (ILOT_UNINSTALL). }
+  if Step = usUninstall then
+    InstallLayoutOrTip('0409:@TEXT_SERVICE@@PROFILE@', 1);
 end;
 
 procedure AsYou(Arguments: String; Wait: TExecWait);

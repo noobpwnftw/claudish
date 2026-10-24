@@ -103,9 +103,9 @@ instead: `claudish setup --profile local`.
 
 | Platform | Tested |
 | --- | --- |
-| Linux (IBus) | real typing in containers: GTK, Qt, and GNOME Terminal on X11, GNOME on Wayland with the Shell extension (13 scenarios) |
-| Windows (PIME/TSF) | Windows 11 ARM64 in a VM: Notepad, Edge, Windows Terminal, the classic console, on Claudish's patched PIME |
-| macOS (IMK) | real typing on macOS 26 in a VM: continue, Tab, focus changes, instruct, Terminal (10 scenarios) |
+| macOS (IMK) | Apple silicon, macOS 26 in a VM: the package installs, and after a logout "ok" + Tab rewrites in TextEdit; the offline panel. Intel Macs: not yet |
+| Windows (PIME/TSF) | Windows 11 ARM64 in a VM: the installer, and after a restart "ok" + Tab rewrites in Notepad; Edge, Windows Terminal and the console earlier. x64: not yet tested |
+| Linux (IBus) | preview: the one-line installer in a clean Ubuntu 24.04 container; real typing (GTK, Qt, GNOME Terminal on X11, GNOME on Wayland) last verified in containers before 2026-10-24 |
 
 Claudish is an experiment in internal beta; the [roadmap](ROADMAP.md) says what
 is next. It is maintained by an AI agent (Claude Code) working under its

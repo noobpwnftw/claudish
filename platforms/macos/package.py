@@ -92,9 +92,15 @@ def main():
         parser.error("%s is older than the sources: build it again (platforms/macos/build.py)" % bundle)
     import plistlib
     version = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
-    # The architectures the bundle was built for, so Installer refuses a Mac it cannot run on.
-    built = subprocess.run(["lipo", "-archs", str(bundle / "Contents/MacOS/Claudish")],
-                           capture_output=True, text=True, check=True).stdout.split()
+    # The architectures every binary in the bundle runs on, so Installer refuses a Mac it cannot run
+    # on: the launcher is universal, but a module pip installed (pydantic_core, for the Claude
+    # backend) can be built for this Mac's architecture only.
+    built = None
+    for binary in [bundle / "Contents/MacOS/Claudish"] + sorted(bundle.rglob("*.so")) + sorted(bundle.rglob("*.dylib")):
+        archs = subprocess.run(["lipo", "-archs", str(binary)], capture_output=True, text=True).stdout.split()
+        if archs:
+            built = set(archs) if built is None else built & set(archs)
+    built = sorted(built or [])
     with tempfile.TemporaryDirectory() as work:
         work = Path(work)
         payload, scripts = work / "payload", work / "scripts"
