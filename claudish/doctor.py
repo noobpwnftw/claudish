@@ -38,7 +38,7 @@ def check_config(state):
         return "fail", str(exc), "fix %s, or move it aside and run `claudish init`" % path
     state.update(profile=name, settings=settings, context=context)
     if name is None:
-        return "ok", "no config file; using the built-in local profile", "optional: `claudish init` writes example profiles"
+        return "warn", "no config file: no model is set up", "`claudish setup` (Claude with your own key), or `claudish init` for example profiles"
     return "ok", "profile %r (backend %s) from %s" % (name, settings["backend"], path), None
 
 
@@ -47,6 +47,9 @@ def check_backend(state):
     if settings is None:
         return "skip", "config did not load", None
     backend = settings["backend"]
+    if backend == "none":
+        return "warn", "no model is set up: compose says so, continue only types", \
+            "`claudish setup` (Claude with your own key), or a profile for any OpenAI-compatible server (docs/configuration.md)"
     if backend == "rules":
         return "ok", "rules backend (no model)", None
     if backend == "claude":

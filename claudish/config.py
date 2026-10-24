@@ -1,15 +1,16 @@
 """Profiles: one JSON file declaring backends and templates. Standard library only.
 
 {
-  "profile": "local",
+  "profile": "claude",
   "profiles": {
-    "local":  {"backend": "llama"},
+    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
     "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
-    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "templates": "grand.json"}
+    "local":  {"backend": "llama", "templates": "grand.json"}
   }
 }
 
-Keys are never stored here: name an environment variable with "api_key_env".
+Keys are never stored here: name an environment variable with "api_key_env". With no file, no model
+is set up (backend "none"): compose says so, and continue only types.
 """
 import json
 import os
@@ -18,8 +19,8 @@ from pathlib import Path
 from .context import Binding, Context
 from . import modes as invocation
 
-BACKENDS = ("llama", "openai", "claude", "command", "rules")
-DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
+BACKENDS = ("none", "llama", "openai", "claude", "command", "rules")
+DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
@@ -121,11 +122,11 @@ STARTER = {
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
         "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
     ],
-    "profile": "local",
+    "profile": "claude",
     "profiles": {
-        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766"},
-        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
         "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeout": 30},
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766"},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
     },
 }

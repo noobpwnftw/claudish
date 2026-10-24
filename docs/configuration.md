@@ -76,11 +76,14 @@ the same file: its backend, tone, tools, and helper answer for that app.
 
 A mode can name the profile that answers it, too: continue runs at every pause
 and wants a small, fast model; an instruction is sent on purpose and can wait
-for a strong one.
+for a strong one. Continue suggests only where it costs nothing per pause (a
+local model, on loopback) or where a profile routes it like this, so a hosted
+profile never gets a request at every pause unasked; without either, continue
+types as is.
 
 ```json
-{"profiles": {"local": {"backend": "llama", "modes": {
-  "continue": {"profile": "tiny"}, "instruct": {"profile": "claude"}}}}}
+{"profiles": {"claude": {"backend": "claude", "modes": {"continue": {"profile": "tiny"}}},
+              "tiny": {"backend": "llama", "model_url": "http://127.0.0.1:18766"}}}
 ```
 
 The app's binding chooses first, then that profile's choice for the mode. The

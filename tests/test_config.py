@@ -74,7 +74,7 @@ class ConfigTests(unittest.TestCase):
         for name in config.STARTER["profiles"]:
             _, settings, _, _ = config.resolve(path, name)
             self.assertEqual(settings["backend"], config.STARTER["profiles"][name]["backend"])
-        self.assertEqual(config.resolve()[0], "local")
+        self.assertEqual(config.resolve()[0], "claude")  # a frontier model with your key; no local one ships
         path.write_text('{"profiles": {"mine": {}}}', encoding="utf-8")
         with self.assertRaises(FileExistsError):
             config.write_starter()

@@ -202,6 +202,33 @@ class ModeTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     config.resolve(path)
 
+    def test_no_model_ships_compose_says_so_and_continue_only_where_it_costs_nothing(self):
+        from claudish.composition import failure
+        with self.assertRaisesRegex(RuntimeError, "no model is set up"):
+            Rewriter("none").rewrite("ok")
+        self.assertEqual(failure("no model is set up · claudish setup"), "no model is set up · claudish setup")
+        # Continue asks at every pause: a local model (or the stand-in) answers it unasked; a
+        # hosted one only where a profile routes continue to it.
+        self.assertTrue(Rewriter("llama").autocompletes and Rewriter("rules").autocompletes)
+        hosted = Rewriter("openai", "https://api.example.com")
+        self.assertFalse(hosted.autocompletes or hosted.continues(None) or Rewriter("none").autocompletes)
+        routed = Rewriter("openai", "https://api.example.com", modes={"continue": {"profile": "fast"}})
+        routed.profile, routed.loader = "main", lambda name: Rewriter("llama")
+        self.assertTrue(routed.continues(None))
+        server = make_server(hosted, 0)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            request = Request("http://127.0.0.1:%s/suggest" % server.server_port, headers={"Content-Type": "application/json"},
+                              data=json.dumps({"text": "Thanks for the review ", "mode": "continue"}).encode())
+            with self.assertRaises(HTTPError) as caught:
+                urlopen(request)
+            self.assertEqual(json.load(caught.exception)["error"], "continue has no model of its own")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
     def test_service_modes_in_rules_mode(self):
         server = make_server(Rewriter("rules"), 0)
         thread = threading.Thread(target=server.serve_forever)

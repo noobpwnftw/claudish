@@ -11,11 +11,18 @@ python -m claudish setup
 ```
 
 It shows each step and asks before doing it: write a config, import MCP servers
-from your Claude setup, download a pinned llama.cpp build and the model (both
-SHA-256 verified), register the input method, start Claudish at login, then run
-`doctor`. Steps already done are skipped, so it is safe to run again.
-`--dry-run` shows the plan, `--yes` does it all, and `--profile claude` sets up a
-hosted profile instead (no model download). Installing the input method on
+from your Claude setup, check your model, register the input method, start
+Claudish at login, then run `doctor`. Steps already done are skipped, so it is
+safe to run again. `--dry-run` shows the plan and `--yes` does it all.
+
+cd_AI ships no model. Setup's default profile is `claude`, a frontier model with
+your own key (`ANTHROPIC_API_KEY`, and `pip install "claudish-ime[claude]"`):
+good slop needs one. `--profile ollama` (or a profile of your own) uses any
+OpenAI-compatible server. `--profile local` is the optional local model: setup
+downloads a pinned llama.cpp build and Qwen2.5 0.5B (both SHA-256 verified) and
+runs them at login. Continue suggests only with a local model, or with a model a
+profile routes to it ([configuration](configuration.md#modes)); without one,
+continue types as is, and with no model at all compose says "no model is set up". Installing the input method on
 Windows and macOS needs an administrator, so setup prints that command. Verified
 end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-systemd`).
 
@@ -33,9 +40,9 @@ Or step by step:
    Instruct. Each mode has its own sample phrases. No model handy? `python -m
    claudish serve --backend rules` runs the demo with simple stand-ins.
 2. **Pick a brain.** `python -m claudish init` writes `~/.config/claudish/config.json`
-   with four profiles: `local` (the default), `ollama` (any OpenAI-compatible
-   server), `claude` (your API key), and `agent` (an agent CLI such as
-   `claude -p`). Choose one with `python -m claudish serve --profile NAME`.
+   with four profiles: `claude` (the default, your API key), `ollama` (any
+   OpenAI-compatible server), `local` (a local model, optional), and `agent` (an
+   agent CLI such as `claude -p`). Choose one with `python -m claudish serve --profile NAME`.
 3. **Install the input method** for [Linux](#linux-input-method),
    [Windows](#windows-input-method), or [macOS](#macos-input-method), and add
    **cd_AI — Claudish** in your input sources.

@@ -252,6 +252,9 @@ def make_server(rewriter, port=18765, token=None):
                 # What is around the caret, the app (which can mean reading a terminal) and window
                 # pictures come only from an input method.
                 return self.reply(403, {"error": "the service token is required"})
+            if mode == "continue" and not (rewriter.continues(app) if trusted else rewriter.autocompletes):
+                # Autocomplete runs at every pause: a hosted model only where a profile routes it.
+                return self.reply(503, {"error": "continue has no model of its own"})
             try:
                 answerer = rewriter.route(app, mode) if trusted else rewriter  # which AI answers here
                 result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted)

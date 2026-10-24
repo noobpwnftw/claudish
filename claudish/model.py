@@ -12,6 +12,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 
 RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
 RECENT_SECONDS = 600
+NO_MODEL = "no model is set up · claudish setup"  # said in the panel, where Tab or Enter asked
 
 
 def rules(text):
@@ -221,6 +222,12 @@ class Rewriter:
         self.claude = Claude(claude_model) if backend == "claude" else None
 
     @property
+    def autocompletes(self):
+        """Whether continue asks this model at every pause unasked: a local one (or the rules
+        stand-in) costs nothing; a hosted one only where a profile routes continue to it."""
+        return self.backend == "rules" or (self.backend in ("llama", "openai") and self.local)
+
+    @property
     def hosted_name(self):
         """Who answered, when it is a hosted model, as the panel names it ("Claude"); "" when local."""
         if not self.hosted:
@@ -235,15 +242,23 @@ class Rewriter:
         """Which AI answers here: the app's binding may name a profile, and that profile may name
         another one for this mode (a small model for continue, a strong one for instructions).
         Routed profiles share this service's sessions, conversations, and recent requests."""
-        chosen = self
-        for binding in self.bindings:
-            if binding.profile and binding.matches(app):
-                chosen = self.load(binding.profile, "text typed in %s" % binding.pattern)
-                break
+        chosen = self.bound(app)
         name = (chosen.modes.get(mode) or {}).get("profile") if mode else None
         if name and name != getattr(chosen, "profile", None):
             chosen = self.load(name, "%s requests" % mode)
         return chosen
+
+    def bound(self, app):
+        """The profile the app's binding names, else this one."""
+        for binding in self.bindings:
+            if binding.profile and binding.matches(app):
+                return self.load(binding.profile, "text typed in %s" % binding.pattern)
+        return self
+
+    def continues(self, app):
+        """Whether continue suggests in this app: its profile routes continue to a model, or the
+        model that would answer costs nothing per pause (autocompletes)."""
+        return bool((self.bound(app).modes.get("continue") or {}).get("profile")) or self.route(app, "continue").autocompletes
 
     def load(self, name, what):
         if name == getattr(self, "profile", None) or self.loader is None:
@@ -366,6 +381,8 @@ class Rewriter:
         of read; context: False for the demo's requests (no token): no observations."""
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
+        if self.backend == "none":
+            raise RuntimeError(NO_MODEL)
         box = self.box(mode, app, purpose, before, after, look, screen, trusted=context)
         return self.answer(mode, text, box)
 

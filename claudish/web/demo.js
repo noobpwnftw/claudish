@@ -151,7 +151,8 @@ async function ask(revision) {
     if (mode === "continue") return;  // continue stays quiet: no suggestion is a fine answer
     state.failed = true;  // the panel says why; your words stay
     state.error = error.name === "AbortError" ? "the model took too long"
-      : error instanceof TypeError ? "the model is offline" : "the request failed";
+      : error instanceof TypeError ? "the model is offline"
+      : /no model is set up/.test(error.message) ? "no model is set up · claudish setup" : "the request failed";
     setStatus("");
   } finally {
     clearTimeout(limit);

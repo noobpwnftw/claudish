@@ -27,6 +27,7 @@ class SetupTests(unittest.TestCase):
         self.service_run = MagicMock(return_value=0)
         self.ime = MagicMock()
         self.managed = ("warn", "not managed")
+        self.backend = ("fail", "the Anthropic SDK is not installed", 'pip install "claudish-ime[claude]"')
         patches = [
             patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.home / ".config"), "HOME": str(self.home)}),
             patch.object(Path, "home", return_value=self.home),
@@ -42,6 +43,7 @@ class SetupTests(unittest.TestCase):
             patch("claudish.setup.service.run", self.service_run),
             patch("claudish.setup.doctor.fetch_json", side_effect=OSError("down")),
             patch("claudish.setup.doctor.main", return_value=0),
+            patch("claudish.setup.doctor.check_backend", side_effect=lambda state: self.backend),
             patch.object(setup, "wait_for_service", return_value=True),
         ]
         for p in patches:
@@ -56,9 +58,18 @@ class SetupTests(unittest.TestCase):
             status = setup.run(*args, **kwargs)
         return status, out.getvalue()
 
-    def test_fresh_machine_plans_everything(self):
-        self.assertEqual(self.states(), {"Config": "todo", "Tone": "done", "MCP servers": "skip", "llama.cpp": "todo",
-                                         "Model": "todo", "Input method": "todo", "Starts at login": "todo"})
+    def test_fresh_machine_plans_everything_but_the_model_is_yours(self):
+        self.assertEqual(self.states(), {"Config": "todo", "Tone": "done", "MCP servers": "skip", "Model": "manual",
+                                         "Input method": "todo", "Starts at login": "todo"})
+        _, out = self.quiet(yes=True)
+        self.assertIn('Model needs you: pip install "claudish-ime[claude]"', out)
+        self.service_run.assert_not_called()  # not at every login while it has no model
+        self.assertIn("not yet: the model needs setting up first (Model)", out)
+
+    def test_a_local_model_is_an_optional_profile(self):
+        self.assertEqual(self.states("local"), {"Config": "todo", "Tone": "done", "MCP servers": "skip",
+                                                "llama.cpp": "todo", "Model": "todo", "Input method": "todo",
+                                                "Starts at login": "todo"})
 
     def test_tone_is_set_for_the_profile(self):
         status, out = self.quiet(yes=True, tone="fix")
@@ -76,7 +87,7 @@ class SetupTests(unittest.TestCase):
             action.assert_not_called()
 
     def test_yes_runs_each_step_once_then_doctor(self):
-        status, out = self.quiet(yes=True)
+        status, out = self.quiet("local", yes=True)
         self.assertEqual(status, 0, out)
         self.assertTrue(config.default_path().is_file())
         self.llama.install.assert_called_once()
@@ -99,13 +110,15 @@ class SetupTests(unittest.TestCase):
         self.model.write_text("")
         self.llama.installed = lambda: self.home / ".tools/llama-server"
         self.managed = ("ok", "systemd user unit (active)")
+        self.backend = ("ok", "Claude via the Anthropic SDK", None)
         with patch("claudish.setup.doctor.check_ime_linux", return_value=[("Input method", "ok", "registered", None)]):
             self.assertEqual(set(self.states().values()) - {"skip"}, {"done"})
 
-    def test_a_hosted_profile_needs_no_model_and_runs_serve(self):
+    def test_a_hosted_profile_downloads_nothing_and_runs_serve(self):
         config.write_starter()
+        self.backend = ("ok", "Claude via the Anthropic SDK", None)
         states = self.states("claude")
-        self.assertNotIn("Model", states)
+        self.assertEqual(states["Model"], "done")
         self.assertNotIn("llama.cpp", states)
         self.quiet("claude", yes=True)
         self.service_run.assert_called_once_with("install", serve=True, extra=["--profile", "claude"])
@@ -126,11 +139,11 @@ class SetupTests(unittest.TestCase):
 
     def test_a_failing_step_does_not_stop_the_rest_but_no_service_without_a_model(self):
         self.models.fetch.side_effect = OSError("network down")
-        _, out = self.quiet(yes=True)
+        _, out = self.quiet("local", yes=True)
         self.assertIn("failed: network down", out)
         self.ime.assert_called_once()  # later steps still run
         self.service_run.assert_not_called()
-        self.assertIn("the local model needs Model first", out)
+        self.assertIn("the model needs setting up first (Model)", out)
 
 
 if __name__ == "__main__":

@@ -105,6 +105,15 @@ def step_model():
         lambda: download_model.fetch("small", progress("model"))
 
 
+def step_backend(settings):
+    """A model you point it at (hosted, or a server of your own): the Anthropic SDK and a key, an
+    agent command, or a server that answers. cd_AI ships none."""
+    status, detail, fix = doctor.check_backend({"settings": settings})
+    if status == "ok":
+        return "done", detail, None
+    return "manual", detail, fix
+
+
 def step_ime():
     system = platform.system()
     if system == "Linux":
@@ -153,8 +162,10 @@ def plan(profile=None, variant="cpu", skip=(), tone=None):
     name, settings = chosen_profile(profile)
     local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
     steps = [("Config", step_config), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
-    if local:
+    if local:  # optional: a local model, downloaded here (claudish setup --profile local)
         steps += [("llama.cpp", lambda: step_llama(settings, variant)), ("Model", step_model)]
+    else:
+        steps += [("Model", lambda: step_backend(settings))]
     steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(name, settings))]
     return name, [(label, "skip", "skipped (--skip)", None) if label.split()[0].lower() in skip
                   else (label,) + check() for label, check in steps]
@@ -191,7 +202,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
     symbols = doctor.marks()
     shown = {"done": symbols["ok"], "todo": "→" if symbols is doctor.MARKS else "->",
              "manual": symbols["warn"], "skip": symbols["skip"]}
-    print("Setting up Claudish for profile %r.\n" % (name or "local"))
+    print("Setting up Claudish for profile %r.\n" % (name or config.STARTER["profile"]))
     manual, started, missing = [], False, []
     for label, state, detail, action in steps:
         print("%s %-16s %s" % (shown[state], label, detail))
@@ -202,7 +213,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
             continue
         if label == "Starts at login" and set(missing) & {"llama.cpp", "Model"}:
             # A login service without its model would only fail at every login.
-            print("  not yet: the local model needs %s first" % " and ".join(m for m in missing if m in ("llama.cpp", "Model")))
+            print("  not yet: the model needs setting up first (%s)" % ", ".join(m for m in missing if m in ("llama.cpp", "Model")))
             continue
         if not (yes or ask("  %s?" % detail[0].upper() + detail[1:])):
             print("  skipped")

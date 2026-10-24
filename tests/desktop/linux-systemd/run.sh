@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install, autostart (user manager restart = new login), and uninstall the systemd user unit, in a container;
-# then `claudish setup --yes` on a fresh copy: real llama.cpp download, config, login service, a real rewrite.
+# then `claudish setup --profile local --yes` (the optional local model) on a fresh copy: real llama.cpp download, config, login service, a real rewrite.
 set -e
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../../.." && pwd)
 docker build -q -t claudish-systemd "$here" >/dev/null
@@ -32,7 +32,7 @@ as_tester sh -c 'ls ~/.config/systemd/user/claudish.service 2>/dev/null || echo 
 model=qwen2.5-0.5b-instruct-q4_k_m.gguf   # mounted, not downloaded again: setup still verifies its SHA-256
 as_tester sh -c "mkdir -p ~/fresh/models && ln -s /models/$model ~/fresh/models/$model"
 docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus \
-    -w /home/tester/fresh "$id" python3 -m claudish setup --yes || echo "setup exit $? (doctor: no IBus in this image)"
+    -w /home/tester/fresh "$id" python3 -m claudish setup --profile local --yes || echo "setup exit $? (doctor: no IBus in this image)"
 echo "after setup: $(health)"
 as_tester python3 -c "
 import json, urllib.request
@@ -40,4 +40,4 @@ request = urllib.request.Request('http://127.0.0.1:18765/suggest', json.dumps({'
                                  {'Content-Type': 'application/json'})
 print('setup rewrite:', json.load(urllib.request.urlopen(request, timeout=30)).get('text'))"
 docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus \
-    -w /home/tester/fresh "$id" python3 -m claudish setup --dry-run | grep -c "→" | sed 's/^/steps left after setup: /'
+    -w /home/tester/fresh "$id" python3 -m claudish setup --profile local --dry-run | grep -c "→" | sed 's/^/steps left after setup: /'

@@ -34,7 +34,11 @@ every toast, it lasts two seconds or until the next key, since it was said where
 - **Continue**: keys go straight into the app. At a word boundary at the end of a line, the rest
   of the sentence shows in grey after the caret. Tab takes it; typing ignores it; Esc dismisses
   it. With nothing offered, Tab is the app's. Autocomplete only: no tools, no retrieval, no agent;
-  its quality is its model's.
+  its quality is its model's. It suggests only with a model set up for it (a local one, or one a
+  profile routes), since it asks at every pause; otherwise it types as is.
+
+cd_AI ships no model: compose uses the one you point it at (a frontier model with your key by
+default; good slop needs one). With none, compose says "no model is set up · claudish setup".
 
 | Key | In compose |
 | --- | --- |

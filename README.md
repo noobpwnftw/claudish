@@ -21,8 +21,11 @@ them as typed. Continue is a Shift tap away when you want your keys to go
 straight in, with the rest of the sentence offered. Where you want none of it,
 switch that app to your usual keyboard: input sources are chosen per app.
 
-The model is yours to choose: a small local one by default, any
-OpenAI-compatible server, Claude with your own key, or an agent CLI. It can read
+cd_AI ships no model: point it at one. Claude with your own key is the default
+setup, and good slop needs a frontier model; any OpenAI-compatible server or an
+agent CLI works too, and `claudish setup --profile local` downloads a small local
+model instead. Continue suggests only with a local model, or where you route one
+for it. The model can read
 context (files, commands, MCP servers) and, when you ask, look things up or run an
 agent whose questions arrive as choices.
 
@@ -38,7 +41,8 @@ python3 -m claudish setup
 ```
 
 Setup shows each step and asks before doing it, skips what is already done, and
-ends with `claudish doctor`. Then log out and back in, and add **cd_AI — Claudish**
+ends with `claudish doctor`. It sets up Claude by default: put your key in
+`ANTHROPIC_API_KEY` and `pip install "claudish-ime[claude]"`. Then log out and back in, and add **cd_AI — Claudish**
 in your input sources. Details for each OS: [docs/install.md](docs/install.md).
 
 ## Keys

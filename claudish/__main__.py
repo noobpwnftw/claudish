@@ -39,7 +39,7 @@ def main():
     bench.add_argument("--url", default="http://127.0.0.1:18765")
     setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "
                                 "input method, start at login, then doctor")
-    setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "local")')
+    setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
     setup.add_argument("--yes", action="store_true", help="Do every step without asking")
     setup.add_argument("--tone", help='The voice: "plain", "fix" (correct, keep your words), or your own words '
                        "(default: Claudish's, polished with em dashes)")

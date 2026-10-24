@@ -20,6 +20,8 @@ HELD_SECONDS = 600  # an exchange held after a focus change is offered on return
 def failure(error):
     """Why a request failed, in a few plain words for the panel."""
     error = str(error or "").lower()
+    if "no model is set up" in error:
+        return "no model is set up · claudish setup"
     if any(word in error for word in ("refused", "unreachable", "offline", "connect", "not running")):
         return "the model is offline"
     if "timed out" in error or "timeout" in error:

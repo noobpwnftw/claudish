@@ -26,7 +26,9 @@ def local_rewriter(endpoint, profile=None):
         except (OSError, ValueError, AttributeError):
             profiles = {}  # resolve() below reports the real problem
         profile = "local" if "local" in profiles else None
-    name, settings, prompt, context = config.resolve(profile=profile)
+    # Without a config file the built-in settings have no model: this script's is the local one.
+    overrides = None if config.default_path().is_file() else {"backend": "llama"}
+    name, settings, prompt, context = config.resolve(profile=profile, overrides=overrides)
     if settings["backend"] != "llama":
         raise ValueError("profile %r uses the %s backend; start.py runs the local model, so use "
                          "`python -m claudish serve --profile %s`" % (name, settings["backend"], name))
