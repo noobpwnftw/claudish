@@ -61,7 +61,7 @@ open dist/macos/cd_AI.pkg
 It installs cd_AI for you alone and ends in cd_AI's settings. Then log out and back in.
 [More](docs/install.md#macos-input-method).
 
-**Windows** (11, x64 and ARM64): the installer is `cd_AI-setup.exe`. Until the first release it is
+**Windows 11** (tested on ARM64; x64 not yet): the installer is `cd_AI-setup.exe`. Until the first release it is
 built from source ([how](docs/install.md#windows-input-method)); the input method comes only from
 it. It ends in cd_AI's settings; then restart, and pick cd_AI with Win+Space.
 

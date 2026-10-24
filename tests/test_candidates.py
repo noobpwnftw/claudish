@@ -342,6 +342,16 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.text, state.restore()), ("", "summarize this thread"))  # Shift+Esc
         self.assertEqual(state.shown, "summarize this thread")
 
+    def test_a_shift_tap_holds_a_sent_exchange_for_shift_esc(self):
+        state = Composition()
+        state.change("decline politely")
+        state.submit()
+        state.offer(state.revision, "A draft.", ["Another."])
+        self.assertEqual((state.toggle(), state.mode), ("decline politely", "continue"))  # your words go in
+        state.toggle()  # back to compose
+        self.assertEqual(state.restore(), "decline politely")  # Shift+Esc: the exchange, drafts and all
+        self.assertEqual(state.candidates, ["A draft.", "Another."])
+
     def test_a_focus_change_commits_only_your_own_words(self):
         """Seven reviewers, unanimous: a focus change may commit your own words, never the model's,
         never words meant for the model, and it never sends or approves."""

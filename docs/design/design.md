@@ -47,7 +47,7 @@ cd_AI ships no model: compose uses the profile's model (Claude by default). With
 | Tab | takes the model's text: asks for a rewrite (it waits in the panel; Tab again puts it in), inserts the highlighted draft, or an answer to read |
 | Enter | talks to the model: sends your words as an instruction, a reply, or the answer to a question (on a draft it lights the row's Tab) |
 | Shift+Enter | keeps your words as typed |
-| ↑ ↓ | move the highlight (no wrap); choices are not numbered: digits and Space are text |
+| ↑ ↓ | move the highlight (no wrap); choices are not numbered: digits are text, and Space does nothing while drafts show |
 | Esc | one step back: cancel the reply you typed, then edit the instruction, then drop it |
 | Shift+Esc | brings back what Esc dropped, or the exchange a focus change held |
 | F8 | attaches a picture of the window to the instruction |

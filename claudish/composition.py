@@ -526,7 +526,9 @@ class Composition:
             self.look = False
             self.change("")
             return ""
-        kept = self.shown
+        # A sent instruction's exchange is held, as on a focus change: back in compose, Shift+Esc
+        # brings it back.
+        kept = self.leave(getattr(self, "held_app", None)) if self.sent else self.shown
         self.mode = "continue"
         self.look = False
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context

@@ -66,7 +66,8 @@ yet). It installs cd_AI's text service (its own build of PIME, beside any PIME y
 such as Chewing or Rime), a Python of its own for the service, and the `claudish` command, and adds
 cd_AI to your input sources. It asks for an administrator once, then sets up a starter config and
 the service at every login, and opens cd_AI's settings in your browser (the key, the tone). Then
-**restart**, and pick cd_AI with Win+Space. An update also asks for a restart: the text service is
+**restart**, and pick cd_AI with Win+Space: it is listed under **English (United States)**, shown as
+ENG in the taskbar. An update also asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one.
 
 It is not signed: SmartScreen shows "Windows protected your PC"; **More info → Run anyway** lets it

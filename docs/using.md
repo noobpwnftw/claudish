@@ -35,8 +35,7 @@ A composition is edited at its end. Navigation keys and Ctrl/Alt/Win shortcuts p
 composing commit your words first, then act.
 Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
-Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,
-platforms/windows/pime, calls back when it does). The composition is limited to 512
+Every platform shows an answer as it arrives. The composition is limited to 512
 characters. When cd_AI's service does not answer (stopped, or just after a laptop wakes), the
 panel says "cd_AI is offline" from your first key.
 
@@ -79,10 +78,7 @@ with the model running in the page through [wllama](https://github.com/ngxson/wl
 (llama.cpp compiled to WebAssembly). It needs no inference server, so any static
 host can serve it. Nothing is downloaded until the visitor clicks **Run the model
 in this browser**; the 491 MB model (pinned Qwen2.5 0.5B) is then cached by the
-browser. A small service worker (`coi-sw.js`)
-supplies the cross-origin isolation headers static hosts cannot set, so the
-multi-threaded build runs: on a DGX Spark's CPU in headless Chromium, a rewrite
-takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
+browser.
 
 ## Recent requests
 

@@ -89,4 +89,11 @@ are in `~/Library/Logs/DiagnosticReports/Claudish-*.ips`.
 
 `.github/workflows/pages.yml` deploys claudish.io on every push to `main`:
 `python scripts/build_static_demo.py --site` writes the home page (`site/`) with the static demo in
-`demo/`. `python scripts/build_static_demo.py` alone writes the demo to `dist/demo/`.
+`demo/`. `python scripts/build_static_demo.py` alone writes the demo to `dist/demo/`. The static demo's
+service worker (`claudish/web/coi-sw.js`) supplies the cross-origin isolation headers a static host
+cannot set, so wllama's multi-threaded build runs: on a DGX Spark's CPU in headless Chromium, a
+rewrite takes about 1 s (9 s single-threaded).
+
+On Windows, cd_AI's PIME
+([platforms/windows/pime](../platforms/windows/pime/README.md)) calls the input method back when an
+answer arrives, so it shows without a key press.
