@@ -110,7 +110,7 @@ class ClaudishInputController(IMKInputController):
     def deactivateServer_(self, sender):
         try:
             self.finish(self.client())
-            self.stop()
+            self.pause()
         except Exception:
             trace("deactivate failed", traceback.format_exc())
         objc.super(ClaudishInputController, self).deactivateServer_(sender)
@@ -174,18 +174,23 @@ class ClaudishInputController(IMKInputController):
         threading.Thread(target=open_it, daemon=True).start()
 
     @objc.python_method
-    def stop(self):
+    def pause(self):
+        """Focus went elsewhere: nothing shows, but the worker stays, so a held exchange's answer
+        is there when you come back (as on IBus)."""
         self.active = False
         if self.timer is not None:
             self.timer.invalidate()
             self.timer = None
-        if self.worker is not None:
-            self.worker.close()
-            self.worker = None
         self.state.change("")
         self.hide_panel()
         TOAST.hide()  # a toast belongs to the text box it was shown at, which is gone
         OVERLAY.hide()
+
+    def stop(self):
+        self.pause()
+        if self.worker is not None:
+            self.worker.close()
+            self.worker = None
 
     def recognizedEvents_(self, sender):
         return NSEventMaskKeyDown | NSEventMaskFlagsChanged  # flags: a Shift tap switches mode
@@ -347,10 +352,14 @@ class ClaudishInputController(IMKInputController):
         if client is None:
             return
         TOAST.show(self.caret(client, start=True), spec)
-        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(2.0, self, "hideToast:", None, False)
+        if getattr(self, "toast_timer", None) is not None:
+            self.toast_timer.invalidate()  # a newer toast gets its own two seconds
+        self.toast_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            2.0, self, "hideToast:", None, False)
 
     @objc.signature(b"v@:@")
     def hideToast_(self, timer):
+        self.toast_timer = None
         TOAST.hide()
 
     @objc.python_method

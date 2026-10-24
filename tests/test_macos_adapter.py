@@ -441,15 +441,16 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(48)  # rewrite asks on Tab
         self.assertEqual(self.controller.worker.app, "com.apple.TextEdit")
 
-    def test_deactivation_commits_and_closes_worker_timer(self):
+    def test_deactivation_commits_stops_the_timer_and_keeps_the_worker(self):
         self.type_text("keep me")
         worker, timer = self.controller.worker, self.controller.timer
         self.controller.deactivateServer_(None)
         self.assertEqual(self.client.commits, ["keep me"])
-        self.assertTrue(worker.closed)
+        self.assertFalse(worker.closed)  # a held exchange's answer arrives while you are away
         self.assertTrue(timer.invalidated)
         self.assertFalse(self.key(0, "x"))
         self.controller.activateServer_(None)
+        self.assertIs(self.controller.worker, worker)
         self.assertTrue(self.key(0, "y"))
 
     def test_host_commit_and_a_click_on_a_row(self):

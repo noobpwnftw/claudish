@@ -70,8 +70,11 @@ def set_extension(enabled):
     link = EXTENSIONS / EXTENSION
     if enabled:
         EXTENSIONS.mkdir(parents=True, exist_ok=True)
-        if not link.exists():
-            link.symlink_to(ROOT / "platforms/linux/gnome-extension" / EXTENSION)
+        target = ROOT / "platforms/linux/gnome-extension" / EXTENSION
+        if link.is_symlink() and link.resolve() != target.resolve():
+            link.unlink()  # an older checkout's (moved or gone): this one's instead
+        if not link.is_symlink() and not link.exists():
+            link.symlink_to(target)
     elif link.is_symlink():
         link.unlink()
     current = enabled_extensions()
