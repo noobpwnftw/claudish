@@ -151,17 +151,6 @@ python3 -m venv .venv
 .venv/bin/python -m claudish settings</pre>
         <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Settings opens in your browser: paste your Claude key there and pick a voice. On macOS, the installer does all of this. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
       </section>
-
-      <section class="section" aria-labelledby="status">
-        <div class="eyebrow">07 / WHERE IT STANDS</div>
-        <h2 id="status">What is tested, and where.</h2>
-        <table class="status">
-          <tr><td>macOS (IMK)</td><td>Apple silicon, macOS 26 in a VM: the package installs, and after a logout "ok" + Tab rewrites in TextEdit. Not notarized: macOS asks you to open it anyway once. Intel Macs: not yet.</td></tr>
-          <tr><td>Windows (PIME/TSF)</td><td>Windows 11 ARM64 in a VM: the installer, and after a restart "ok" + Tab rewrites in Notepad. Not signed: SmartScreen asks once. x64: not yet tested.</td></tr>
-          <tr><td>Linux (IBus)</td><td>Preview: the one-line installer in a clean Ubuntu 24.04 container; real typing (GTK, Qt, GNOME Terminal on X11, GNOME on Wayland) last verified in containers before 2026-10-24. KDE is not yet tested.</td></tr>
-          <tr><td>Browser demo</td><td>The model runs in the page, through WebAssembly.</td></tr>
-        </table>
-      </section>
     </main>
 
     <footer class="page-footer">

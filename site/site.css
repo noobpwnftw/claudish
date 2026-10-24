@@ -52,8 +52,6 @@ table{border-collapse:collapse;width:100%}
 td{padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.55;vertical-align:top}
 tr:first-child td{border-top:0}
 .keys td:first-child{width:120px;white-space:nowrap}
-.status td:first-child{width:200px;font-family:var(--mono);font-size:12px;color:var(--label);padding-right:20px}
-.status td:last-child{color:var(--muted)}
 .features{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px}
 .features li{font-size:15px;line-height:1.7;color:var(--muted)}
 .features b{color:var(--ink);font-weight:600}
@@ -72,5 +70,5 @@ code{font-family:var(--mono);font-size:12px}
 .page-footer{border-top:1px solid var(--line);padding:22px 0 30px;display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.4px;line-height:1.6}
 @media(min-width:1500px){.hero{padding-top:68px}}
 @media(max-width:900px){.shell{padding:0 28px}.hero,.split{grid-template-columns:1fr;gap:36px}.cards,.features{grid-template-columns:1fr}}
-@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install'],.nav a[href$='/releases']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child,.status td:first-child{width:auto}.status td{display:block;padding:4px 0}.status tr td:first-child{padding-top:14px}.page-footer{flex-direction:column}}
+@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install'],.nav a[href$='/releases']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child{width:auto}.page-footer{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
