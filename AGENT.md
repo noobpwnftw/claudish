@@ -16,9 +16,15 @@ adoption with a product that works flawlessly and stays installed.
 ## Loop
 
 Read `AGENT_STATE.md` (now and next; a local, untracked file) and `ROADMAP.md`. Pick the highest-value unblocked task:
-correctness and data loss, then native usability, setup, rewrite quality and latency, then
-contributor experience. Make the smallest coherent change and check it. Commit, update the state,
-and go on.
+correctness and data loss, then onboarding through a first accepted rewrite, native usability,
+rewrite quality and latency, then contributor experience. Make the smallest coherent change and
+check it. Commit, update the state, and go on.
+
+The product is a slop keyboard people can install and use. Prove progress with actual installs,
+typing, recordings and reproducible checks. Keep the README, settings and install instructions
+consistent with the working product. Record remaining gaps with a concrete next action; do the
+unblocked preparation without waiting for the owner. Keep the shared instructions here;
+`AGENTS.md` and `CLAUDE.md` are entry points, not separate policies.
 
 ## Invariants
 

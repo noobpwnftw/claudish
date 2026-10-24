@@ -49,6 +49,20 @@
         </figure>
       </section>
 
+      <section class="section" id="typing" aria-labelledby="typing-title">
+        <div class="eyebrow">RECORDED ON MACOS</div>
+        <h2 id="typing-title">From “ok” to corporate prose.</h2>
+        <figure class="recording">
+          <img src="cd_AI.gif" alt="Typing ok in TextEdit, Tab previews a rewrite, and Tab again inserts it" width="880" height="402" loading="lazy">
+          <figcaption>TextEdit: type, Tab to preview, Tab to insert.</figcaption>
+        </figure>
+        <details class="recording">
+          <summary>A terminal task, handed to Claude Code</summary>
+          <img src="cd_AI-terminal.gif" alt="A typo question, a handoff command accepted at the prompt, then Claude Code fixing the invoice test" width="1100" height="597" loading="lazy">
+          <p class="body small">Enter asks about the typo. For the task, Tab inserts the helper's command; Enter runs it in the project folder.</p>
+        </details>
+      </section>
+
       <section class="section" aria-labelledby="layers">
         <div class="eyebrow">01 / TWO MODES, ONE SHIFT</div>
         <h2 id="layers">Compose, or <span class="nobr">continue<span class="dash">—</span></span>Shift switches.</h2>
@@ -94,7 +108,7 @@
         <div class="eyebrow">04 / MODELS</div>
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
-          <li><b>Backends.</b> Claude (the default), any OpenAI-compatible server, or an agent CLI.</li>
+          <li><b>Backends.</b> A Claude subscription through Claude Code, a ChatGPT subscription through Codex, Claude with an API key, or any OpenAI-compatible server.</li>
           <li><b>Or local.</b> <code>setup --profile local</code> downloads llama.cpp and Gemma 4 E4B (4.9 GB).</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app.</li>
           <li><b>Tools and agents.</b> An instruction may call your MCP tools, ask you a question, or hand the task to Claude Code or another agent.</li>
@@ -109,11 +123,11 @@
           <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
           <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
 
-1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop. On macOS, do only this instead: clone the repository (step 2), run `python3 platforms/macos/build.py` and `python3 platforms/macos/package.py` there, open `dist/macos/cd_AI.pkg`, and tell me the installer does the rest: its last step opens cd_AI's settings, where I paste my Claude key myself; then I log out and back in.
+1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop. On macOS, clone the repository (step 2), run `python3 platforms/macos/build.py` and `python3 platforms/macos/package.py` there, and open `dist/macos/cd_AI.pkg`. The installer opens cd_AI's settings; continue at step 5, then log out and back in.
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
 3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
 4. Run `python -m claudish setup --yes`. It writes a config, registers the input method (on Linux; on Windows the input method comes from cd_AI-setup.exe, see docs/install.md), and starts cd_AI at login.
-5. cd_AI ships no model: it is set up for Claude with an API key. Run `python -m claudish settings`: it opens cd_AI's settings in my browser, where I paste the key. Wait for me.
+5. Run `python -m claudish settings` if the installer has not opened it. Help me pick my existing model: Claude Code for a Claude subscription, Codex for a ChatGPT subscription, Claude with an API key, or another model API. If a subscription command is missing or not logged in, help install it and log in. Use Try a rewrite in Settings to check that my chosen model answers. Let me enter any key in Settings myself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
 7. Finish by telling me how to start: on Linux, log out and back in and add "cd_AI — Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick cd_AI with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Enter sends my words as an instruction, Shift+Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
         </div>
@@ -124,7 +138,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[claude]"
 .venv/bin/python -m claudish setup
 .venv/bin/python -m claudish settings</pre>
-        <p class="body small">Settings opens in your browser: paste your Claude key there and pick a tone. On macOS, the installer does all of this. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
+        <p class="body small">Settings opens in your browser: choose Claude Code, Codex, Claude with an API key, or another model API; pick a tone and try a rewrite. On macOS, the installer opens it. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
       </section>
     </main>
 

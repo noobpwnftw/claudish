@@ -96,8 +96,10 @@ source checkout for development: [docs/install.md](docs/install.md).
 | Linux | IBus, a preview. |
 
 The first release, 0.1.0, is in preparation; the [roadmap](ROADMAP.md) says what is next. How each
-platform is tested: [docs/development.md](docs/development.md#testing). cd_AI is maintained by an
-AI agent (Claude Code) under its owner's direction ([AGENT.md](AGENT.md)).
+platform is tested: [docs/development.md](docs/development.md#testing). cd_AI is maintained with
+Claude Code and Codex under its owner's direction ([AGENT.md](AGENT.md)).
+The recordings above come from the Mac VM; the [Linux typing rig](docs/development.md#linux-docker-rig)
+and [verification commands](docs/development.md#verify) run against the code in this repository.
 
 ## More
 

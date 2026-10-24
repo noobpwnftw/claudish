@@ -23,15 +23,67 @@ page in Chromium; each step under 5 s). Installs are checked on each OS:
 
 ## Implementation
 
-`claudish/composition.py` owns text, candidate, and revision. All three adapters use
-it. A single background worker waits for a typing pause and coalesces pending
-requests. Every edit invalidates the previous candidate; an old response cannot
-replace newer text, including after composition ends.
+The installable Python package is `claudish-ime` (`pyproject.toml`); its command is `claudish`.
+Its core uses the standard library. The Anthropic and MCP SDKs are optional extras; platform
+packages supply their native dependencies. The source inventory:
 
-The service sends each request to the profile's backend (`claudish/model.py`): Claude through
-the SDK by default, any OpenAI-compatible server, or an agent CLI. What the model is told is in
-`claudish/templates.json`. Measurements and model comparisons are in
-[benchmarks](../benchmarks/README.md).
+| Area | Source | Responsibility |
+| --- | --- | --- |
+| Typing state | `claudish/composition.py` | Composition, revisions, candidates, acceptance, focus and the held exchange |
+| Delivery | `claudish/client.py`, `server.py` | Coalescing background worker, loopback requests, settings and session events |
+| Models | `claudish/model.py`, `warm.py`, `children.py` | API/command/rules backends, subscription CLI lifecycle and child processes |
+| Wording | `claudish/templates.json`, `modes.py`, `turn.py` | Tone, prompts, examples, field context and output handling |
+| Instructions | `claudish/conversation.py`, `sessions.py`, `agent.py`, `handoff.py` | Turns, tools, questions, helper handoffs and CLI sessions |
+| Context | `claudish/context.py`, `tools.py`, `textbox*.py`, `screen.py`, `capture.py` | Providers/tools, surrounding text, terminal text and F8 pictures |
+| Onboarding | `claudish/setup.py`, `settings.py`, `keys.py`, `doctor.py`, `service.py`, `config.py` | Install steps, model choice, first rewrite, config, diagnosis and login service |
+| Linux | `platforms/linux/` | IBus engine, registration and GNOME Shell panel |
+| macOS | `platforms/macos/` | InputMethodKit controller, native panel, build and installer |
+| Windows | `platforms/windows/` | PIME adapter, pinned PIME/libIME2 patches and installer |
+| Browser | `claudish/web/`, `site/`, `scripts/build_static_demo.py` | Settings, design lab, browser inference and project site |
+| Evidence | `tests/`, `benchmarks/`, `docs/cd_AI*.gif` | Regression checks, typing rig, measured model outputs and VM recordings |
+| Maintenance | `AGENT.md`, `AGENTS.md`, `CLAUDE.md`, `ROADMAP.md` | Shared instructions, agent entry points and the ordered queue |
+
+All three adapters use the same composition state. Input events do not wait for inference, and
+every edit invalidates the previous candidate. Generated `claudish/web/lab-states.js` comes from
+`scripts/lab_states.py`, which drives that same state; edit its generator rather than its output.
+
+`docs/research/` records earlier design reviews; `benchmarks/` records model runs with their
+conditions. Neither is a current release certification. `models/`, `.tools/`, `dist/`, local VM
+helpers and `AGENT_STATE.md` are working material outside Git. Keep that material available for
+the rigs; it is not part of the shipped source.
+
+## Current evidence and next checks
+
+As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
+release. The merge gate runs 268 unit tests, both adapter smokes and the settings browser check.
+The browser check includes subscription startup/failure/retry, a first rewrite and stale example
+responses. CLI protocol tests use stand-ins; they do not establish account access. Separate browser
+runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
+2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
+at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
+
+The TextEdit recording shows a rewrite accepted with Tab. The Terminal recording shows a typo
+question, the handoff command inserted at the prompt, Claude Code starting in the invoice project,
+and its fix passing the fixture's test. These are actual Mac VM captures. Windows ARM64 has
+install/update/restart and six instruction/focus/tool flows checked; Linux has the six Docker
+typing scenarios below. Installed bundles must be rebuilt to include subsequent source changes.
+
+The next checks, in order, are in [ROADMAP.md](../ROADMAP.md). In particular:
+
+- Run first-use Settings through a logged-in subscription on each installed package, then accept
+  `ok` in a native editor after the required restart/login. Keep the browser's UI-state tests and
+  native typing evidence separate.
+- Prepare downloadable release candidates. A funded Anthropic-key rewrite and its failure states
+  remain unchecked on the installed Mac and Windows packages; publishing requires the owner.
+- Check Windows x64, both native panel themes against the design lab, and current Wayland
+  behavior. The documented macOS Terminal continue/Tab limitation remains.
+
+The browser demo keeps its pinned Qwen2.5 0.5B model, selected from candidates that fit browser
+constraints. Model size, loading time and speed matter alongside quality there. The broader
+[G53 study](../benchmarks/README.md#choosing-the-models-g53-2026-10-24) includes CPU and browser
+timings as well as quality; its [current choices](../benchmarks/README.md#current-choices) explain
+the different decisions. Revisit the browser choice only with a better measured tradeoff.
+The native recordings complement the interactive demo.
 
 ## Build the tested CUDA backend
 

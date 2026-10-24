@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from claudish import modes  # noqa: E402
 
-# Pinned like scripts/download_model.py's "small" preset (the tested default model).
+# Pinned like scripts/download_model.py's "small" preset; chosen among browser-sized candidates.
+# It is not the native app's default (no model ships with the app).
 MODEL_URL = ("https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/"
              "9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf")
 MODEL_BYTES = 491400032
@@ -74,6 +75,8 @@ def build_site(out):
     shutil.copy(site / "favicon.png", out / "favicon.png")
     shutil.copy(web / "kit.css", out / "kit.css")  # the hero draws the panel with the kit itself
     shutil.copy(web / "theme.js", out / "theme.js")
+    for name in ("cd_AI.gif", "cd_AI-terminal.gif"):
+        shutil.copy(ROOT / "docs" / name, out / name)
     page = (site / "index.html").read_text(encoding="utf-8")
     page = page.replace('  <meta charset="utf-8">\n', '  <meta charset="utf-8">\n'
                         '  <meta http-equiv="Content-Security-Policy" content="%s">\n' % SITE_CSP, 1)

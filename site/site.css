@@ -38,6 +38,10 @@ h1 em{color:var(--accent)}
 .ime figcaption{font-size:12px;color:var(--muted);padding:12px 22px;border-top:1px solid var(--line)}
 kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--key-border);border-radius:3px;padding:2px 5px;margin-right:6px;color:var(--label)}
 .section{border-top:1px solid var(--line);padding:46px 0 50px}
+.recording{max-width:1100px;margin:0 0 22px}
+.recording img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px}
+.recording figcaption{font-size:13px;color:var(--muted);margin-top:10px}
+.recording summary{cursor:pointer;color:var(--label);font-size:15px;padding:8px 0 14px}
 h2{font-family:var(--serif);font-weight:400;font-size:clamp(28px,3vw,38px);letter-spacing:-1px;margin:12px 0 26px;text-wrap:balance}
 h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 10px}
 .body{font-size:15px;line-height:1.75;color:var(--muted);max-width:640px}

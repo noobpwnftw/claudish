@@ -38,11 +38,15 @@ class SiteBuildTests(unittest.TestCase):
             page = (out / "index.html").read_text(encoding="utf-8")
             demo = (out / "demo" / "index.html").read_text(encoding="utf-8")
             css = (out / "site.css").read_text(encoding="utf-8")
+            recordings = {name: (out / name).is_file() for name in ("cd_AI.gif", "cd_AI-terminal.gif")}
         self.assertIn('href="demo/"', page)
         self.assertNotIn('href="/', page)
         self.assertIn('class="wordmark" href="../"', demo)  # the demo links back home
         self.assertIn(':root[data-theme="dark"]{', css)  # the demo's tokens, both themes
         self.assertIn("Content-Security-Policy", page)
+        for name in ("cd_AI.gif", "cd_AI-terminal.gif"):
+            self.assertIn('src="%s"' % name, page)
+            self.assertTrue(recordings[name], name)
         prompt = re.search(r'<pre id="prompt-text">(.*?)</pre>', page, re.S).group(1)
         self.assertIn("tapping Shift switches to continue", prompt)  # it ends on the keys
         # Every command the prompt tells an agent to run must exist.

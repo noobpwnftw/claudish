@@ -58,8 +58,9 @@ text; a failure leaves your wording available; and password fields are bypassed.
 
 `python scripts/check.py` runs the unit tests, compile, diff check, IBus and PIME smokes, and the
 settings page in Chromium, each in under 5 seconds, and reports PASS, FAIL, or
-SKIP with a reason. It is the merge gate. A test workflow slower than that is not one we run: make
-it faster or drop it. Real typing on Linux, Windows and macOS is checked by hand.
+SKIP with a reason. It is the merge gate. Keep each test step within five seconds. One-off builds,
+setup and recordings can take longer; run lengthy work in the background. Real typing is checked
+in the Linux Docker rig and on the Windows and macOS VMs.
 
 Windows' PIME is built from source with `platforms/windows/pime/make_source.sh` and, on Windows
 with the Visual Studio C++ tools (`buildtools.ps1`), `build-pime.ps1`.
@@ -90,9 +91,10 @@ Open goals are in [ROADMAP.md](ROADMAP.md), each with what "done" means; everyth
 and "Later" is open to take. Say in an issue what you mean to do before a large change. A pull
 request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
 
-The project is maintained by an AI agent (Claude Code) under the owner's direction. Its working
-files: [AGENT.md](AGENT.md) (its rules), [ROADMAP.md](ROADMAP.md) (the open goals), and
-`CLAUDE.md` (which points the agent at AGENT.md). It reviews pull requests against the same gate and the guarantees above.
+The project is maintained with Claude Code and Codex under the owner's direction. Both use
+[AGENT.md](AGENT.md) for the working rules and [ROADMAP.md](ROADMAP.md) for open goals;
+`CLAUDE.md` and `AGENTS.md` point at those instructions. `AGENT_STATE.md` is the local checkpoint.
+Changes use the same merge gate and guarantees above.
 
 ## Bug reports
 

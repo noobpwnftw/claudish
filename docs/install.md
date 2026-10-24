@@ -9,6 +9,11 @@ of every install, take an [Anthropic API key](https://console.anthropic.com/sett
 subscription, kept running beside the service), or **Codex** for a ChatGPT subscription (it runs Codex's
 `codex` command the same way), or the address of another model API.
 
+Pick the model you already use, then use **Try a rewrite** in Settings before switching input
+methods. Subscription choices show when their command is starting or needs a login. After
+logging in through that command, try the rewrite again. Once it answers, finish the OS steps below:
+type `ok`, press Tab to preview the rewrite, then Tab again to insert it. Shift+Enter keeps `ok`.
+
 ## The `claudish` command
 
 Every install includes cd_AI's command line, `claudish`: `claudish settings`, `claudish doctor`,
