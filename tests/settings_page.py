@@ -37,7 +37,18 @@ async def check(args, home, port):
         page.set_default_timeout(1000)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
+        authenticated = asyncio.Event()
+
+        async def delayed_session(route):
+            await authenticated.wait()
+            await route.continue_()
+
+        await page.route("**/settings/session", delayed_session)
         await page.goto(url)
+        # A packaged app's cold start can leave the page visible before its session is ready.
+        # A fast first click must wait, rather than posting a setting without its token.
+        await expect(page.locator("input[name=choice][value=claude-code]")).to_be_disabled()
+        authenticated.set()
         assert "#" not in page.url, "the token stays out of the address"
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")  # the rules backend, in words
         await expect(page.locator("input[name=choice][value=claude]")).to_be_checked()

@@ -248,6 +248,7 @@ async function start() {
   }
   if (!token) throw new Error("open this from cd_AI's menu (Settings…) or with `claudish settings`");
   render(await call("/settings/state"));
+  $("controls").disabled = false;
 }
 start().catch((error) => {
   $("status").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".";
