@@ -498,6 +498,8 @@ class ClaudishTextService(TextService):
             return True
         if key == 0x0D:
             action = self.state.enter()  # Enter talks to the model; it never inserts its text
+            if action == "pass":  # nothing composed: the app's Enter, as it is (never replayed)
+                return False
             if action == "choose":  # answer with the highlighted choice
                 chosen = self.state.answer_choice()
                 if chosen and self.worker:

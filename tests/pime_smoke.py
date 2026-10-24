@@ -166,8 +166,15 @@ def main():
             shift_tap()  # compose, starting empty: the words are in the app already
             for char in "as is":
                 key(ord(char.upper()), ord(char))
+            for _ in range(2):  # TSF's test, then the key: Shift+Enter is taken both times
+                assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is True
+            before = list(replayed)
             assert key(0x0D, modifiers=(0x10,))["commitString"] == "as is"  # Shift+Enter keeps it as it is
+            assert replayed == before  # and nothing reaches the app after it: no newline
             assert service.state.mode == "compose" and service.state.text == ""
+            # With nothing composed, Shift+Enter and Enter are the app's (a newline), never replayed.
+            assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is False
+            assert key(0x0D)["return"] is False and replayed == before
             assert service.state.mode == "compose" and service.state.text == ""
             # Compose: no request while typing; Enter sends it as an instruction; the next Enter inserts.
             calls = worker_class.return_value.schedule.call_count
