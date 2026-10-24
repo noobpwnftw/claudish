@@ -106,7 +106,7 @@ class ModelDriver:
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
-        self.handed = self.inserted = None
+        self.handed = self.inserted = self.command = None
         try:
             result = rewriter.answer(
                 "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
@@ -115,13 +115,16 @@ class ModelDriver:
         except Exception as exc:  # with MCP servers open, a stop arrives wrapped in an exception group
             if self.cancelled:
                 return
-            if not (isinstance(exc, RuntimeError) and (self.inserted or self.handed)):
+            if not (isinstance(exc, RuntimeError) and (self.inserted or self.handed or self.command)):
                 raise
             result = {"consulted": []}  # the model said nothing after an answer was chosen or a helper opened
         if self.cancelled:
             return
         if self.inserted:  # an answer you read and chose to insert
             session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"])
+            return
+        if self.command:  # a helper's command line, at a terminal prompt: Tab puts it there, Enter runs it
+            session.emit("result", text=self.command, candidates=[self.command], consulted=result["consulted"])
             return
         if self.handed:
             # The task went to a helper (or an answer was read): nothing is inserted, and the
@@ -162,6 +165,15 @@ class ModelDriver:
                 task = str(arguments.get("task") or "").strip()[:500]
                 note = handoff.write_note(task, box.observations)
                 session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
+                if box.kind == "terminal":
+                    # At a terminal prompt the helper's command is the draft: Tab puts it at the
+                    # prompt and your Enter runs it there, in that folder; no window, no question.
+                    command = handoff.line(helper, note, session)
+                    if command:
+                        self.command = command
+                        self.conversation.handoffs.append({"helper": title, "task": task, "session": session,
+                                                           "note": note, "tmux": "", "cwd": "", "started": time.time()})
+                        return "Its command is at the prompt for the user to run. Reply with just: OK"
                 launcher = getattr(self.rewriter, "launcher", None)
                 window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
                 if not handoff.launch(helper, note, launcher, session, window):
@@ -173,12 +185,14 @@ class ModelDriver:
                 self.handed = "%s opened in a new window" % title
                 return "Handed over. Reply with just: OK"
             tools["helper__" + title] = (
-                "Hand the task to %s, a coding agent that works on the user's machine in its own terminal "
-                "window, when it takes more than an answer here (investigating, editing files, several "
-                "steps), or when the user asks for it." % title,
+                "Hand the task to %s, a coding agent that works on the user's machine (in a terminal, its "
+                "command is offered at the prompt; elsewhere in a new terminal window), when it takes more "
+                "than an answer here (investigating, editing files, several steps), or when the user asks "
+                "for it." % title,
                 {"type": "object", "properties": {"task": {"type": "string",
                  "description": "What %s should do, in one or two sentences" % title}}, "required": ["task"]},
-                hand_over, "write", lambda arguments, title=title: "Send this task to %s?" % title)
+                hand_over, "read" if box.kind == "terminal" else "write",
+                lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
     def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False):

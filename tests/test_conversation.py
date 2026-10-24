@@ -205,6 +205,25 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual((result["type"], result["text"]), ("error", "no answer, so the instruction stopped"))
         self.assertLessEqual(len(model.sent), 2)  # it stops at the next call, not after every round
 
+    def test_at_a_terminal_prompt_the_helper_is_a_command_to_run(self):
+        """In a terminal the handoff is a draft at the prompt: Tab puts it there and your Enter runs
+        it in that folder; no window opens and nothing is asked."""
+        import os
+        import tempfile
+        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the tests fail and fix it"})]),
+                         answer("OK"))
+        with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
+                patch("claudish.handoff.launch") as launch, \
+                patch.dict(os.environ, {"XDG_RUNTIME_DIR": tempfile.mkdtemp()}):
+            asked, result = self.drive(model, [], helper=["claude", "--session-id", "{session}", "{prompt}"],
+                                       purpose="terminal", screen="$ python3 -m unittest\nFAILED (failures=1)\n$ ")
+        launch.assert_not_called()
+        self.assertEqual(asked, [])
+        command = result["text"]
+        self.assertEqual(result["candidates"], [command])
+        self.assertTrue(command.startswith("claude --session-id "), command)
+        self.assertIn("handoff", command)  # the note with the task and the screen
+
     def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
         import os
         import tempfile

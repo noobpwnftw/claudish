@@ -316,14 +316,16 @@ from any text box. Set the profile's `"helper"` to its command, with `{prompt}`
 (a request to read the handoff note) or `{note}` (the note's path):
 
 ```json
-{"profiles": {"local": {"backend": "llama", "helper": ["claude", "{prompt}"]}}}
+{"profiles": {"local": {"backend": "llama", "helper": ["claude", "--session-id", "{session}", "{prompt}"]}}}
 ```
 
 The model offers it when a task takes more than an answer at the caret, or
-when you ask ("have claude look into why the build fails"), and you are asked
-first: "Send this task to claude?", with No first and then Yes. Yes opens the helper in a new
-terminal window, on a note with the task and what was observed (a terminal's
-screen). Not offered when the program is not installed or
+when you ask ("have claude look into why the tests fail"). At a terminal prompt the
+helper's command is the draft: Tab puts it at the prompt and Enter runs it there, in that
+folder, on a note with the task and the terminal's screen. In any other text box you are
+asked first ("Send this task to claude?", No first, then Yes), and Yes opens it in a new
+terminal window. `{session}` gives the helper a session id, so a later "is it done?" in
+the same text box can look at its progress. Not offered when the program is not installed or
 the command skips the helper's own permission prompts. Needs a backend with
 tool calls (llama.cpp, any OpenAI-compatible server, or Claude).
 
