@@ -54,6 +54,12 @@ own key, or `setup --profile local` with Gemma 4 E4B), named voices, the templat
   default for hosted profiles, or asked once per app?
 - **The voice for work:** a first-run question in setup ("slop for fun, proofread for work") and
   the voice named in the panel's footer.
+- **The owner's answers:** the terminal's last lines stay on with any model (documented): whoever
+  uses a hosted model with their own key has chosen to trust that provider (a slop keyboard's
+  audience cares less about privacy, and anyone who does should not use a hosted key), and what a
+  terminal shows is mostly compile errors, not secrets. Enter
+  keeps summoning (G47 stays the way to change it); setup asks for a voice on its first
+  interactive run (done), and the panel stays as it is.
 - Smaller asks: a share card in the demo (before and after, for Slack or X); a SECURITY.md (what
   leaves the machine per profile and mode); `"tone"` directly on a binding; hot reload of the
   config and templates; fcitx5 on Linux (the pinyin user's Rime runs there, and IBus-only is not

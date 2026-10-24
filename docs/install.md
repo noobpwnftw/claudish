@@ -44,7 +44,8 @@ silicon, the local model below made slop as well as anything we tried.
    .venv/bin/python -m claudish setup
    ```
 
-   It shows each step and asks before doing it: write a config (profile `claude`), import MCP
+   It asks which voice you want (corporate slop unless you pick another: `proofread` keeps your
+   words for work), then shows each step and asks before doing it: write a config (profile `claude`), import MCP
    servers from your Claude setup, check the model, register the input method, start Claudish
    at login, then run `doctor`. Steps already done are skipped, so it is safe to run again.
    `--dry-run` shows the plan and `--yes` does it all. Installing the input method on Windows

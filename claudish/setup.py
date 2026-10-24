@@ -200,8 +200,24 @@ def ask(question):
         return False
 
 
+def choose_voice():
+    """The first run's one question: which voice (owner, 2026-10-24: slop for fun, proofread for
+    work). Enter keeps the default; a name, or a few words of your own, picks another."""
+    print("Which voice? Enter keeps corporate slop.")
+    for name, tone in TEMPLATES["tones"]["named"].items():
+        print("  %-10s %s" % (name, tone.get("about", "")))
+    print("  or a few words of your own, such as \"plain and friendly\".")
+    try:
+        answer = input("Voice [corporate]: ").strip()
+    except EOFError:
+        return None
+    return None if answer in ("", "corporate") else answer
+
+
 def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=None):
     try:
+        if tone is None and not (yes or dry_run) and sys.stdin.isatty() and not chosen_profile(profile)[1].get("tone"):
+            tone = choose_voice()  # asked once: a profile with a voice is not asked again
         name, steps = plan(profile, variant, skip, tone)
     except ValueError as exc:
         print("setup: %s" % exc)

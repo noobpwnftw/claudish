@@ -78,6 +78,17 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(settings["tone"], "proofread")
         self.assertEqual(self.states()["Tone"], "done")  # the default profile keeps it
 
+    def test_the_first_run_asks_for_a_voice_once(self):
+        with patch("sys.stdin.isatty", return_value=True), patch("builtins.input", side_effect=["proofread", "y", "y", "y", "y", "y"]):
+            _, out = self.quiet()
+        self.assertIn("Which voice?", out)
+        self.assertEqual(config.resolve()[1]["tone"], "proofread")
+        with patch("sys.stdin.isatty", return_value=True), patch("builtins.input", side_effect=["y"] * 6):
+            _, out = self.quiet()
+        self.assertNotIn("Which voice?", out)  # the profile has one now
+        _, out = self.quiet(yes=True)
+        self.assertNotIn("Which voice?", out)
+
     def test_dry_run_changes_nothing(self):
         status, out = self.quiet(dry_run=True)
         self.assertEqual(status, 0)
