@@ -8,7 +8,7 @@ answered is in [architecture.md](architecture.md).
 demo uses it as is. The design lab (`claudish/web/design.html`, on the site at
 `demo/design.html`) draws every state in a skin per platform (reference, Windows 11, macOS,
 GNOME; light and dark), from the panel descriptions `claudish/composition.py` produces. A skin
-changes only tokens (type, colours, shape, key names). A native input method passes a state when
+changes only tokens (type, colors, shape, key names). A native input method passes a state when
 it matches the lab's mock of it (`design.html?platform=macos&state=drafts&solo`), checked by hand.
 Where a platform cannot draw something, the design changes for all of them: no per-platform
 substitutes.
@@ -35,7 +35,7 @@ every toast, it lasts two seconds or until the next key, since it was said where
 - **Compose** (where cd_AI starts): your words are held as the platform's composition (one plain
   underline) until you choose, as in a CJK input method.
 - **Continue**: keys go straight into the app. At a word boundary at the end of a line, the rest
-  of the sentence shows in grey after the caret. Tab takes it; typing ignores it; Esc dismisses
+  of the sentence shows in gray after the caret. Tab takes it; typing ignores it; Esc dismisses
   it. With nothing offered, Tab is the app's. Autocomplete only: no tools, no retrieval, no agent;
   its quality is its model's. It suggests only with a model set up for it (a local one, or one a
   profile routes); otherwise it types as is.
@@ -83,7 +83,7 @@ words.
 ## The panel
 
 One anatomy for every state: an optional thread ("You asked", "You answered": one line each, the
-label muted, your words in the text colour); an optional header (a small label for who asks or
+label muted, your words in the text color); an optional header (a small label for who asks or
 what this is, then the content as is, a command in monospace); rows; one footer (the AI tile, or a
 warning mark on failure; what is happening; each key with its verb; free words such as "or type a
 reply").
@@ -94,7 +94,7 @@ reply").
   the footer is never lit.
 - **Failure:** the warning mark and the reason in plain words ("the model is offline"), regular
   weight; Tab retries a rewrite, Enter an instruction; Esc edit.
-- **Colour:** Claudish orange means only AI (the tile); the highlight and the lit key use the
+- **Color:** Claudish orange means only AI (the tile); the highlight and the lit key use the
   platform's accent. Muted text 4.5:1 or more, the suggestion and keycap borders 3:1 or more; a
   forced-colors rendering keeps the bar and the key.
 - **Placement:** under the line, its content starting where the composition starts (what IMK,
@@ -109,9 +109,9 @@ reply").
 
 ## What each platform cannot draw, and the design that follows
 
-- The composition is the platform's plain underline (macOS cannot colour it; Wayland cannot style
+- The composition is the platform's plain underline (macOS cannot color it; Wayland cannot style
   it), so a sent instruction looks like one being typed; the panel's "working" says it was sent.
-- The suggestion is cd_AI's own grey text after the caret, in its UI font at the caret's height
+- The suggestion is cd_AI's own gray text after the caret, in its UI font at the caret's height
   (only macOS reports the app's font), and only at the end of a line.
 - Each platform reports where a composition starts (and the caret without one), so the panel
   anchors there everywhere.
@@ -124,7 +124,7 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 
 ## Open
 
-How much context continue gets; per-app input behaviour (first, continue's Tab in macOS
+How much context continue gets; per-app input behavior (first, continue's Tab in macOS
 Terminal); replacing an instruction a focus change left in the text when its draft is taken on
 return; keys you can rebind (Enter asks and Shift+Enter keeps, as above); screen-reader
 announcements.

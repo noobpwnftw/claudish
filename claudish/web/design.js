@@ -11,12 +11,12 @@ const SKINS = {
   gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel and the suggestion, on X11 and Wayland alike.", app: "Text Editor"},
 };
 
-// Each state: the text box around the caret (before it, your composition, the grey suggestion)
+// Each state: the text box around the caret (before it, your composition, the gray suggestion)
 // and a note. What cd_AI draws there is generated: lab-states.js holds the panel of every state,
 // made by driving claudish/composition.py into it (scripts/lab_states.py), so the lab draws what
 // the input method draws.
 const STATES = [
-  {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.", before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
+  {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in gray. Tab takes it; typing ignores it.", before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
   {id: "compose", title: "Compose: typing", note: "Your words, composed. The keys show from the first key.", before: "Team: ", comp: "running late, start without me"},
   {id: "rewriting", title: "Compose: rewriting", note: "The model works on the rewrite.", before: "Team: ", comp: "running late, start without me"},
   {id: "converted", title: "Compose: a rewrite", note: "The rewrite shows in the panel; Tab puts it in.", before: "Team: ", comp: "running late, start without me"},
@@ -94,9 +94,11 @@ function place(host) {
     const style = getComputedStyle(floating);
     const inset = parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth)
       + (floating.classList.contains("k-panel") ? parseFloat(getComputedStyle(floating).getPropertyValue("--k-row-x")) || 0 : 0);
-    // Clamped to the screen, as a real input method's window is (it floats over the app's).
+    // Kept inside the card (a narrow screen's card is narrower than the panel's own width).
+    const edge = Math.min(host.getBoundingClientRect().right, document.documentElement.clientWidth);
+    floating.style.maxWidth = `${edge - Math.max(box.left, 0) - 16}px`;
     const left = Math.max(8 - box.left, Math.min(start.left - box.left - inset,
-                                                 document.documentElement.clientWidth - box.left - floating.offsetWidth - 8));
+                                                 edge - box.left - floating.offsetWidth - 8));
     floating.style.left = `${left}px`;
     floating.style.top = `${lineBottom - box.top + 6}px`;
     // The window is as tall as what it shows, with the same margin below as above.
@@ -142,7 +144,7 @@ const DRAWN = [
   ["The composition (plain underline)", "TSF composition", "IMK marked text", "IBus preedit (Wayland text-input)"],
   ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D-Bus"],
   ["The mode switch", "the same overlay window", "the same overlay panel", "the extension's label"],
-  ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's colour scheme"],
+  ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's color scheme"],
 ];
 
 function feasibility() {

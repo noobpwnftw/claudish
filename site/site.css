@@ -43,16 +43,18 @@ h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 10px}
 .body{font-size:15px;line-height:1.75;color:var(--muted);max-width:640px}
 .small{font-size:13px}
 .body.small{max-width:none}
-.card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:11px;letter-spacing:.3px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label);text-wrap:balance}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1;text-wrap:balance}.io-key{margin:0 0 0 auto;align-self:flex-end}
-.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.card-io{margin-top:auto;border-top:1px solid var(--line);background:var(--candidate-bg);padding:12px 22px 14px}.io{display:flex;align-items:baseline;gap:12px;padding:4px 0}.io-label{flex:none;width:68px;font-family:var(--mono);font-size:11px;letter-spacing:.3px;color:var(--muted)}.io-typed{font-family:var(--serif);font-size:15px;color:var(--label);text-wrap:balance}.io-result{font-family:var(--serif);font-size:15px;color:var(--ink);flex:1;text-wrap:pretty}.io-take{justify-content:flex-end;padding-top:2px}.io-key{margin:0}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+@media(max-width:1100px){.cards{grid-template-columns:1fr}}
+.nobr{white-space:nowrap}
 .tones{margin-top:22px}.tones .io-label{width:76px}
 .card{border:1px solid var(--line);border-radius:6px;background:var(--editor-bg);display:flex;flex-direction:column;overflow:hidden}
-.card-body{padding:22px 22px 18px}.card-body p{font-size:14px;line-height:1.65;color:var(--muted);margin:0}
+.card-body{padding:22px 22px 18px}.card-body p{font-size:14px;line-height:1.65;color:var(--muted);margin:0;text-wrap:pretty}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start}
 table{border-collapse:collapse;width:100%}
 td{padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.55;vertical-align:top}
 tr:first-child td{border-top:0}
-.keys td:first-child{width:120px;white-space:nowrap}
+.keys td:first-child{width:120px;white-space:nowrap;padding-right:18px}.keys td{text-wrap:pretty}
 .features{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px}
 .features li{font-size:15px;line-height:1.7;color:var(--muted)}
 .features b{color:var(--ink);font-weight:600}
@@ -65,10 +67,10 @@ tr:first-child td{border-top:0}
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:13px;line-height:1.7}
 .prompt pre{padding:18px 20px;color:var(--output-text)}
 .by-hand{margin-top:34px}
-.commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg)}
+.commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg);white-space:pre;overflow-wrap:normal;overflow-x:auto}
 code{font-family:var(--mono);font-size:12px}
 .page-footer{border-top:1px solid var(--line);padding:22px 0 30px;display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.4px;line-height:1.6}
 @media(min-width:1500px){.hero{padding-top:68px}}
 @media(max-width:900px){.shell{padding:0 28px}.hero,.split{grid-template-columns:1fr;gap:36px}.cards,.features{grid-template-columns:1fr}}
-@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install'],.nav a[href$='/releases']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child{width:auto}.page-footer{flex-direction:column}}
+@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child{width:auto}.page-footer{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}

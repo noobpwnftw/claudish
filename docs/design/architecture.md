@@ -29,7 +29,7 @@ question to the user presented as is."
 
 | Action | Where it goes | Asked by |
 | --- | --- | --- |
-| **complete** | after the caret, grey; Tab takes it | a pause in continue |
+| **complete** | after the caret, gray; Tab takes it | a pause in continue |
 | **replace** | the rewrite in the panel; Tab puts it in | Tab in compose |
 | **insert** | drafts in the panel; ↑ ↓ choose, Tab inserts | Enter in compose |
 | **ask** | a question with choices, or an answer to read, shown as is; the answer goes back to the model | an instruction, when it needs you |

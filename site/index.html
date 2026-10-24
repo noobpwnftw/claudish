@@ -18,7 +18,6 @@
       <nav class="nav" aria-label="Main">
         <a href="demo/">Demo</a>
         <a href="#install">Install</a>
-        <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a>
         <a href="https://github.com/noobpwnftw/claudish">GitHub</a>
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme">☾</button>
       </nav>
@@ -33,9 +32,8 @@
           <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
-            <a class="button" href="#install">Install with your agent</a>
+            <a class="button" href="#install">Install</a>
           </div>
-          <p class="note">The first release is coming; until then, install from source. <a href="https://github.com/noobpwnftw/claudish/releases">Releases ↗</a></p>
         </div>
         <figure class="ime" aria-label="Example: three plain words, rewritten at the caret, waiting for Tab">
           <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret"><span class="k-comp">this is important</span><span class="cursor"></span></span></div>
@@ -53,11 +51,11 @@
 
       <section class="section" aria-labelledby="layers">
         <div class="eyebrow">01 / TWO MODES, ONE SHIFT</div>
-        <h2 id="layers">Compose, or continue<span class="dash">—</span>Shift switches.</h2>
+        <h2 id="layers">Compose, or <span class="nobr">continue<span class="dash">—</span></span>Shift switches.</h2>
         <div class="cards">
-          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Type a few words and press Tab: the rewrite appears in the panel. Tab again inserts it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">can't make it tonight, sorry</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">Regrettably, I must convey that I won't be able to make it tonight—my current bandwidth is fully allocated to high-priority deliverables, but I look forward to connecting when our schedules realign!</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Instruct</h3><p>Type what you want and press Enter; drafts wait in the panel, and Tab takes one.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">three drafts to choose from</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Continue</h3><p>A Shift tap, and your keys go straight in.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Type a few words and press Tab: the rewrite appears in the panel. Tab again inserts it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">can't make it tonight, sorry</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">Regrettably, I must convey that I won't be able to make it tonight—my current bandwidth is fully allocated to high-priority deliverables, but I look forward to connecting when our schedules realign!</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
+          <article class="card"><div class="card-body"><h3>Ask</h3><p>Type what you want and press Enter: drafts wait in the panel, ↑↓ picks one, and Tab takes it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">draft 1</span><span class="io-result">I genuinely appreciate you carving out time to connect with me; however, at this juncture, I am unable to make the proposed meeting time work.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div><div class="io"><span class="io-label">draft 2</span><span class="io-result">I sincerely appreciate you extending this invitation to connect—it sounds like a truly valuable discussion! Regrettably, due to prior commitments that require my full focus, I won't be able to make the scheduled time.</span></div></div></article>
+          <article class="card"><div class="card-body"><h3>Continue</h3><p>A Shift tap, and your keys go straight in.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
 
@@ -75,19 +73,9 @@
         </div></article>
       </section>
 
-      <section class="section balanced" aria-labelledby="everyone">
-        <div class="eyebrow">03 / MORE USES</div>
-        <h2 id="everyone">Proofread, draft, ask.</h2>
-        <div class="cards">
-          <article class="card"><div class="card-body"><h3>Proofread</h3><p>With the proofread tone, Tab corrects spelling and grammar.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">pump 3 tripped again, no injuries</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Say what you need</h3><p>In compose, describe the message and press Enter; Tab inserts the highlighted draft.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">flour 2 bags short, credit by tuesday</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">In reviewing the latest inventory metrics, it appears we are currently facing a slight deficit of two bags of flour. To proactively mitigate any potential supply chain disruptions, could we please arrange for the necessary credit to be processed by Tuesday?</span><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Ask</h3><p>Ask about what is on screen; the answer shows in the panel.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">what does this error mean</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">It can't find a piece it needs to build.</span><kbd class="io-key">Esc</kbd></div></div></article>
-        </div>
-      </section>
-
       <section class="section split" aria-labelledby="keys">
         <div>
-          <div class="eyebrow">04 / THE KEYS</div>
+          <div class="eyebrow">03 / THE KEYS</div>
           <h2 id="keys">Everything else is typing.</h2>
         </div>
         <table class="keys">
@@ -103,7 +91,7 @@
       </section>
 
       <section class="section" aria-labelledby="byoi">
-        <div class="eyebrow">05 / MODELS</div>
+        <div class="eyebrow">04 / MODELS</div>
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
           <li><b>Backends.</b> Claude (the default), any OpenAI-compatible server, or an agent CLI.</li>
@@ -114,7 +102,7 @@
       </section>
 
       <section class="section" id="install" aria-labelledby="install-title">
-        <div class="eyebrow">06 / INSTALL</div>
+        <div class="eyebrow">05 / INSTALL</div>
         <h2 id="install-title">Let your agent do it.</h2>
         <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want cd_AI.</p>
         <div class="prompt">
@@ -144,7 +132,7 @@ python3 -m venv .venv
 
     <footer class="page-footer">
       <span>cd_AI is an independent, MIT-licensed project. Not affiliated with or endorsed by Anthropic.</span>
-      <span><a href="demo/">Demo</a> · <a href="https://github.com/noobpwnftw/claudish">GitHub</a> · <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a></span>
+      <span><a href="demo/">Demo</a> · <a href="https://github.com/noobpwnftw/claudish">GitHub</a></span>
     </footer>
   </div>
 </body>

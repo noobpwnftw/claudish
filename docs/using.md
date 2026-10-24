@@ -9,7 +9,7 @@ Typing in detail, the browser demos, and terminals.
 | Type | Continue: straight into the app. Compose: your words gather as the composition (underlined) |
 | Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second, after a pause: Shift with another key (a capital, Shift+Enter), held (Shift+click), or pressed right after another key (rolled typing) is not one. Leaving compose keeps your words as typed. A brief pill at the caret says the mode and where Shift goes next; GNOME's top bar, Windows' taskbar, and the macOS menu bar show it all along |
-| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in grey. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
+| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in gray. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With an answer to read: insert it (Esc dismisses it). |
@@ -48,7 +48,7 @@ composition at the caret, and the panel, drawn with the same kit as the design l
 (`/design.html`) and the desktop adapters. It opens in compose (Tab
 offers a rewrite, Enter sends it as an instruction and offers drafts to choose
 with ↑↓ and take with Tab, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
-pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
+pause after a word and the rest waits in gray; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default.
 
