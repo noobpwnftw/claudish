@@ -53,8 +53,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 
 The guarantees every change must keep: typed text is never lost; a candidate is
 only offered, and accepted explicitly (Tab); a stale result never replaces newer
-text; a failure leaves your wording available; secure fields are bypassed; and
-typed text goes only to a backend the user configured. No model ships: the user picks one.
+text; a failure leaves your wording available; and password fields are bypassed. No model ships: the user picks one.
 
 ## Checks
 
@@ -111,6 +110,4 @@ The most useful reports say:
 - `python -m claudish doctor --json` output, which covers the backend, the service, the
   input method's registration, and context sources, and contains no typed text.
 
-Leave out the text you typed if it is private. A made-up phrase that reproduces
-the problem is just as good. The service never logs typed text, so it cannot
-leak through logs you attach.
+A made-up phrase that reproduces the problem is just as good as the text you typed.

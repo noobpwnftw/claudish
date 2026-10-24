@@ -43,7 +43,7 @@ silicon, the local model below made slop as well as anything we tried.
 
    It opens the settings in your browser (later, **Settings…** in the input menu opens them
    again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
-   where the service reads it (the Keychain on macOS, a file only you can read beside the config
+   where the service reads it (the Keychain on macOS, a file beside the config
    elsewhere), and uses it from your next keystroke. It never goes into the config. The same
    page picks the voice, or a model server on this computer instead of Claude.
 
@@ -79,7 +79,7 @@ http://127.0.0.1:18765, or `--backend rules` for simple stand-ins with no model.
 
 ## A local model (optional)
 
-For a model on your own machine: free per keystroke, private, and what lets continue suggest at
+For a model on your own machine: free per keystroke, and what lets continue suggest at
 every pause. The one setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB), which made slop as well
 as anything we tried, a frontier model included ([benchmarks](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)).
 It answers in about 0.6 s on a GPU or Apple silicon and 3–4 s on a CPU alone; models small enough
@@ -202,7 +202,12 @@ Control shortcuts commit the current wording before being passed through.
 Characters typed with Option, such as — and €, stay in the composition.
 Password fields get their keys untouched.
 
-**Uninstall:** `Claudish service uninstall` (the bundle's command line, above), switch to another
-input source and remove cd_AI from your input sources, then delete
-`~/Library/Input Methods/Claudish.app`. Your config stays in `~/.config/claudish/`, and a saved key
-in the Keychain under "cd_AI".
+**Uninstall:**
+
+1. In **System Settings → Keyboard → Text Input → Edit**, select cd_AI and click **−**.
+2. Paste into Terminal, which stops cd_AI's service and removes the app:
+   `~/Library/Input\ Methods/Claudish.app/Contents/MacOS/Claudish service uninstall && rm -rf ~/Library/Input\ Methods/Claudish.app`
+3. Log out and back in.
+
+Your config stays in `~/.config/claudish/`, and a saved key in the Keychain under "cd_AI" (Keychain
+Access removes it).

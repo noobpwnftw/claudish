@@ -16,7 +16,7 @@ Typing in detail, the browser demos, and terminals.
 | Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Enter never inserts the model's text, so a reflexive second Enter inserts nothing: the highlighted draft lights its Tab, the key that does. With nothing composed, Enter is the app's (a newline) |
 | ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, as Space is. An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
-| Shift+Enter (compose) | Keep what you composed as it is, and stay in compose |
+| Shift+Enter (compose) | Keep what you composed as it is, and stay in compose. Most CJK input methods keep the typed letters with Enter; in cd_AI, Enter asks the model and Shift+Enter keeps |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (nothing is inserted; a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
 | Switching windows | Your own words go in as typed; a rewrite never does (only Tab); a sent instruction's exchange is held for that text box, and a reply you were typing is not inserted. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
@@ -101,9 +101,7 @@ A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 `claudish recent` shows the service's last few requests: the mode and the text
 box, which profile and backend answered (and whether it is hosted), what was
 consulted, the exact system prompt and turn the model received, the outcome,
-and the time it took (`--full` prints the prompts whole). They live in the
-service's memory only, never on disk, and only you can read them (the service
-token).
+and the time it took (`--full` prints the prompts whole).
 
 ## In a terminal
 
@@ -118,9 +116,7 @@ on Linux, UI Automation on Windows, the AX API on macOS), only when you press
 Tab or Enter in compose, never on continue's pauses (continue stays quiet in
 terminals), and never at a password prompt. On macOS the service's Python needs
 the Accessibility permission; on Linux the desktop's accessibility bus must run
-(GNOME and KDE run it). The lines go to the profile's model, so with a hosted one (the default
-Claude) they leave your machine; what looks like a key, a token or a password is replaced first,
-a best effort, not a guarantee. A profile's `"read_terminal": false` turns reading off.
+(GNOME and KDE run it). The lines go to the profile's model. A profile's `"read_terminal": false` turns reading off.
 Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
 Terminal.app.
 
