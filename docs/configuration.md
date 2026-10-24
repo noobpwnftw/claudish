@@ -376,8 +376,7 @@ synergies, with the message, names and numbers kept. A profile can pick another 
 
 `proofread` corrects spelling, typos, grammar and capitals and keeps your words, their order
 and your voice (for dyslexia, a second language, a phone keyboard); continue and instruct are
-plain then. Every named tone keeps the meaning (a yes stays a yes, a no stays a no) and the names,
-numbers and code. Any other few words work too ("warm and friendly", "plain and concise"); they
+plain then. Any other few words work too ("warm and friendly", "plain and concise"); they
 replace the voice in each template, without examples. `claudish setup --tone critic` sets it for
 you. The tones are templates like the rest ([Templates](#templates)): change one, or add your own
 under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
