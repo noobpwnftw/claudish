@@ -4,18 +4,21 @@
 
 ## Now
 
-- Windows review fixes: a fork on branch `agent/windows-review` (in /home/nooby/Downloads/claudish),
-  verifying on the Windows VM.
 - G64: a fork runs every documented config and command for real (branch `agent/config-practice`,
-  its own worktree).
-- Mac: build, install, restart, then "ok" + Tab, verified after the macOS fixes; cd_AI stays enabled
-  and its service comes back after a restart.
+  its own worktree); it also has two install.sh findings (no `claudish` on PATH after install.sh;
+  doctor's service fix names a source checkout's commands).
+
+Verified 2026-10-25, each in one run:
+- Windows review fixes on the ARM64 VM (`376eafb`).
+- Windows stays installed: install, restart, update over it, restart; the service, its task, the
+  input source and both launchers are there each time; "ok" + Tab Tab rewrites in Notepad.
+- Mac: build, install, restart, "ok" + Tab in TextEdit; still enabled and serving after a restart.
+- Linux: install.sh in a clean Ubuntu 24.04 container; setup --yes and doctor name the next steps.
 
 ## Next
 
-The forks' results, then a Windows stays-installed run (update over an install, restart). Then the
-established-review round, with thefuck (nvbn/thefuck) as the bar: only what a first visitor would
-notice as unfinished counts.
+The config fork's result; then the established-review round, with thefuck (nvbn/thefuck) as the
+bar: only what a first visitor would notice as unfinished counts.
 
 ## Release 0.1.0
 
@@ -31,4 +34,4 @@ Claude with a valid Anthropic key.
   one-shot build, install, restart and type cycle (about 2 minutes); VNC can click.
 - Windows 11 ARM64 VM: the job runner and helpers in scratchpad/win.
 - Venvs: `.tools/claude-venv` (SDK extras), `.tools/browser-venv` (Playwright). Models in `models/`.
-- Worktree /home/nooby/Downloads/claudish-main is the main session's (on `main`).
+- /home/nooby/Downloads/claudish is the main checkout (on `main`); forks use their own worktrees.
