@@ -49,7 +49,9 @@ CONCLUSION = """<!doctype html><meta charset="utf-8">
 <body style="font: 13px -apple-system, sans-serif">
 <p><b>Log out and back in to finish.</b> macOS loads a new input method at login.</p>
 <p>Then pick <b>cd_AI</b> in the input menu (the menu bar, or Control–Space), type a few words in
-any app, and press <b>Tab</b>. Settings… in that menu changes the key and the tone.</p>
+any app, and press <b>Tab</b> to preview a rewrite; <b>Tab</b> again inserts it.
+<b>Shift+Enter</b> keeps your words. <b>Settings…</b> in that menu changes the model and tone
+and lets you try a rewrite.</p>
 </body>
 """
 
