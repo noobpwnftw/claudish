@@ -1256,7 +1256,7 @@ index 0000000..dadfca2
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..9030da4 100644
+index ea37cdc..14559ab 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1357,7 +1357,19 @@ index ea37cdc..9030da4 100644
  void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
      ITfContext* context = session->context();
      if(context) {
-@@ -911,6 +995,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -650,6 +734,11 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+ }
+ 
+ STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
++    // Claudish: a document has the focus again (the app's window came back to the front, or another
++    // text box in it): the same as the key event sink's focus, which does not come for that.
++    if (pDocMgrFocus) {
++        onSetFocus();
++    }
+     return S_OK;
+ }
+ 
+@@ -911,6 +1000,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
