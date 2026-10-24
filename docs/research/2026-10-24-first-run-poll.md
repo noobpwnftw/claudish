@@ -35,7 +35,7 @@ the service token; a change the service cannot use is undone; setup ends in the 
 ## Open
 
 - A release download (the owner's decision), with a checksum, and the Open Anyway picture.
-- Linux and Windows: "Settings…" in the IBus and PIME menus; installers (G61).
+- Done since: "Settings…" in the IBus and PIME menus; the Windows installer and the Linux script.
 - What a local model needs on a typical Mac: the test VM (4 GB, 4 virtual cores) cannot hold
   Gemma 4 E4B, so "a model you run yourself" stays an advanced option, unmeasured there.
 - A persistent mode indicator beyond the menu's tick (the Rime user); the CJK-style Enter (G47).
