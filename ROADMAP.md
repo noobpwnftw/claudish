@@ -1,61 +1,32 @@
 # Claudish roadmap
 
-The input method as the way you talk to machines: autocomplete while you type, a rewrite of what
-you composed, and one-line instructions answered at the caret, in every app, with the model you
-configure. An input method, not a chat app (owner, 2026-10-23). Claude is the default backend; latency
-should feel like typing. The design: [docs/design/design.md](docs/design/design.md); how a request is
-answered: [docs/design/architecture.md](docs/design/architecture.md).
+An input method, not a chat app: continue while you type, a rewrite of what you composed, and
+one-line instructions answered at the caret, in every app, with the model you configure. Design:
+[docs/design/design.md](docs/design/design.md); architecture:
+[docs/design/architecture.md](docs/design/architecture.md). What is done is in the
+[changelog](CHANGELOG.md) and git history.
 
-This is the maintainer's queue (`AGENT.md`): goals with stable IDs, reprioritized on evidence.
+## Now
 
-## Open
-
-| ID | Status | Goal and acceptance | Depends on |
-| --- | --- | --- | --- |
-| G45 | active | **The visual pass.** Every native input method matches the design lab (`claudish/web/design.html`) state by state, on Windows, macOS and GNOME, light and dark. Accept (install poll, user-level): the panel never clips or covers the caret and reads as native in light and dark at 1x and 2x on each platform, with one check at 150% and one in high contrast; the settings window looks like a system pane. Pixel-matching beyond that stops. | |
-| G01 | active | **Native typing in real apps.** Typing, taking a result, focus changes, shortcuts, password fields, Unicode and service failure, on all three platforms. Accept (owner, 2026-10-24: checks under 5 s; the desktop rigs are gone): unit and smoke tests, and real typing by hand on each OS. | |
-| G41 | done | **Recent requests.** `claudish recent` shows the last requests. | |
-| G02 | active | **A clean checkout is easy to try:** fresh-environment setup verified (no model ships: a key, or `--profile local`); quick starts, troubleshooting and uninstall per OS. | |
-| G47 | queued | **Configurable compose keys.** `keys.summon` (Enter, or Shift+Enter with Enter keeping your words), read by the shared state, so every adapter, the panel's footer, the demo, the lab and the docs follow; a toggle in G62's settings window (the owner, 2026-10-24: configurable, not polled; the CJK habit, Enter commits your words, is the later setting the 2026-10-24 onboarding poll asked for). Swapping moves everything Enter does today with it (owner): answering a question's highlighted choice, refusing an approval with a reason, sending a reply, retrying an instruction; picking stays on ↑↓ and Tab. Accept: unit tests for both bindings across every state the lab draws; the panel's footer words follow. Also the mode switch key (Shift tap, Caps Lock, a chord). | G62 |
-| G51 | queued | **Replace the instruction a focus change left in the text** when a draft is taken on return (round 6, 5/7), where it still sits right before the caret (IBus delete_surrounding_text, a TSF range, IMK's replacement range); else insert at the caret. Accept: by hand on each platform, leave, return, take a draft, and the instruction is gone. | |
-| G50 | queued | **Per-app input profiles:** how cd_AI behaves in an app (bundle id, process, window class; next to G38's bindings). First: continue's Tab in macOS Terminal (the suggestion is not marked text, so Terminal keeps Tab). | G38 |
-| G57 | tabled (owner, 2026-10-24: onboarding and visuals first) | **A share card in the demo** (onboarding poll): "you typed: ok → cd_AI: …" as an image with the wordmark, ready for Slack or X: the day-1 growth loop. | |
-| G59 | tabled (owner, 2026-10-24: onboarding and visuals first) | **Tones without friction** (onboarding poll): `"tone"` and `"templates"` directly on a binding; the service picks up edits to config.json and templates.json without a restart; `claudish rewrite --tone X "ok"` documented as the loop for writing a tone. | |
-| G60 | tabled (owner, 2026-10-24: onboarding and visuals first) | **fcitx5 on Linux** (onboarding poll: CJK users' Rime runs there). The README says IBus only. | |
-| G21 | reconsider (G53: nothing under 1B makes usable slop) | **A small, purpose-trained Claudish model** that runs in the browser and does continue extremely well (ProgramAsWeights' "compile by training" recipe: generated pairs, a small model, the fidelity evaluation as the gate). | |
-| G48 | queued (debatable) | **How much context continue gets,** measured, not assumed: completions with and without each kind of context, for latency and quality. | G21 |
-| G32 | queued | **Remove continue's workarounds for model weakness** (the quoting frame, echo stripping, `parroted()`) once a model does continue well. | G21 |
-| G49 | on demand | **Writing as you do:** if users ask, solved in the model (tuned on your writing, or your examples as context), not a habit store in Claudish. | G21, G48 |
-| G46 | tabled | **Selected text into the buffer**, to recover words a focus change committed. | |
-| G04 | queued | **Shareable demo material:** an accurate recording and launch text from the working product (new public posts need the owner's OK). | |
-| G06 | queued | **Release readiness:** packaging, model licensing, versioning, CI artifacts, install and rollback, as a checklist with evidence. | |
-| G30 | queued | **Auto-update:** `claudish update` fetches a signed release, shows what changes, and keeps the previous version to roll back to. | G06 |
-
-## Done
-
-| ID | What | Evidence |
+| ID | Goal | Acceptance |
 | --- | --- | --- |
-| G61 | **One installer per OS** (install poll): `cd_AI.pkg` for Apple silicon (ad-hoc signed: Open Anyway once; a logout after, as for any macOS input method), `cd_AI-setup.exe` for Windows 11 (unsigned: SmartScreen Run anyway; a restart after; installs beside any PIME), and a one-line script for Linux. Each registers the input method, starts the service and ends in the settings. Evidence: docs/research/2026-10-24-release-review.md. Later, not promised: winget, a Homebrew cask. | done (2026-10-24) |
-| G62 | **The settings page** (owner: a window, not a wizard; the native macOS window was replaced by the browser after it slowed the input menu): "Settings…" in the input menu on macOS, IBus and the PIME indicator, and at the end of a first install: the Claude key (checked with Anthropic), another model API (any OpenAI-compatible address, optional key saved for that address, the server's own models; it must answer before cd_AI switches), the tone. Evidence: tests/test_settings.py, tests/settings_page.py; on the Mac VM, a first install opens it, and "ok" + Tab in TextEdit through Gemma 4 on the Spark (0.85 s). [First-run poll](docs/research/2026-10-24-first-run-poll.md). | done (2026-10-24) |
-| G63 | **Release gates** (install poll): typing never waits on the service (the panel says "cd_AI is offline" from the first key, Shift+Enter keeps your words; checked on macOS and Windows); installs checked on VMs (macOS 26, Windows 11 ARM64 with Defender on, a clean Ubuntu container); a downloaded Windows installer passes SmartScreen with Run anyway. The release itself waits on one check with a real Anthropic key (docs/release.md on the `agent/release-0.1.0` branch). | done (2026-10-24) |
-| G37, G52 | Replaced by G61 (one installer per OS) and G62 (the settings window), after the install poll. | docs/research/2026-10-24-install-poll.md |
-| G54 | **Slop is the default tone**, with named tones (salesman, critic, bard, proofread; "fix" renamed); checked on Gemma 4 E4B (rewrite 71–80/80, continue 82–85/86). | `2061559` |
-| G55 | **The local model is Gemma 4 E4B** (QAT Q4_0, pinned, SHA-256 verified, thinking off). | `85032ad` |
-| G56 | **Onboarding as a funnel:** the README and homepage open with real slop and five tones; `claudish init` writes an editable templates.json, `claudish templates` prints what a profile ends up with; setup asks for a tone once; then the onboarding poll. | `2061559`, `84b106b`, docs/research/2026-10-24-onboarding-poll.md |
-| G53 | **Choosing the models** (owner: no hunches): 14 candidates on the slop tone, judged by Gemma 4 26B (calibrated on hand labels: rewrite 92%, continue 86%, slop 90%), test half after dev-half template choice, latency on GPU, CPU alone and in the browser. Gemma 4 E4B/12B/26B make slop as well as anything tried, frontier included; nothing under 1B does. | `ff4876c`, benchmarks/README.md (Choosing the models) |
-| G03, G12 | Fidelity evaluation (names, numbers, negation, facts) and a local judge for meaning flips | `benchmarks/evaluate.py`, gate: 38/41 |
-| G05 | Contributor path | CONTRIBUTING.md, docs/development.md |
-| G07 | Modifier characters stay in the composition; shortcuts commit and pass | unit tests |
-| G08 | The IBus smoke and the PIME contract run in the merge gate (`scripts/check.py`); the remote CI that ran them on three OSes is paused by the owner (2026-10-24) | `scripts/check.py` |
-| G09, G15, G28 | Continue (autocomplete), rewrite, instruct, and the model's own questions | unit and smoke tests; by hand on each platform |
-| G10, G20, G38 | Context providers, supported text boxes, bindings routing an app to a profile | docs/configuration.md |
-| G11, G13, G14 | Backends are configuration; one config with profiles; the house style is the model's | docs/configuration.md |
-| G17, G43 | One request, one answer: one loop with tools, for local models and Claude | docs/design/architecture.md |
-| G18, G27, G39, G44 | Agent sessions at the caret, drafts, handoff to a helper, follow-ups | live Claude Code runs |
-| G19, G22–G25 | Onboarding, `doctor`, `service`, `mcp import`, `setup` | docs/install.md |
-| G26 | A picture of the window as context (F8) | unit tests; Windows 11 ARM64 capture (docs/configuration.md) |
-| G29 | GNOME on Wayland, with a Shell extension drawing the panel | verified in a GNOME Shell 46 container (2026-10; that rig was removed 2026-10-24) |
-| G31, G42 | The demo is an input method on the kit; the home page | claudish.io |
-| G33, G34 | The key design, settled in six review rounds | docs/design/design.md, docs/research/ |
-| G35 | Context from apps without MCP: terminals through accessibility | by hand on all platforms |
-| G16, G40 | Dropped: `claudish fix` (replaced by G35); the key poll (decided; the rest is G47) | |
+| G01 | **Works flawlessly and stays installed** on all three platforms | Install, restart, type, update, uninstall on the Mac and Windows VMs and in a Linux container, each run once on demand; every review finding fixed |
+| G64 | **Configs and docs work as written** | Every documented command and config run for real and fixed (branch `agent/config-practice`) |
+| G45 | **The natives match the design lab**, state by state | By hand on each platform, both themes |
+| G06 | **Release 0.1.0** | docs/release.md (branch `agent/release-0.1.0`); waits on a Claude rewrite with a valid key (owner) |
+
+## Next
+
+| ID | Goal |
+| --- | --- |
+| G47 | Configurable compose keys (`keys.summon`), read by the shared state |
+| G51 | Replace the instruction a focus change left in the text when its draft is taken on return |
+| G50 | Per-app input behaviour beside bindings; first, continue's Tab in macOS Terminal |
+| G60 | fcitx5 on Linux |
+| G30 | `claudish update`, keeping the previous version to roll back to |
+
+## Later or on demand
+
+A small purpose-trained model for continue (G21, after G53 found nothing under 1B usable), then the
+continue measurements and workarounds that depend on it (G48, G32, G49); a demo share card (G57);
+tone and templates directly on a binding (G59); selected text back into the buffer (G46).
