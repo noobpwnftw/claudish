@@ -22,6 +22,7 @@ def keylog(*fields):
 
 
 MODE_COMMAND = 100  # the input indicator's click; its menu items follow
+SETTINGS_COMMAND = 200  # Settings… in that menu
 # TSF input scopes (InputScope.h) by the names the service understands.
 INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "number",
                 31: "password", 32: "phone", 33: "phone", 34: "phone", 35: "phone", 36: "phone"}
@@ -65,6 +66,21 @@ def focused_app():
 PREVIEW = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Claudish", "lab-preview.js")
 
 
+def open_settings():
+    """cd_AI's settings in the browser, the same page on every OS. Asking the service for the page's
+    link happens off the input thread: typing never waits on it."""
+    import threading
+    import webbrowser
+    from .client import settings_url
+
+    def open_it():
+        try:
+            webbrowser.open(settings_url())
+        except Exception:
+            pass  # no service: nothing to open; doctor says why
+    threading.Thread(target=open_it, daemon=True).start()
+
+
 class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
@@ -101,12 +117,14 @@ class ClaudishTextService(TextService):
         elif MODE_COMMAND < commandId <= MODE_COMMAND + len(MODES):  # a pick from its menu
             if self.state.mode != MODES[commandId - MODE_COMMAND - 1]:
                 self.switch_mode()
+        elif commandId == SETTINGS_COMMAND:
+            open_settings()
 
     def onMenu(self, buttonId):
         if buttonId != "windows-mode-icon":
             return None
         return [{"text": mode, "id": MODE_COMMAND + 1 + index, "checked": mode == self.state.mode}
-                for index, mode in enumerate(MODES)]
+                for index, mode in enumerate(MODES)] + [{}, {"text": "Settings…", "id": SETTINGS_COMMAND}]
 
     def onDeactivate(self):
         if self.worker:

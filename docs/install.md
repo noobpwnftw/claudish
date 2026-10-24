@@ -42,7 +42,7 @@ silicon, the local model below made slop as well as anything we tried.
    ```
 
    It opens the settings in your browser (later, **Settings…** in the input menu opens them
-   again on macOS). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
+   again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
    where the service reads it (the Keychain on macOS, a file only you can read beside the config
    elsewhere), and uses it from your next keystroke. It never goes into the config. The same
    page picks the voice, or a model server on this computer instead of Claude.

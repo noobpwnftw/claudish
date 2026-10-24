@@ -52,9 +52,14 @@ def main():
             reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
             assert service.state.mode == "continue" and reply["changeButton"][0]["icon"].endswith("mode-continue.ico"), reply
             menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
-            assert [(m["text"], m["checked"]) for m in menu] == [("compose", False), ("continue", True)], menu
+            assert [(m["text"], m["checked"]) for m in menu[:2]] == [("compose", False), ("continue", True)], menu
+            assert menu[2] == {} and menu[3]["text"] == "Settings…", menu  # a separator, then the settings
             service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
             assert service.state.mode == "compose"
+            opened = []
+            with patch("pime_claudish.claudish_ime.open_settings", lambda: opened.append(True)):
+                service.handleRequest({"method": "onCommand", "id": menu[3]["id"], "type": 0})
+            assert opened == [True] and service.state.mode == "compose"
 
             def key(code, char=0, method="onKeyDown", modifiers=(), **around):
                 states = [0] * 256

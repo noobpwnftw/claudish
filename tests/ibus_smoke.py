@@ -125,6 +125,12 @@ try:
     assert engine.composition.mode == "continue"
     engine.do_property_activate("mode.compose", IBus.PropState.UNCHECKED)  # a radio item turning off: nothing
     assert engine.composition.mode == "continue"
+    # Settings… beside the modes: the page in the browser, off the main loop.
+    opened = []
+    module.open_settings, real_open = (lambda: opened.append(True)), module.open_settings
+    engine.do_property_activate("settings", IBus.PropState.UNCHECKED)
+    module.open_settings = real_open
+    assert opened == [True] and engine.composition.mode == "continue"
     # A terminal (its field purpose, or the program) is not prose: continue asks nothing there.
     engine.do_set_content_type(IBus.InputPurpose.TERMINAL, 0)
     assert engine.composition.quiet and not engine.composition.automatic

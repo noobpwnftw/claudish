@@ -91,6 +91,22 @@ class Screen:
 SCREEN = None
 
 
+def open_settings():
+    """cd_AI's settings in the browser, the same page on every OS. Asking the service for the page's
+    link happens off the main loop: typing never waits on it."""
+    import subprocess
+    import threading
+    from claudish.client import settings_url
+
+    def open_it():
+        try:
+            subprocess.run(["xdg-open", settings_url()], check=False, timeout=10,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as error:
+            trace("settings failed", type(error).__name__)
+    threading.Thread(target=open_it, daemon=True).start()
+
+
 def screen():
     global SCREEN
     if SCREEN is None:
@@ -449,6 +465,10 @@ class ClaudishEngine(IBus.Engine):
         if register:
             properties = IBus.PropList()
             properties.append(current)
+            properties.append(IBus.Property(key="settings", prop_type=IBus.PropType.NORMAL,
+                                            label=IBus.Text.new_from_string("Settings…"),
+                                            tooltip=IBus.Text.new_from_string("The model, your key, the voice"),
+                                            sensitive=True, visible=True))
             self.register_properties(properties)
             return
         self.update_property(current)
@@ -456,6 +476,9 @@ class ClaudishEngine(IBus.Engine):
             self.update_property(choice)
 
     def do_property_activate(self, name, state):
+        if name == "settings":
+            open_settings()
+            return
         if name.startswith("mode.") and state == IBus.PropState.CHECKED and name[5:] in MODES:
             if self.composition.mode != name[5:]:
                 self.switch_mode()
