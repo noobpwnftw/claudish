@@ -50,7 +50,6 @@ const state = {
   working: false,
   failed: false,
   error: "",     // why the last request failed, in plain words
-  hosted: "",    // the hosted model behind the shown answer, said in the panel
   reply: "",     // what you type once an instruction is sent: a reply, or your next words
   highlight: 0,  // the highlighted draft (↑ and ↓ move it)
   editing: false,  // the instruction came back to the caret (Esc edit): the next Esc drops it
@@ -70,7 +69,7 @@ function change(text) {
   state.adopted = false;
   state.asked = null;
   state.working = state.failed = false;
-  state.error = state.hosted = state.reply = "";
+  state.error = state.reply = "";
   state.highlight = 0;
   state.editing = false;
   state.revision++;
@@ -136,14 +135,13 @@ async function ask(revision) {
     if (revision !== state.revision) return;  // you typed since: a stale answer never lands
     state.candidate = data.text;
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
-    state.hosted = hosted && data.backend !== "browser" ? (data.backend === "claude" ? "Claude" : "a hosted model") : "";
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
     if (mode === "instruct" && state.nudged === JSON.stringify(["pending", state.text, state.reply]))
       state.nudged = showing();  // Enter was pressed while they came, and nothing since
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
-      : `${elapsed} ms · ${data.backend === "rules" ? "rules, no model" : hosted ? "hosted model" : "local model"}`;
+      : `${elapsed} ms · ${data.backend === "rules" ? "rules, no model" : "model"}`;
     setStatus("");
   } catch (error) {
     if (revision !== state.revision) return;
@@ -169,8 +167,7 @@ const nudge = () => state.nudged !== null && state.nudged === showing();
 function panel() {
   if (live() || !state.text) return null;
   const shown = {thread: [], label: null, body: null, code: false, rows: [], on: -1, foot: [], tail: null, tile: "ai",
-                 status: null, busy: false, failed: null, mark: null, replying: false};
-  const mark = state.hosted ? `from ${state.hosted} · hosted` : null;
+                 status: null, busy: false, failed: null, replying: false};
   // Once the composition no longer shows your instruction (you type a reply), the panel says it.
   if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
   const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
@@ -180,11 +177,11 @@ function panel() {
                             foot: [[state.asked === "rewrite" ? "Tab" : "Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
-    return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight, mark,
+    return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight,
             foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab",
             nudge: nudge(), ...typing};
   }
-  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate, mark,
+  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate,
                                foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab"};
   // Composing: the keys show from the first key (what Enter does must be known).
   return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
@@ -641,14 +638,14 @@ async function checkConnection() {
     serviceTimeout = Number(data.timeout) || 3;
     hosted = Boolean(data.hosted);
     backend = data.backend;
-    $("inference-note").textContent = hosted ? "Hosted inference, as configured." : "Actual local inference.";
+    $("inference-note").textContent = "Actual inference.";
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"
         : data.backend === "claude" ? "Claude API connected" : data.backend === "command" ? "Agent command connected"
-        : hosted ? "Remote model connected" : "Local service connected"));
+        : "Model service connected"));
     $("backend").textContent = data.backend === "rules" ? "RULES MODE · NO MODEL"
-      : data.backend === "claude" ? "cd_AI · CLAUDE API" : hosted ? "cd_AI · REMOTE MODEL" : "cd_AI · LOCAL LLM";
+      : data.backend === "claude" ? "cd_AI · CLAUDE API" : "cd_AI · MODEL API";
   } catch {
     $("connection").className = "connection offline";
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Service unavailable"));

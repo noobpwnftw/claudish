@@ -56,9 +56,6 @@ def states():
     yield "drafts", state.panel()
     state.enter()  # Enter on a draft: its Tab lights
     yield "nudged", state.panel()
-    state = sent("decline the offsite politely")
-    state.offer(state.revision, DRAFTS[0], DRAFTS[1:], hosted="Claude")
-    yield "hosted", state.panel()
     question = {"id": "q", "label": "The model asks", "body": "The whole thread, or only the last reply?",
                 "choices": [{"label": "The whole thread"}, {"label": "Only the last reply"}]}
     state = asked("summarize this thread", question)

@@ -199,8 +199,7 @@ class ClaudishInputController(IMKInputController):
             trace("result", sorted(result[1]), "current" if result[0] == self.state.revision else "stale")
         if result:
             revision, data = result
-            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ()),
-                                                   data.get("hosted", "")):
+            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
                 if self.state.converted:  # the rewrite you asked for with Tab, in place of your words
                     client = self.client()
                     if client is not None:

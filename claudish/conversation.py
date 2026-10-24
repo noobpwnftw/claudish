@@ -113,8 +113,7 @@ class ModelDriver:
         if self.cancelled:
             return
         if self.inserted:  # an answer you read and chose to insert
-            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"],
-                         hosted=rewriter.hosted_name)
+            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"])
             return
         if self.handed:
             # The task went to a helper (or an answer was read): nothing is inserted, and the
@@ -122,8 +121,7 @@ class ModelDriver:
             session.emit("result", text="", candidates=[], done=self.handed,
                          consulted=result["consulted"] + [self.handed])
             return
-        session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"],
-                     hosted=rewriter.hosted_name)
+        session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"])
 
     def own_tools(self, session, box):
         """Claudish's tools for an instruction: a question to the user (shown as is, the answer goes

@@ -334,7 +334,7 @@ class ClaudishTextService(TextService):
         if result:
             revision, data = result
             if "text" in data:
-                self.state.offer(revision, data["text"], data.get("candidates", ()), data.get("hosted", ""))
+                self.state.offer(revision, data["text"], data.get("candidates", ()))
             elif "question" in data:
                 self.state.ask(revision, data["question"], data["session"])
             elif "progress" in data or "partial" in data:

@@ -135,8 +135,7 @@ class ClaudishEngine(IBus.Engine):
         if result:
             revision, data = result
             trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
-            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ()),
-                                                         data.get("hosted", "")):
+            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
                 self.render()
             elif "question" in data and self.composition.ask(revision, data["question"], data["session"]):
                 self.render()

@@ -30,10 +30,7 @@ python -m claudish serve --backend claude --claude-model claude-haiku-5-5
 
 The Claude backend runs one request at a time, uses low effort, and turns on
 server-side refusal fallbacks (except on Haiku, which has none). It never
-offers a declined or truncated rewrite; your wording stays. Typed text goes
-only where you point the service. A non-loopback `--model-url` and the Claude
-backend are reported as `"hosted": true` in `/health`, and the browser demo
-labels them as hosted. No model ships: the starter profile is Claude with your own key, and
+offers a declined or truncated rewrite. No model ships: the starter profile is Claude with your own key, and
 `--profile local` is the local one.
 
 Change what the model is told with a templates file, for any backend (see
@@ -89,8 +86,7 @@ types as is.
 
 The app's binding chooses first, then that profile's choice for the mode. The
 service's own profile (`claudish serve --profile`, or the file's `"profile"`)
-holds the bindings; other profiles are loaded when they are first needed, and a
-hosted one is announced when it is.
+holds the bindings; other profiles are loaded when they are first needed.
 
 ### An agent CLI as the backend
 
@@ -136,8 +132,8 @@ pass `--config FILE`):
 
 `python -m claudish serve` uses the file's `"profile"`. `--profile claude`
 picks another, and any flag overrides the profile's value. A template path in a
-profile is relative to the config file. Keys are never stored in the file: name
-an environment variable with `api_key_env`. Unknown keys, a literal `api_key`,
+profile is relative to the config file. To take a key from the environment, name
+its variable with `api_key_env`. Unknown keys, a literal `api_key`,
 and wrong types are rejected at startup. `/health` reports the active profile.
 
 ### Window pictures
@@ -148,7 +144,7 @@ Enter: the hint shows "instruct + window picture", and the service captures the
 focused window once, sends it with that one instruction, and lists it in
 "consulted". Nothing is captured without F8, F8 never carries over to the next
 instruction, password fields never reach Claudish, and the picture is not stored
-or logged. With a hosted backend it goes to that service, as your text does.
+or logged.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
   ImageMagick (`sudo apt install x11-utils imagemagick`). On Wayland or macOS,
@@ -183,9 +179,7 @@ file; requests cannot add them. Results are cached for `ttl` seconds (default
 30). A failing or slow provider (`timeout`, default 5 s) is skipped, never
 blocking a rewrite. Context goes into the system prompt, ahead of your text, so a
 local llama.cpp server reuses its prompt cache while you type. Adapters may also
-send the text around the caret as `before`/`after` in `/suggest`. Context goes
-to the profile's backend, so with a hosted backend it leaves the machine like
-your text does.
+send the text around the caret as `before`/`after` in `/suggest`.
 
 MCP servers can supply context too (`pip install "claudish-ime[mcp]"`). Claudish
 starts the configured stdio server, calls one tool or reads one resource, and

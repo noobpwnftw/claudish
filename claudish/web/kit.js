@@ -19,7 +19,7 @@
   }
 
   // The footer: the AI tile (or a warning mark, or continue's neutral tile), what is happening,
-  // each key with its verb, the free words, and a hosted model's name at the end.
+  // each key with its verb, and the free words.
   function footer(spec, keys) {
     const foot = el("div", "k-foot");
     if (spec.tile === "warn") foot.append(el("span", "k-warn", "!"));  // a failure reads without colour
@@ -33,7 +33,6 @@
     if (spec.failed) foot.append(el("span", "k-status failed", spec.failed));
     for (const [key, verb] of spec.foot || []) foot.append(hint(key, verb, keys));
     if (spec.tail) foot.append(el("span", "k-hint", spec.tail));
-    if (spec.mark) foot.append(el("span", "k-mark", spec.mark));
     return foot;
   }
 

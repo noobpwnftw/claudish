@@ -22,9 +22,8 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 | **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 | **continue** | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 
-Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
-until you take it, and your own words are always one key away: Shift+Enter keeps
-them as typed. Continue is a Shift tap away when you want your keys to go
+Tap Shift to switch, as Shift switches English and pinyin. Shift+Enter keeps
+your words as typed. Continue is a Shift tap away when you want your keys to go
 straight in, with the rest of the sentence offered. Where you want none of it,
 switch that app to your usual keyboard (the system can remember it per app once you turn that on:
 [how](docs/using.md)).
@@ -61,7 +60,7 @@ open dist/macos/cd_AI.pkg
 It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
 Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
 
-**Linux** (developer preview, IBus only; fcitx5 is not supported yet): one line, no sudo (it names any system package to add first):
+**Linux** (developer preview, IBus only; fcitx5 is not supported yet): one line:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
@@ -80,10 +79,8 @@ py -m venv .venv
 .venv\Scripts\python -m claudish setup
 ```
 
-Setup shows each step and asks before doing it, skips what is already done, runs
-`claudish doctor`, and opens cd_AI's settings in your browser: paste your Claude
-key (checked with Anthropic, kept where the service reads it, never in the config) and pick a
-voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
+Setup runs `claudish doctor` and opens cd_AI's settings in your browser: paste your Claude key and
+pick a voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
 instead: `claudish setup --profile local`.
 
 ## Keys

@@ -74,8 +74,7 @@ the scores.
 ## Common changes
 
 - **A backend:** add a branch in `Rewriter.rewrite` (`model.py`) and a
-  `--backend` choice in `config.BACKENDS`. Report hosted backends through
-  `Rewriter.hosted`, so `/health` and the demo can say so. Optional SDKs stay
+  `--backend` choice in `config.BACKENDS`. Optional SDKs stay
   optional: import them lazily, and add a `pyproject.toml` extra.
 - **A mode:** add a template to `modes.defaults()` and, if needed, output
   handling in `modes.finish()`. Users can also add modes from a profile without

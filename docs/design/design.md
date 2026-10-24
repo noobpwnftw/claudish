@@ -90,7 +90,7 @@ One anatomy for every state: an optional thread ("You asked", "You answered": on
 label muted, your words in the text colour); an optional header (a small label for who asks or
 what this is, then the content as is, a command in monospace); rows; one footer (the AI tile, or a
 warning mark on failure; what is happening; each key with its verb; free words such as "or type a
-reply"; "from Claude · hosted" at the end when a hosted model answered).
+reply").
 
 - **The highlighted row:** a neutral fill, a bar in the platform's accent, and the key that takes
   it (Tab for a draft, Enter for a choice) in a trailing column every row keeps. Enter on a draft

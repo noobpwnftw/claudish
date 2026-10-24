@@ -90,7 +90,7 @@ permission requests.
    the screen (GNOME Terminal, Windows Terminal and the console, Terminal.app). macOS needs the
    Accessibility permission for the service's Python; Linux needs the accessibility bus.
 4. A picture of the focused window, on request (F8), for a vision-capable backend; never in a
-   secure field; labelled when the backend is hosted.
+   password field.
 5. The text alone.
 
 In a terminal the model sees the screen and your words ("fix") and does one of three things, each
@@ -101,5 +101,4 @@ to a helper.
 ## Backends
 
 OpenAI-compatible servers (llama.cpp, vLLM, Ollama: `tools` and `tool_calls`), Claude through the
-official SDK (client-side tools), and agent CLIs (Claude Code over stream-json). Typed text goes
-only to a backend the user configured; hosted backends are labelled.
+official SDK (client-side tools), and agent CLIs (Claude Code over stream-json).

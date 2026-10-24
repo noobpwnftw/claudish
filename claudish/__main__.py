@@ -67,8 +67,7 @@ def main():
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
-    commands.add_parser("key", help="Save your Claude API key where the service reads it (the Keychain on macOS, "
-                                     "a file only you can read elsewhere); never in the config")
+    commands.add_parser("key", help="Save your Claude API key")
     shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, your key, the voice")
     shown.add_argument("--url", default="http://127.0.0.1:18765")
     shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
@@ -274,10 +273,10 @@ def show_recent(url, full=False):
         print("No requests yet.")
     for item in items:
         where = " · ".join(str(part) for part in (item.get("app"), item.get("kind")) if part) or "no app"
-        print("%s  %s in %s  →  %s%s (%s%s)" % (
+        print("%s  %s in %s  →  %s%s%s" % (
             time.strftime("%H:%M:%S", time.localtime(item["time"])), item["mode"], where,
             item.get("backend"), " " + item["model"] if item.get("model") else "",
-            "hosted" if item.get("hosted") else "local", ", profile " + item["profile"] if item.get("profile") else ""))
+            " (profile %s)" % item["profile"] if item.get("profile") else ""))
         print("  consulted: %s" % (", ".join(item.get("consulted") or []) or "nothing"))
         print("  outcome:   %s%s" % (item.get("outcome", "running"),
                                      ", %s ms" % item["elapsed_ms"] if item.get("elapsed_ms") is not None else ""))

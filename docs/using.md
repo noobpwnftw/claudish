@@ -99,7 +99,7 @@ A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 ## What was sent
 
 `claudish recent` shows the service's last few requests: the mode and the text
-box, which profile and backend answered (and whether it is hosted), what was
+box, which profile and backend answered, what was
 consulted, the exact system prompt and turn the model received, the outcome,
 and the time it took (`--full` prints the prompts whole).
 
@@ -109,7 +109,7 @@ A terminal prompt is a text box too. Type a command, and if it fails, tap
 Shift, type what you want ("fix", or "undo the last commit but keep the
 changes"), and press Enter: the instruction goes with the last lines of what the
 terminal shows, and the answer is a command line, placed at the prompt like
-typed text. Running it is your Enter. Nothing is installed in the shell.
+typed text. Running it is your Enter.
 
 cd_AI reads the screen through the accessibility APIs screen readers use (AT-SPI
 on Linux, UI Automation on Windows, the AX API on macOS), only when you press

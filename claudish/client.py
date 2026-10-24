@@ -213,8 +213,7 @@ class Suggestions:
                     self.deliver(revision, {"done": event["done"], "session": key})
                 elif kind == "result":
                     self.deliver(revision, {"text": event["text"], "candidates": event.get("candidates") or [event["text"]],
-                                            "consulted": event.get("consulted") or [], "session": key,
-                                            "hosted": event.get("hosted") or ""})
+                                            "consulted": event.get("consulted") or [], "session": key})
                 elif kind == "error":
                     self.deliver(revision, {"error": event["text"], "session": key})
                 elif kind in EVENTS:

@@ -55,7 +55,7 @@ def split_title(text):
 def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
-                 "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None, "mark": None,
+                 "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None,
                  "replying": False, "take": "Enter", "nudge": False}, **shown)
 
 
@@ -107,7 +107,7 @@ class Composition:
         self.adopted = False
         self.asked = None
         self.working = self.failed = False
-        self.error = self.hosted = ""
+        self.error = ""
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
         self.revision += 1
@@ -152,7 +152,7 @@ class Composition:
         "code" (the header: who asks or what this is, then the content as is); "rows":
         [{"text", "legend"}] with "on" the highlighted one (-1: none, an approval) and "take" its
         key; "foot": [(key, verb)], then "tail" (free words); "tile": "ai" or "warn"; "status" with
-        "busy"; "failed" (why); "mark" (a hosted model's name); "nudge" (Enter was pressed on a
+        "busy"; "failed" (why); "nudge" (Enter was pressed on a
         draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
@@ -193,13 +193,11 @@ class Composition:
             readings = self.candidates or [self.candidate]
             shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
-                         take="Tab", nudge=self.nudge,
-                         mark=self.hosted and "from %s · hosted" % self.hosted)
+                         take="Tab", nudge=self.nudge)
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                         take="Tab",
-                         mark=self.hosted and "from %s · hosted" % self.hosted)
+                         take="Tab")
         elif self.offline:  # said from the first key, not found out on Tab: your words stay yours
             shown.update(tile="warn", failed="cd_AI is offline",
                          foot=[("Shift+Enter", "keep")] + ([("Esc", "drop")] if self.editing else []))
@@ -233,7 +231,7 @@ class Composition:
         words = [w for w in (shown["label"] and shown["body"] and "%s: %s" % (shown["label"], shown["body"])
                              or shown["body"], shown["status"] and shown["status"] + ("…" if shown["busy"] else ""),
                              shown["failed"]) if w]
-        words += ["%s %s" % key for key in shown["foot"]] + [w for w in (shown["tail"], shown["mark"]) if w]
+        words += ["%s %s" % key for key in shown["foot"]] + [w for w in (shown["tail"],) if w]
         return " · ".join(words)
 
     def _showing(self):
@@ -533,15 +531,14 @@ class Composition:
         self.change(self.text)
         return True
 
-    def offer(self, revision, text, alternatives=(), hosted=""):
-        """A result arrived. hosted: the hosted model that wrote it ("Claude"), said in the panel."""
+    def offer(self, revision, text, alternatives=()):
+        """A result arrived."""
         held = self.route(revision)
         if held is not None:  # the exchange you left: it goes on, out of sight
-            held.offer(revision, text, alternatives, hosted)
+            held.offer(revision, text, alternatives)
             return False
         if revision != self.revision or not self.text:
             return False
-        self.hosted = hosted or ""
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.highlight = 0

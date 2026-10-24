@@ -149,17 +149,6 @@ def claude_messages(messages):
     return system, out
 
 
-KNOWN_APIS = {"api.openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "api.groq.com": "Groq",
-              "api.anthropic.com": "Anthropic", "api.mistral.ai": "Mistral", "api.deepseek.com": "DeepSeek"}
-
-
-def api_name(host):
-    """A model API as the panel names it: the service's name, else its host."""
-    if not host:
-        return "a hosted model"
-    return KNOWN_APIS.get(host, host)
-
-
 class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
@@ -243,17 +232,6 @@ class Rewriter:
         """Whether continue asks this model at every pause unasked: a local one (or the rules
         stand-in) costs nothing; a hosted one only where a profile routes continue to it."""
         return self.backend == "rules" or (self.backend in ("llama", "openai") and self.local)
-
-    @property
-    def hosted_name(self):
-        """Who answered, when it is a hosted model, as the panel names it ("Claude"); "" when local."""
-        if not self.hosted:
-            return ""
-        if self.backend == "claude":
-            return "Claude"
-        if self.backend == "command":
-            return str(self.command[0]).rsplit("/", 1)[-1].capitalize() if self.command else "a hosted model"
-        return api_name(urlsplit(self.endpoint).hostname)
 
     def route(self, app, mode=None):
         """Which AI answers here: the app's binding may name a profile, and that profile may name

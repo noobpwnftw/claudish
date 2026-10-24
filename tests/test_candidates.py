@@ -191,18 +191,17 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         working = state.panel()
         self.assertEqual((working["status"], working["busy"], working["foot"]), ("working", True, [("Esc", "stop")]))
-        state.offer(state.revision, "Hi!", ["Hello!", "Hey!"], hosted="Claude")
+        state.offer(state.revision, "Hi!", ["Hello!", "Hey!"])
         drafts = state.panel()
         self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
-        self.assertEqual((drafts["foot"], drafts["mark"]),
-                         ([("↑↓", "choose"), ("Tab", "insert"), ("Esc", "edit")], "from Claude · hosted"))
+        self.assertEqual(drafts["foot"], [("↑↓", "choose"), ("Tab", "insert"), ("Esc", "edit")])
         self.assertEqual(drafts["take"], "Tab")  # the highlighted row says Tab takes it
         self.assertEqual(drafts["thread"], [])  # the instruction is still the composition: no "You asked"
         state.change("this is important")
         state.tab()
         state.offer(state.revision, "This is crucial.")
         rewritten = state.panel()  # your words, as large, until you keep it
-        self.assertEqual((rewritten["label"], rewritten["body"], rewritten["mark"]), ("Rewrite", "This is crucial.", ""))
+        self.assertEqual((rewritten["label"], rewritten["body"]), ("Rewrite", "This is crucial."))
         state.change("x")
         state.submit()
         state.fail(state.revision, "Connection refused")

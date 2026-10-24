@@ -26,7 +26,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -49,7 +48,6 @@ window.LAB_STATES = {
   "status": "rewriting",
   "busy": true,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -76,7 +74,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": "",
   "replying": false,
   "take": "Tab",
   "nudge": false
@@ -99,7 +96,6 @@ window.LAB_STATES = {
   "status": "working",
   "busy": true,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -143,7 +139,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": "",
   "replying": false,
   "take": "Tab",
   "nudge": false
@@ -187,54 +182,9 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": "",
   "replying": false,
   "take": "Tab",
   "nudge": true
- },
- "hosted": {
-  "thread": [],
-  "label": null,
-  "body": null,
-  "code": false,
-  "rows": [
-   {
-    "text": "Thank you for the invitation — I'm afraid I can't make the offsite this time.",
-    "legend": null
-   },
-   {
-    "text": "I'd love to join, but I won't be able to attend the offsite.",
-    "legend": null
-   },
-   {
-    "text": "Unfortunately the offsite clashes with a deadline, so I'll have to sit this one out.",
-    "legend": null
-   }
-  ],
-  "on": 0,
-  "foot": [
-   [
-    "↑↓",
-    "choose"
-   ],
-   [
-    "Tab",
-    "insert"
-   ],
-   [
-    "Esc",
-    "edit"
-   ]
-  ],
-  "tail": null,
-  "tile": "ai",
-  "status": null,
-  "busy": false,
-  "failed": null,
-  "mark": "from Claude · hosted",
-  "replying": false,
-  "take": "Tab",
-  "nudge": false
  },
  "ask": {
   "thread": [],
@@ -267,7 +217,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -308,7 +257,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": true,
   "take": "Enter",
   "nudge": false
@@ -336,7 +284,6 @@ window.LAB_STATES = {
   "status": "working",
   "busy": true,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -368,7 +315,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -400,7 +346,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -427,7 +372,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Tab",
   "nudge": false
@@ -450,7 +394,6 @@ window.LAB_STATES = {
   "status": "Reading tests/test_parser.py",
   "busy": true,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -477,7 +420,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": "the model is offline",
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -517,7 +459,6 @@ window.LAB_STATES = {
   "status": null,
   "busy": false,
   "failed": null,
-  "mark": "",
   "replying": false,
   "take": "Tab",
   "nudge": false
@@ -540,7 +481,6 @@ window.LAB_STATES = {
   "status": "dropped",
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -563,7 +503,6 @@ window.LAB_STATES = {
   "status": "3 drafts ready",
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -586,7 +525,6 @@ window.LAB_STATES = {
   "status": "compose",
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false
@@ -609,7 +547,6 @@ window.LAB_STATES = {
   "status": "continue",
   "busy": false,
   "failed": null,
-  "mark": null,
   "replying": false,
   "take": "Enter",
   "nudge": false

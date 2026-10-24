@@ -3,7 +3,7 @@
 The panel draws Composition.panel()'s description as the design lab does (claudish/web/design.html,
 macOS skin): an optional header (a small label, then the content as is), rows (the highlighted
 one a neutral fill with the system accent bar and the key that takes it), and one footer (the AI
-tile or a warning mark, what is happening, each key with its verb, a hosted model's name). The
+tile or a warning mark, what is happening, each key with its verb). The
 overlay draws continue's suggestion right after the caret, in the system font at the caret's
 height. Non-activating panels: the app keeps the keyboard; a click on a row picks it.
 """
@@ -264,8 +264,8 @@ class Panel:
         return sum(self.drawn(view) for view, _ in items) + sum(gap for _, gap in items[:-1])
 
     def footer(self, spec, secondary, gap):
-        """[(view, gap after)]: the mark, what is happening, each key with its verb, the tail, and a
-        hosted model's name at the end; `gap` between items (.k-foot or .k-toast), CAP_GAP between
+        """[(view, gap after)]: the mark, what is happening, each key with its verb, and the tail;
+        `gap` between items (.k-foot or .k-toast), CAP_GAP between
         a key and its verb."""
         items = []
         self.keys = []
@@ -293,8 +293,6 @@ class Panel:
             items.append((label(verb, SMALL, color=secondary), gap))
         if spec["tail"]:
             items.append((label(spec["tail"], SMALL, color=secondary), gap))
-        if spec["mark"]:
-            items.append((label(spec["mark"], SMALL, color=secondary), 0))
         return items
 
     def place_turn(self, line, y, h, width, pick):
@@ -348,8 +346,6 @@ class Panel:
         for index, (view, gap) in enumerate(items):
             size = self.size(view)
             drawn = self.drawn(view)
-            if index == len(items) - 1 and gap == 0 and index:  # the hosted mark, at the end
-                x = max(x, width - PAD - ROW_X - drawn)
             if any(view is key for key in getattr(self, "keys", [])) and symbols(view):
                 bottom = middle - ink_middle(view) + view.font().descender()  # descender is negative
             elif isinstance(view, NSTextField):

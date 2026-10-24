@@ -65,7 +65,6 @@
 /* Enter on a draft: the row's Tab, lit until the next key (no animation; the footer is not lit). */
 .k-cap.lit{background:var(--k-lit-bg,color-mix(in srgb,var(--k-select) 20%,var(--k-surface)));border:var(--k-lit-border,1px solid var(--k-select));
   color:var(--k-lit-color,var(--k-text));padding:var(--k-lit-pad,1px 5px);font-weight:var(--k-lit-weight,inherit)}
-.k-mark{margin-left:auto;white-space:nowrap}
 .k-status{color:var(--k-text)}
 .k-status.failed{color:var(--k-error)}
 .k-warn{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--k-error);color:var(--k-surface);font-size:12px;font-weight:700;line-height:1}

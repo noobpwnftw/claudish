@@ -184,10 +184,6 @@ export default class CdAiExtension extends Extension {
         }
         if (panel.tail)
             foot.add_child(label(panel.tail, 'cd-verb'));
-        if (panel.mark) {
-            foot.add_child(new St.Widget({x_expand: true}));
-            foot.add_child(label(panel.mark, 'cd-verb'));
-        }
         box.add_child(foot);
     }
 

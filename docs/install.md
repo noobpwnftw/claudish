@@ -29,10 +29,9 @@ silicon, the local model below made slop as well as anything we tried.
    ```
 
    It asks which voice you want (corporate slop unless you pick another: `proofread` keeps your
-   words for work), then shows each step and asks before doing it: write a config (profile
-   `claude`), import MCP servers from your Claude setup, check the model, register the input
-   method, start Claudish at login, then run `doctor`. Steps already done are skipped, so it is
-   safe to run again. `--dry-run` shows the plan and `--yes` does it all. Installing the input
+   words for work), then writes a config (profile
+   `claude`), imports MCP servers from your Claude setup, checks the model, registers the input
+   method, starts Claudish at login, and runs `doctor`. `--yes` does it all. Installing the input
    method on Windows and macOS needs an administrator, so setup prints that command.
 
 3. **Give it your key** in cd_AI's settings:
@@ -42,9 +41,8 @@ silicon, the local model below made slop as well as anything we tried.
    ```
 
    It opens the settings in your browser (later, **Settings…** in the input menu opens them
-   again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
-   where the service reads it (the Keychain on macOS, a file beside the config
-   elsewhere), and uses it from your next keystroke. It never goes into the config. The same
+   again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it,
+   and uses it from your next keystroke. The same
    page picks the voice, or a model server on this computer instead of Claude.
 
    Keys from elsewhere work too: `ant auth login` (the Anthropic CLI), or `ANTHROPIC_API_KEY` in

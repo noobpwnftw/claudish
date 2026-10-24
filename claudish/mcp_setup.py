@@ -145,9 +145,7 @@ def context_test(app, profile=None, show=False):
     for mode in ("continue", "rewrite", "instruct"):
         chosen = (routed["modes"].get(mode) or {}).get("profile") or answering
         _, chosen_settings, _, _ = config.resolve(profile=chosen) if chosen != name else (None, settings, None, None)
-        print("  %-9s answered by profile %r (%s%s)" % (mode, chosen, chosen_settings["backend"],
-                                                       ", hosted" if chosen_settings.get("hosted") or
-                                                       chosen_settings["backend"] == "claude" else ""))
+        print("  %-9s answered by profile %r (%s)" % (mode, chosen, chosen_settings["backend"]))
     status = 0
     for origin, provider in providers:
         text = provider.get()

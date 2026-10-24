@@ -90,8 +90,7 @@ def check_service(state):
     except Exception:
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
             "start it: `python scripts/start.py` (local model) or `python -m claudish serve --profile NAME`"
-    detail = "running: backend %s, profile %s%s" % (health.get("backend"), health.get("profile"),
-                                                     ", hosted" if health.get("hosted") else "")
+    detail = "running: backend %s, profile %s" % (health.get("backend"), health.get("profile"))
     return "ok", detail, None
 
 
