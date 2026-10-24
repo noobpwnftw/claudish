@@ -64,6 +64,14 @@ class Claude:
             options["tools"] = [{"name": tool["function"]["name"], "description": tool["function"].get("description", ""),
                                  "input_schema": tool["function"].get("parameters") or {"type": "object", "properties": {}}}
                                 for tool in tools]
+        else:
+            # The last round answers without tools, but the API takes earlier tool blocks only with
+            # their tools declared: declare the ones used, and let none be called.
+            used = sorted({block["name"] for message in conversation if isinstance(message["content"], list)
+                           for block in message["content"] if block.get("type") == "tool_use"})
+            if used:
+                options["tools"] = [{"name": name, "input_schema": {"type": "object", "properties": {}}} for name in used]
+                options["tool_choice"] = {"type": "none"}
         try:
             response = self.client.beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
                                                         system=system, messages=conversation,

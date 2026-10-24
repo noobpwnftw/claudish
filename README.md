@@ -79,7 +79,7 @@ instead: `claudish setup --profile local`.
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
 | Tab | take the model's text: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft, an answer to read (with nothing offered, Tab is the app's) |
-| Enter | compose: send it as an instruction (it stays underlined while the model works), a reply, or the answer to the model's question; Enter never inserts the model's text (with nothing composed, a newline) |
+| Enter | compose: send it as an instruction (it stays underlined while the model works), a reply, or the answer to the model's question (with nothing composed, a newline) |
 | Shift+Enter | compose: keep your words as they are (where most CJK input methods use Enter for that) |
 | ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text |
 | F8 | with an instruction: also send a picture of this window |

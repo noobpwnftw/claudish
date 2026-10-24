@@ -47,7 +47,7 @@ default; good slop needs one). With none, compose says "no model is set up · cl
 | Key | In compose |
 | --- | --- |
 | Tab | takes the model's text: asks for a rewrite (it waits in the panel; Tab again puts it in), inserts the highlighted draft, or an answer to read |
-| Enter | talks to the model: sends your words as an instruction, a reply, or the answer to a question; it never inserts the model's text (on a draft it lights the row's Tab, the key that does) |
+| Enter | talks to the model: sends your words as an instruction, a reply, or the answer to a question (on a draft it lights the row's Tab) |
 | Shift+Enter | keeps your words as typed |
 | ↑ ↓ | move the highlight (no wrap); choices are not numbered: digits and Space are text |
 | Esc | one step back: cancel the reply you typed, then edit the instruction, then drop it |
