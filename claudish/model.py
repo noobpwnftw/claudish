@@ -569,8 +569,12 @@ class Rewriter:
 
     def run_command(self, prompt):
         """An agent CLI (claude -p, ollama run, ...): the prompt on stdin, never through a shell."""
+        command = list(self.command)
+        if os.path.basename(command[0]).startswith("claude") and not os.path.exists(command[0]):
+            from .settings import claude_code  # an update moved it (Claude Code, or its VS Code copy)
+            command[0] = claude_code() or command[0]
         try:
-            done = subprocess.run(self.command, input=prompt, capture_output=True, text=True,
+            done = subprocess.run(command, input=prompt, capture_output=True, text=True,
                                   errors="replace", timeout=self.timeout)
         except subprocess.TimeoutExpired:
             raise RuntimeError("the agent took longer than %g s" % self.timeout)

@@ -8,6 +8,7 @@ from io import BytesIO
 import types
 import unittest
 from unittest.mock import patch
+from pathlib import Path
 from urllib.request import urlopen
 
 from claudish import modes
@@ -224,6 +225,18 @@ class CommandBackendTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "needs a"):
             Rewriter("command")
 
+
+    def test_a_moved_claude_is_found_again(self):
+        """Claude Code's updates move the binary a profile saved: the command finds it again."""
+        import stat
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            claude = Path(folder, "claude")
+            claude.write_text("#!/bin/sh\ncat\n")
+            claude.chmod(claude.stat().st_mode | stat.S_IEXEC)
+            rewriter = Rewriter("command", command=[str(Path(folder, "gone", "claude")), "-p"])
+            with patch("claudish.settings.claude_code", return_value=str(claude)):
+                self.assertIn("fine", rewriter.run_command("it is fine"))
 
     def test_serve_cli_keeps_the_profile_command(self):
         import os

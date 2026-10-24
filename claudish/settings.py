@@ -26,7 +26,7 @@ def claude_code():
     service may not have the shell's PATH, so the profile keeps the full path)."""
     found = shutil.which("claude")
     if found:
-        return str(Path(found).resolve())
+        return str(Path(found).absolute())  # the link, not its target: an update moves the target
     home = Path.home()
     places = [home / ".local/bin/claude", home / ".claude/local/claude", Path("/usr/local/bin/claude"),
               Path("/opt/homebrew/bin/claude"), home / ".npm-global/bin/claude",
