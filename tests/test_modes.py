@@ -64,7 +64,7 @@ class ModeTests(unittest.TestCase):
             system, turn = payload["messages"][0]["content"], payload["messages"][-1]["content"]
             self.assertIn("The text box is a terminal in com.apple.Terminal.", system)
             self.assertIn("run when the user presses Enter", system)  # what the box's kind means
-            self.assertNotIn("em dash", system)  # a command line has no voice
+            self.assertNotIn("em dash", system)  # a command line has no tone
             # The screen goes with the instruction it explains; the prose examples stay out.
             self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nfix"))
             self.assertIn("<context name=\"terminal screen, last lines\">", turn)
@@ -114,12 +114,12 @@ class ModeTests(unittest.TestCase):
             for mode in ("rewrite", "continue", "instruct"):
                 self.assertIn(word, named.modes[mode]["system"])
                 self.assertTrue(named.modes[mode]["examples"])
-            self.assertIn("a no stays a no", named.modes["rewrite"]["system"])  # the meaning is guarded in every voice
+            self.assertIn("a no stays a no", named.modes["rewrite"]["system"])  # the meaning is guarded in every tone
         plain = Rewriter(max_tokens=64, tone="plain and concise")
         for mode in ("rewrite", "continue", "instruct"):
             self.assertIn("plain and concise", plain.modes[mode]["system"])
             self.assertNotIn("slop", plain.modes[mode]["system"])
-            self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its voice
+            self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its tone
         proofread = Rewriter(max_tokens=64, tone="proofread")  # corrects, keeps your words
         self.assertIn("Keep their words", proofread.modes["rewrite"]["system"])
         self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
@@ -181,11 +181,11 @@ class ModeTests(unittest.TestCase):
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
         self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"])
-        self.assertEqual(payload["max_tokens"], 48)  # to the end of a sentence, in the voice
+        self.assertEqual(payload["max_tokens"], 48)  # to the end of a sentence, in the tone
         _, payload = self.call(rewriter, "decline politely", "instruct")
         self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"], 400))
         _, payload = self.call(rewriter, "so", "rewrite")
-        self.assertEqual(payload["max_tokens"], 160)  # the voice's paragraph, past the profile's 64
+        self.assertEqual(payload["max_tokens"], 160)  # the tone's paragraph, past the profile's 64
         with self.assertRaisesRegex(ValueError, "unknown mode"):
             rewriter.rewrite("so", mode="sing")
 

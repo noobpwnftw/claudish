@@ -43,7 +43,7 @@ class SettingsTests(Home):
         self.assertEqual([tone["name"] for tone in state["tones"]][:1], ["corporate"])
         self.assertFalse(self.path.exists())
 
-    def test_a_voice_goes_to_every_profile_the_window_manages_and_corporate_clears_it(self):
+    def test_a_tone_goes_to_every_profile_the_window_manages_and_corporate_clears_it(self):
         settings.apply({"tone": "critic"})
         profiles = self.written()["profiles"]
         self.assertEqual({profiles[n].get("tone") for n in ("claude", "ollama", "local")}, {"critic"})

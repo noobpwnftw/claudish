@@ -140,11 +140,11 @@ STARTER_TEMPLATES = {
     "about": [
         "Your templates. cd_AI's own are in claudish/templates.json; this file names only what you change,",
         "mode by mode and key by key. `claudish templates` prints what a profile ends up with. To switch",
-        "voice, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
+        "tone, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
         "proofread, or one of yours below. docs/configuration.md#templates has the rest.",
     ],
     "tones": {"named": {"mine": {
-        "about": "A voice to make your own: set \"tone\": \"mine\" in config.json, then rewrite this one.",
+        "about": "A tone to edit: set \"tone\": \"mine\" in config.json, then rewrite this one.",
         "modes": {"rewrite": {
             "system": "Rewrite the user's text the way a weary pirate captain would say it: salty, theatrical, "
                       "one or two sentences. Keep the meaning: a yes stays a yes, a no stays a no, a question "

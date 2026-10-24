@@ -34,7 +34,7 @@ def numbers(text):
 
 
 def check(case, output, slop=False):
-    """Return the names of failed fidelity checks for one rewrite. slop: the voice may balloon
+    """Return the names of failed fidelity checks for one rewrite. slop: the tone may balloon
     (a paragraph for "ok"); only truncation and a runaway answer fail its length."""
     source = case["text"]
     failures = ["missing:" + item for item in case.get("keep", []) if item not in output]
@@ -90,7 +90,7 @@ def main():
     parser.add_argument("--cases", type=Path, default=root / "benchmarks/eval/cases.json")
     parser.add_argument("--label", required=True, help="Model and settings, recorded in the output")
     parser.add_argument("--output", type=Path, help="Write full JSON results here")
-    parser.add_argument("--slop", action="store_true", help="The voice is full slop: no length ceiling but 600 characters")
+    parser.add_argument("--slop", action="store_true", help="The tone is full slop: no length ceiling but 600 characters")
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding="utf-8"))
     try:

@@ -17,6 +17,9 @@ def load(path):
     where = "templates %s" % path
     if not isinstance(data, dict) or set(data) - SECTIONS:
         raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))
+    tones = data.get("tones")
+    if isinstance(tones, dict) and "voice" in tones and "tone" not in tones:
+        tones["tone"] = tones.pop("voice")  # its name before 0.1.0
     for name, mode in (data.get("modes") or {}).items():
         check_mode(where, name, mode, name in TEMPLATES["modes"])
     for name, tone in ((data.get("tones") or {}).get("named") or {}).items():
@@ -69,10 +72,10 @@ def defaults(override=None, tone=None):
 
     max_tokens None means the backend's default. candidates: how many readings to offer (an
     instruction is sent on purpose and awaited, so it offers a short list; while you type, one).
-    tone: a voice other than the default: a named one (templates "tones": salesman, critic, bard,
+    tone: a tone other than the default: a named one (templates "tones": salesman, critic, bard,
     proofread, ...), which brings its own wording and examples, or a few words of your own
-    ("warm and friendly"), which fill the "voice" wording without examples (the default's teach
-    its own voice). A mode's own system in the profile's templates wins over the tone, and is
+    ("warm and friendly"), which fill the "tone" wording without examples (the default's teach
+    its own tone). A mode's own system in the profile's templates wins over the tone, and is
     used as written in any box (custom)."""
     words = merged(override)
     own = (override or {}).get("modes") or {}
@@ -82,11 +85,11 @@ def defaults(override=None, tone=None):
         custom = "system" in (own.get(name) or {})
         named = words["tones"]["named"]
         if tone and not custom and tone in named:
-            voice = (named[tone].get("modes") or {}).get(name)
-            if voice:
-                system, examples = voice["system"], voice.get("examples", [])
-        elif tone and not custom and name in words["tones"]["voice"]:
-            system, examples = words["tones"]["voice"][name].replace("{tone}", tone), []
+            wording = (named[tone].get("modes") or {}).get(name)
+            if wording:
+                system, examples = wording["system"], wording.get("examples", [])
+        elif tone and not custom and name in words["tones"]["tone"]:
+            system, examples = words["tones"]["tone"][name].replace("{tone}", tone), []
         specs[name] = {"system": system, "plain": mode.get("plain") or system,
                        "examples": messages(examples, mode.get("frame")), "max_tokens": mode.get("max_tokens"),
                        "candidates": mode.get("candidates") or 1, "custom": custom, "box": words["box"]}

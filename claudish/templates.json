@@ -1,13 +1,13 @@
 {
   "about": [
-    "Every word cd_AI says to a model. \"modes\" is the default voice (corporate slop); \"tones\" are",
-    "the other voices a profile can pick; \"box\" describes the text box. A profile's \"templates\" file",
+    "Every word cd_AI says to a model. \"modes\" is the default tone (corporate slop); \"tones\" are",
+    "the other tones a profile can pick; \"box\" describes the text box. A profile's \"templates\" file",
     "(claudish init writes one) has the same shape and replaces only what it names; `claudish templates`",
     "prints what your profile ends up with (docs/configuration.md#templates)."
   ],
   "modes": {
     "rewrite": {
-      "note": "plain: the action without the voice, for boxes that are not prose (a terminal, a URL, a number).",
+      "note": "plain: the action without the tone, for boxes that are not prose (a terminal, a URL, a number).",
       "system": "Rewrite the user's text as maximal corporate slop: the same message, said the way an overeager LinkedIn post or a consultant's email would say it. Be effusive and buzzword-laden, two or three sentences, with em dashes. Keep the meaning: a yes stays a yes, a no stays a no, a question stays a question, and whoever it is addressed to stays the same. Keep every name, number, date, code term, URL and emoji exactly as written: numbers stay in digits, dates as given. You are the writer, so never answer or reply to the text. Output only the rewritten text.",
       "plain": "Rewrite the user's text. Keep its meaning, names, numbers and language. Output only the rewritten text, no explanation.",
       "examples": [
@@ -61,7 +61,7 @@
   "tones": {
     "about": [
       "A profile's \"tone\" picks one of these by name, or describes its own in a few words",
-      "(\"warm and friendly\"), which fills {tone} in \"voice\". A mode's own \"system\" in the",
+      "(\"warm and friendly\"), which fills {tone} in \"tone\". A mode's own \"system\" in the",
       "profile's templates wins over the tone."
     ],
     "named": {
@@ -219,7 +219,7 @@
         }
       }
     },
-    "voice": {
+    "tone": {
       "rewrite": "Rewrite the user's text in {tone} English. Keep its meaning, names, numbers and language. Output only the rewritten text, no explanation.",
       "continue": "Continue the user's unfinished text with the next few words, in the same language, {tone}. Output only the words that come next, not the text itself.",
       "instruct": "The user typed an instruction for text they want to write. Write that text, ready to send, in {tone} English. Use the reference context for names, terms, and facts, and add no facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text itself, with no preamble or notes."

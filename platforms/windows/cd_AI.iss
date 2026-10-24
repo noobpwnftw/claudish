@@ -141,7 +141,7 @@ begin
     ExecAsOriginalUser(ExpandConstant('{app}\PIME\PIMELauncher.exe'), '', '', SW_HIDE, ewNoWait, Code);
     AsYou('-m claudish init', ewWaitUntilTerminated);
     AsYou('-m claudish service install', ewWaitUntilTerminated);
-    { The first install ends in cd_AI's settings (the key, the voice); an update opens nothing. }
+    { The first install ends in cd_AI's settings (the key, the tone); an update opens nothing. }
     if First then
       AsYou('-m claudish settings --first', ewNoWait);
   end;

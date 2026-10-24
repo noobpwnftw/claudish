@@ -58,7 +58,7 @@ def step_config(name):
 
 
 def step_tone(name, settings, tone):
-    """The voice: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
+    """The tone: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
     few words, with --tone."""
     current = settings.get("tone")
     if not tone or tone == current:
@@ -103,7 +103,7 @@ def step_llama(settings, variant):
 
 
 def step_model():
-    """The local model: Gemma 4 E4B (Apache-2.0), best for its size at cd_AI's voice (G53)."""
+    """The local model: Gemma 4 E4B (Apache-2.0), best for its size at cd_AI's tone (G53)."""
     _, download_model = scripts()
     if download_model.target("gemma").is_file():
         return "done", str(download_model.target("gemma")), None
@@ -200,15 +200,15 @@ def ask(question):
         return False
 
 
-def choose_voice():
-    """The first run's one question: which voice (owner, 2026-10-24: slop for fun, proofread for
+def choose_tone():
+    """The first run's one question: which tone (owner, 2026-10-24: slop for fun, proofread for
     work). Enter keeps the default; a name, or a few words, picks another."""
-    print("Which voice? Enter keeps corporate slop.")
+    print("Which tone? Enter keeps corporate slop.")
     for name, tone in TEMPLATES["tones"]["named"].items():
         print("  %-10s %s" % (name, tone.get("about", "")))
     print("  or a few words, such as \"plain and friendly\".")
     try:
-        answer = input("Voice [corporate]: ").strip()
+        answer = input("Tone [corporate]: ").strip()
     except EOFError:
         return None
     return None if answer in ("", "corporate") else answer
@@ -217,7 +217,7 @@ def choose_voice():
 def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=None):
     try:
         if tone is None and not (yes or dry_run) and sys.stdin.isatty() and not chosen_profile(profile)[1].get("tone"):
-            tone = choose_voice()  # asked once: a profile with a voice is not asked again
+            tone = choose_tone()  # asked once: a profile with a tone is not asked again
         name, steps = plan(profile, variant, skip, tone)
     except ValueError as exc:
         print("setup: %s" % exc)
@@ -269,7 +269,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
 
 
 def settings():
-    """Setup ends where the macOS installer does: in cd_AI's settings (the key, the voice), here in
+    """Setup ends where the macOS installer does: in cd_AI's settings (the key, the tone), here in
     the browser. Run by an agent (no terminal), it only says how to open them."""
     from .client import settings_url
     try:
@@ -277,8 +277,8 @@ def settings():
     except OSError:
         return  # no service to ask: doctor has said why
     if not sys.stdin.isatty():
-        print("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the voice.")
+        print("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the tone.")
         return
     import webbrowser
-    print("\nOpening cd_AI's settings in your browser: the model, its key, and the voice.")
+    print("\nOpening cd_AI's settings in your browser: the model, its key, and the tone.")
     webbrowser.open(url + "&first=1")

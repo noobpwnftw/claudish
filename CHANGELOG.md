@@ -9,8 +9,8 @@ No release has been made yet. What a first release would contain:
   ↑ ↓ to choose, Tab to insert; Shift+Enter keeps them as typed; Esc steps back), and continue
   (keys go straight in, with a grey suggestion that Tab takes). Tab takes the model's text; Enter talks to the model. The design:
   [docs/design/design.md](docs/design/design.md).
-- **Voices:** corporate slop by default ("ok" becomes a paragraph of shared vision), or a
-  salesman, a critic, a bard, proofread (corrects typos), or a described voice.
+- **Tones:** corporate slop by default ("ok" becomes a paragraph of shared vision), or a
+  salesman, a critic, a bard, proofread (corrects typos), or a described tone.
 - **Templates:** the prompts are in one templates file; `claudish init` writes a copy to edit,
   and `claudish templates` prints what a profile uses.
 - **Input methods** for Linux (IBus, with a GNOME Shell extension drawing the panel), Windows (a

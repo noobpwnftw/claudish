@@ -9,8 +9,8 @@ tools). The model answers with one action: complete (continue), replace (rewrite
 The box is described once, in the system prompt. Observations (a terminal's screen, the
 profile's context, the app's bindings) go in the turn, next to the user's words, fenced as
 material, not instructions: a model reads "fix" as being about what it sees there, not about
-an earlier draft. A voice is for prose: a command line, a URL, or a number has none, so the
-Claudish voice and its prose examples apply only to prose boxes.
+an earlier draft. A tone is for prose: a command line, a URL, or a number has none, so the
+Claudish tone and its prose examples apply only to prose boxes.
 """
 from .modes import TEMPLATES
 from .screen import is_terminal
@@ -109,7 +109,7 @@ def observe(rewriter, box, mode, look=False, screen=None):
 
 
 def system(spec, mode, box, retrieval=False, tools=False):
-    """The system prompt: the action in the voice (prose) or plain (other kinds), then the box."""
+    """The system prompt: the action in the tone (prose) or plain (other kinds), then the box."""
     base = spec["system"] if box.prose or spec.get("custom") else spec.get("plain", spec["system"])
     words = spec.get("box", WORDS)
     return base + box.describe(mode, retrieval, words) + ("\n\n" + words["tools"] if tools else "")

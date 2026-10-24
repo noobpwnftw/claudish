@@ -4,7 +4,7 @@ larger local model (G12, G53).
 python benchmarks/judge.py --calibrate                       # agreement with hand labels
 python benchmarks/judge.py --results eval/spark-small.json   # judge an evaluate.py report
 python benchmarks/judge.py --task continue --calibrate       # the same for continue
-python benchmarks/judge.py --task slop --results R.json      # a rewrite in the slop voice
+python benchmarks/judge.py --task slop --results R.json      # a rewrite in the slop tone
 
 Any OpenAI-compatible server works; llama.cpp constrains the reply to the JSON schema.
 Texts are sent only to --model-url (default: loopback).

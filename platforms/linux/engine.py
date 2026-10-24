@@ -514,7 +514,7 @@ class ClaudishEngine(IBus.Engine):
             properties.append(current)
             properties.append(IBus.Property(key="settings", prop_type=IBus.PropType.NORMAL,
                                             label=IBus.Text.new_from_string("Settings…"),
-                                            tooltip=IBus.Text.new_from_string("The model, its key, the voice"),
+                                            tooltip=IBus.Text.new_from_string("The model, its key, the tone"),
                                             sensitive=True, visible=True))
             self.register_properties(properties)
             return

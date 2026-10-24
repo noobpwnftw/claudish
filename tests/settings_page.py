@@ -43,14 +43,14 @@ async def check(args, home, port):
         if args.screenshots:
             await page.screenshot(path=str(args.screenshots / "settings.png"), full_page=True)
 
-        await page.get_by_text("Bard", exact=True).click()  # a voice, at once
-        await expect(page.locator("#voice-message")).to_have_text("Bard it is.")
+        await page.get_by_text("Bard", exact=True).click()  # a tone, at once
+        await expect(page.locator("#tone-message")).to_have_text("Bard it is.")
         assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "bard"
-        await page.get_by_text("Your own words", exact=True).click()
+        await page.get_by_text("Described", exact=True).click()
         await page.locator("#own-words").fill("plain and friendly")
         await page.locator("#own-words").press("Enter")
         await page.locator("#own-words").blur()
-        await expect(page.locator("#voice-message")).to_have_text("Voice saved.")
+        await expect(page.locator("#tone-message")).to_have_text("Tone saved.")
         assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "plain and friendly"
 
         await page.get_by_text("Another model API").click()  # the form first: nothing switched yet
@@ -81,7 +81,7 @@ async def check(args, home, port):
         await expect(reused.locator("#status")).to_contain_text("expired")
         assert not errors, errors
         await browser.close()
-    print("Settings page passed: ticket kept out of the address and good once, voices (named, own words), "
+    print("Settings page passed: ticket kept out of the address and good once, tones (named, described), "
           "a model server (nothing there: not switched; then switched), reload, narrow window, no ticket no settings")
 
 

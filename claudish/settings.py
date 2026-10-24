@@ -1,7 +1,7 @@
 """The settings window's model (G62): what it shows, and the few changes it makes to config.json.
 
 The window offers three things (docs/research/2026-10-24-install-poll.md): the Claude key, the
-voice, and a model server on this computer instead of Claude. They map onto the starter's
+tone, and a model server on this computer instead of Claude. They map onto the starter's
 profiles: "claude", and "ollama" for any OpenAI-compatible server (Ollama, LM Studio, llama.cpp).
 A config whose default is another profile is shown as that profile and left to its file.
 The key is saved by claudish/keys.py.
@@ -14,7 +14,7 @@ from . import config, keys
 from .modes import TEMPLATES
 
 CHOICES = {"claude": "claude", "server": "ollama"}  # the window's choice -> the starter profile it uses
-MANAGED = ("claude", "ollama", "local")  # the profiles whose voice the window sets
+MANAGED = ("claude", "ollama", "local")  # the profiles whose tone the window sets
 
 
 def read(path=None):
@@ -172,7 +172,7 @@ def apply(changes, path=None):
     if "tone" in changes:
         tone = changes["tone"]
         if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
-            raise ValueError("a voice is a name or a few words")
+            raise ValueError("a tone is a name or a few words")
         tone = tone.strip()
         for name in MANAGED:
             if name in profiles:

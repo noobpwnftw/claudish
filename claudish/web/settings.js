@@ -5,7 +5,7 @@
 const fragment = new URLSearchParams(location.hash.slice(1));
 history.replaceState(null, "", location.pathname);
 const $ = (id) => document.getElementById(id);
-const VOICE_WORDS = "Your own words";
+const TONE_WORDS = "Described";
 const remember = (name, value) => { try { sessionStorage.setItem(name, value); } catch (error) { /* private window */ } };
 const recall = (name) => { try { return sessionStorage.getItem(name); } catch (error) { return null; } };
 if (fragment.get("first")) remember("cd_AI-first", "1");
@@ -63,21 +63,21 @@ function render(state) {
   if (document.activeElement !== $("model")) $("model").value = state.server.model;
   $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.key_where}` : "";
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
-  voices(state);
+  tones(state);
 }
 
-function voices(state) {
-  const group = $("voices");
+function tones(state) {
+  const group = $("tones");
   if (!group.childElementCount) {
-    const rows = state.tones.map((tone) => voiceRow(tone.name, tone.name[0].toUpperCase() + tone.name.slice(1), tone.about));
-    const own = voiceRow("", VOICE_WORDS, "A few words, such as “plain and friendly”.");
+    const rows = state.tones.map((tone) => toneRow(tone.name, tone.name[0].toUpperCase() + tone.name.slice(1), tone.about));
+    const own = toneRow("", TONE_WORDS, "A few words, such as “plain and friendly”.");
     own.classList.add("own");
     const words = document.createElement("input");
     words.type = "text";
     words.id = "own-words";
     words.maxLength = 200;
-    words.setAttribute("aria-label", VOICE_WORDS);
-    words.addEventListener("change", () => words.value.trim() && change({tone: words.value}, "voice-message", "Voice saved."));
+    words.setAttribute("aria-label", TONE_WORDS);
+    words.addEventListener("change", () => words.value.trim() && change({tone: words.value}, "tone-message", "Tone saved."));
     words.addEventListener("focus", () => { own.querySelector("input[type=radio]").checked = true; });
     own.querySelector("span").append(words);
     group.replaceChildren(...rows, own);
@@ -88,15 +88,15 @@ function voices(state) {
   if (state.own_words && document.activeElement !== $("own-words")) $("own-words").value = state.tone;
 }
 
-function voiceRow(value, title, about) {
+function toneRow(value, title, about) {
   const row = document.createElement("label");
   row.className = "row choice";
   const radio = document.createElement("input");
   radio.type = "radio";
-  radio.name = "voice";
+  radio.name = "tone";
   radio.value = value;
   radio.addEventListener("change", () => {
-    if (value) change({tone: value}, "voice-message", `${title} it is.`);
+    if (value) change({tone: value}, "tone-message", `${title} it is.`);
     else $("own-words").focus();
   });
   const text = document.createElement("span");
@@ -110,7 +110,7 @@ function voiceRow(value, title, about) {
 }
 
 async function sample() {
-  // One real rewrite in the chosen voice: what Tab will do, before you log out and try it.
+  // One real rewrite in the chosen tone: what Tab will do, before you log out and try it.
   if (!shown || !ready(shown)) return;
   $("sample").hidden = false;
   $("sample").textContent = "Trying it: “ok” becomes…";

@@ -169,7 +169,7 @@ python benchmarks/judge.py --results benchmarks/eval/spark-small.json
 
 ## Choosing the models (G53, 2026-10-24)
 
-The question: which model makes cd_AI's default voice, full corporate slop that keeps the
+The question: which model makes cd_AI's default tone, full corporate slop that keeps the
 message, and which autocompletes. English only (cd_AI is the English input method).
 
 **Method.** 14 candidates, each through the real service with the slop templates
@@ -185,7 +185,7 @@ labels: rewrite 92% on pass or fail (82 labels), continue 86% (110), slop 90% (1
 76% on continue. Cases split in halves by a hash of their id; the table reports the test half.
 Every output and verdict: [`eval/g53-slop-results.json`](eval/g53-slop-results.json).
 
-Rewrite, in the slop voice (test half, 41 cases; latency on the GB10 GPU):
+Rewrite, in the slop tone (test half, 41 cases; latency on the GB10 GPU):
 
 | Model | Size | Pass | 95% interval | Median |
 | --- | ---: | ---: | ---: | ---: |
@@ -203,7 +203,7 @@ Rewrite, in the slop voice (test half, 41 cases; latency on the GB10 GPU):
 | Qwen2.5-1.5B | 1.1 GB | 2/41 (5%) | 1–16% | 0.15 s |
 | Qwen2.5-0.5B (the old default) | 0.5 GB | 1/41 (2%) | 0–13% | 0.08 s |
 
-Continue, in the slop voice (test half, 47 cases):
+Continue, in the slop tone (test half, 47 cases):
 
 | Model | Pass | 95% interval | Median |
 | --- | ---: | ---: | ---: |
@@ -239,9 +239,9 @@ the hosted models was tried. Some mechanical failures are strictness on both sid
 greedy decoding.
 
 **Conclusions.** Nothing under 1B parameters makes usable slop (≤ 7%), so a small bundled model
-was never going to carry the voice; shipping none and asking for a model is right. Gemma 4 E4B
+was never going to carry the tone; shipping none and asking for a model is right. Gemma 4 E4B
 (Apache-2.0, 4.9 GB) does slop as well as anything tried, frontier included, at 0.6 s on a GPU but
 3–4 s on a CPU alone: the local model worth recommending to people with a GPU or Apple silicon,
 in place of Qwen2.5-0.5B. For autocomplete at every pause, Gemma 4 E2B (83%, 0.24 s on a GPU) or
-E4B (91%, 0.39 s). The earlier fidelity runs (the "polished, slightly verbose" voice) measured a
+E4B (91%, 0.39 s). The earlier fidelity runs (the "polished, slightly verbose" tone) measured a
 bar the project no longer aims at and are not reported here.

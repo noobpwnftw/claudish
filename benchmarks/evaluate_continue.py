@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--cases", type=Path, default=root / "benchmarks/eval/continue_cases.json")
     parser.add_argument("--label", required=True, help="Model and settings, recorded in the output")
     parser.add_argument("--output", type=Path, help="Write full JSON results here")
-    parser.add_argument("--slop", action="store_true", help="The voice is full slop: up to 45 words")
+    parser.add_argument("--slop", action="store_true", help="The tone is full slop: up to 45 words")
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding="utf-8"))
     try:

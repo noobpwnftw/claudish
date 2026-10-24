@@ -42,7 +42,7 @@ def main():
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
     setup.add_argument("--yes", action="store_true", help="Do every step without asking")
-    setup.add_argument("--tone", help="The voice: corporate (the default slop), salesman, critic, bard, proofread "
+    setup.add_argument("--tone", help="The tone: corporate (the default slop), salesman, critic, bard, proofread "
                        "(corrects, keeps your words), or a few words of your own")
     setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
     setup.add_argument("--variant", choices=["cpu", "vulkan"], default="cpu", help="llama.cpp build to download")
@@ -68,7 +68,7 @@ def main():
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
     commands.add_parser("key", help="Save your Claude API key")
-    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, its key, the voice")
+    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, its key, the tone")
     shown.add_argument("--url", default="http://127.0.0.1:18765")
     shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
     shown.add_argument("--first", action="store_true", help="With the first-run line (log out, then Tab)")

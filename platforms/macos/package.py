@@ -40,7 +40,7 @@ killall Claudish 2> /dev/null
 "$cd_ai" init > /dev/null 2>&1 || true
 "$cd_ai" service install
 "$cd_ai" register  # added and enabled, not selected
-# The first install ends in cd_AI's settings in the browser (the key, the voice); an update opens nothing.
+# The first install ends in cd_AI's settings in the browser (the key, the tone); an update opens nothing.
 [ -n "$first" ] && "$cd_ai" settings --first
 exit 0
 """
@@ -49,7 +49,7 @@ CONCLUSION = """<!doctype html><meta charset="utf-8">
 <body style="font: 13px -apple-system, sans-serif">
 <p><b>Log out and back in to finish.</b> macOS loads a new input method at login.</p>
 <p>Then pick <b>cd_AI</b> in the input menu (the menu bar, or Control–Space), type a few words in
-any app, and press <b>Tab</b>. Settings… in that menu changes the key and the voice.</p>
+any app, and press <b>Tab</b>. Settings… in that menu changes the key and the tone.</p>
 </body>
 """
 

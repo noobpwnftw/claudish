@@ -28,10 +28,10 @@ cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an 
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
 model, or a profile routed to one. Context: files, commands and MCP servers, per app.
 
-## Voices and templates
+## Tones and templates
 
 The templates are in one file: `claudish templates` prints it, and `claudish init` writes a
-`templates.json` to edit. Pick another voice (`salesman`, `critic`, `bard`, or
+`templates.json` to edit. Pick another tone (`salesman`, `critic`, `bard`, or
 `proofread`, which only fixes your typos), or write one. Context, tools and agents:
 [configuration](docs/configuration.md).
 
@@ -46,7 +46,7 @@ python3 platforms/macos/build.py && python3 platforms/macos/package.py
 open dist/macos/cd_AI.pkg
 ```
 
-It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
+It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a tone.
 Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
 
 **Linux** (developer preview, IBus only; fcitx5 is not supported yet): one line:
@@ -69,7 +69,7 @@ py -m venv .venv
 ```
 
 Setup runs `claudish doctor` and opens cd_AI's settings in your browser: paste your Claude key and
-pick a voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
+pick a tone. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
 instead: `claudish setup --profile local`.
 
 ## Keys

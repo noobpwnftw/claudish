@@ -144,7 +144,7 @@ focused window once, sends it with that one instruction, and lists it in
   mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
 
 Verified with a real capture in both places. On Windows 11 ARM64, a Notepad
-invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
+intone was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
 Spark GPU; "what is the amount due here?" returned "The amount due is 1,250.00
 EUR." in 0.18 s.
 
@@ -333,8 +333,8 @@ git status?"); your answer goes back to it.
 
 ### Tone
 
-cd_AI's default voice is corporate slop: "ok" becomes a paragraph about shared vision and
-synergies. A profile can pick another voice:
+cd_AI's default tone is corporate slop: "ok" becomes a paragraph about shared vision and
+synergies. A profile can pick another tone:
 
 ```json
 {"profiles": {"work": {"backend": "claude", "tone": "critic"}}}
@@ -350,7 +350,7 @@ synergies. A profile can pick another voice:
 
 `proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain
 then. Any other few words work too ("warm and friendly", "plain and concise"); they
-replace the voice in each template, without examples. `claudish setup --tone critic` sets it for
+replace the tone in each template, without examples. `claudish setup --tone critic` sets it for
 you. The tones are templates like the rest ([Templates](#templates)): change one, or add your own
 under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
 over the tone. Instructions typed in a terminal always get a command line.

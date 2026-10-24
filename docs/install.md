@@ -27,7 +27,7 @@ is set up for Claude.
    .venv/bin/python -m claudish setup
    ```
 
-   It asks which voice you want (corporate slop by default), then writes a config (profile
+   It asks which tone you want (corporate slop by default), then writes a config (profile
    `claude`), imports MCP servers from your Claude setup, checks the model, registers the input
    method, starts Claudish at login, and runs `doctor`. `--yes` does it all. Installing the input
    method on Windows and macOS needs an administrator, so setup prints that command.
@@ -40,7 +40,7 @@ is set up for Claude.
 
    It opens the settings in your browser (later, **Settings…** in the input menu opens them
    again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it,
-   and uses it right away. The same page picks the voice, or another model API instead of Claude.
+   and uses it right away. The same page picks the tone, or another model API instead of Claude.
 
    Keys from elsewhere work too: `ant auth login` (the Anthropic CLI), or `ANTHROPIC_API_KEY` in
    your account's environment (a variable you `export` in a terminal does not reach a service
@@ -125,7 +125,7 @@ This adapter does not support an Fcitx-only session or a raw terminal console.
 **The installer.** `cd_AI-setup.exe` installs everything for x64 and ARM64 Windows: cd_AI's PIME
 (the text service, for every app, beside any PIME you have), a Python of its own for the service, and
 cd_AI in your input sources. It asks for an administrator once, then sets up a starter config, the service at
-every login, and cd_AI's settings in your browser (the key, the voice). Then sign out and back in,
+every login, and cd_AI's settings in your browser (the key, the tone). Then sign out and back in,
 or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
 "Windows protected your PC"; **More info → Run anyway** lets it through. cd_AI brings its own build
@@ -168,7 +168,7 @@ open dist/macos/cd_AI.pkg
 `cd_AI.pkg` installs for you alone (`~/Library/Input Methods`, no administrator password) and does
 the rest: a starter config, the service at every login, and cd_AI added to your input sources and
 enabled. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
-the end: paste your Claude key, pick a voice. Then **log out and back in**, as after installing or
+the end: paste your Claude key, pick a tone. Then **log out and back in**, as after installing or
 updating any macOS input method: until then macOS keeps its old list of input sources (and, after
 an update, the old cd_AI). **Settings…** in the input menu opens the settings again.
 
