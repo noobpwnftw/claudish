@@ -129,6 +129,31 @@ class WorkerTests(unittest.TestCase):
         finally:
             worker.close()
 
+    def test_one_slow_health_answer_is_not_offline(self):
+        """A busy machine answers /health late now and then: the panel does not flicker offline."""
+        import contextlib
+        import threading
+        answers = iter([TimeoutError()] + [None] * 1000)
+        seen = []
+
+        def opened(url, timeout):
+            answer = next(answers)
+            if answer:
+                raise answer
+            return contextlib.nullcontext()
+        worker = Suggestions(endpoint="http://127.0.0.1:9")
+        worker.close()  # its own watcher stops; this test drives one
+        worker.stopped, worker.offline = threading.Event(), False
+        with patch("claudish.client.OPENER.open", opened):
+            watcher = threading.Thread(target=worker._watch, kwargs={"every": 0.005})
+            watcher.start()
+            for _ in range(40):
+                seen.append(worker.offline)
+                time.sleep(0.002)
+            worker.stopped.set()
+            watcher.join()
+        self.assertNotIn(True, seen)
+
     def test_tab_asks_for_a_short_word_continue_does_not(self):
         """"ok" is the README's own example: a rewrite asked for with Tab is sent whatever its length;
         continue, which asks by itself at every pause, waits for a few characters."""

@@ -113,12 +113,18 @@ class Suggestions:
     def _watch(self, every=3.0):
         """Whether the service answers, checked off the input thread every few seconds, so the panel
         says it is offline from the first key (a refused connection on this computer fails at once)."""
+        missed = 0
         while True:
             try:
-                with OPENER.open(self.endpoint + "/health", timeout=1):
-                    self.offline = False
-            except Exception:
-                self.offline = True
+                with OPENER.open(self.endpoint + "/health", timeout=2):
+                    self.offline, missed = False, 0
+            except Exception as exc:
+                missed += 1
+                # Nothing listening is offline at once; a slow answer (a busy machine, a settings
+                # reload) only when it happens twice in a row.
+                refused = isinstance(getattr(exc, "reason", exc), ConnectionRefusedError)
+                if refused or missed >= 2:
+                    self.offline = True
             if self.stopped.wait(every):
                 return
 
