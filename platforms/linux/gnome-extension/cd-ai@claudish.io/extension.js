@@ -191,7 +191,9 @@ export default class CdAiExtension extends Extension {
     // something is composed, else the caret); the suggestion right after the caret. Clamped.
     _place() {
         const {x, y, width, height} = this._cursor;
-        const monitor = Main.layoutManager.findMonitorForActor(this._panel) || Main.layoutManager.primaryMonitor;
+        // The monitor with the caret, not the one the panel was last on.
+        const monitor = Main.layoutManager.monitors.find((m) => x >= m.x && x < m.x + m.width && y >= m.y && y < m.y + m.height)
+            || Main.layoutManager.primaryMonitor;
         for (const box of [this._panel, this._toast]) {
             if (!box.visible) {
                 box._opened = null;

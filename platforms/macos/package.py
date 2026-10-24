@@ -101,6 +101,8 @@ def main():
         if archs:
             built = set(archs) if built is None else built & set(archs)
     built = sorted(built or [])
+    if not built:  # no architecture common to every binary: the package would install nowhere
+        parser.error("lipo found no architecture common to the bundle's binaries; rebuild it on this Mac")
     with tempfile.TemporaryDirectory() as work:
         work = Path(work)
         payload, scripts = work / "payload", work / "scripts"

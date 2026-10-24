@@ -78,6 +78,20 @@ def ink_middle(field):
     return ink.origin.y + ink.size.height / 2
 
 
+
+def units(text):
+    """A string's length as AppKit counts it, in UTF-16 units (an emoji is two)."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def caret_screen(x, y):
+    """The visible frame of the screen the caret is on (the main one when none holds it)."""
+    for screen in NSScreen.screens() or []:
+        frame = screen.frame()
+        if frame.origin.x <= x < frame.origin.x + frame.size.width and frame.origin.y <= y < frame.origin.y + frame.size.height:
+            return screen.visibleFrame()
+    return NSScreen.mainScreen().visibleFrame()
+
 class Box(NSView):
     """A rounded rectangle in a colour, drawn by AppKit (a layer's CGColor needs Quartz's bridge)."""
 
@@ -185,9 +199,9 @@ class Panel:
             line = label("%s  %s" % (turn["label"], turn["body"]), SIZE)
             words = line.attributedStringValue().mutableCopy()
             words.addAttribute_value_range_("NSFont", NSFont.systemFontOfSize_weight_(SMALL, NSFontWeightSemibold),
-                                            (0, len(turn["label"])))
-            words.addAttribute_value_range_("NSColor", secondary, (0, len(turn["label"])))
-            words.addAttribute_value_range_("NSUnderline", 1, (len(turn["label"]) + 2, len(turn["body"])))
+                                            (0, units(turn["label"])))
+            words.addAttribute_value_range_("NSColor", secondary, (0, units(turn["label"])))
+            words.addAttribute_value_range_("NSUnderline", 1, (units(turn["label"]) + 2, units(turn["body"])))
             one_line = NSMutableParagraphStyle.alloc().init()
             one_line.setLineBreakMode_(4)  # NSLineBreakByTruncatingTail: "thanking them fo…", as the lab does
             words.addAttribute_value_range_("NSParagraphStyle", one_line, (0, words.length()))
@@ -213,7 +227,7 @@ class Panel:
             text = label(row["text"] + legend, SIZE, color=secondary if replying else None, width=text_width)
             if legend:  # the legend in the secondary colour
                 words = text.attributedStringValue().mutableCopy()
-                words.addAttribute_value_range_("NSColor", secondary, (len(row["text"]), len(legend)))
+                words.addAttribute_value_range_("NSColor", secondary, (units(row["text"]), units(legend)))
                 text.setAttributedStringValue_(words)
             size = text.fittingSize()
             widest = max(widest, size.width + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
@@ -243,7 +257,7 @@ class Panel:
             x = self.opened[0]
         self.opened = (x, cy)
         frame = NSMakeRect(x, cy - height - 6, width, height)
-        screen = NSScreen.mainScreen().visibleFrame()
+        screen = caret_screen(cx, cy)
         if frame.origin.y < screen.origin.y:  # no room below: above the line
             frame.origin.y = cy + ch + 6
         frame.origin.x = max(screen.origin.x + 4, min(frame.origin.x, screen.origin.x + screen.size.width - width - 4))
