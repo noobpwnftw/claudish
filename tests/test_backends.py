@@ -216,9 +216,6 @@ class CommandBackendTests(unittest.TestCase):
             self.assertEqual(built["rewriter"].command, [sys.executable, "-c", "print(1)"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ClaudeLoopTests(unittest.TestCase):
     """Claude with tools and a conversation: the same loop as any model (the tool calls translated)."""
@@ -300,3 +297,7 @@ class RealSdkTests(unittest.TestCase):
         path, key, body = seen[0]
         self.assertEqual((path.split("?")[0], key, body["model"]), ("/v1/messages", "sk-ant-test", "claude-opus-5-5"))
         self.assertEqual(body["messages"][-1]["role"], "user")
+
+
+if __name__ == "__main__":
+    unittest.main()

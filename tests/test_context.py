@@ -225,9 +225,6 @@ class MCPContextTests(unittest.TestCase):
                 Context([spec])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class RoutingTests(unittest.TestCase):
     """Which AI answers where: a binding's "profile" routes an app's requests to that profile."""
@@ -313,3 +310,7 @@ class ModeRoutingTests(unittest.TestCase):
             path.write_text(json.dumps({"profiles": {"main": {"backend": "rules", "modes": {"continue": {"profile": "nope"}}}}}))
             with self.assertRaisesRegex(ValueError, "names profile 'nope'"):
                 config.resolve(path)
+
+
+if __name__ == "__main__":
+    unittest.main()

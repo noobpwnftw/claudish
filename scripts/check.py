@@ -29,13 +29,21 @@ LIMIT = 5  # seconds a check may take
 
 def run(name, command):
     started = time.monotonic()
+    # Its own process group: on a timeout everything it started goes too (a service, a browser).
+    process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                               start_new_session=hasattr(os, "killpg"))
     try:
-        process = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=LIMIT)
+        out, err = process.communicate(timeout=LIMIT)
     except subprocess.TimeoutExpired:
+        if hasattr(os, "killpg"):
+            os.killpg(process.pid, 9)
+        else:
+            process.kill()
+        process.communicate()
         results.append((name, "FAIL", "over %d s: make it faster or drop it" % LIMIT))
         return None
     status = "PASS" if process.returncode == 0 else "FAIL"
-    output = (process.stdout + process.stderr).strip().splitlines()
+    output = (out + err).strip().splitlines()
     results.append((name, status, "%.1fs" % (time.monotonic() - started)))
     if status == "FAIL":
         # The traceback and what it asserted (a browser test appends a long page snapshot), then the end.

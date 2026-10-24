@@ -165,9 +165,6 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(session.events[-1]["text"], "cancelled")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class AskAndHelperTests(unittest.TestCase):
     """The model's own question (shown as is), and a helper as a tool that acts, asked about first."""
@@ -406,12 +403,18 @@ class TmuxHandleTests(unittest.TestCase):
         if not shutil.which("tmux"):
             self.skipTest("no tmux")
         name = "claudish-test-%d" % (time.time() * 1000 % 100000)
-        subprocess.run(["tmux", "new-session", "-d", "-s", name, "printf 'building\\nAPI_KEY=sk-abcdefghijklmnopqrstuvwxyz123456\\nall tests pass\\n'; sleep 30"],
+        subprocess.run(["tmux", "new-session", "-d", "-s", name, "printf 'building\\nAPI_KEY=sk-abcdefghijklmnopqrstuvwxyz123456\\nall tests pass\\n'; sleep 5"],
                        check=True)
         try:
-            time.sleep(0.5)
-            text = handoff.progress({"helper": "aider", "task": "fix it", "tmux": name, "started": time.time(), "cwd": "/"})
+            deadline, text = time.monotonic() + 3, ""
+            while "all tests pass" not in text and time.monotonic() < deadline:  # drawn when tmux gets to it
+                time.sleep(0.05)
+                text = handoff.progress({"helper": "aider", "task": "fix it", "tmux": name, "started": time.time(), "cwd": "/"})
         finally:
             subprocess.run(["tmux", "kill-session", "-t", name])
         self.assertIn("all tests pass", text)
         self.assertNotIn("sk-abc", text)  # redacted, like a terminal screen
+
+
+if __name__ == "__main__":
+    unittest.main()
