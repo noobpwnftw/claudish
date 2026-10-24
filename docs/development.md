@@ -122,15 +122,19 @@ python.org, and Accessibility for the process that runs the driver (over SSH:
 `/usr/libexec/sshd-keygen-wrapper`):
 
 ```sh
-python3 platforms/macos/build.py
-python3 -m claudish serve --backend rules &
 .tools/macos-build-venv/bin/python -m pip install "pyobjc-framework-Quartz>=10,<13"
-.tools/macos-build-venv/bin/python tests/desktop/macos/driver.py [--reinstall]
+tests/desktop/macos/cycle.sh        # on the Mac
+tests/desktop/macos/remote.sh       # or from your machine: syncs this tree, runs it there
 ```
 
-`--reinstall` puts a fresh build in place (expect the Allow dialog). macOS starts
-an input method at login and does not restart it after an update or a crash, so
-the rig starts it (`open -g`) when it is not running.
+A cycle builds the bundle and `cd_AI.pkg`, installs the package over whatever is
+installed (its postinstall stops the old build, as a user's reinstall would),
+runs the rig against the same bundle's rules service in the login service's
+place, and then hands the port back to the login service. No build or service
+from an earlier run is left to collide with. The first install of a build asks
+"Allow … to enable cd_AI?"; the rig waits for it. macOS starts an input method
+at login and does not restart it after an update or a crash, so the rig starts
+it (`open -g`) when it is not running.
 
 For debugging, `touch ~/Library/Logs/cd_AI-trace.log` before cd_AI starts makes
 it log event kinds and errors there (never typed text); remove the file to stop.

@@ -57,10 +57,11 @@ def check_backend(state):
             import anthropic  # noqa: F401
         except ImportError:
             return "fail", "the Anthropic SDK is not installed", 'pip install "claudish-ime[claude]"'
-        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        from .keys import stored
+        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") or stored()
                 or Path.home().joinpath(".config", "anthropic").is_dir()):
-            return "warn", "no ANTHROPIC_API_KEY and no `ant auth login` profile found", \
-                "set ANTHROPIC_API_KEY, or run `ant auth login`"
+            return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", \
+                "`claudish key` saves one (macOS), or set ANTHROPIC_API_KEY, or run `ant auth login`"
         return "ok", "Claude via the Anthropic SDK (%s)" % settings["claude_model"], None
     if backend == "command":
         program = settings["command"][0]

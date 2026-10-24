@@ -18,7 +18,9 @@ LABEL = "com.claudish.service"
 
 
 def command(local, extra):
-    """The argv the service manager runs."""
+    """The argv the service manager runs: inside the macOS bundle, the bundle itself (G61)."""
+    if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
+        return [os.environ["EXECUTABLEPATH"], "serve"] + list(extra)  # py2app's launcher sets it
     if local:
         return [sys.executable, str(ROOT / "scripts" / "start.py")] + list(extra)
     return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
@@ -63,7 +65,7 @@ def launchd_plist(argv):
   </array>
   <key>WorkingDirectory</key><string>%s</string>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
 </dict>
 </plist>
 """ % (LABEL, arguments, escape(str(ROOT)))

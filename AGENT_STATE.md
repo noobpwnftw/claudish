@@ -21,6 +21,16 @@ G57-G60 tabled.
 
 ## Verified (latest)
 
+- G61 macOS (branch `agent/mac-package`): `platforms/macos/package.py` builds `cd_AI.pkg` (36 MB,
+  ad-hoc, current-user domain, no password). On the VM, `installer -target CurrentUserHomeDirectory`
+  over a running build: the postinstall stops the old build (as Squirrel's does), writes the starter
+  config, loads the login service (the bundle's own `serve`; `/health` answers, Claude backend) and
+  registers/enables/selects the input source; the rig then 12/12 in one run. A second service on a
+  taken port now exits 0 without replacing the running one's token (it caused the rig's 403s), and
+  launchd restarts only crashes. CI paused by the owner (Check workflow disabled) until G61-G63/G45. The key is in the Keychain (`claudish key`). Not yet: the GUI
+  Installer path with Open Anyway (owner's hand test), publishing a release (needs the owner).
+  Finder's desktop: macOS opens its own bottom input window for every IME (owner checked Pinyin);
+  no special case.
 - `ff4876c` (G53 report): gate `check.py --model` 10/10. `378ef93` (install steps): gate, CI 5/5,
   the systemd container test (setup --profile local end to end). `6f21847` (no model ships): gate,
   CI 5/5. `05ff8bb` (compose default): Linux 41/41, GNOME 13/13, Windows 15/15 + 4/4, macOS 11/11.

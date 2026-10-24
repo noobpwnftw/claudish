@@ -149,6 +149,10 @@ desktops, and qemu/KVM (aarch64) for Windows on ARM. macOS needs Apple
 hardware, so it stays on remote CI. Remote CI is opt-in: it runs only for `ci/*`
 branches or a manual dispatch. Run one for `main` before notable merges, since
 Windows-only failures are invisible locally.
+Paused (owner, 2026-10-24): the Check workflow is disabled on GitHub until the onboarding
+milestones (G61-G63, G45) are made; `gh workflow enable Check` restores it. Until then, push no
+`ci/*` branches; the merge gate is `check.py --model` plus, for adapter or packaging changes, the
+platform's rig on its VM (macOS: `tests/desktop/macos/remote.sh`; Windows: the qemu VM).
 Push a `ci/<topic>` branch when a change touches the Windows or macOS adapters,
 packaging, or anything the Spark cannot run. It provides the only Windows and
 macOS coverage. Only report remote CI as passing after every job of the run for

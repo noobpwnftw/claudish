@@ -1,8 +1,8 @@
 """Real typing on macOS (GitHub's macOS runners are Apple hardware): the built input method,
 selected through Text Input Sources, typing into a test app (app.py) with Quartz key events.
 
-Run on a Mac with the bundle built (platforms/macos/build.py) and the service running with the
-rules backend (python -m claudish serve --backend rules). Needs pyobjc-framework-Quartz.
+Run through cycle.sh (build, install, the rules service, this), or on a Mac with the bundle built
+and a service running with the rules backend. Needs pyobjc-framework-Quartz.
 """
 import json
 import shutil
@@ -200,7 +200,10 @@ def scenarios():
     elif "--reinstall" in sys.argv:
         # In place: a removed and re-added bundle is a new input source, which macOS asks about again.
         sh("rsync", "-a", "--delete", str(ROOT / "dist/macos/Claudish.app") + "/", str(TARGET) + "/")
-        subprocess.run(["pkill", "-f", str(TARGET)], check=False)  # the next key starts the new build
+        # Stop the old build, as the package does; until it has exited it still counts as running
+        # below, and the first keys would reach the app with no input method.
+        subprocess.run(["killall", "Claudish"], check=False, capture_output=True)
+        wait_for(lambda: subprocess.run(["pgrep", "-x", "Claudish"], capture_output=True).returncode, timeout=10)
         print("note: macOS keeps the old bundle's name and icon (and sometimes the input method) until"
               " you log out and in", flush=True)
     select_input_method()

@@ -21,7 +21,8 @@ class ServiceDefinitionTests(unittest.TestCase):
         argv = ["/usr/bin/python3", "-m", "claudish", "serve", "--profile", "a&b"]
         plist = plistlib.loads(service.launchd_plist(argv).encode())
         self.assertEqual(plist["ProgramArguments"], argv)
-        self.assertTrue(plist["RunAtLoad"] and plist["KeepAlive"])
+        self.assertTrue(plist["RunAtLoad"])
+        self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})  # crashes restart; "already running" does not
 
     def test_windows_task_prefers_pythonw(self):
         with tempfile.TemporaryDirectory() as directory:

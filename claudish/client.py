@@ -28,12 +28,12 @@ def read_token():
         return ""
 
 
-def write_token():
-    """A new token for this service run, in a file only this user can read."""
+def write_token(token=None):
+    """This service run's token (a new one when None), in a file only this user can read."""
     import secrets
     path = token_path()
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    token = secrets.token_urlsafe(32)
+    token = token or secrets.token_urlsafe(32)
     temporary = path + ".tmp"
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, "w") as out:

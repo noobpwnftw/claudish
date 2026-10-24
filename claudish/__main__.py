@@ -67,6 +67,8 @@ def main():
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
+    commands.add_parser("key", help="Save your Claude API key where the service reads it (macOS: the Keychain); "
+                                     "it is never written to the config")
     recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
                                  "(in the service's memory only)")
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
@@ -83,6 +85,19 @@ def main():
     if argv[:1] == ["service"] and "--" in argv:
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
+    if args.command == "key":
+        import getpass
+        import subprocess
+        from .keys import store
+        value = getpass.getpass("Claude API key (not shown): ").strip()
+        if not value:
+            sys.exit("No key given; nothing saved.")
+        try:
+            store(value)
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
+            sys.exit(str(exc))
+        print("Saved in the Keychain (cd_AI). cd_AI's service uses it from its next start.")
+        return
     if args.command == "recent":
         if args.clear:
             from .client import call
@@ -159,8 +174,21 @@ def main():
             _, routed, routed_templates, routed_context = config.resolve(args.config, name)
             return Rewriter.from_settings(routed, routed_templates, routed_context, name)
         rewriter.loader = load
+        import errno
+        import secrets
         from .client import write_token
-        server = make_server(rewriter, args.port, write_token())
+        token = secrets.token_urlsafe(32)
+        try:
+            server = make_server(rewriter, args.port, token)
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE:
+                raise
+            # Another service has the port (most likely cd_AI's own): nothing to do, and its
+            # token stays as it is. Exit 0, so the login service does not start it again.
+            print("Port %s is in use: cd_AI is already running, or another program has it. "
+                  "Check with `claudish doctor`." % args.port, file=sys.stderr, flush=True)
+            return
+        write_token(token)  # only once the port is ours: the running service's token stays valid
         if rewriter.hosted:
             target = ("the Anthropic API (%s)" % settings["claude_model"] if rewriter.claude
                       else " ".join(settings["command"]) if settings["backend"] == "command"
