@@ -231,6 +231,7 @@ function toast(spec = null) {
 // Keys, as an input method sees them. Returns true when the key was taken.
 function key(name, shift = false) {
   flash(name);
+  document.querySelectorAll("#editor > .k-toast").forEach((old) => old.remove());  // a key ends a toast
   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(name)) {
     settle();
     const lineStart = doc.text.lastIndexOf("\n", doc.caret - 1) + 1;
@@ -413,11 +414,11 @@ function placeCandidateWindow() {
   const window = $("candidates");
   const editor = $("editor").getBoundingClientRect();
   const caret = CARET.getBoundingClientRect();
-  // The panel fits the editor (a phone's is narrower than the panel's 440 px), as a real panel
-  // fits its screen.
+  // The panel is as wide as its words, up to the editor (the demo has no 440 px cap), as a real
+  // panel fits its screen.
   const panel = window.querySelector(".k-panel, .k-toast");
-  if (panel) panel.style.maxWidth = panel.style.minWidth = "";
-  if (panel && editor.width - 16 < panel.offsetWidth) panel.style.maxWidth = panel.style.minWidth = `${editor.width - 16}px`;
+  const room = `${editor.width - 16}px`;
+  if (panel) Object.assign(panel.style, {maxWidth: room, minWidth: `min(var(--k-min), ${room})`});
   // As on every platform: under the line, the panel's content starting where the composition
   // starts (what IMK, TSF and IBus report while something is composed), or at the caret.
   const start = PREEDIT.textContent ? PREEDIT.getClientRects()[0] || caret : caret;

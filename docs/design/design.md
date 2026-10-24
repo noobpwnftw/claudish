@@ -24,7 +24,8 @@ new work: does it make one turn at the caret better?
 
 A Shift tap (Shift pressed and released alone, not right after another key) switches mode, as
 Shift switches English and pinyin. The taskbar, menu bar or top bar shows the mode all along; a
-switch shows the mode's tile and name briefly at the caret ("compose · Shift continue").
+switch shows the mode's tile and name briefly at the caret ("compose · Shift continue"); like
+every toast, it lasts two seconds or until the next key, since it was said where the caret was.
 
 - **Continue** (where cd_AI starts): keys go straight into the app. At a word boundary at the end
   of a line, the rest of the sentence shows in grey after the caret. Tab takes it; typing ignores

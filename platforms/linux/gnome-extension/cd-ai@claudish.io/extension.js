@@ -87,8 +87,8 @@ export default class CdAiExtension extends Extension {
             return;
         }
         this._fill(this._panel, screen.panel);
-        if (screen.panel && !screen.toast)
-            this._toast.visible = false;  // a panel replaces a toast at the caret
+        if (screen.toast === false || (screen.panel && !screen.toast))
+            this._toast.visible = false;  // a key or a panel ends a toast: it was said where the caret was
         this._ghost.visible = Boolean(screen.ghost);
         if (screen.ghost) {
             // cd_AI's own grey text, in the UI font at the caret's height.

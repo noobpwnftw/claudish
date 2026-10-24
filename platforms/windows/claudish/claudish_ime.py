@@ -168,6 +168,7 @@ class ClaudishTextService(TextService):
             return False
         self.shift.other()
         self.switching = False
+        self.hideMessage()  # a key ends a toast: it was said where the caret was
         if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.

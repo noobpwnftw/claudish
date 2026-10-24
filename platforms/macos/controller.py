@@ -443,6 +443,7 @@ class ClaudishInputController(IMKInputController):
         if not self.active or event.type() != NSEventTypeKeyDown:
             return False
         self.shift.other()
+        TOAST.hide()  # a key ends a toast: it was said where the caret was
         flags = event.modifierFlags()
         # Option types characters such as — and €; it is not a shortcut by itself.
         if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl):

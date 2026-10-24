@@ -54,7 +54,7 @@ class Screen:
     extension), IBus's popup shows the rows and the hint as plain text."""
 
     def __init__(self):
-        self.shell, self.state = False, "{}"
+        self.shell, self.state, self.shown, self.toasting = False, "{}", {}, False
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
             info = Gio.DBusNodeInfo.new_for_xml(SCREEN_XML).interfaces[0]
@@ -74,10 +74,18 @@ class Screen:
         invocation.return_value(GLib.Variant("(s)", (self.state,)))
 
     def publish(self, panel=None, ghost="", toast=None):
-        self.state = json.dumps({"panel": panel, "ghost": ghost, "toast": toast})
+        """What is at the caret. A toast stays until its time is up or a key ends it (False)."""
+        self.toasting = bool(toast) or (self.toasting and toast is None)
+        self.shown = {"panel": panel, "ghost": ghost}
+        self.state = json.dumps({**self.shown, "toast": toast})
         if self.bus is not None:
             self.bus.emit_signal(None, "/io/claudish/Screen", "io.claudish.Screen", "Changed",
                                  GLib.Variant("(s)", (self.state,)))
+
+    def end_toast(self):
+        """A key ends a toast: it was said where the caret was."""
+        if self.toasting:
+            self.publish(**self.shown, toast=False)
 
 
 SCREEN = None
@@ -273,6 +281,7 @@ class ClaudishEngine(IBus.Engine):
             return False
         if not state & IBus.ModifierType.RELEASE_MASK:
             self.shift.other()
+            screen().end_toast()
         if not state & IBus.ModifierType.RELEASE_MASK:
             name = IBus.keyval_name(keyval) or ""
             trace("key", name if len(name) > 1 else "char", self.composition.mode,
