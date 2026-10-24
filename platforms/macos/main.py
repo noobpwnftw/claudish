@@ -7,10 +7,13 @@ the claudish command line, and `Claudish register` adds and enables the input so
 import os
 import sys
 
-# py2app points SSL_CERT_FILE at a certificate file the bundle does not carry; without it, the HTTP
-# client uses the system's trust store (truststore), which is what a Mac should use.
-if os.environ.get("SSL_CERT_FILE") and not os.path.exists(os.environ["SSL_CERT_FILE"]):
-    del os.environ["SSL_CERT_FILE"]
+# py2app points SSL_CERT_FILE at a certificate file the bundle does not carry, and the bundle's
+# OpenSSL has no certificates of its own (python.org's Python leaves that to "Install
+# Certificates"): HTTPS (Anthropic's API) fails "certificate verify failed". The bundle carries
+# certifi's as a file.
+if not os.path.exists(os.environ.get("SSL_CERT_FILE") or ""):
+    import certifi
+    os.environ["SSL_CERT_FILE"] = certifi.where()
 
 from AppKit import NSApplication
 from Foundation import NSBundle

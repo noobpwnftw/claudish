@@ -66,8 +66,9 @@ def check_key(key):
                             max_retries=0).models.list(limit=1)
     except anthropic.AuthenticationError:
         return "Anthropic did not accept that key"
-    except anthropic.APIConnectionError:
-        return "Anthropic could not be reached to check it"
+    except anthropic.APIConnectionError as exc:  # the network, or this computer's certificates: say which
+        cause = exc.__cause__ or exc
+        return "Anthropic could not be reached to check it (%s: %s)" % (type(cause).__name__, str(cause)[:120])
     except anthropic.APIError as exc:
         return "Anthropic answered: %s" % getattr(exc, "message", exc)
     return None

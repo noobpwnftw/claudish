@@ -1,5 +1,7 @@
 """Configurable backends: Claude via a stand-in SDK, and OpenAI-compatible endpoints (no live services)."""
+import importlib.util
 import json
+import os
 import tempfile
 import threading
 from io import BytesIO
@@ -253,3 +255,45 @@ class ClaudeLoopTests(unittest.TestCase):
         result = second["messages"][-1]["content"][0]
         self.assertEqual((result["type"], result["tool_use_id"], result["content"]),
                          ("tool_result", "tu1", "The user chose: Yes"))
+
+
+@unittest.skipUnless(importlib.util.find_spec("anthropic"), "the Anthropic SDK is not installed here")
+class RealSdkTests(unittest.TestCase):
+    """The real Anthropic SDK against a stand-in for Anthropic's API: what cd_AI sends (the endpoint,
+    the model, the key) and what it makes of the answer. Anthropic itself needs a real key."""
+
+    def test_a_rewrite_goes_through_the_sdk_as_sent_and_answered(self):
+        import json as wire
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        seen = []
+
+        class Anthropic(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = wire.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                # The SDK sends the key as x-api-key, or (2.x) as a bearer token: either way, the key.
+                key = self.headers.get("x-api-key") or (self.headers.get("Authorization") or "").removeprefix("Bearer ")
+                seen.append((self.path, key, body))
+                answer = wire.dumps({"id": "msg_1", "type": "message", "role": "assistant", "model": body["model"],
+                                     "content": [{"type": "text", "text": "Absolutely—let's align on that."}],
+                                     "stop_reason": "end_turn", "stop_sequence": None,
+                                     "usage": {"input_tokens": 12, "output_tokens": 8}}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(answer)))
+                self.end_headers()
+                self.wfile.write(answer)
+
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Anthropic)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        environment = {"ANTHROPIC_BASE_URL": "http://127.0.0.1:%d" % server.server_port, "ANTHROPIC_API_KEY": "sk-ant-test"}
+        with patch.dict(os.environ, environment):
+            result = Rewriter("claude", claude_model="claude-opus-5-5").rewrite("ok")
+        self.assertEqual(result["text"], "Absolutely—let's align on that.")
+        path, key, body = seen[0]
+        self.assertEqual((path.split("?")[0], key, body["model"]), ("/v1/messages", "sk-ant-test", "claude-opus-5-5"))
+        self.assertEqual(body["messages"][-1]["role"], "user")
