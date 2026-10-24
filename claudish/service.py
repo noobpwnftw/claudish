@@ -23,6 +23,8 @@ def command(local, extra):
         return [os.environ["EXECUTABLEPATH"], "serve"] + list(extra)  # py2app's launcher sets it
     if local:
         return [sys.executable, str(ROOT / "scripts" / "start.py")] + list(extra)
+    if not (ROOT / "scripts" / "serve.py").is_file():  # installed as a package (the Windows installer)
+        return [sys.executable, "-m", "claudish", "serve"] + list(extra)
     return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
 
 

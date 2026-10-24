@@ -24,6 +24,13 @@ class ServiceDefinitionTests(unittest.TestCase):
         self.assertTrue(plist["RunAtLoad"])
         self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})  # crashes restart; "already running" does not
 
+    def test_an_installed_package_runs_its_module(self):
+        """Without the checkout's scripts/ (the Windows installer's Python): `python -m claudish serve`."""
+        with tempfile.TemporaryDirectory() as directory, patch.object(service, "ROOT", Path(directory)):
+            self.assertEqual(service.command(False, ["--profile", "x"]),
+                             [sys.executable, "-m", "claudish", "serve", "--profile", "x"])
+        self.assertEqual(service.command(False, [])[1:], [str(service.ROOT / "scripts" / "serve.py")])
+
     def test_windows_task_prefers_pythonw(self):
         with tempfile.TemporaryDirectory() as directory:
             python, pythonw = Path(directory, "python.exe"), Path(directory, "pythonw.exe")
