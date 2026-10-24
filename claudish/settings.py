@@ -28,7 +28,7 @@ def claude_code():
     if found:
         return str(Path(found).absolute())  # the link, not its target: an update moves the target
     home = Path.home()
-    places = [home / ".local/bin/claude", home / ".claude/local/claude", Path("/usr/local/bin/claude"),
+    places = [home / ".local/bin/claude", home / ".local/bin/claude.exe", home / ".claude/local/claude", Path("/usr/local/bin/claude"),
               Path("/opt/homebrew/bin/claude"), home / ".npm-global/bin/claude",
               Path(os.environ.get("APPDATA", home / "AppData/Roaming")) / "npm/claude.cmd"]
     places += sorted((Path(p) for p in glob.glob(str(home / ".vscode*/extensions/anthropic.claude-code-*/"
