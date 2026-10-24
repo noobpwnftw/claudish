@@ -43,7 +43,7 @@ def resolve(path=None, profile=None, overrides=None):
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError) as exc:
             raise ValueError("cannot read %s: %s" % (path, exc))
         profiles = data.get("profiles") if isinstance(data, dict) else None

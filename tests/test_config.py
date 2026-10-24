@@ -99,5 +99,16 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("mine", path.read_text(encoding="utf-8"))
 
 
+class ByteOrderMarkTests(unittest.TestCase):
+    def test_a_config_saved_with_a_byte_order_mark_loads(self):
+        """Windows PowerShell 5's Set-Content -Encoding UTF8 writes one."""
+        import tempfile
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_bytes(b"\xef\xbb\xbf" + json.dumps({"profile": "p", "profiles": {"p": {"backend": "rules"}}}).encode())
+            self.assertEqual(config.resolve(path)[0], "p")
+
+
 if __name__ == "__main__":
     unittest.main()

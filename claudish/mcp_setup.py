@@ -30,7 +30,7 @@ def discover():
     found = {}
     for label, path in claude_sources():
         try:
-            servers = json.loads(path.read_text(encoding="utf-8")).get("mcpServers") or {}
+            servers = json.loads(path.read_text(encoding="utf-8-sig")).get("mcpServers") or {}
         except (OSError, ValueError):
             continue
         for name, server in servers.items():
@@ -77,7 +77,7 @@ def sanitize(name, server):
 
 def import_servers(path=None, dry_run=False, replace=False):
     path = Path(path or config.default_path())
-    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else json.loads(json.dumps(config.STARTER))
+    data = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else json.loads(json.dumps(config.STARTER))
     servers = data.setdefault("mcp_servers", {})
     found, imported, needed = discover(), [], set()
     if not found:
@@ -111,7 +111,7 @@ def list_servers():
     shown = marks()
     from .context import list_server
     try:
-        data = json.loads(Path(config.default_path()).read_text(encoding="utf-8"))
+        data = json.loads(Path(config.default_path()).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         data = {}
     servers = data.get("mcp_servers") or {}

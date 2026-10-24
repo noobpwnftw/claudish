@@ -13,7 +13,7 @@ SECTIONS = {"about", "modes", "tones", "box"}
 
 def load(path):
     """A templates file, checked: the shipped shape, naming only what it changes."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     where = "templates %s" % path
     if not isinstance(data, dict) or set(data) - SECTIONS:
         raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))

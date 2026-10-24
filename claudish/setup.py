@@ -68,7 +68,7 @@ def step_tone(name, settings, tone):
 
     def write():
         path = config.default_path()
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
         data.setdefault("profiles", {}).setdefault(name, {})["tone"] = tone
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return "todo", "set the %s profile's tone to %r" % (name, tone), write
@@ -79,7 +79,7 @@ def step_mcp():
     if not found:
         return "skip", "no MCP servers configured for Claude Desktop or Claude Code", None
     path = config.default_path()
-    have = (json.loads(path.read_text(encoding="utf-8")).get("mcp_servers") or {}) if path.is_file() else {}
+    have = (json.loads(path.read_text(encoding="utf-8-sig")).get("mcp_servers") or {}) if path.is_file() else {}
     new = sorted(set(found) - set(have))
     if not new:
         return "done", "all %d already imported" % len(found), None

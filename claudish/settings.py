@@ -59,7 +59,7 @@ def read(path=None):
     path = path or config.default_path()
     if not path.is_file():
         return dict(config.STARTER, profiles={k: dict(v) for k, v in config.STARTER["profiles"].items()})
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def key_state():

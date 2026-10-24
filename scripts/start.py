@@ -23,7 +23,7 @@ def local_rewriter(endpoint, profile=None):
     Without --profile: "local" when the config file has it, else the file's default."""
     if profile is None and config.default_path().is_file():
         try:
-            profiles = json.loads(config.default_path().read_text(encoding="utf-8")).get("profiles") or {}
+            profiles = json.loads(config.default_path().read_text(encoding="utf-8-sig")).get("profiles") or {}
         except (OSError, ValueError, AttributeError):
             profiles = {}  # resolve() below reports the real problem
         profile = "local" if "local" in profiles else None
