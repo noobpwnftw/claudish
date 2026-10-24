@@ -285,6 +285,7 @@ function key(name, shift = false) {
       if (words.length <= MAX) { removeSelection(); change(words); state.adopted = true; }
     }
     if (!state.text) return false;
+    if (state.reply) return true;  // a reply you are typing: Enter sends it, and Tab takes nothing over it
     // The first Tab asks for the rewrite, which takes your words' place as it arrives; the next
     // keeps it (or an instruction's first draft). A pending answer is not stale text: Tab waits.
     if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft

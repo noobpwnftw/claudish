@@ -65,6 +65,7 @@ class Composition:
         self.candidate = ""
         self.candidates = []  # every reading offered; candidate is the first
         self.revision = 0
+        self.issued = 0  # the last revision ever used: a held exchange coming back never reuses one
         self.mode = MODES[0]
         self.asked = None  # compose: what the pending or shown result is ("rewrite" or "instruct")
         self.working = False  # a rewrite or an instruction was asked for and its result is pending
@@ -109,7 +110,8 @@ class Composition:
         self.error = ""
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
-        self.revision += 1
+        self.issued = max(self.issued, self.revision) + 1
+        self.revision = self.issued
 
     @property
     def request_mode(self):
@@ -265,6 +267,8 @@ class Composition:
             return "pass"
         if self.question:  # Tab inserts an answer to read; a question's choice is Enter's
             return "choose" if self.reading and not self.reply else "wait"
+        if self.reply:  # a reply you are typing: Enter sends it, and Tab takes nothing over it
+            return "wait"
         if self.converted or (self.asked == "instruct" and self.candidate):
             return "accept"
         if self.asked == "rewrite" and self.candidate:
@@ -317,7 +321,7 @@ class Composition:
         app's)."""
         if self.held is not None and not self.text and not self.live:
             held, self.held = self.held, None  # the exchange you left, back as it was
-            self.__dict__.update({k: v for k, v in held.__dict__.items() if k != "held"})
+            self.__dict__.update({k: v for k, v in held.__dict__.items() if k not in ("held", "issued")})
             return self.reply or self.text
         if self.live or not self.dropped:
             return ""
