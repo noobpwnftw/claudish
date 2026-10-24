@@ -119,6 +119,17 @@ def indicator():
     return shown.pop() if len(shown) == 1 else sorted(shown)
 
 
+def content_left():
+    """Where the visible panel's or toast's content starts on screen (its left edge plus the inset
+    the extension anchors by), or None."""
+    return shell_eval("""(() => { let found = null;
+        const walk = a => { if (a.visible && a.has_style_class_name && a.has_style_class_name('cd-panel'))
+                              found = Math.round(a.get_transformed_position()[0] + (a.has_style_class_name('cd-toast') ? 6
+                                      : a.get_theme_node().get_padding(3) + 10));  // St.Side.LEFT
+                            (a.get_children ? a.get_children() : []).forEach(walk); };
+        walk(global.stage); return found; })()""")
+
+
 def focus(name):
     COMMANDS.write_text(name)
     try:
@@ -153,6 +164,25 @@ def scenarios(keys):
     keys.press("ctrl+a", "BackSpace")
     keys.press("Shift_L")  # back to compose
     time.sleep(0.4)
+
+    # The panel starts where the composition starts, whatever the caret: typed, dropped (its
+    # toast), or brought back whole by Shift+Esc. (GNOME Shell reports the composition's start
+    # as the cursor location while something is composed.)
+    focus("other")
+    keys.type("say")
+    settle()
+    start = content_left()
+    keys.type(" hi there")
+    settle()
+    check("the panel stays where the composition starts while you type", content_left(), start)
+    keys.press("Escape")
+    settle(0.3)
+    check("dropped is said where the words were", content_left(), start)
+    keys.press("Shift_L+Escape")
+    settle()
+    check("restored words get their panel at their start, not their end", content_left(), start)
+    keys.press("Escape")
+    settle(0.3)
 
     focus("other")
     keys.type("very important")

@@ -1,5 +1,5 @@
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..26b875b 100644
+index 7829c72..4bfcca0 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -204,8 +204,8 @@ index 7829c72..26b875b 100644
 -			if (!textService_->isComposing()) {
 -				textService_->startComposition(session->context());
 -			}
-+			// Claudish: no composition is started to place the window: it is placed by the caret
-+			// (caretRect), and a sent instruction's panel shows with nothing composed.
++			// Claudish: no composition is started to place the window: it is placed where the
++			// composition starts, else at the caret (anchorRect).
  			textService_->showCandidates(session);
  		}
  		else {
@@ -298,7 +298,7 @@ index 3e09587..ecd1639 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..bb82190 100644
+index 28d8286..ef45425 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -268,6 +268,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
@@ -318,9 +318,9 @@ index 28d8286..bb82190 100644
 -	if (selectionRect(session, &textRect)) {
 -		// FIXME: where should we put the candidate window?
 -		candidateWindow_->move(textRect.left, textRect.bottom);
-+	if (caretRect(session, &textRect)) {
-+		// Claudish: under the caret's line, the content starting at the caret (design lab); it
-+		// stays where it opened while it is open on that line, never sliding as you type.
++	if (anchorRect(session, &textRect)) {
++		// Claudish: under the line, the content starting where the composition starts (or the
++		// caret); it stays where it opened while it is open on that line, never sliding as you type.
 +		placeCandidates(textRect);
  	}
  
@@ -332,7 +332,7 @@ index 28d8286..bb82190 100644
 -        if (selectionRect(session, &textRect)) {
 -            // FIXME: where should we put the candidate window?
 -            candidateWindow_->move(textRect.left, textRect.bottom);
-+        if (caretRect(session, &textRect)) {
++        if (anchorRect(session, &textRect)) {
 +            placeCandidates(textRect);
          }
      }
@@ -341,8 +341,8 @@ index 28d8286..bb82190 100644
  	showingCandidates_ = false;
  }
  
-+// Claudish: the candidate window opens under the caret and stays where it opened while it shows
-+// on the same line with the caret at or right of it (when the text leaves, it moves to the caret).
++// Claudish: the candidate window opens under its anchor (anchorRect) and stays where it opened while
++// it shows on the same line with the anchor at or right of it (when the text leaves, it follows).
 +void TextService::placeCandidates(const RECT& caret) {
 +	int x = caret.left - candidateWindow_->textInset();
 +	if (candidateWindow_->isVisible() && pinnedLine_ == caret.bottom && x >= pinnedX_)
@@ -381,9 +381,9 @@ index 28d8286..bb82190 100644
 +	hideMessage();
 +	messageWindow_ = make_unique<Ime::MessageWindow>(this, session);
 +	messageWindow_->setPanel(panel);
-+	RECT caret;
-+	if (caretRect(session, &caret))
-+		messageWindow_->move(caret.left - messageWindow_->textInset(), caret.bottom + Ime::scaled(6) - messageWindow_->topInset());
++	RECT anchor;
++	if (anchorRect(session, &anchor))
++		messageWindow_->move(anchor.left - messageWindow_->textInset(), anchor.bottom + Ime::scaled(6) - messageWindow_->topInset());
 +	messageWindow_->show();
 +	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
 +}
@@ -397,7 +397,7 @@ index 28d8286..bb82190 100644
 -            // FIXME: where should we put the message window?
 -            messageWindow_->move(textRect.left, textRect.bottom);
 -        }
-+        if (caretRect(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
++        if (anchorRect(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
 +            messageWindow_->move(textRect.left - messageWindow_->textInset(),
 +                                 textRect.bottom + Ime::scaled(6) - messageWindow_->topInset());
      }

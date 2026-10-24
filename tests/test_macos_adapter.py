@@ -73,6 +73,9 @@ class TextClient(Client):
     def stringFromRange_actualRange_(self, span, actual):
         raise AssertionError("crashes in IMK when PyObjC passes a NULL actualRange")
 
+    def attributesForCharacterIndex_lineHeightRectangle_(self, index, rect):
+        return {}, ((10 * index, 400), (1, 18))  # a caret 10 points per character along the line
+
 
 class Grey:
     """NSAttributedString, as far as the adapter uses it."""
@@ -105,10 +108,10 @@ class Panel:
     """cd_AI's panel (platforms/macos/panel.py): records what it shows."""
 
     def __init__(self, toast=False):
-        self.visible, self.spec, self.pick = False, None, None
+        self.visible, self.spec, self.pick, self.rect = False, None, None, None
 
     def show(self, rect, spec, pick=None):
-        self.visible, self.spec, self.pick = True, spec, pick
+        self.visible, self.spec, self.pick, self.rect = True, spec, pick, rect
 
     def hide(self):
         self.visible, self.spec = False, None
@@ -456,6 +459,27 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.module.PANEL.pick(2)  # a click on the second row
         self.assertEqual(self.client.commits[-1], "Hi there.")
+
+    def test_the_panel_starts_where_the_composition_starts(self):
+        """Under the composition's start, as CJK candidate windows sit, whatever the caret: typed,
+        dropped (its toast), or brought back whole by Shift+Esc (docs/design/design.md, Placement)."""
+        client = TextClient("Dear Sam, ")
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        start = ((100, 400), (1, 18))  # "Dear Sam, " is 10 characters
+        try:
+            for char in "say hi":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                                                characters=lambda c=char: c), client)
+            self.assertEqual(self.module.PANEL.rect, start)  # not the caret, 6 characters on
+            escape = lambda flags=0: fresh.handleEvent_client_(types.SimpleNamespace(
+                type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: flags, characters=lambda: "\x1b"), client)
+            escape()  # dropped: said where the words were
+            self.assertEqual((self.module.TOAST.spec["status"], self.module.TOAST.rect), ("dropped", start))
+            escape(self.module.NSEventModifierFlagShift)  # back, whole
+            self.assertEqual((client.marked_text(), self.module.PANEL.rect), ("say hi", start))
+        finally:
+            fresh.inputControllerWillClose()
 
     def test_continue_starts_from_the_text_box_and_the_suggestion_is_grey(self):
         client = TextClient("Thanks for the review ")

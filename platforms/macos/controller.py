@@ -177,14 +177,19 @@ class ClaudishInputController(IMKInputController):
             return None
 
     @objc.python_method
-    def caret(self, client):
+    def caret(self, client, start=False):
         """The caret's line in screen coordinates ((x, y), (w, h)), y at the line's bottom, for the
-        panel and the overlay. IMK's lineHeightRectangle is what input methods place windows by;
-        firstRectForCharacterRange came back with y at the line's top in our tests, so it is the
-        fallback, corrected for that."""
+        overlay; with start, where the composition starts (the caret when nothing is composed), for
+        the panel and the toasts, as CJK candidate windows sit (docs/design/design.md, Placement).
+        IMK's lineHeightRectangle is what input methods place windows by; firstRectForCharacterRange
+        came back with y at the line's top in our tests, so it is the fallback, corrected for that."""
+        def location_of(found):
+            return (found.location, found.length) if hasattr(found, "location") else tuple(found)
         try:
-            selected = client.selectedRange()
-            location = selected.location if hasattr(selected, "location") else selected[0]
+            location = location_of(client.selectedRange())[0]
+            marked = location_of(client.markedRange()) if start else (NSNotFound, 0)
+            if marked[0] != NSNotFound and marked[1]:
+                location = marked[0]
         except Exception:
             location = 0
         try:
@@ -246,7 +251,7 @@ class ClaudishInputController(IMKInputController):
             self.hide_panel()
             return
         TOAST.hide()  # a panel replaces a toast at the caret
-        PANEL.show(self.caret(client), spec, self.pick)
+        PANEL.show(self.caret(client, start=True), spec, self.pick)
         trace("panel", len(spec["rows"]), "rows", "lit" if spec.get("nudge") else "plain")  # no text
         self.drawn = spec
 
@@ -256,7 +261,7 @@ class ClaudishInputController(IMKInputController):
         client = client if client is not None else self.client()
         if client is None:
             return
-        TOAST.show(self.caret(client), spec)
+        TOAST.show(self.caret(client, start=True), spec)
         NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(2.0, self, "hideToast:", None, False)
 
     @objc.signature(b"v@:@")

@@ -1223,7 +1223,7 @@ index 0000000..dadfca2
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..0fa0c72 100644
+index ea37cdc..9030da4 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1324,7 +1324,7 @@ index ea37cdc..0fa0c72 100644
  void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
      ITfContext* context = session->context();
      if(context) {
-@@ -911,6 +995,24 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -911,6 +995,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
@@ -1346,18 +1346,34 @@ index ea37cdc..0fa0c72 100644
 +    return ret;
 +}
 +
++// Claudish: where a panel or a toast is anchored: the composition's start (as CJK candidate
++// windows sit), or the caret when nothing is composed (docs/design/design.md, Placement).
++bool TextService::anchorRect(EditSession* session, RECT* rect) const {
++    if(session && isComposing()) {
++        ComPtr<ITfContextView> view;
++        ComPtr<ITfRange> range, start;
++        BOOL clipped;
++        if(session->context()->GetActiveView(&view) == S_OK && composition_->GetRange(&range) == S_OK
++           && range->Clone(&start) == S_OK && start->Collapse(session->editCookie(), TF_ANCHOR_START) == S_OK
++           && view->GetTextExt(session->editCookie(), start, rect, &clipped) == S_OK)
++            return true;
++    }
++    return caretRect(session, rect);
++}
++
  HWND TextService::compositionWindow(EditSession* session) const {
      HWND hwnd = NULL;
      ComPtr<ITfContextView> view;
 diff --git a/src/TextService.h b/src/TextService.h
-index f2c1c09..289d6a1 100644
+index f2c1c09..0babc07 100644
 --- a/src/TextService.h
 +++ b/src/TextService.h
-@@ -137,9 +137,16 @@ public:
+@@ -137,9 +137,17 @@ public:
      void endComposition(ITfContext* context);
      bool compositionRect(EditSession* session, RECT* rect) const;
      bool selectionRect(EditSession* session, RECT* rect) const;
 +    bool caretRect(EditSession* session, RECT* rect) const;  // Claudish: also with nothing composed
++    bool anchorRect(EditSession* session, RECT* rect) const;  // Claudish: the composition's start, else the caret
      HWND compositionWindow(EditSession* session) const;
  
      std::wstring compositionString(EditSession* session) const;
