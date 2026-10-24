@@ -184,6 +184,7 @@ def load_adapter():
     appkit.NSAttributedString = Grey
     appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor", textColor=lambda: "textColor")
     appkit.NSForegroundColorAttributeName = "NSColor"
+    appkit.NSEvent = types.SimpleNamespace(mouseLocation=lambda: types.SimpleNamespace(x=500, y=300))
     for name, value in {"NSEventMaskKeyDown": 1024, "NSEventTypeKeyDown": 10,
                         "NSEventMaskFlagsChanged": 4096, "NSEventTypeFlagsChanged": 12,
                         "NSEventModifierFlagShift": 1 << 17,
@@ -459,6 +460,19 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.module.PANEL.pick(2)  # a click on the second row
         self.assertEqual(self.client.commits[-1], "Hi there.")
+
+    def test_a_password_field_gets_its_keys_untouched(self):
+        with patch.object(self.module, "secure_input", return_value=True):
+            for char in "hunter2":
+                self.assertFalse(self.key(0, char))  # straight in: the app types it
+            self.assertFalse(self.key(53, "\x1b"))
+        self.assertEqual((self.controller.state.text, self.client.marked, self.module.PANEL.visible), ("", "", False))
+
+    def test_without_a_caret_the_panel_goes_by_the_pointer_not_a_corner(self):
+        client = TextClient("x")
+        client.attributesForCharacterIndex_lineHeightRectangle_ = lambda index, rect: ({}, ((0, 0), (1, 18)))
+        client.firstRectForCharacterRange_actualRange_ = lambda span, actual: ((0, 0), (0, 0))
+        self.assertEqual(self.controller.caret(client), ((500, 282), (0, 18)))
 
     def test_the_panel_starts_where_the_composition_starts(self):
         """Under the composition's start, as CJK candidate windows sit, whatever the caret: typed,

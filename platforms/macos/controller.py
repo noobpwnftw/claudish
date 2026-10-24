@@ -1,11 +1,12 @@
 """InputMethodKit controller; all Cocoa client operations stay on the main thread."""
+import ctypes
 import os
 import time
 import traceback
 
 import objc
 from AppKit import NSEventMaskFlagsChanged, NSEventMaskKeyDown, NSEventTypeFlagsChanged, NSEventTypeKeyDown
-from AppKit import NSAttributedString, NSColor, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
+from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagShift
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
@@ -24,6 +25,17 @@ def trace(*fields):
     if TRACE:
         with open(TRACE, "a") as out:
             out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
+
+
+def secure_input():
+    """Whether a password field (or Terminal's Secure Keyboard Entry) has secure input on: then
+    keys go straight to it, and nothing is composed, shown, or sent to a model."""
+    try:
+        carbon = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/Carbon.framework/Carbon")
+        carbon.IsSecureEventInputEnabled.restype = ctypes.c_bool
+        return bool(carbon.IsSecureEventInputEnabled())
+    except (OSError, AttributeError):
+        return False
 
 
 SURROUNDING = 8000
@@ -197,7 +209,7 @@ class ClaudishInputController(IMKInputController):
             rect = found[1] if isinstance(found, tuple) and len(found) == 2 else None
             if rect is not None:
                 (x, y), (w, h) = unpack(rect)
-                if h > 0:
+                if h > 0 and (x, y) != (0, 0):  # the screen's corner: the app did not say
                     trace("caret line", round(x), round(y), round(w), round(h), "at", location)
                     return (x, y), (w, h)
         except Exception:
@@ -206,12 +218,15 @@ class ClaudishInputController(IMKInputController):
             found = client.firstRectForCharacterRange_actualRange_((location, 0), None)
             rect = found[0] if isinstance(found, tuple) and len(found) == 2 and not hasattr(found, "origin") else found
             (x, y), (w, h) = unpack(rect)
-            if h > 0:
+            if h > 0 and (x, y) != (0, 0):
                 trace("caret first", round(x), round(y), round(w), round(h), "at", location)
                 return (x, y - h), (w, h)
         except Exception:
             trace("caret failed", traceback.format_exc().splitlines()[-1])
-        return (200, 400), (0, 18)
+        # No caret from the app: under the pointer, where the person is looking, not a corner.
+        pointer = NSEvent.mouseLocation()
+        trace("caret unknown: at the pointer")
+        return (pointer.x, pointer.y - 18), (0, 18)
 
     @objc.python_method
     def show_ghost(self, client):
@@ -436,6 +451,11 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def handle(self, event, client):
+        if secure_input():  # a password field: straight in, nothing shown, nothing sent
+            self.hide_panel()
+            OVERLAY.hide()
+            TOAST.hide()
+            return False
         if self.active and event.type() == NSEventTypeFlagsChanged:
             if event.keyCode() in (56, 60):  # left or right Shift, pressed or released
                 if event.modifierFlags() & NSEventModifierFlagShift:

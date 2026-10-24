@@ -268,6 +268,16 @@ def scenarios():
     wait_for(lambda: document().endswith("say hi."))
     check("instruct: Enter sends, Tab inserts", document().split("\n")[-1], "As requested—say hi.")
 
+    # 4b. A password field (secure input on): keys go straight in, still in compose; nothing marked.
+    COMMANDS.write_text("secret")
+    wait_for(lambda: not COMMANDS.read_text())
+    time.sleep(0.5)
+    type_text("pa-ss1")
+    time.sleep(0.5)
+    check("a password field gets its keys untouched", (state().get("secret"), state().get("marked")), ("pa-ss1", ""))
+    COMMANDS.write_text("focus")
+    wait_for(lambda: not COMMANDS.read_text())
+
     # 5. G35: in Terminal.app an instruction sees the screen (the service reads it through AX; its
     # Python needs the Accessibility permission), and the draft lands at the prompt.
     sys.path.insert(0, str(ROOT))
