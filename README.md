@@ -28,8 +28,8 @@ straight in, with the rest of the sentence offered. Where you want none of it,
 switch that app to your usual keyboard (the system can remember it per app once you turn that on:
 [how](docs/using.md)).
 
-cd_AI ships no model: point it at one. Claude with your own key is the default
-setup, since it works on any computer; any OpenAI-compatible server or an agent CLI
+cd_AI ships no model: point it at one. Claude is the default setup; any
+OpenAI-compatible server or an agent CLI
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B, a local model
 that made slop as well as anything we tried (quick on a GPU or Apple silicon, 3–4 s on
 a CPU alone). Continue suggests only with a local model, or where you route one
@@ -37,11 +37,11 @@ for it. The model can read
 context (files, commands, MCP servers) and, when you ask, look things up or run an
 agent whose questions arrive as choices.
 
-## Make it yours
+## Voices and templates
 
-The slop is manufactured, and the factory is yours. Every word cd_AI says to a model is in one
+Every word cd_AI says to a model is in one
 file you can read and change: `claudish templates` prints it, and `claudish init` writes a
-`templates.json` of your own to edit. Pick another voice (`salesman`, `critic`, `bard`, or
+`templates.json` to edit. Pick another voice (`salesman`, `critic`, `bard`, or
 `proofread`, which only fixes your typos), or write one. Then give it context: files, commands
 and MCP servers per app, tools it may call, an agent to hand a task to
 ([configuration](docs/configuration.md)).

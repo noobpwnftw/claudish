@@ -6,7 +6,7 @@ version is in the [README](../README.md#install).
 ## Quick start
 
 You need Python 3.10+, git, and a model to point it at. cd_AI ships no model: out of the box it
-is set up for Claude with your own API key, which works on any computer. With a GPU or Apple
+is set up for Claude. With a GPU or Apple
 silicon, the local model below made slop as well as anything we tried.
 
 1. **Get it**, with the Claude SDK, in a virtual environment of its own (current Ubuntu, Debian
@@ -77,8 +77,7 @@ http://127.0.0.1:18765, or `--backend rules` for simple stand-ins with no model.
 
 ## A local model (optional)
 
-For a model on your own machine: free per keystroke, and what lets continue suggest at
-every pause. The one setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB), which made slop as well
+A local model is what lets continue suggest at every pause. The one setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB), which made slop as well
 as anything we tried, a frontier model included ([benchmarks](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)).
 It answers in about 0.6 s on a GPU or Apple silicon and 3–4 s on a CPU alone; models small enough
 to be fast on any CPU make no usable slop.
@@ -136,7 +135,7 @@ This adapter does not support an Fcitx-only session or a raw terminal console.
 
 **The installer.** `cd_AI-setup.exe` installs everything for x64 and ARM64 Windows: cd_AI's PIME
 (the text service, for every app, beside any PIME you have), a Python of its own for the service, and
-cd_AI in your input sources. It asks for an administrator once; the rest is yours: a starter config, the service at
+cd_AI in your input sources. It asks for an administrator once, then sets up a starter config, the service at
 every login, and cd_AI's settings in your browser (your key, the voice). Then sign out and back in,
 or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
@@ -180,7 +179,7 @@ open dist/macos/cd_AI.pkg
 
 `cd_AI.pkg` installs for you alone (`~/Library/Input Methods`, no administrator password) and does
 the rest: a starter config, the service at every login, and cd_AI added to your input sources and
-enabled; which input source you use stays your choice. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
+enabled. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
 the end: paste your Claude key, pick a voice. Then **log out and back in**, as after installing or
 updating any macOS input method: until then macOS keeps its old list of input sources (and, after
 an update, the old cd_AI). **Settings…** in the input menu opens the settings again.

@@ -5,7 +5,7 @@ Models, profiles, context, MCP servers, tools, window pictures, and agent sessio
 ## Backends
 
 Claudish supplies the plumbing: the input method, its templates, and the
-service between them. The model is your choice, and how well it follows the
+service between them. How well a model follows the
 template depends on that model. `benchmarks/evaluate.py` measures any backend
 on the same cases.
 
@@ -19,8 +19,8 @@ python -m claudish serve --backend openai --model-url https://api.example.com \
     --model some-model --api-key-env EXAMPLE_API_KEY --timeout 10
 ```
 
-Or use Claude through the official SDK. It is an optional dependency. The
-credentials are yours: set `ANTHROPIC_API_KEY`, or run `ant auth login`.
+Or use Claude through the official SDK. It is an optional dependency. Set
+`ANTHROPIC_API_KEY`, or run `ant auth login`.
 
 ```sh
 pip install "claudish-ime[claude]"
@@ -30,7 +30,7 @@ python -m claudish serve --backend claude --claude-model claude-haiku-5-5
 
 The Claude backend runs one request at a time, uses low effort, and turns on
 server-side refusal fallbacks (except on Haiku, which has none). It never
-offers a declined or truncated rewrite. No model ships: the starter profile is Claude with your own key, and
+offers a declined or truncated rewrite. No model ships: the starter profile is Claude, and
 `--profile local` is the local one.
 
 Change what the model is told with a templates file, for any backend (see
@@ -101,8 +101,7 @@ stdin; the command's output becomes the candidate, which you accept with Tab:
 ```
 
 Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
-`llm`, or your own script. The command comes only from your config, runs without a
-shell, and never sees your text as arguments. Tool permissions are the CLI's
+`llm`, or a script. The command runs without a shell, with the text on stdin. Tool permissions are the CLI's
 own; for example, Claude Code's `--allowedTools` in the command list. Agents are
 slow, so the profile's `timeout` applies (`/health` reports it), and typing is
 never blocked while one works. These profiles are reported as hosted unless
@@ -277,8 +276,8 @@ pick, and its final answer is a candidate like any other. For Claude Code:
 - *"is my branch clean?"* → `Deny` / `Allow — Bash: git status`: ↓ to a choice and Enter
   answers (Allow is a deliberate ↓↓ Enter; Deny lets the agent carry on without it), or type a reply and
   press Enter: it denies the call with your words as the reason ("use git diff
-  instead"), so the agent can adjust. Nothing runs without
-  your choice unless your own Claude Code settings already allow it.
+  instead"), so the agent can adjust. Claude Code's own settings may allow a call
+  without asking.
 - **Esc** at any point stops the agent's turn and gives you back the instruction to
   refine; Esc again drops it. Editing the instruction stops the turn too.
 - **Follow-ups continue the same agent.** Each text box has its own agent
@@ -302,7 +301,7 @@ pick, and its final answer is a candidate like any other. For Claude Code:
   the text box. Without an agent, the model driver has the same two tools
   whenever the text box is longer than what it is sent.
 - The agent runs with your Claude Code login, settings, and working directory
-  (the service's), and its usage counts as yours. A session is limited to five
+  (the service's), and its usage counts against that login. A session is limited to five
   minutes and four at a time.
 - Status: tested end to end in the Linux desktop container (real IBus and GTK)
   with a scripted agent that speaks Claude Code's stream-json protocol (the

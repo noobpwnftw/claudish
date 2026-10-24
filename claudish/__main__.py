@@ -153,7 +153,7 @@ def main():
             sys.exit(str(exc))
         print("Wrote %s with profiles: %s (default: %s)," % (
             path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
-        print("and %s: the words cd_AI says to a model, yours to change (claudish templates shows them)."
+        print("and %s: the words cd_AI says to a model, editable (claudish templates shows them)."
               % path.with_name("templates.json"))
         print("Try one: claudish serve --profile ollama   (or claude, agent)")
         return
