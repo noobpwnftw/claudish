@@ -65,10 +65,10 @@ class SettingsTests(Home):
         self.assertEqual((state["choice"], state["claude_code"]), ("claude-code", None))
         profile = self.written()["profiles"]["claude-code"]
         # The full path: a login service may not have the shell's PATH.
-        self.assertEqual(profile["command"], ["/opt/claude/bin/claude", "-p", "--model", "haiku", "--output-format", "text"])
+        self.assertEqual((profile["command"], profile["model"]), (["/opt/claude/bin/claude"], "haiku"))
         self.assertEqual(profile["tone"], "critic")
         name, resolved, _, _ = config.resolve()
-        self.assertEqual((name, resolved["backend"]), ("claude-code", "command"))
+        self.assertEqual((name, resolved["backend"]), ("claude-code", "claude-code"))  # kept running (claudish/warm.py)
 
     def test_codex_for_a_chatgpt_subscription(self):
         with patch.object(settings, "codex", return_value=None):
@@ -79,12 +79,11 @@ class SettingsTests(Home):
         with patch.object(settings, "codex", return_value="/opt/codex/bin/codex"):
             state = settings.apply({"choice": "codex"})
         self.assertEqual((state["choice"], state["codex"]), ("codex", None))
-        command = self.written()["profiles"]["codex"]["command"]
-        # The full path, and cd_AI's config folder to work in (not wherever the service started).
-        self.assertEqual(command[:2], ["/opt/codex/bin/codex", "exec"])
-        self.assertEqual((command[command.index("-C") + 1], command[-1]), (str(self.path.parent), "-"))
+        profile = self.written()["profiles"]["codex"]
+        # The full path: a login service may not have the shell's PATH.
+        self.assertEqual((profile["command"], profile["model"]), (["/opt/codex/bin/codex"], "gpt-6-luna"))
         name, resolved, _, _ = config.resolve()
-        self.assertEqual((name, resolved["backend"]), ("codex", "command"))
+        self.assertEqual((name, resolved["backend"]), ("codex", "codex"))  # kept running (claudish/warm.py)
 
     def test_the_extension_copy_is_the_command_not_a_helper_beside_it(self):
         with tempfile.TemporaryDirectory() as home:

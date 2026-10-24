@@ -222,6 +222,12 @@ def main():
         write_token(token)  # only once the port is ours: the running service's token stays valid
         print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
             server.server_port, settings["backend"], ", profile " + profile if profile else ""), flush=True)
+        rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
+        import signal
+
+        def interrupt(signum, frame):
+            raise KeyboardInterrupt
+        signal.signal(signal.SIGTERM, interrupt)  # a service manager's stop ends the model process too
         if rewriter.read_terminal:
             import threading
             from .screen import warm
@@ -233,6 +239,7 @@ def main():
         finally:
             server.server_close()
             server.rewriter.conversations.close()
+            server.rewriter.stop_model()
     elif args.command == "rewrite":
         with reachable(args.url):
             print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))

@@ -82,25 +82,36 @@ The app's binding chooses first, then that profile's choice for the mode. The
 service's own profile (`claudish serve --profile`, or the file's `"profile"`)
 holds the bindings; other profiles are loaded when they are first needed.
 
+### A subscription: Claude Code or Codex
+
+The settings page's **Claude Code** and **Codex** choices use a Claude or a ChatGPT subscription
+through its own command line. cd_AI keeps that model process running beside the service, as it does
+the local model: it starts and warms up with the service, is restarted if it ends, and stops with
+the service. `/health` and `claudish doctor` give its state (`starting`, `warm`, `restarting`, or
+why it failed). Each rewrite is its own conversation, with cd_AI's template as the whole
+instruction. The choice writes the command's full path (a login service may not have your shell's
+PATH); `model` is optional:
+
+```json
+{"profiles": {"claude-code": {"backend": "claude-code", "command": ["/home/me/.local/bin/claude"], "model": "haiku", "timeout": 30},
+              "codex": {"backend": "codex", "command": ["/home/me/.local/bin/codex"], "model": "gpt-6-luna", "timeout": 60}}}
+```
+
+Claude Code runs `claude -p` in stream-json mode with no tools, MCP servers or settings, one process
+per request, the next one started ahead of time. Codex runs one `codex app-server` with a new
+read-only, ephemeral thread per request at low effort; a model the account does not offer falls
+back to Codex's default. Measured on a DGX Spark with the default tone, from Tab to the rewrite:
+about 2 s for either (each CLI started per request: about 4 s for Claude Code, 5 s for Codex).
+
 ### An agent CLI as the backend
 
 With `"backend": "command"`, Claudish sends the mode's instructions, the profile's context, and your text on
-stdin; the command's output becomes the candidate, which you accept with Tab. The settings page's
-**Claude Code** choice writes this profile, with the full path to `claude` (a login service may
-not have your shell's PATH), for a Claude subscription:
+stdin; the command's output becomes the candidate, which you accept with Tab. The CLI starts for each
+request:
 
 ```json
-{"profiles": {"claude-code": {"backend": "command", "timeout": 30,
-                              "command": ["/home/me/.local/bin/claude", "-p", "--model", "haiku", "--output-format", "text"]}}}
-```
-
-The **Codex** choice writes the same kind of profile for a ChatGPT subscription; `codex exec` reads
-the text on `-` (stdin) and works read-only in cd_AI's config folder:
-
-```json
-{"profiles": {"codex": {"backend": "command", "timeout": 60,
-                        "command": ["/home/me/.local/bin/codex", "exec", "--skip-git-repo-check", "--ephemeral",
-                                    "-s", "read-only", "-C", "/home/me/.config/claudish", "-"]}}}
+{"profiles": {"claude-p": {"backend": "command", "timeout": 30,
+                           "command": ["claude", "-p", "--model", "haiku", "--output-format", "text"]}}}
 ```
 
 A longer-running agent, for instructions:

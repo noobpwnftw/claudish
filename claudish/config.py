@@ -19,7 +19,7 @@ from pathlib import Path
 from .context import Binding, Context
 from . import modes as invocation
 
-BACKENDS = ("none", "llama", "openai", "claude", "command", "rules")
+BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
 DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
@@ -82,7 +82,9 @@ def resolve(path=None, profile=None, overrides=None):
         settings["backend"] = "openai"  # a model server named with no backend: any OpenAI-compatible one
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
-    if settings["backend"] == "command":
+    if settings["backend"] in ("claude-code", "codex") and not settings["command"]:
+        settings["command"] = ["claude" if settings["backend"] == "claude-code" else "codex"]
+    if settings["backend"] in ("command", "claude-code", "codex"):
         command = settings["command"]
         if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
             raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')
@@ -126,8 +128,8 @@ STARTER = {
         "ollama: any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, a hosted API): set model_url,",
         "  and model when the server has several. A key: saved in the settings, or api_key_env.",
         "local: the llama.cpp server and Gemma 4 E4B that `claudish setup --profile local` installs.",
-        "claude-code: Claude Code's `claude -p` (a Claude subscription), picked in cd_AI's settings.",
-        "codex: Codex's `codex exec` (a ChatGPT subscription), picked in cd_AI's settings.",
+        "claude-code: Claude Code (a Claude subscription), kept running beside the service; picked in cd_AI's settings.",
+        "codex: Codex (a ChatGPT subscription), kept running beside the service; picked in cd_AI's settings.",
         "agent: an agent CLI that reads the text on stdin (here Claude Code's `claude -p`).",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
         "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
@@ -138,11 +140,10 @@ STARTER = {
         "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
         "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
-        "claude-code": {"backend": "command", "timeout": 30, "templates": "templates.json",
-                        "command": ["claude", "-p", "--model", "haiku", "--output-format", "text"]},
-        "codex": {"backend": "command", "timeout": 60, "templates": "templates.json",
-                  "command": ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only",
-                              "-C", "~/.config/claudish", "-"]},
+        "claude-code": {"backend": "claude-code", "command": ["claude"], "model": "haiku", "timeout": 30,
+                        "templates": "templates.json"},
+        "codex": {"backend": "codex", "command": ["codex"], "model": "gpt-6-luna", "timeout": 60,
+                  "templates": "templates.json"},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
     },
 }

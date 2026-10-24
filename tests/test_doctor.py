@@ -178,5 +178,23 @@ class ClaudeKeyChecks(unittest.TestCase):
             self.assertIn("pick Codex", self.check(None)[2])
 
 
+class WarmBackendChecks(unittest.TestCase):
+    """Claude Code and Codex, kept running by the service: their CLI, and their state in /health."""
+
+    def test_the_cli_is_found_or_named(self):
+        settings = {"backend": "claude-code", "command": [sys.executable], "model": "haiku"}
+        self.assertEqual(doctor.check_backend({"settings": settings})[0], "ok")
+        with patch("claudish.settings.claude_code", return_value=None):
+            status, _, fix = doctor.check_backend({"settings": dict(settings, command=["/gone/claude"])})
+        self.assertEqual(status, "fail")
+        self.assertIn("cd_AI's settings", fix)
+
+    def test_the_model_process_state_is_reported(self):
+        base = {"service": "cd_AI", "backend": "codex", "profile": "codex"}
+        for model, status in (("warm", "ok"), ("starting", "warn"), ("failed: Codex ended", "fail")):
+            with patch.object(doctor, "fetch_json", return_value=dict(base, model=model)):
+                self.assertEqual(doctor.check_service({})[0], status, model)
+
+
 if __name__ == "__main__":
     unittest.main()

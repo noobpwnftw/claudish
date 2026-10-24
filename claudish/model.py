@@ -239,11 +239,15 @@ class Rewriter:
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.opener = None
         self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
-        if backend == "command":
+        self.warm = None  # Claude Code or Codex, kept running beside the service (claudish/warm.py)
+        if backend in ("command", "claude-code", "codex"):
             if not command:
-                raise ValueError('the command backend needs a "command" list in the profile')
+                raise ValueError('the %s backend needs a "command" list in the profile' % backend)
             self.command = command
             self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
+        if backend in ("claude-code", "codex"):
+            from . import config, warm
+            self.warm = warm.make(backend, command, model, str(config.default_path().parent))
         self.claude = Claude(claude_model) if backend == "claude" else None
 
     @property
@@ -251,6 +255,22 @@ class Rewriter:
         """Whether continue asks this model at every pause unasked: a local one (or the rules
         stand-in) costs nothing; a hosted one only where a profile routes continue to it."""
         return self.backend == "rules" or (self.backend in ("llama", "openai") and self.local)
+
+    def start_model(self):
+        """At service start: a model process cd_AI runs (Claude Code, Codex) starts and warms up."""
+        if self.warm:
+            self.warm.start()
+
+    def stop_model(self):
+        """At service stop, or when the settings replace this profile: its model process ends."""
+        for rewriter in [self] + list(getattr(self, "routed", {}).values()):
+            if rewriter.warm:
+                rewriter.warm.stop()
+
+    @property
+    def model_state(self):
+        """"warm", "starting", "restarting", "failed: why", or None when cd_AI runs no model process."""
+        return self.warm.state if self.warm else None
 
     def route(self, app, mode=None):
         """Which AI answers here: the app's binding may name a profile, and that profile may name
@@ -283,6 +303,7 @@ class Rewriter:
             other.url = getattr(self, "url", None)
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
             other.bindings = self.bindings  # the service's: a binding's context reaches the profile it routes to
+            other.start_model()  # its model process, as the service's own starts with the service
             self.routed[name] = other
         return self.routed[name]
 
@@ -302,8 +323,8 @@ class Rewriter:
         if look:
             if mode != "instruct":
                 raise ValueError("a window picture is only taken for an instruction")
-            if self.backend == "command":
-                raise RuntimeError("the command backend cannot take a window picture; use claude or a vision model")
+            if self.backend in ("command", "claude-code", "codex"):
+                raise RuntimeError("the %s backend cannot take a window picture; use claude or a vision model" % self.backend)
         box = Box(app, "terminal" if screen else purpose, before, after)
         if trusted:
             observe(self, box, mode, look, screen)
@@ -454,6 +475,8 @@ class Rewriter:
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
                 outputs = [self.run_command(prompt + "\n\nText:\n" + said)]
+            elif self.warm:
+                outputs = [self.warm.ask(prompt + "\n\nText:\n" + said, self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
                 output, usage = self.claude.rewrite(said, prompt, examples, box.image)
                 if not output:

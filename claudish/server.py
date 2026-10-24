@@ -42,8 +42,16 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         fresh.url = rewriter.url
         # What is running goes on: sessions, each text box's conversation, the recent requests.
         fresh.sessions, fresh.conversations, fresh.recent = rewriter.sessions, rewriter.conversations, rewriter.recent
+        old = rewriter
+        same = (old.warm and fresh.warm and type(old.warm) is type(fresh.warm)
+                and (old.warm.command, old.warm.model) == (fresh.warm.command, fresh.warm.model))
+        if same:  # the same model process goes on (a tone or a binding changed)
+            fresh.warm, old.warm = old.warm, None
+        else:
+            fresh.start_model()
         rewriter = fresh
         server.rewriter = fresh
+        old.stop_model()
         stamps[0] = stamp()
 
     def stamp():
@@ -269,7 +277,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                     "profile": getattr(rewriter, "profile", None),
                     # Which app goes to which profile (the AI that answers there).
                     "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},
-                    "modes": list(rewriter.modes), "timeout": rewriter.timeout}
+                    "modes": list(rewriter.modes), "timeout": rewriter.timeout,
+                    **({"model": rewriter.model_state} if rewriter.model_state else {})}
 
         def post_settings(self):
             """The settings window: its changes go to the config (the key to its store), and the

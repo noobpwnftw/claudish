@@ -206,21 +206,17 @@ def apply(changes, path=None):
             raise ValueError(problem)
     if "server" in changes and server_key:  # accepted by the server: saved for its address only
         keys.store(server_key, keys.server_name(profiles["ollama"]["model_url"]))
-    if changes.get("choice") == "claude-code":
-        command = claude_code()
-        if not command:  # like a server that is not there: no switch to a model that cannot answer
-            raise ValueError(NO_CLAUDE_CODE)
-        entry = profiles.setdefault("claude-code", dict(config.STARTER["profiles"]["claude-code"]))
-        entry["command"] = [command] + list(entry.get("command") or config.STARTER["profiles"]["claude-code"]["command"])[1:]
-    if changes.get("choice") == "codex":
-        command = codex()
-        if not command:
-            raise ValueError(NO_CODEX)
-        entry = profiles.setdefault("codex", dict(config.STARTER["profiles"]["codex"]))
-        arguments = list(entry.get("command") or config.STARTER["profiles"]["codex"]["command"])[1:]
-        if "-C" in arguments:  # it works in cd_AI's config folder, not wherever the service started
-            arguments[arguments.index("-C") + 1] = str(path.parent)
-        entry["command"] = [command] + arguments
+    for choice, find, missing in (("claude-code", claude_code, NO_CLAUDE_CODE), ("codex", codex, NO_CODEX)):
+        if changes.get("choice") == choice:
+            command = find()
+            if not command:  # like a server that is not there: no switch to a model that cannot answer
+                raise ValueError(missing)
+            # Kept running beside the service (claudish/warm.py); the full path, so the login service
+            # finds it without the shell's PATH. A tone set earlier stays.
+            tone = (profiles.get(choice) or {}).get("tone")
+            profiles[choice] = dict(config.STARTER["profiles"][choice], command=[command])
+            if tone:
+                profiles[choice]["tone"] = tone
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))

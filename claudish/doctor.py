@@ -71,6 +71,17 @@ def check_backend(state):
                 fix = "with a Claude subscription, pick Claude Code in cd_AI's settings (`claudish settings`); or " + fix
             return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", fix
         return "ok", "Claude via the Anthropic SDK (%s)" % settings["claude_model"], None
+    if backend in ("claude-code", "codex"):
+        name, find = ("Claude Code", "claude") if backend == "claude-code" else ("Codex", "codex")
+        program = settings["command"][0]
+        if shutil.which(program) or Path(program).is_file():
+            return "ok", "%s (%s), kept running by the service" % (name, settings.get("model") or "its default model"), None
+        from . import settings as window
+        found = window.claude_code() if backend == "claude-code" else window.codex()
+        if found:  # an update moved it: the service finds it again; saving the choice records the new path
+            return "ok", "%s at %s, kept running by the service" % (name, found), None
+        return "fail", "%s's `%s` command was not found" % (name, find), \
+            "install %s and log in, then pick it again in cd_AI's settings (`claudish settings`)" % name
     if backend == "command":
         program = settings["command"][0]
         if shutil.which(program) or Path(program).is_file():
@@ -104,7 +115,13 @@ def check_service(state):
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
             "start it at every login: `claudish service install` (the config's profile; `--local` for the local model)"
     detail = "running: backend %s, profile %s" % (health.get("backend"), health.get("profile"))
-    return "ok", detail, None
+    model = health.get("model")  # Claude Code or Codex, kept running beside the service
+    if model and model.startswith("failed"):
+        return "fail", "%s; its model process %s" % (detail, model), \
+            "check that its CLI works and is logged in (`claude` or `codex` in a terminal), then `claudish service install`"
+    if model in ("starting", "restarting"):
+        return "warn", "%s; its model process is %s" % (detail, model), "wait a few seconds and check again"
+    return "ok", detail + ("; its model process is warm" if model == "warm" else ""), None
 
 
 def check_managed():
