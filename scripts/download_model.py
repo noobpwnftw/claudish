@@ -12,7 +12,12 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 # Pinned to the upstream revisions measured in benchmarks/; the hashes are their LFS SHA-256.
+# gemma: the local model for people (G53: slop as well as anything tried; Apache-2.0); tiny and
+# small: the gate's quick test models.
 PRESETS = {
+    "gemma": ("google/gemma-4-E4B-it-qat-q4_0-gguf", "4b4a2c1d584be7264f87aac328a1bc739ce81b6c",
+              "gemma-4-E4B_q4_0-it.gguf", 5154941280,
+              "676c35070db6dbe52f93e9c864ee0fba4eddea94b9c875d9cb10daff453fbaee"),
     "tiny": ("lmstudio-community/SmolLM2-135M-Instruct-GGUF", "04f7f8a05a8e4bc208e88d11e8c9122be36c2f9b",
              "SmolLM2-135M-Instruct-Q4_K_M.gguf", 105454144,
              "bda484992f9655d22504b14e57985257fa6a86937c61f957cf99c10a3bcae169"),

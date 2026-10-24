@@ -29,7 +29,7 @@
         <div class="hero-text">
           <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
           <h1 id="title">If you can type there,<br>you can use AI <em>there.</em></h1>
-          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: a small local one by default, or your own API key. The answer arrives as a candidate at the caret.</p>
+          <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, and what you type goes to a model you choose: Claude with your own API key by default, or one on your own computer. The answer arrives as a candidate at the caret.</p>
           <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
@@ -102,7 +102,7 @@
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
           <li><b>Yours to choose.</b> Claude with your API key (the default setup: good slop needs a frontier model), any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
-          <li><b>Or local.</b> <code>setup --profile local</code> downloads llama.cpp and a 491 MB model, checksum-verified. Nothing leaves your machine, and continue suggests at every pause.</li>
+          <li><b>Or local.</b> <code>setup --profile local</code> downloads llama.cpp and Gemma 4 E4B (4.9 GB), checksum-verified. Nothing leaves your machine, and continue suggests at every pause.</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app: the PR diff in your editor, the ticket in your browser. Import the MCP servers you already use with Claude.</li>
           <li><b>Tools and agents.</b> An instruction may call your MCP tools, ask you a question, or hand the task to Claude Code or another agent. You approve every side effect.</li>
           <li><b>Restraint.</b> It runs only on what you type, looks at the screen only when you press F8, and never inserts anything you did not accept. Password fields bypass it.</li>

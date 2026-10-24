@@ -22,7 +22,7 @@ class SetupTests(unittest.TestCase):
         self.llama = SimpleNamespace(installed=lambda: None, host=lambda: ("Linux", "arm64"), BUILD="b1",
                                      ASSETS={("Linux", "arm64", "cpu"): ("llama.tar.gz", 18 << 20, "x")},
                                      install=MagicMock())
-        self.models = SimpleNamespace(target=lambda preset: self.model, PRESETS={"small": (0, 0, 0, 491 << 20)},
+        self.models = SimpleNamespace(target=lambda preset: self.model, PRESETS={"gemma": (0, 0, 0, 5154941280)},
                                       fetch=MagicMock())
         self.service_run = MagicMock(return_value=0)
         self.ime = MagicMock()

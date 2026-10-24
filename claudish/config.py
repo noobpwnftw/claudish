@@ -126,7 +126,7 @@ STARTER = {
     "profiles": {
         "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
         "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeout": 30},
-        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766"},
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
     },
 }

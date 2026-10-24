@@ -23,8 +23,8 @@ switch that app to your usual keyboard: input sources are chosen per app.
 
 cd_AI ships no model: point it at one. Claude with your own key is the default
 setup, and good slop needs a frontier model; any OpenAI-compatible server or an
-agent CLI works too, and `claudish setup --profile local` downloads a small local
-model instead. Continue suggests only with a local model, or where you route one
+agent CLI works too, and `claudish setup --profile local` downloads Gemma 4 E4B, a
+local model that makes slop as well as anything we tried (it wants a GPU or Apple silicon). Continue suggests only with a local model, or where you route one
 for it. The model can read
 context (files, commands, MCP servers) and, when you ask, look things up or run an
 agent whose questions arrive as choices.

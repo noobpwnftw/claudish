@@ -72,8 +72,11 @@ http://127.0.0.1:18765, or `--backend rules` for simple stand-ins with no model.
 
 ## A local model (optional)
 
-For a model on your own machine (free per keystroke, private, and what lets continue suggest at
-every pause; small models make weak slop):
+For a model on your own machine: free per keystroke, private, and what lets continue suggest at
+every pause. The one setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB), which made slop as well
+as anything we tried, a frontier model included ([benchmarks](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)).
+It answers in about 0.6 s on a GPU or Apple silicon and 3–4 s on a CPU alone; models small enough
+to be fast on any CPU make no usable slop.
 
 ```sh
 python3 -m claudish setup --profile local
@@ -81,12 +84,12 @@ python3 -m claudish setup --profile local
 
 Setup downloads a pinned [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) release
 build (`b11822`, 12–24 MB, the CPU build; Metal on Apple silicon; `--variant vulkan` for most GPUs
-on Linux and Windows) into `.tools/` and Qwen2.5 0.5B Instruct (491 MB) into `models/`, both
-checked against their published SHA-256, and runs them at login. The same by hand:
+on Linux and Windows) into `.tools/` and Gemma 4 E4B (QAT Q4_0) into `models/`, both checked
+against their published SHA-256, and runs them at login. The same by hand:
 
 ```sh
 python3 scripts/download_llama.py
-python3 scripts/download_model.py small
+python3 scripts/download_model.py gemma
 python3 scripts/start.py
 ```
 

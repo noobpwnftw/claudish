@@ -99,12 +99,13 @@ def step_llama(settings, variant):
 
 
 def step_model():
+    """The local model: Gemma 4 E4B (Apache-2.0), best for its size at cd_AI's voice (G53)."""
     _, download_model = scripts()
-    if download_model.target("small").is_file():
-        return "done", str(download_model.target("small")), None
-    size = download_model.PRESETS["small"][3]
-    return "todo", "download Qwen2.5 0.5B (%d MB, SHA-256 verified) into models/" % (size >> 20), \
-        lambda: download_model.fetch("small", progress("model"))
+    if download_model.target("gemma").is_file():
+        return "done", str(download_model.target("gemma")), None
+    size = download_model.PRESETS["gemma"][3]
+    return "todo", "download Gemma 4 E4B (%.1f GB, SHA-256 verified) into models/" % (size / 1e9), \
+        lambda: download_model.fetch("gemma", progress("model"))
 
 
 def step_backend(settings):

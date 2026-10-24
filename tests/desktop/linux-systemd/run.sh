@@ -29,7 +29,7 @@ as_tester sh -c 'ls ~/.config/systemd/user/claudish.service 2>/dev/null || echo 
 # A fresh copy, as a new user would have it (tracked and new files; no .tools/, no config).
 (cd "$root" && git ls-files -co --exclude-standard -z | xargs -0 tar cf - 2>/dev/null) | \
     docker exec -i -u tester "$id" sh -c 'mkdir -p ~/fresh && tar xf - -C ~/fresh'
-model=qwen2.5-0.5b-instruct-q4_k_m.gguf   # mounted, not downloaded again: setup still verifies its SHA-256
+model=gemma-4-E4B_q4_0-it.gguf   # mounted, not downloaded again: setup still verifies its SHA-256
 as_tester sh -c "mkdir -p ~/fresh/models && ln -s /models/$model ~/fresh/models/$model"
 docker exec -u tester -e XDG_RUNTIME_DIR=/run/user/1001 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus \
     -w /home/tester/fresh "$id" python3 -m claudish setup --profile local --yes || echo "setup exit $? (doctor: no IBus in this image)"
