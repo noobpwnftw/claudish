@@ -94,7 +94,7 @@ Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
 own; for example, Claude Code's `--allowedTools` in the command list. Agents are
 slow, so the profile's `timeout` applies (`/health` reports it).
 
-Measured on the Spark with Claude Code 2.1.306: an instruct request ("thank
+Measured on a DGX Spark (GB10) with Claude Code 2.1.306: an instruct request ("thank
 Priya for fixing the flaky CI job, it saved the release") returned a finished,
 em-dashed thank-you note in 4.5 s.
 
@@ -139,8 +139,8 @@ focused window once, sends it with that one instruction, and lists it in
   mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
 
 Verified with a real capture in both places. On Windows 11 ARM64, a Notepad
-invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
-Spark GPU; "what is the amount due here?" returned "The amount due is 1,250.00
+invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on a
+DGX Spark's GPU; "what is the amount due here?" returned "The amount due is 1,250.00
 EUR." in 0.18 s.
 
 ### Context

@@ -81,7 +81,7 @@ host can serve it. Nothing is downloaded until the visitor clicks **Run the mode
 in this browser**; the 491 MB model (pinned Qwen2.5 0.5B) is then cached by the
 browser. A small service worker (`coi-sw.js`)
 supplies the cross-origin isolation headers static hosts cannot set, so the
-multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
+multi-threaded build runs: on a DGX Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
 
 ## Recent requests
@@ -109,7 +109,7 @@ Terminal.app.
 **Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
 Esc only while there is marked text. An instruction stays marked while its drafts show,
 so they work there; continue's suggestion is not marked text, so Tab completes in the
-shell instead of taking it (ROADMAP G50).
+shell instead of taking it.
 
 On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
 cases (23 need a fix, 7 are legitimate commands that failed for environmental
@@ -124,7 +124,7 @@ command:
 The cases carry no error output for the legitimate commands, so a model sees
 only the command and guesses; on a real screen it sees what went wrong.
 Reproduce with `python benchmarks/evaluate_terminal.py --label NAME` against a
-model server (the Spark, CPU llama.cpp b11822).
+model server (measured on a DGX Spark's CPU, llama.cpp b11822).
 
 ## Talking to a coding agent in its own chat box
 

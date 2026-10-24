@@ -37,7 +37,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 - **`claudish/model.py`** has the `Rewriter` and its backends. **`templates.json`** holds the
   prompts; **`modes.py`** loads them into the invocation modes (rewrite, continue, instruct); **`context.py`** holds the context providers (file, command, MCP,
   caret text); **`config.py`** loads profiles.
-- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs (G35);
+- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs;
   **`capture.py`** takes the window picture F8 asks for.
 - **Instructions and agents:** **`turn.py`** answers one instruction (tools in **`tools.py`**),
   **`conversation.py`** keeps a text box's turns, **`sessions.py`** and **`agent.py`** run an agent
@@ -91,9 +91,8 @@ for the owner are free to take. Say in an issue what you mean to do before a lar
 request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
 
 The project is maintained by an AI agent (Claude Code) under the owner's direction. Its working
-files: [AGENT.md](AGENT.md) (its mandate and
-rules), [AGENT_STATE.md](AGENT_STATE.md) (where the work stands), and `CLAUDE.md` (which points the
-agent at AGENT.md). It reviews pull requests against the same gate and the guarantees above.
+files: [AGENT.md](AGENT.md) (its rules), [ROADMAP.md](ROADMAP.md) (the open goals), and
+`CLAUDE.md` (which points the agent at AGENT.md). It reviews pull requests against the same gate and the guarantees above.
 
 ## Bug reports
 

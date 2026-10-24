@@ -15,7 +15,7 @@ adoption with a product that works flawlessly and stays installed.
 
 ## Loop
 
-Read `AGENT_STATE.md` (now and next) and `ROADMAP.md`. Pick the highest-value unblocked task:
+Read `AGENT_STATE.md` (now and next; a local, untracked file) and `ROADMAP.md`. Pick the highest-value unblocked task:
 correctness and data loss, then native usability, setup, rewrite quality and latency, then
 contributor experience. Make the smallest coherent change and check it. Commit, update the state,
 and go on.

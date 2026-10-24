@@ -31,7 +31,7 @@ the SDK by default, any OpenAI-compatible server, or an agent CLI. What the mode
 ## Build the tested CUDA backend
 
 The measured llama.cpp commit is
-`0693dbfb915f33233818373b5f6969396658d02c`. On the Spark, with CUDA 13 and CMake:
+`0693dbfb915f33233818373b5f6969396658d02c`. On a DGX Spark (GB10), with CUDA 13 and CMake:
 
 ```sh
 git clone https://github.com/ggml-org/llama.cpp.git .tools/llama.cpp

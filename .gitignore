@@ -7,3 +7,4 @@ build/
 dist/
 AGENT_STOP
 platforms/macos/cd.tiff
+AGENT_STATE.md
