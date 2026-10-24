@@ -224,16 +224,16 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller = self.module.ClaudishInputController().initWithServer_delegate_client_(
             object(), None, self.client)
         self.controller.activateServer_(None)
-        self.controller.state.mode = "compose"  # these tests exercise compose; a new session starts in continue
+        self.assertEqual(self.controller.state.mode, "compose")  # a new session starts in compose
 
     def tearDown(self):
         self.controller.inputControllerWillClose()
 
-    def test_switching_to_cd_ai_types_like_en_us(self):
+    def test_continue_types_like_en_us(self):
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, self.client)
         fresh.activateServer_(None)
         try:
-            self.assertEqual(fresh.state.mode, "continue")
+            fresh.state.mode = "continue"
             for char in "ls -la":
                 self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
                     type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0, characters=lambda c=char: c), self.client))
@@ -462,6 +462,7 @@ class MacOSAdapterTests(unittest.TestCase):
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
         fresh.activateServer_(None)
         try:
+            fresh.state.mode = "continue"
             event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
                                           characters=lambda: "o")
             fresh.handleEvent_client_(event, client)

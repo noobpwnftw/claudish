@@ -84,10 +84,10 @@ class ModeFeelTests(unittest.TestCase):
 
     def test_shift_keeps_what_you_see_and_goes_to_continue(self):
         state = Composition()
-        self.assertEqual((state.toggle(), state.mode, state.text), ("", "compose", ""))
+        self.assertEqual(state.mode, "compose")  # where cd_AI starts
         state.change("very good")
         self.assertEqual((state.toggle(), state.mode, state.text), ("very good", "continue", "very good"))
-        state.toggle()
+        self.assertEqual((state.toggle(), state.mode, state.text), ("", "compose", ""))
         state.change("hi")
         state.tab()
         state.offer(state.revision, "Hello.")
@@ -170,6 +170,7 @@ class ModeFeelTests(unittest.TestCase):
 
     def test_continue_waits_for_the_end_of_a_line(self):
         state = Composition()
+        state.mode = "continue"
         state.change("Thanks for the review ")
         self.assertTrue(state.automatic)
         state.inside = True  # text follows the caret on its line
@@ -440,7 +441,7 @@ class AgentReplyTests(unittest.TestCase):
 class ContinueTests(unittest.TestCase):
     def test_continue_asks_only_at_a_word_boundary(self):
         state = Composition()
-        self.assertEqual(state.mode, "continue")
+        state.mode = "continue"
         for typed, asks in (("Thanks for the rev", False), ("Thanks for the review ", True),
                             ("Hi Sam,", True), ("it seems", False), ("über", False), ("done.", True)):
             state.change(typed)

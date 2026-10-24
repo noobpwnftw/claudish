@@ -214,10 +214,17 @@ def scenarios():
     current = sh(sys.executable, str(HERE / "input_source.py"), "--current")
     check("cd_AI is the selected input source", current.startswith(BUNDLE_ID), True)
 
-    # 3. Continue: keys go straight in; the rest waits as grey marked text; Tab takes it.
+    # 3. cd_AI starts in compose: what you type is held, marked; Esc drops it.
+    type_text("hi")
+    wait_for(lambda: state().get("marked") == "hi", timeout=10)
+    check("cd_AI starts in compose: what you type is held, marked", (document(), state().get("marked")), ("hi", "hi"))
+    key("Escape")
+    wait_for(lambda: not document(), timeout=5)
+    # Continue (a Shift tap): keys go straight in; the rest waits in grey; Tab takes it.
+    shift_tap()
     type_text("ls -la")
     time.sleep(0.5)
-    check("cd_AI starts in continue: keys go straight in", document(), "ls -la")
+    check("continue: keys go straight in", document(), "ls -la")
     running = not subprocess.run(["pgrep", "-f", str(TARGET / "Contents/MacOS")], capture_output=True).returncode
     check("cd_AI is running (the keys went through it)", running, True)
     key("Down")  # the context starts over
@@ -277,7 +284,7 @@ def scenarios():
         time.sleep(1.0)
         global TYPING_INTO
         TYPING_INTO = "com.apple.Terminal"  # the focus guard watches Terminal now, not the test window
-        shift_tap()  # compose
+        # Terminal's window is a new session for cd_AI: it starts in compose.
         type_text("fix")
         key("Return")  # the instruction, with the screen's last lines
         # It stays marked while its drafts show, so Terminal gives cd_AI Tab: Tab takes the draft

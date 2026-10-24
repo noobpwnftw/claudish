@@ -22,17 +22,19 @@ engine = module.ClaudishEngine(connection=connection, object_path="/org/claudish
 commits = []
 engine.commit_text = lambda text: commits.append(text.get_text())
 try:
-    # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
+    def shift_tap():
+        assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
+        assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.RELEASE_MASK)
+
+    assert engine.composition.mode == "compose"  # where cd_AI starts
+    # A Shift tap goes to continue, which types like en_US: keys straight in, hyphens kept.
+    shift_tap()
     assert engine.composition.mode == "continue"
     for char in "ls -la":  # passed on: the app inserts each key and reports its caret after it
         assert not engine.do_process_key_event(ord(char), 0, 0)
     assert engine.composition.text == "ls -la" and not commits, commits
     assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # nothing offered: Tab is the app's
     commits.clear()
-
-    def shift_tap():
-        assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
-        assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.RELEASE_MASK)
 
     shift_tap()  # a Shift tap: compose, which holds what you type
     assert engine.composition.mode == "compose"
@@ -134,6 +136,6 @@ try:
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: continue by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Enter), live continue, F8, candidate list, mode menu, quiet in terminals, password bypass")
+    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Enter), live continue, F8, candidate list, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()

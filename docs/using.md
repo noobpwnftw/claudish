@@ -48,7 +48,7 @@ composition at the caret, and the panel, drawn with the same kit as the design l
 (`/design.html`) and the desktop adapters. It opens in compose, the pitch (Tab
 offers a rewrite, Enter sends it as an instruction and offers drafts to choose
 with ↑↓ and take with Tab, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
-pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in continue. A key strip lights the keys as you use them, and each sample
+pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default; a choice lasts only for the current page,
 with no cookies or storage.

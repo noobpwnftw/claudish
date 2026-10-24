@@ -81,17 +81,19 @@ def doctor():
 
 def scenarios():
     focus("entry")
-    type_text("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
-    time.sleep(0.3)
-    check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
-    key("ctrl+a", "BackSpace")
-    key("shift")  # a Shift tap: continue -> compose
-    type_text("hello-world")
+    type_text("hello-world")  # cd_AI starts in compose: what you type is held
     settle()
-    check("composition is not committed while typing", state()["entry"], "")
+    check("cd_AI starts in compose: nothing is committed while typing", state()["entry"], "")
     key("shift+Return")
     wait_for(lambda: state()["entry"], what="commit")
     check("Shift+Enter keeps your words as typed", state()["entry"], "hello-world")
+    key("ctrl+a", "BackSpace")
+    key("shift")  # a Shift tap: continue, which types like en_US
+    type_text("ls -la")
+    time.sleep(0.3)
+    check("continue: keys go straight in, hyphens kept", state()["entry"], "ls -la")
+    key("ctrl+a", "BackSpace")
+    key("shift")  # back to compose
 
     focus("other")
     type_text("very important")
@@ -392,7 +394,7 @@ def surrounding_context(service):
 
 def terminal_scenario():
     """G35: an instruction typed at a terminal prompt sees the terminal's screen, read through AT-SPI,
-    with nothing installed in the shell. Starts in continue, where surrounding_context() ends."""
+    with nothing installed in the shell. Typed in continue, where the email scenario left it."""
     sys.path.insert(0, str(SRC))
     from claudish.screen import read_atspi, tail
     background("/usr/libexec/at-spi-bus-launcher", "--launch-immediately")

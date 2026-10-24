@@ -28,12 +28,13 @@ Shift switches English and pinyin. The taskbar, menu bar or top bar shows the mo
 switch shows the mode's tile and name briefly at the caret ("compose · Shift continue"); like
 every toast, it lasts two seconds or until the next key, since it was said where the caret was.
 
-- **Continue** (where cd_AI starts): keys go straight into the app. At a word boundary at the end
-  of a line, the rest of the sentence shows in grey after the caret. Tab takes it; typing ignores
-  it; Esc dismisses it. With nothing offered, Tab is the app's. Autocomplete only: no tools, no
-  retrieval, no agent; its quality is its model's.
-- **Compose**: your words are held as the platform's composition (one plain underline) until you
-  choose, as in a CJK input method:
+- **Compose** (where cd_AI starts): your words are held as the platform's composition (one plain
+  underline) until you choose, as in a CJK input method. You ask on purpose and see that it is
+  working, so a model that takes its time (a hosted one) still fits.
+- **Continue**: keys go straight into the app. At a word boundary at the end of a line, the rest
+  of the sentence shows in grey after the caret. Tab takes it; typing ignores it; Esc dismisses
+  it. With nothing offered, Tab is the app's. Autocomplete only: no tools, no retrieval, no agent;
+  its quality is its model's.
 
 | Key | In compose |
 | --- | --- |

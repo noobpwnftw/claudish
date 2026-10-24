@@ -14,6 +14,7 @@ Start-Process notepad; Start-Sleep 3
 $window = Get-Process Notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
 if (-not [Keys]::Focus($window.MainWindowHandle)) { throw 'Notepad could not take the foreground' }
 Start-Sleep 1
+[Keys]::Press(0x10); Start-Sleep -Milliseconds 300  # cd_AI starts in compose: continue first
 [Keys]::Type('Thanks for the review '); Start-Sleep -Milliseconds 1500
 Show-State 'continue'
 [Keys]::Press(0x1B); [Keys]::ClearEdit($window.MainWindowHandle)

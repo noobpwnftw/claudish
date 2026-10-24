@@ -79,6 +79,8 @@ def main():
         if "--preview" in sys.argv:
             preview()
             return
+        keys.press("Shift_L")  # cd_AI starts in compose: continue first
+        time.sleep(0.4)
         keys.type("Thanks for the review ")  # continue: the rest of the sentence after the caret
         time.sleep(1.2)
         shot("continue")

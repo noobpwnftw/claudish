@@ -47,13 +47,14 @@ def main():
             reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
             # The mode in the taskbar's input indicator; its menu and a click switch it.
             button = [b for b in reply["addButton"] if b["id"] == "windows-mode-icon"][0]
-            assert button["icon"].endswith("mode-continue.ico") and os.path.exists(button["icon"]), button
+            assert button["icon"].endswith("mode-compose.ico") and os.path.exists(button["icon"]), button
+            assert service.state.mode == "compose"  # where cd_AI starts
             reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
-            assert service.state.mode == "compose" and reply["changeButton"][0]["icon"].endswith("mode-compose.ico"), reply
+            assert service.state.mode == "continue" and reply["changeButton"][0]["icon"].endswith("mode-continue.ico"), reply
             menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
-            assert [(m["text"], m["checked"]) for m in menu] == [("continue", False), ("compose", True)], menu
+            assert [(m["text"], m["checked"]) for m in menu] == [("compose", False), ("continue", True)], menu
             service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
-            assert service.state.mode == "continue"
+            assert service.state.mode == "compose"
 
             def key(code, char=0, method="onKeyDown", modifiers=(), **around):
                 states = [0] * 256
@@ -70,7 +71,8 @@ def main():
                 assert key(0x10, method="filterKeyUp")["return"] is True  # PIME asks twice; the same answer
                 return key(0x10, method="onKeyUp")
 
-            # Switching to cd_AI types like en_US: continue, keys straight in, hyphens kept.
+            # A Shift tap goes to continue, which types like en_US: keys straight in, hyphens kept.
+            shift_tap()
             assert service.state.mode == "continue"
             typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
             assert typed == "ls -la", typed
@@ -241,7 +243,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, continue by default, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
 
 
 if __name__ == "__main__":

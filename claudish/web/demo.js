@@ -41,7 +41,7 @@ function moveTo(index, extend) {
 
 const state = {
   text: "",          // continue: the model's context (already in the text box); else the composition
-  mode: "compose",   // the demo opens with the pitch; the installed input method starts in continue
+  mode: "compose",   // where cd_AI starts
   asked: null,       // compose: what the pending or shown result is ("rewrite" or "instruct")
   candidate: "",
   candidates: [],

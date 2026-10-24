@@ -32,6 +32,7 @@ def main():
         driver.fresh_document()
         driver.select_input_method()
         driver.front()
+        driver.shift_tap()  # cd_AI starts in compose: continue first
         driver.type_text("Thanks for the review ")
         time.sleep(2.5)  # the suggestion is cd_AI's own overlay, not marked text: give it time
         show("continue")

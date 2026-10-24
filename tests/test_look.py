@@ -24,6 +24,7 @@ PNG = capture.encode_png(2, 1, [bytes([255, 0, 0, 0, 0, 255])])
 class CompositionTests(unittest.TestCase):
     def test_f8_is_for_instructions_only_and_never_carries_over(self):
         state = Composition()
+        to_mode(state, "continue")
         state.insert("x")
         self.assertFalse(state.toggle_look())  # continue: nothing is sent as an instruction
         state.commit()

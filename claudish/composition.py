@@ -4,11 +4,11 @@ import time
 
 MAX_COMPOSITION = 512
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
-# continue (where cd_AI starts) types like en_US: your keys go straight in, and the rest of the
-# sentence waits after the caret for Tab. compose holds what you type: Tab shows a rewrite (Tab
-# again puts it in), Enter sends it as an instruction and offers drafts, Shift+Enter keeps it as it
-# is, and Esc steps back until it is gone (docs/design/design.md).
-MODES = ("continue", "compose")
+# compose (where cd_AI starts) holds what you type: Tab shows a rewrite (Tab again puts it in),
+# Enter sends it as an instruction and offers drafts, Shift+Enter keeps it as it is, and Esc steps
+# back until it is gone. continue types like en_US: your keys go straight in, and the rest of the
+# sentence waits after the caret for Tab (docs/design/design.md).
+MODES = ("compose", "continue")
 # Tab takes the model's text (a suggestion, a rewrite, a draft, an answer to read); Enter talks to the
 # model (sends an instruction, a reply, an answer to its question). Enter never inserts the model's
 # words, so a reflexive second Enter after sending can insert nothing (owner, 2026-10-24).

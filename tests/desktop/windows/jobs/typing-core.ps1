@@ -91,12 +91,8 @@ for ($i = 0; $i -lt 50; $i++) { try { Invoke-RestMethod http://127.0.0.1:18765/h
 
 function Invoke-Scenarios {
   # Scenarios (same intent as the Linux desktop test).
-  [Keys]::Type('ls -la'); Start-Sleep -Milliseconds 300  # switching to cd_AI types like en_US
-  Check 'cd_AI starts in continue: keys go straight in' (Get-Text) 'ls -la'
-  Reset-Target
-  Start-Sleep -Milliseconds 400; [Keys]::Press(0x10); Start-Sleep -Milliseconds 200  # a Shift tap: continue -> compose
-  [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600
-  Check 'composition is not committed while typing' (Get-Text) ''
+  [Keys]::Type('hello-world'); Start-Sleep -Milliseconds 600  # cd_AI starts in compose: what you type is held
+  Check 'cd_AI starts in compose: nothing committed while typing' (Get-Text) ''
   [Keys]::Press(0x0D, 0x10); Start-Sleep -Milliseconds 500  # Shift+Enter keeps your words
   $dash = [string][char]0x2014  # not a literal: Windows PowerShell may read this file as ANSI
   Check 'Shift+Enter keeps your words as typed' (Get-Text) 'hello-world'

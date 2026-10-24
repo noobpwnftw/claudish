@@ -11,13 +11,14 @@ Windows, and macOS. Switch to it like a keyboard language, and keep typing.
 
 | | You type | cd_AI |
 | --- | --- | --- |
-| **continue** (where it starts) | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
-| **compose**, then Tab | `this is important` | a rewrite in Claudish, waiting; Tab again puts it in |
+| **compose** (where it starts), then Tab | `this is important` | a rewrite in Claudish, waiting; Tab again puts it in |
 | **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
+| **continue** | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 
 Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
-until you take it, and your own words are always one key away. Continue can be
-ignored forever; compose is there when you want it. Where you want none of it,
+until you take it, and your own words are always one key away: Shift+Enter keeps
+them as typed. Continue is a Shift tap away when you want your keys to go
+straight in, with the rest of the sentence offered. Where you want none of it,
 switch that app to your usual keyboard: input sources are chosen per app.
 
 The model is yours to choose: a small local one by default, any

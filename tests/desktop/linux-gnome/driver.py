@@ -136,20 +136,23 @@ def settle(seconds=0.8):
 
 def scenarios(keys):
     focus("entry")
-    keys.type("ls -la")  # switching to cd_AI types like en_US: straight in, nothing changed
-    time.sleep(0.4)
-    check("cd_AI starts in continue: keys go straight in", state()["entry"], "ls -la")
-    check("the top bar shows the mode: continue", indicator(), "cd")
-    keys.press("ctrl+a", "BackSpace")
-    keys.press("Shift_L")  # a Shift tap: compose
-    time.sleep(0.4)
-    check("a Shift tap: the top bar shows compose", indicator(), "AI")
+    check("cd_AI starts in compose: the top bar shows it", indicator(), "AI")
     keys.type("hello-world")
     settle()
-    check("composition is not committed while typing", state()["entry"], "")
+    check("compose: nothing is committed while typing", state()["entry"], "")
     keys.press("Shift_L+Return")
     wait_for(lambda: state()["entry"], what="commit")
     check("Shift+Enter keeps your words as typed", state()["entry"], "hello-world")
+    keys.press("ctrl+a", "BackSpace")
+    keys.press("Shift_L")  # a Shift tap: continue, which types like en_US
+    time.sleep(0.4)
+    check("a Shift tap: the top bar shows continue", indicator(), "cd")
+    keys.type("ls -la")
+    time.sleep(0.4)
+    check("continue: keys go straight in, hyphens kept", state()["entry"], "ls -la")
+    keys.press("ctrl+a", "BackSpace")
+    keys.press("Shift_L")  # back to compose
+    time.sleep(0.4)
 
     focus("other")
     keys.type("very important")
