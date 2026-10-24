@@ -13,12 +13,11 @@ per-platform duct tape; the CJK input-method reviewers weigh most on keys.
 
 ## Current task
 
-Done today: G54 (voices), G55 (Gemma 4 E4B local), G56 (onboarding funnel, the poll in
-docs/research/2026-10-24-onboarding-poll.md). Next candidates from the poll, by value: G37 (a real
-Mac app with a first run; the install wall for everyone but developers), G58 (SECURITY.md), G59
-(voices without friction), G57 (a share card), G60 (fcitx5). Owner answers today: the terminal's
-lines stay on with any model; Enter keeps summoning (the CJK habit is a later setting, G47, and
-swapping moves every Enter action); setup asks for a voice once; the panel does not name it.
+G61, one installer per OS, then G62 (the settings window) and G63 (release gates), with G45 to its
+user-level acceptance (docs/research/2026-10-24-install-poll.md). Owner: no Apple Developer ID; on
+macOS the Download button (.pkg, ad-hoc signed; Open Anyway in Privacy & Security, measured on
+26.6) first and a curl one-liner second; a settings window, not a wizard; avoid feature creep.
+G57-G60 tabled.
 
 ## Verified (latest)
 
