@@ -84,3 +84,9 @@ it log event kinds and errors there; remove the file to stop.
 `open -g` starts.) Exceptions
 in an input method otherwise vanish into the host app's run loop. Crash reports
 are in `~/Library/Logs/DiagnosticReports/Claudish-*.ips`.
+
+## The site and the static demo
+
+`.github/workflows/pages.yml` deploys claudish.io on every push to `main`:
+`python scripts/build_static_demo.py --site` writes the home page (`site/`) with the static demo in
+`demo/`. `python scripts/build_static_demo.py` alone writes the demo to `dist/demo/`.

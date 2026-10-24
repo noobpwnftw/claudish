@@ -30,6 +30,10 @@ cd "$home"
 # `claudish` on PATH, as ~/.local/bin is on Ubuntu, Fedora and most desktops.
 mkdir -p "$HOME/.local/bin"
 ln -sf "$home/.venv/bin/claudish" "$HOME/.local/bin/claudish"
+# An update: the running service restarts with the new code (setup leaves a running one alone).
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/claudish.service" ]; then
+  .venv/bin/python -m claudish service install > /dev/null && echo "cd_AI's service restarted with this version."
+fi
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *) echo "The claudish command is in ~/.local/bin, which is not on PATH in this shell; a new login adds it on most desktops." ;;

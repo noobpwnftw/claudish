@@ -14,7 +14,7 @@ Typing in detail, the browser demos, and terminals.
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With an answer to read: insert it (Esc dismisses it). |
 | Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Enter on a draft lights its Tab. With nothing composed, Enter is the app's (a newline) |
-| ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, as Space is. An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
+| ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
 | Shift+Enter (compose) | Keep what you composed as it is, and stay in compose. Most CJK input methods keep the typed letters with Enter; in cd_AI, Enter asks the model and Shift+Enter keeps |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
@@ -27,8 +27,8 @@ Typing in detail, the browser demos, and terminals.
 Where you want no suggestions at all, switch that app to your usual keyboard;
 the system remembers it per app or window once you turn that on: Windows,
 Settings → Time & language → Typing → Advanced keyboard settings → "Let me use a
-different input method for each app window"; macOS, Settings → Keyboard → Input
-Sources → "Automatically switch to a document's input source"; GNOME Tweaks →
+different input method for each app window"; macOS, System Settings → Keyboard →
+Text Input → Edit… → "Automatically switch to a document's input source"; GNOME Tweaks →
 Keyboard → "Switch input sources individually for each window".
 
 A composition is edited at its end. Navigation keys and Ctrl/Alt/Win shortcuts pressed while
@@ -42,7 +42,7 @@ panel says "cd_AI is offline" from your first key.
 
 ## Browser demo
 
-With the launcher running, open **http://127.0.0.1:18765**. The demo is the
+With cd_AI's service running (`claudish service status`), open **http://127.0.0.1:18765**. The demo is the
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and the panel, drawn with the same kit as the design lab
 (`/design.html`) and the desktop adapters. It opens in compose (Tab
@@ -74,7 +74,7 @@ claudish serve --model-url http://127.0.0.1:18766
 
 ## Static demo: the model in your browser
 
-It runs at [claudish.io/demo](https://claudish.io/demo/), under the [project home page](https://claudish.io) (`site/`: what Claudish is, the keys, and an install prompt to paste into a coding agent). `.github/workflows/pages.yml` deploys both on every push to `main` (`python scripts/build_static_demo.py --site`). `python scripts/build_static_demo.py` alone writes `dist/demo/`, the same browser demo
+It runs at [claudish.io/demo](https://claudish.io/demo/), under the [project home page](https://claudish.io). It is the same browser demo
 with the model running in the page through [wllama](https://github.com/ngxson/wllama)
 (llama.cpp compiled to WebAssembly). It needs no inference server, so any static
 host can serve it. Nothing is downloaded until the visitor clicks **Run the model

@@ -52,7 +52,7 @@ class LinuxChecks(unittest.TestCase):
         (self.home / ".config/environment.d").mkdir(parents=True)
         (self.home / ".config/environment.d/90-claudish-ibus.conf").write_text("IBUS_COMPONENT_PATH=x\n")
         stale = self.run_checks(XDG_CONFIG_HOME=str(self.home / ".config"))
-        self.assertEqual(stale["IBus search path"][0], "fail")
+        self.assertEqual(stale["IBus search path"][0], "warn")  # set up: the next login takes it up, not a failure
         self.assertIn("log out and back in", stale["IBus search path"][1])
         healthy = self.run_checks(IBUS_COMPONENT_PATH="/usr/share/ibus/component:%s" % self.component.parent)
         self.assertEqual({name: status for name, (status, _) in healthy.items()},

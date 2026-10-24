@@ -34,7 +34,8 @@ are missing), clones cd_AI into `~/.local/share/claudish`, makes its own Python 
 links `claudish` into `~/.local/bin`, and runs `claudish setup`. Setup asks for a tone, writes the
 config, registers the input method with IBus, starts the service at every login (a systemd user
 unit), and opens cd_AI's settings in your browser. Then **log out and back in**, and add
-**English → cd_AI — Claudish** in **Settings → Keyboard → Input Sources**.
+**English → cd_AI — Claudish** in **Settings → Keyboard → Input Sources**. Running the same line
+again updates cd_AI and restarts its service.
 
 **By hand**, from a checkout: `sudo apt install ibus python3-gi gir1.2-ibus-1.0`, then
 
@@ -96,7 +97,8 @@ method: until then macOS keeps its old list of input sources (and, after an upda
 **Settings…** in the input menu opens the settings again.
 
 The package is ad-hoc signed, not notarized. A copy downloaded with a browser is blocked the first
-time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**.
+time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**, and **Open
+Anyway** again in the dialog.
 `installer -pkg cd_AI.pkg -target CurrentUserHomeDirectory` in Terminal installs it without that.
 
 **Building the package**, on a Mac with Python 3.10+ from python.org:

@@ -130,11 +130,15 @@ def check_ime_linux():
         path = os.environ.get("IBUS_COMPONENT_PATH", "")
         if str(user.parent) not in path.split(":"):
             environment = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "environment.d/90-claudish-ibus.conf"
-            results.append(("IBus search path", "fail",
-                            "this session's IBUS_COMPONENT_PATH does not include %s, so IBus cannot see Claudish" % user.parent,
-                            "log out and back in (installed: %s); if your session ignores environment.d: "
-                            "sudo /usr/bin/python3 %s --system" % (environment, INSTALL_PY)
-                            if environment.is_file() else "/usr/bin/python3 %s, then log out and back in" % INSTALL_PY))
+            if environment.is_file():  # set up; this session started before it, as any new install's does
+                results.append(("IBus search path", "warn",
+                                "set up in %s; it takes effect at your next login" % environment,
+                                "log out and back in; if your session ignores environment.d: "
+                                "sudo /usr/bin/python3 %s --system" % INSTALL_PY))
+            else:
+                results.append(("IBus search path", "fail",
+                                "this session's IBUS_COMPONENT_PATH does not include %s, so IBus cannot see Claudish" % user.parent,
+                                "/usr/bin/python3 %s, then log out and back in" % INSTALL_PY))
         else:
             results.append(("IBus search path", "ok", "includes the user component directory", None))
     try:

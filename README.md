@@ -77,7 +77,7 @@ source checkout for development: [docs/install.md](docs/install.md).
 | Tab | take the model's text: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft, an answer to read (with nothing offered, Tab is the app's) |
 | Enter | compose: send it as an instruction (it stays underlined while the model works), a reply, or the answer to the model's question (with nothing composed, a newline) |
 | Shift+Enter | compose: keep your words as they are (where most CJK input methods use Enter for that) |
-| ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text |
+| ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text, and Space does nothing while drafts show |
 | F8 | with an instruction: also send a picture of this window |
 | Esc | one step back: what you typed, then edit (your instruction back at the caret), then drop |
 | Shift+Esc | bring back what Esc dropped, or the exchange you left when you switched windows |
