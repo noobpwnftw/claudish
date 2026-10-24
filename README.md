@@ -18,7 +18,7 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 
 | | You type | cd_AI |
 | --- | --- | --- |
-| **compose** (where it starts), then Tab | `this is important` | a rewrite in Claudish, waiting; Tab again puts it in |
+| **compose** (where it starts), then Tab | `this is important` | a rewrite in cd_AI's panel, waiting; Tab again puts it in |
 | **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 | **continue** | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 

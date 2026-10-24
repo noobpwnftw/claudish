@@ -14,7 +14,7 @@
 <body>
   <div class="shell">
     <header class="topbar">
-      <a class="wordmark" href="./" aria-label="Claudish home">cd<span class="dash">—</span><span class="ai">AI</span></a>
+      <a class="wordmark" href="./" aria-label="cd_AI home">cd<span class="dash">—</span><span class="ai">AI</span></a>
       <nav class="nav" aria-label="Main">
         <a href="demo/">Demo</a>
         <a href="#install">Install</a>
@@ -47,7 +47,7 @@
               <div class="k-foot"><span class="k-tile ai">AI</span><span class="k-hint"><span class="k-cap">Tab</span>insert</span><span class="k-hint"><span class="k-cap">Esc</span>dismiss</span></div>
             </div>
           </div>
-          <figcaption>Your words stay yours until you press Tab. Any text box: chat, mail, an editor, a terminal.</figcaption>
+          <figcaption>Your words stay yours until you press Tab. Any text box: chat, mail, an editor, a terminal. Shown: a real rewrite by Gemma 4, in the default voice.</figcaption>
         </figure>
       </section>
 
@@ -96,7 +96,7 @@
         <div>
           <div class="eyebrow">04 / THE KEYS</div>
           <h2 id="keys">Everything else is typing.</h2>
-          <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. Claudish extends it from what you meant to say to what you meant to do.</p>
+          <p class="body">People who type Chinese or Japanese already know this grammar: compose, see the candidates, choose, commit. cd_AI extends it from what you meant to say to what you meant to do.</p>
         </div>
         <table class="keys">
           <tr><td><kbd>Shift</kbd></td><td>tap to switch: continue or compose</td></tr>
@@ -125,7 +125,7 @@
       <section class="section" id="install" aria-labelledby="install-title">
         <div class="eyebrow">06 / INSTALL</div>
         <h2 id="install-title">Let your agent do it.</h2>
-        <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want Claudish. It shows you the plan before it changes anything, and leaves sudo and administrator steps to you.</p>
+        <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want cd_AI. It shows you the plan before it changes anything, and leaves sudo and administrator steps to you.</p>
         <div class="prompt">
           <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
           <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
@@ -134,7 +134,7 @@
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
 3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
 4. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
-5. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts Claudish at login.
+5. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts cd_AI at login.
 6. If setup says a step needs me (sudo on Linux; on Windows, cd_AI-setup.exe as administrator), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
 7. cd_AI ships no model: it is set up for Claude with my own API key. Run `python -m claudish settings`: it opens cd_AI's settings in my browser, where I paste the key myself (cd_AI checks it with Anthropic and keeps it where its service reads it). Wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
 8. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.

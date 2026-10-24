@@ -221,5 +221,14 @@ class ServiceTests(unittest.TestCase):
                 model.rewrite("hello")
 
 
+
+class PanelNamesTests(unittest.TestCase):
+    def test_a_model_api_is_named_as_a_person_knows_it(self):
+        from claudish.model import api_name
+        self.assertEqual([api_name(h) for h in ("api.openai.com", "openrouter.ai", "10.0.0.249", "192.168.1.5",
+                                                 "models.example.com")],
+                         ["OpenAI", "OpenRouter", "your network", "your network", "models.example.com"])
+
+
 if __name__ == "__main__":
     unittest.main()

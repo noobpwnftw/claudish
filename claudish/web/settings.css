@@ -37,8 +37,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 main { max-width: 560px; margin: 0 auto; padding: 18px 20px 24px; }
-.hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-#status { margin: 0 4px 6px; font-size: 13px; font-weight: 500; }
+header { display: flex; align-items: center; gap: 10px; margin: 0 4px 14px; }
+header img { border-radius: 7px; flex: none; }
+h1 { font-size: 17px; font-weight: 600; margin: 0; }
+#status { margin: 0 4px 14px; font-size: 13px; font-weight: 500; }
 #next { margin: 0 4px 14px; color: var(--muted); }
 kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid var(--field-line); border-radius: 4px; padding: 0 4px; }
 .sample { margin: 6px 4px 0; font-size: 12px; }
