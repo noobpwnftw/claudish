@@ -136,12 +136,12 @@ try:
     assert engine.do_process_key_event(ord(" "), 0, 0)
     assert engine.composition.text == "café^", engine.composition.text
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.text
-    # A shortcut while an instruction is out: your words go in, and the exchange is held to come back to.
+    # A shortcut while an instruction is out: the instruction is cleared, held with its exchange for Shift+Esc.
     for char in "fix it":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and engine.composition.sent
     assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
-    assert commits[-1] == "fix it" and engine.composition.held is not None and not engine.composition.text
+    assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
     engine.composition.held = None
     # The indicator's menu picks a mode, as a Shift tap does.
     engine.do_property_activate("mode.continue", IBus.PropState.CHECKED)

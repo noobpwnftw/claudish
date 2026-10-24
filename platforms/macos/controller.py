@@ -105,7 +105,7 @@ class ClaudishInputController(IMKInputController):
                 0.04, self, "pollSuggestions:", None, True)
         pill = self.state.returned(self.app(self.client()))  # back where an exchange was held
         if pill:
-            self.show_toast(pill)
+            self.show_toast(pill, lasting=True)  # it waits for your next key, as the design says
 
     def deactivateServer_(self, sender):
         try:
@@ -346,14 +346,18 @@ class ClaudishInputController(IMKInputController):
         self.drawn = spec
 
     @objc.python_method
-    def show_toast(self, spec, client=None):
-        """A panel shown briefly at the caret: the mode switch, or what Esc just dropped."""
+    def show_toast(self, spec, client=None, lasting=False):
+        """A panel at the caret: briefly (the mode switch, what Esc just dropped), or until your next
+        key (lasting: the pill for an exchange held while you were away)."""
         client = client if client is not None else self.client()
         if client is None:
             return
         TOAST.show(self.caret(client, start=True), spec)
         if getattr(self, "toast_timer", None) is not None:
             self.toast_timer.invalidate()  # a newer toast gets its own two seconds
+            self.toast_timer = None
+        if lasting:  # a pill: until a key or a focus change ends it
+            return
         self.toast_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
             2.0, self, "hideToast:", None, False)
 

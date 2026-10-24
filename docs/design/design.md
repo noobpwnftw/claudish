@@ -72,7 +72,7 @@ be known before it is pressed).
    safe choice (Deny, No) is listed first and nothing is highlighted: the first ↓ lands on Deny,
    so Allow is always a deliberate ↓↓ Enter. Typed words refuse it with a reason ("or type why
    not", then "Enter deny with reason").
-5. **A focus change** commits what the composition shows; the exchange is held for that text box
+5. **A focus change** commits words you are typing; a sent instruction is cleared, and its exchange is held for that text box
    and a passive pill shows on return ("3 drafts ready · Shift+Esc open"); it expires after ten
    minutes.
 6. **A drop** says "dropped · Shift+Esc restore".
@@ -125,6 +125,5 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 ## Open
 
 How much context continue gets; per-app input behavior (first, continue's Tab in macOS
-Terminal); replacing an instruction a focus change left in the text when its draft is taken on
-return; keys you can rebind (Enter asks and Shift+Enter keeps, as above); screen-reader
+Terminal); keys you can rebind (Enter asks and Shift+Enter keeps, as above); screen-reader
 announcements.

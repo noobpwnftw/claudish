@@ -214,10 +214,10 @@ class ClaudishEngine(IBus.Engine):
         self.update_auxiliary_text(IBus.Text.new_from_string(hint), bool(text and hint))
 
     def focus_mode(self):
-        """What IBus does with the preedit when focus leaves: it is committed, as a CJK input
-        method's is. It only ever holds your own words (an instruction, a reply), never the
-        model's."""
-        return IBus.PreeditFocusMode.COMMIT
+        """What IBus does with the preedit when focus leaves: words you are typing are committed, as
+        a CJK input method's are; a sent instruction (or a reply to the model) is cleared, held with
+        its exchange for Shift+Esc."""
+        return IBus.PreeditFocusMode.CLEAR if self.composition.sent else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.around_caret()[1] if self.composition.live else ""
@@ -548,7 +548,7 @@ class ClaudishEngine(IBus.Engine):
             self.composition.leave(self.app)
             self.render()
             return
-        # IBus commits the visible preedit (your own words) through PreeditFocusMode.COMMIT.
+        # IBus commits the visible preedit (words you were typing) through PreeditFocusMode.COMMIT.
         self.do_reset()
 
     def do_disable(self):

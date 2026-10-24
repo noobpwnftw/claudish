@@ -347,7 +347,7 @@ class ModeFeelTests(unittest.TestCase):
         state.change("decline politely")
         state.submit()
         state.offer(state.revision, "A draft.", ["Another."])
-        self.assertEqual((state.toggle(), state.mode), ("decline politely", "continue"))  # your words go in
+        self.assertEqual((state.toggle(), state.mode), ("", "continue"))  # the instruction is not text for the app
         state.toggle()  # back to compose
         self.assertEqual(state.restore(), "decline politely")  # Shift+Esc: the exchange, drafts and all
         self.assertEqual(state.candidates, ["A draft.", "Another."])
@@ -367,7 +367,7 @@ class ModeFeelTests(unittest.TestCase):
         state.ask(sent, {"id": "q", "label": "The model asks", "body": "All?", "choices": [{"label": "Yes"}]}, "s")
         state.insert("o")
         state.insert("n")
-        self.assertEqual(state.leave("app"), "on")  # what the composition shows goes in, as a CJK preedit
+        self.assertEqual(state.leave("app"), "")  # words for the model never go into the app: held with the exchange
         self.assertIsNone(state.returned("other app"))  # never offered in another app
         self.assertEqual(state.returned("app")["status"], "the model asks")  # a pill, taking no keys
         self.assertEqual((state.text, state.panel()), ("", None))

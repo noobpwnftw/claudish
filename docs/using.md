@@ -19,7 +19,7 @@ Typing in detail, the browser demos, and terminals.
 | Shift+Enter (compose) | Keep what you composed as it is, and stay in compose. Most CJK input methods keep the typed letters with Enter; in cd_AI, Enter asks the model and Shift+Enter keeps |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
-| Switching windows | Your words go in as typed; a sent instruction's exchange is held for that text box. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
+| Switching windows | Words you are typing go in as typed; a sent instruction is not: it leaves the text box with its exchange, held for that text box. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
 | F8 (compose) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
 | Tab with a selection (compose) | With nothing composed, the selected text becomes your words, and Tab asks for its rewrite as above; Esc twice puts it back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
 | Backspace | Edit the composition; with a rewrite showing, the first Backspace closes it |

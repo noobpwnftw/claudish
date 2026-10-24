@@ -19,7 +19,6 @@ one-line instructions answered at the caret, in every app, with the model you co
 | ID | Goal |
 | --- | --- |
 | G47 | Configurable compose keys (`keys.summon`), read by the shared state |
-| G51 | Replace the instruction a focus change left in the text when its draft is taken on return |
 | G50 | Per-app input behavior beside bindings; first, continue's Tab in macOS Terminal |
 | G60 | fcitx5 on Linux |
 | G30 | `claudish update`, keeping the previous version to roll back to |

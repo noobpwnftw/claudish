@@ -603,20 +603,19 @@ class Composition:
         return text
 
     def leave(self, app=None):
-        """Focus left the text box: what the app may keep. What the composition shows goes in, as a
-        CJK input method commits its preedit: your own words (an instruction, a reply), never the
-        model's (a rewrite is not taken); nothing is sent or approved. A sent instruction's exchange
-        is held (its work goes on) and offered again on return (returned)."""
+        """Focus left the text box: what the app may keep. Words you were still typing go in, as a
+        CJK input method commits its preedit; never the model's (a rewrite is not taken). A sent
+        instruction is not text for the app: it is cleared with its exchange, which is held (its work
+        goes on) and offered on return (returned); Shift+Esc brings it back whole."""
         if self.live:
             self.change("")
             return ""
         if self.sent:
-            words = self.shown
             held = copy.copy(self)
             held.held = None
             self.held, self.held_app, self.held_at = held, app, time.monotonic()
             self.change("")
-            return words
+            return ""
         words = self.text
         self.change("")
         return words
