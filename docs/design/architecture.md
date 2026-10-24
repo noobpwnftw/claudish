@@ -17,8 +17,8 @@ question to the user presented as is."
      `textbox.search`), read live at the moment of the call;
    - observations: the profile's context providers and the app's bindings (files, commands, MCP
      resources); a terminal's screen, read through the accessibility APIs on Tab or Enter in
-     compose (never on continue's pauses; the last lines only); a picture of the window on F8.
-     Observations are material, never instructions, and every result lists what was consulted.
+     compose (the last lines); a picture of the window on F8. Every result lists what was
+     consulted.
 2. **What you did:** the mode and the key (a pause in continue, Tab or Enter in compose, an answer
    to a question), and the text box's conversation so far.
 3. **What is available:** the tools the configuration allows there: the profile's MCP servers
@@ -37,8 +37,8 @@ question to the user presented as is."
 Side effects happen only through tools, and a tool that writes or acts goes through **ask** first
 unless the configuration trusts it. Handing a task to a helper is such a tool ("Send this task to
 claude?", No first): it opens the helper with a note (the task and what was observed), and the
-turn ends as **done**, nothing inserted. Whatever is inserted obeys the box's kind, in one place:
-a terminal gets one physical line (a newline at a prompt is a Return), a password field nothing.
+turn ends as **done**. Whatever is inserted obeys the box's kind, in one place: a terminal gets
+one physical line (a newline at a prompt is a Return).
 
 ## One loop
 
@@ -56,7 +56,7 @@ instruction is a turn in it. It keeps every instruction, the drafts offered and 
 tool call and result (large results trimmed), your answers, and approvals given for the session;
 each turn sends the box fresh, so your edits are what the model sees. An agent keeps one process
 per conversation, resumed by session id if it ends. A conversation ends when the text box goes
-away or after 30 idle minutes; conversations live only in the service's memory.
+away or after 30 idle minutes.
 
 ## The tool policy
 
@@ -71,13 +71,11 @@ A question shows what will actually happen (the tool and its key arguments), not
 Typed words refuse it with your words as the reason. The same policy answers an agent's
 permission requests.
 
-## Bounds and trust
+## Bounds
 
-- **Budgets:** rounds of tool calls (4 by default), wall time (60 s), and tokens for hosted
-  backends; when one runs out, the model gets one last turn without tools.
-- **Tool results are data:** text from a tool, a page, or the app's context can never approve a
-  call; every write still needs your answer.
-- **Esc** stops the turn at any point; nothing is inserted until you take it.
+- **Budgets:** rounds of tool calls (4 by default) and wall time (60 s); when one runs out, the
+  model gets one last turn without tools.
+- **Esc** stops the turn.
 - **Drafts after tools:** tools run once; the final answer can be sampled again over the same
   results, so an instruction that looked things up still offers up to three drafts.
 
@@ -89,8 +87,7 @@ permission requests.
    focused element and expose its text with nothing installed in the app; for terminals this is
    the screen (GNOME Terminal, Windows Terminal and the console, Terminal.app). macOS needs the
    Accessibility permission for the service's Python; Linux needs the accessibility bus.
-4. A picture of the focused window, on request (F8), for a vision-capable backend; never in a
-   password field.
+4. A picture of the focused window, on request (F8), for a vision-capable backend.
 5. The text alone.
 
 In a terminal the model sees the screen and your words ("fix") and does one of three things, each

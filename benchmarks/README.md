@@ -28,7 +28,7 @@ host event (F6), as explained in [docs/using.md](../docs/using.md#typing).
 
 The 135M model often repeats input, copies the prompt example, or emits
 explanations. The 500M model produced usable stylistic rewrites on these four
-inputs and is the default. Neither model is fine-tuned for Claudish.
+inputs and was the default then. Neither model is fine-tuned for Claudish.
 
 Weight SHA-256:
 
@@ -45,10 +45,10 @@ Original model sources: [SmolLM2](https://huggingface.co/HuggingFaceTB/SmolLM2-1
 
 ## Rewrite fidelity evaluation
 
-[`eval/cases.json`](eval/cases.json) holds 41 varied inputs: names, numbers,
-dates, negation, code identifiers and URLs, questions, very short and casual
-messages, multi-sentence text, already-formal text, tone, emoji, and French and
-Spanish. [`evaluate.py`](evaluate.py) sends each case to a running service and
+The runs in this section used the 41 cases [`eval/cases.json`](eval/cases.json) held then:
+names, numbers, dates, negation, code identifiers and URLs, questions, very short and casual
+messages, multi-sentence text, already-formal text, tone, emoji, and French and Spanish. It now
+holds 80 English cases (G53, below). [`evaluate.py`](evaluate.py) sends each case to a running service and
 applies mechanical checks:
 
 - required names, numbers, and identifiers are kept;
@@ -95,7 +95,7 @@ build.
 
 ## Prompt experiments (G11)
 
-The aim was to make the default model add em dashes without losing meaning.
+The aim was to make the default model of the time, Qwen2.5 0.5B, add em dashes without losing meaning.
 Each variant is a templates file, [`eval/templates/g11-*.json`](eval/templates/),
 run through the service (`claudish serve --templates FILE`) and scored by
 `evaluate.py` with the same cases and checks. Results for Qwen2.5 0.5B on the
@@ -157,7 +157,7 @@ matter for flagging. The judge still calls some language switches "same"; the
 mechanical language check covers those. It is also stricter than the labels in
 places: it flagged "Shipped it" becoming "It was delivered", arguably correctly.
 
-On the shipped default model's 41 rewrites, the judge finds **26 meaning-
+On Qwen2.5 0.5B's 41 rewrites (the default then), the judge finds **26 meaning-
 preserving**, against 38 that pass the mechanical checks. The hand labels give
 27. The mechanical score overstates fidelity by about a third.
 
@@ -179,7 +179,7 @@ message, and which autocompletes. English only (cd_AI is the English input metho
 ([`eval/continue_cases.json`](eval/continue_cases.json)). A case passes when it passes the
 mechanical checks (`evaluate.py --slop`: names, numbers, negation, no preamble, sane length;
 `evaluate_continue.py --slop`: something offered, a clean join, no talk about the task, no
-invented pronoun) and the judge passes it. The judge is Gemma 4 26B, chosen by agreement with hand
+invented pronoun where a case names ones to avoid) and the judge passes it. The judge is Gemma 4 26B, chosen by agreement with hand
 labels: rewrite 92% on pass or fail (82 labels), continue 86% (110), slop 90% (110,
 [`eval/slop_labels.json`](eval/slop_labels.json)); Qwen2.5-14B reached 60% on slop and Qwen3-30B
 76% on continue. Cases split in halves by a hash of their id; the table reports the test half.

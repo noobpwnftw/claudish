@@ -38,7 +38,7 @@ def check_config(state):
         return "fail", str(exc), "fix %s, or move it aside and run `claudish init`" % path
     state.update(profile=name, settings=settings, context=context)
     if name is None:
-        return "warn", "no config file: no model is set up", "`claudish setup` (Claude with your own key), or `claudish init` for example profiles"
+        return "warn", "no config file: no model is set up", "`claudish setup` (Claude by default), or `claudish init` for example profiles"
     return "ok", "profile %r (backend %s) from %s" % (name, settings["backend"], path), None
 
 

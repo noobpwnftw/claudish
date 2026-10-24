@@ -10,7 +10,7 @@ contains.
 ```sh
 git clone https://github.com/noobpwnftw/claudish && cd claudish
 python3 -m venv .venv && .venv/bin/python -m pip install -e ".[claude,mcp]"
-.venv/bin/python scripts/check.py      # the merge gate, about six seconds
+.venv/bin/python scripts/check.py      # the merge gate, a few seconds
 ```
 
 Python 3.10 or newer. Without the `[claude,mcp]` extras the tests that need those SDKs are skipped,
@@ -34,9 +34,8 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
   (180 ms), coalesces, and never blocks an input event.
 - **`claudish/server.py`** is the loopback HTTP service: `/suggest` and `/health`,
   plus the browser demo in `claudish/web/`.
-- **`claudish/model.py`** has the `Rewriter`, its backends, and the default
-  template. **`modes.py`** holds the invocation modes (rewrite, continue,
-  instruct); **`context.py`** holds the context providers (file, command, MCP,
+- **`claudish/model.py`** has the `Rewriter` and its backends. **`templates.json`** holds the
+  prompts; **`modes.py`** loads them into the invocation modes (rewrite, continue, instruct); **`context.py`** holds the context providers (file, command, MCP,
   caret text); **`config.py`** loads profiles.
 - **`claudish/screen.py`** reads a focused terminal through the accessibility APIs (G35);
   **`capture.py`** takes the window picture F8 asks for.
@@ -53,19 +52,19 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 
 The guarantees every change must keep: typed text is never lost; a candidate is
 only offered, and accepted explicitly (Tab); a stale result never replaces newer
-text; a failure leaves your wording available; and password fields are bypassed. No model ships: the user picks one.
+text; a failure leaves your wording available; and password fields are bypassed.
 
 ## Checks
 
 `python scripts/check.py` runs the unit tests, compile, diff check, IBus and PIME smokes, and the
-settings page in Chromium, each in under 5 seconds (about six in all), and reports PASS, FAIL, or
+settings page in Chromium, each in under 5 seconds, and reports PASS, FAIL, or
 SKIP with a reason. It is the merge gate. A test workflow slower than that is not one we run: make
 it faster or drop it. Real typing on Linux, Windows and macOS is checked by hand.
 
 Windows' PIME is built from source with `platforms/windows/pime/make_source.sh` and, on Windows
 with the Visual Studio C++ tools (`buildtools.ps1`), `build-pime.ps1`.
 
-Changes to templates or models are measured, not argued: `benchmarks/evaluate.py`
+Changes to templates or models are measured with `benchmarks/evaluate.py`
 for fidelity, `benchmarks/judge.py` (a larger local model, calibrated against
 hand labels) for meaning changes the mechanical checks miss, and
 `benchmarks/evaluate_terminal.py` for instructions typed at a terminal prompt. Read the outputs, not only
@@ -73,15 +72,14 @@ the scores.
 
 ## Common changes
 
-- **A backend:** add a branch in `Rewriter.rewrite` (`model.py`) and a
+- **A backend:** add a branch in `Rewriter.answer` (`model.py`) and a
   `--backend` choice in `config.BACKENDS`. Optional SDKs stay
   optional: import them lazily, and add a `pyproject.toml` extra.
-- **A mode:** add a template to `modes.defaults()` and, if needed, output
+- **A mode:** add a template to `claudish/templates.json` and, if needed, output
   handling in `modes.finish()`. Users can also add modes from a profile without
   code.
 - **A context provider:** add a type to `context.PROVIDER_KEYS` and a branch in
-  `Provider.read`. Providers come only from the config file, and a failing one
-  must be skipped, never fatal.
+  `Provider.read`. A provider that fails is skipped.
 - **An adapter key:** implement it in all three adapters, and test it in
   `tests/test_macos_adapter.py`, `tests/ibus_smoke.py` and `tests/pime_smoke.py`, then type it by
   hand on each OS.
@@ -93,7 +91,7 @@ for the owner are free to take. Say in an issue what you mean to do before a lar
 request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
 
 The project is maintained by an AI agent (Claude Code) under the owner's direction. Its working
-files are in the repository, so its decisions are on record: [AGENT.md](AGENT.md) (its mandate and
+files: [AGENT.md](AGENT.md) (its mandate and
 rules), [AGENT_STATE.md](AGENT_STATE.md) (where the work stands), and `CLAUDE.md` (which points the
 agent at AGENT.md). It reviews pull requests against the same gate and the guarantees above.
 
@@ -107,6 +105,6 @@ The most useful reports say:
   version);
 - the keys you pressed, what you expected, and what you got;
 - `python -m claudish doctor --json` output, which covers the backend, the service, the
-  input method's registration, and context sources, and contains no typed text.
+  input method's registration, and context sources.
 
-A made-up phrase that reproduces the problem is just as good as the text you typed.
+A made-up phrase that reproduces the problem works.

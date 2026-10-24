@@ -59,10 +59,10 @@ def step_config(name):
 
 def step_tone(name, settings, tone):
     """The voice: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
-    few words of your own, with --tone."""
+    few words, with --tone."""
     current = settings.get("tone")
     if not tone or tone == current:
-        return "done", "%s (change with --tone %s, or your own words)" % (
+        return "done", "%s (change with --tone %s, or a few words)" % (
             "corporate, the default" if not current else repr(current),
             ", ".join(n for n in TONES if n != "corporate")), None
 
@@ -97,7 +97,7 @@ def step_llama(settings, variant):
     if asset is None:
         return "manual", "no pinned %s build for %s %s" % ((variant,) + download_llama.host()), \
             "get llama-server from https://github.com/ggml-org/llama.cpp/releases and put it on PATH"
-    return "todo", "download llama.cpp %s (%s, %d MB, SHA-256 verified) into .tools/" % (
+    return "todo", "download llama.cpp %s (%s, %d MB) into .tools/" % (
         download_llama.BUILD, asset[0], asset[1] >> 20), \
         lambda: download_llama.install(variant, progress("llama.cpp"))
 
@@ -108,7 +108,7 @@ def step_model():
     if download_model.target("gemma").is_file():
         return "done", str(download_model.target("gemma")), None
     size = download_model.PRESETS["gemma"][3]
-    return "todo", "download Gemma 4 E4B (%.1f GB, SHA-256 verified) into models/" % (size / 1e9), \
+    return "todo", "download Gemma 4 E4B (%.1f GB) into models/" % (size / 1e9), \
         lambda: download_model.fetch("gemma", progress("model"))
 
 
@@ -202,11 +202,11 @@ def ask(question):
 
 def choose_voice():
     """The first run's one question: which voice (owner, 2026-10-24: slop for fun, proofread for
-    work). Enter keeps the default; a name, or a few words of your own, picks another."""
+    work). Enter keeps the default; a name, or a few words, picks another."""
     print("Which voice? Enter keeps corporate slop.")
     for name, tone in TEMPLATES["tones"]["named"].items():
         print("  %-10s %s" % (name, tone.get("about", "")))
-    print("  or a few words of your own, such as \"plain and friendly\".")
+    print("  or a few words, such as \"plain and friendly\".")
     try:
         answer = input("Voice [corporate]: ").strip()
     except EOFError:
@@ -277,8 +277,8 @@ def settings():
     except OSError:
         return  # no service to ask: doctor has said why
     if not sys.stdin.isatty():
-        print("\nNext: `claudish settings` opens cd_AI's settings, for your Claude key and the voice.")
+        print("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the voice.")
         return
     import webbrowser
-    print("\nOpening cd_AI's settings in your browser: paste your Claude key there and pick a voice.")
+    print("\nOpening cd_AI's settings in your browser: the model, its key, and the voice.")
     webbrowser.open(url + "&first=1")

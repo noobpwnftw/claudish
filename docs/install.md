@@ -6,8 +6,7 @@ version is in the [README](../README.md#install).
 ## Quick start
 
 You need Python 3.10+, git, and a model to point it at. cd_AI ships no model: out of the box it
-is set up for Claude. With a GPU or Apple
-silicon, the local model below made slop as well as anything we tried.
+is set up for Claude.
 
 1. **Get it**, with the Claude SDK, in a virtual environment of its own (current Ubuntu, Debian
    and Homebrew Pythons refuse a plain `pip install`):
@@ -28,13 +27,12 @@ silicon, the local model below made slop as well as anything we tried.
    .venv/bin/python -m claudish setup
    ```
 
-   It asks which voice you want (corporate slop unless you pick another: `proofread` keeps your
-   words for work), then writes a config (profile
+   It asks which voice you want (corporate slop by default), then writes a config (profile
    `claude`), imports MCP servers from your Claude setup, checks the model, registers the input
    method, starts Claudish at login, and runs `doctor`. `--yes` does it all. Installing the input
    method on Windows and macOS needs an administrator, so setup prints that command.
 
-3. **Give it your key** in cd_AI's settings:
+3. **Add the API key** in cd_AI's settings:
 
    ```sh
    .venv/bin/python -m claudish settings
@@ -42,8 +40,7 @@ silicon, the local model below made slop as well as anything we tried.
 
    It opens the settings in your browser (later, **Settings…** in the input menu opens them
    again; on Windows, in the taskbar indicator's menu). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it,
-   and uses it from your next keystroke. The same
-   page picks the voice, or a model server on this computer instead of Claude.
+   and uses it right away. The same page picks the voice, or another model API instead of Claude.
 
    Keys from elsewhere work too: `ant auth login` (the Anthropic CLI), or `ANTHROPIC_API_KEY` in
    your account's environment (a variable you `export` in a terminal does not reach a service
@@ -52,8 +49,6 @@ silicon, the local model below made slop as well as anything we tried.
 4. **Log out and back in**, add **cd_AI — Claudish** in your input sources, and type: Tab asks
    for the rewrite, Enter sends an instruction. The keys are in the [README](../README.md#keys).
 
-Verified end to end on Ubuntu 24.04 under systemd in a container.
-
 **Another model:** `python3 -m claudish init` writes `~/.config/claudish/config.json` with
 profiles to start from: `claude` (the default), `ollama` (any OpenAI-compatible server, local or
 hosted), `local` (below), and `agent` (an agent CLI such as `claude -p`). Run setup with
@@ -61,8 +56,7 @@ hosted), `local` (below), and `agent` (an agent CLI such as `claude -p`). Run se
 "no model is set up".
 
 **Continue** (a Shift tap) types straight into the app. It suggests the rest of a sentence only
-with a local model, or with a model a profile routes to it ([configuration](configuration.md#modes)),
-because it asks at every pause.
+with a local model, or with a model a profile routes to it ([configuration](configuration.md#modes)).
 
 **Start at login by hand:** `python3 -m claudish service install` runs `claudish serve` with
 the config's profile at every login: a systemd user unit on Linux, a logon task on Windows (no
@@ -77,10 +71,8 @@ http://127.0.0.1:18765, or `--backend rules` for simple stand-ins with no model.
 
 ## A local model (optional)
 
-A local model is what lets continue suggest at every pause. The one setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB), which made slop as well
-as anything we tried, a frontier model included ([benchmarks](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)).
-It answers in about 0.6 s on a GPU or Apple silicon and 3–4 s on a CPU alone; models small enough
-to be fast on any CPU make no usable slop.
+The local model that setup installs is Gemma 4 E4B (Apache-2.0, 4.9 GB)
+([benchmarks](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)).
 
 ```sh
 python3 -m claudish setup --profile local
@@ -88,8 +80,7 @@ python3 -m claudish setup --profile local
 
 Setup downloads a pinned [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) release
 build (`b11822`, 12–24 MB, the CPU build; Metal on Apple silicon; `--variant vulkan` for most GPUs
-on Linux and Windows) into `.tools/` and Gemma 4 E4B (QAT Q4_0) into `models/`, both checked
-against their published SHA-256, and runs them at login. The same by hand:
+on Linux and Windows) into `.tools/` and Gemma 4 E4B (QAT Q4_0) into `models/`, and runs them at login. The same by hand:
 
 ```sh
 python3 scripts/download_llama.py
@@ -97,8 +88,8 @@ python3 scripts/download_model.py gemma
 python3 scripts/start.py
 ```
 
-Both download scripts use only the standard library; an interrupted download leaves nothing
-behind, and a verified file is not downloaded again. Set `HF_ENDPOINT` to use a mirror.
+Both download scripts use only the standard library, and a finished file is not downloaded
+again. Set `HF_ENDPOINT` to use a mirror.
 `start.py` uses `llama-server` from your `PATH` first, then the downloaded build; pass
 `--server /path/to/llama-server` (`llama-server.exe` on Windows) to use your own, for example
 with CUDA. The service listens on `127.0.0.1:18765`, the model on `127.0.0.1:18766`; Ctrl+C stops
@@ -120,11 +111,9 @@ sudo /usr/bin/python3 platforms/linux/install.py --system
 IBus only reads engine definitions from `IBUS_COMPONENT_PATH`, which defaults to
 `/usr/share/ibus/component`. The per-user install therefore writes
 `~/.config/environment.d/90-claudish-ibus.conf` to add `~/.local/share/ibus/component`.
-systemd-managed sessions, including GNOME, apply it at the next login. The
-installer does not change the active keyboard. Log out and back in, then add
+systemd-managed sessions, including GNOME, apply it at the next login. Log out and back in, then add
 **English → cd_AI — Claudish** to Input Sources and select it with your input-source
-shortcut while the service is running. The engine keeps your keyboard layout, so
-AltGr and dead keys still work. The project directory must stay at its
+shortcut while the service is running. The engine keeps your keyboard layout. The project directory must stay at its
 installed path. Remove with `install.py --uninstall` (add `--system` if you
 installed that way), then log out and back in.
 
@@ -136,13 +125,12 @@ This adapter does not support an Fcitx-only session or a raw terminal console.
 **The installer.** `cd_AI-setup.exe` installs everything for x64 and ARM64 Windows: cd_AI's PIME
 (the text service, for every app, beside any PIME you have), a Python of its own for the service, and
 cd_AI in your input sources. It asks for an administrator once, then sets up a starter config, the service at
-every login, and cd_AI's settings in your browser (your key, the voice). Then sign out and back in,
+every login, and cd_AI's settings in your browser (the key, the voice). Then sign out and back in,
 or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
 "Windows protected your PC"; **More info → Run anyway** lets it through. cd_AI brings its own build
-of PIME (its text service and launcher) as a part of cd_AI, in cd_AI's folder, with names of its own:
-a PIME you already have (Chewing, Rime) keeps working beside it, and uninstalling cd_AI leaves it
-alone. Uninstalling cd_AI takes it out of your input sources too. Tested on ARM64; x64 not yet.
+of PIME (its text service and launcher) as a part of cd_AI, in cd_AI's folder, with names of its own,
+so it installs beside a PIME you already have (Chewing, Rime). Uninstalling cd_AI takes it out of your input sources too. Tested on ARM64; x64 not yet.
 
 Until there is a download, it is built on Windows with Python 3.10+ and Inno Setup 6, over cd_AI's
 PIME (below, built from source): `python platforms\windows\package.py` writes
@@ -157,7 +145,7 @@ launcher's pipe), so it is a part of cd_AI rather than a PIME of its own. On Lin
 the Visual Studio 2022 C++ tools (`buildtools.ps1` installs them), `build-pime.ps1` builds the text
 service for x86, x64 and ARM64 and the launcher (Rust, installed on first use) into a tree of a
 released PIME's files (its Python and the rest); `python platforms\windows\package.py` then makes
-`cd_AI-setup.exe` from that tree. The installer removes cleanly: Settings → Apps → cd_AI → Uninstall
+`cd_AI-setup.exe` from that tree. Uninstall: Settings → Apps → cd_AI → Uninstall
 (the text service's DLLs, loaded in running apps, go at the next restart).
 
 ## macOS input method
@@ -165,7 +153,7 @@ released PIME's files (its Python and the rest); `python platforms\windows\packa
 The adapter uses Apple's [InputMethodKit](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller)
 through [PyObjC](https://pyobjc.readthedocs.io/en/latest/apinotes/InputMethodKit.html).
 The builder uses py2app to bundle Python, the adapter, and its shared modules
-into `Claudish.app`. The model runs in a separate process as on Windows/Linux.
+into `Claudish.app`. The service runs as a separate process, as on Windows and Linux.
 
 **The installer** (Apple silicon; Intel Macs are not supported yet). Until there is a release to download, build it on a Mac with Python 3.10+
 from python.org:
@@ -197,7 +185,6 @@ The candidate panel refreshes automatically, and the keys are the same as on the
 other platforms (above). Navigation keys and Command or
 Control shortcuts commit the current wording before being passed through.
 Characters typed with Option, such as — and €, stay in the composition.
-Password fields get their keys untouched.
 
 **Uninstall:**
 

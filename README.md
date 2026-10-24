@@ -32,9 +32,8 @@ model, or a profile routed to one. Context: files, commands and MCP servers, per
 
 The templates are in one file: `claudish templates` prints it, and `claudish init` writes a
 `templates.json` to edit. Pick another voice (`salesman`, `critic`, `bard`, or
-`proofread`, which only fixes your typos), or write one. Then give it context: files, commands
-and MCP servers per app, tools it may call, an agent to hand a task to
-([configuration](docs/configuration.md)).
+`proofread`, which only fixes your typos), or write one. Context, tools and agents:
+[configuration](docs/configuration.md).
 
 ## Install
 
@@ -95,11 +94,8 @@ instead: `claudish setup --profile local`.
 | Linux (IBus) | preview: the one-line installer in a clean Ubuntu 24.04 container; real typing (GTK, Qt, GNOME Terminal on X11, GNOME on Wayland) last verified in containers before 2026-10-24 |
 
 Claudish is preparing its first release, 0.1.0; the [roadmap](ROADMAP.md) says what
-is next. It is maintained by an AI agent (Claude Code) working under its
-owner's direction and the rules in [AGENT.md](AGENT.md); commits it makes carry a
-`Co-Authored-By: Claude` trailer. Design reviews in
-[docs/research](docs/research/) are synthetic: agents playing user personas, not
-real users.
+is next. It is maintained by an AI agent (Claude Code) under its owner's direction
+([AGENT.md](AGENT.md)).
 
 ## More
 

@@ -7,9 +7,9 @@ Typing in detail, the browser demos, and terminals.
 | Key/action | Result |
 | --- | --- |
 | Type | Continue: straight into the app. Compose: your words gather as the composition (underlined) |
-| Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter, so nothing is sent while you compose |
+| Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second, after a pause: Shift with another key (a capital, Shift+Enter), held (Shift+click), or pressed right after another key (rolled typing) is not one. Leaving compose keeps your words as typed. A brief pill at the caret says the mode and where Shift goes next; GNOME's top bar, Windows' taskbar, and the macOS menu bar show it all along |
-| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in grey, drawn by cd_AI (never typed). Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
+| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in grey. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With an answer to read: insert it (Esc dismisses it). |
@@ -17,12 +17,12 @@ Typing in detail, the browser demos, and terminals.
 | ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, as Space is. An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
 | Shift+Enter (compose) | Keep what you composed as it is, and stay in compose. Most CJK input methods keep the typed letters with Enter; in cd_AI, Enter asks the model and Shift+Enter keeps |
-| Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (nothing is inserted; a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
+| Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
-| Switching windows | Your own words go in as typed; a rewrite never does (only Tab); a sent instruction's exchange is held for that text box, and a reply you were typing is not inserted. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
+| Switching windows | Your words go in as typed; a sent instruction's exchange is held for that text box. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
 | F8 (compose) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
 | Tab with a selection (compose) | With nothing composed, the selected text becomes your words, and Tab asks for its rewrite as above; Esc twice puts it back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
-| Backspace | Edit the composition and invalidate its candidate |
+| Backspace | Edit the composition; with a rewrite showing, the first Backspace closes it |
 
 Where you want no suggestions at all, switch that app to your usual keyboard;
 the system remembers it per app or window once you turn that on: Windows,
@@ -36,30 +36,25 @@ composing commit your words first; on Windows the first such key is consumed, so
 Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
 Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,
-platforms/windows/pime, calls back when it does). Short phrases work best: the buffer is
-limited to 512 characters and generation to 64 tokens. A truncated or failed
-rewrite is never offered; Shift+Enter still keeps your words. When cd_AI's service does not
-answer (stopped, or just after a laptop wakes), the panel says "cd_AI is offline" from your first
-key, rather than when Tab fails; compose works as always, and Shift+Enter keeps what you typed.
+platforms/windows/pime, calls back when it does). The composition is limited to 512
+characters. When cd_AI's service does not answer (stopped, or just after a laptop wakes), the
+panel says "cd_AI is offline" from your first key.
 
 ## Browser demo
 
 With the launcher running, open **http://127.0.0.1:18765**. The demo is the
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and the panel, drawn with the same kit as the design lab
-(`/design.html`) and the desktop adapters. It opens in compose, the pitch (Tab
+(`/design.html`) and the desktop adapters. It opens in compose (Tab
 offers a rewrite, Enter sends it as an instruction and offers drafts to choose
 with ↑↓ and take with Tab, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
 pause after a word and the rest waits in grey; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
-toggle follows the system by default; a choice lasts only for the current page,
-with no cookies or storage.
+toggle follows the system by default.
 
-The page calls the same local model as the desktop adapters. Nothing is saved
-in browser storage. If your browser runs on a different machine from the Spark,
-forward TCP port **18765** using the VS Code Ports tab or SSH, then open the
-forwarded localhost URL. Keep the local port at 18765. Browser requests must
-come from the demo's own origin; cross-origin requests remain blocked.
+The page calls the same service as the desktop adapters. If your browser runs on another
+machine, forward TCP port **18765** (the VS Code Ports tab or SSH), then open the
+forwarded localhost URL. Keep the local port at 18765.
 
 For a model-free UI demo: `python -m claudish serve --backend rules`, then open
 the same URL. The page labels this as rules mode.
@@ -71,13 +66,7 @@ python -m claudish rewrite "This is very important."
 python -m claudish bench --runs 12
 ```
 
-Example output from the default model:
-
-```text
-This is of utmost significance.
-```
-
-To run against an existing llama-server instead of starting one:
+To use a llama-server that is already running:
 
 ```sh
 python -m claudish serve --model-url http://127.0.0.1:18766
@@ -94,7 +83,6 @@ browser. A small service worker (`coi-sw.js`)
 supplies the cross-origin isolation headers static hosts cannot set, so the
 multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
-A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 
 ## Recent requests
 
@@ -105,16 +93,14 @@ and the time it took (`--full` prints the prompts whole).
 
 ## In a terminal
 
-A terminal prompt is a text box too. Type a command, and if it fails, tap
-Shift, type what you want ("fix", or "undo the last commit but keep the
-changes"), and press Enter: the instruction goes with the last lines of what the
+A terminal prompt is a text box too. After a command fails, in compose (where cd_AI starts) type
+what you want ("fix", or "undo the last commit but keep the changes") and press Enter: the instruction goes with the last lines of what the
 terminal shows, and the answer is a command line, placed at the prompt like
 typed text. Running it is your Enter.
 
 cd_AI reads the screen through the accessibility APIs screen readers use (AT-SPI
-on Linux, UI Automation on Windows, the AX API on macOS), only when you press
-Tab or Enter in compose, never on continue's pauses (continue stays quiet in
-terminals), and never at a password prompt. On macOS the service's Python needs
+on Linux, UI Automation on Windows, the AX API on macOS), when you press
+Tab or Enter in compose (continue stays quiet in terminals). On macOS the service's Python needs
 the Accessibility permission; on Linux the desktop's accessibility bus must run
 (GNOME and KDE run it). The lines go to the profile's model. A profile's `"read_terminal": false` turns reading off.
 Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and

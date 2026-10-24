@@ -68,7 +68,7 @@ def main():
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
     commands.add_parser("key", help="Save your Claude API key")
-    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, your key, the voice")
+    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, its key, the voice")
     shown.add_argument("--url", default="http://127.0.0.1:18765")
     shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
     shown.add_argument("--first", action="store_true", help="With the first-run line (log out, then Tab)")

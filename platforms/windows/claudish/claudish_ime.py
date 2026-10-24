@@ -10,7 +10,7 @@ from .screen import is_terminal
 
 
 def keylog(*fields):
-    """Opt-in diagnostics: CLAUDISH_KEYLOG=path appends key routing events. Never logs typed text."""
+    """Opt-in diagnostics: CLAUDISH_KEYLOG=path appends key routing events."""
     import os
     path = os.environ.get("CLAUDISH_KEYLOG")
     if path:

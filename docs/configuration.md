@@ -29,8 +29,7 @@ python -m claudish serve --backend claude --claude-model claude-haiku-5-5
 ```
 
 The Claude backend runs one request at a time, uses low effort, and turns on
-server-side refusal fallbacks (except on Haiku, which has none). It never
-offers a declined or truncated rewrite. No model ships: the starter profile is Claude, and
+server-side refusal fallbacks (except on Haiku, which has none). No model ships: the starter profile is Claude, and
 `--profile local` is the local one.
 
 Change what the model is told with a templates file, for any backend (see
@@ -54,9 +53,7 @@ The input method knows which app has focus. On Linux, IBus reports the program
 
 In a bound app, Claudish reads that context and the model or agent works with
 it. Everywhere else it is a plain input method. Patterns are case-insensitive
-globs. Every response lists what was `consulted`, so it is always visible what
-the AI read. Support grows by adding context providers per app, not by
-installing another app.
+globs. Every response lists what was `consulted`.
 
 A binding can also say **which AI answers** there, by naming another profile of
 the same file: its backend, tone, tools, and helper answer for that app.
@@ -74,10 +71,8 @@ the same file: its backend, tone, tools, and helper answer for that app.
 
 A mode can name the profile that answers it, too: continue runs at every pause
 and wants a small, fast model; an instruction is sent on purpose and can wait
-for a strong one. Continue suggests only where it costs nothing per pause (a
-local model, on loopback) or where a profile routes it like this, so a hosted
-profile never gets a request at every pause unasked; without either, continue
-types as is.
+for a strong one. Continue suggests only with a local model or where a profile
+routes it like this; otherwise continue types as is.
 
 ```json
 {"profiles": {"claude": {"backend": "claude", "modes": {"continue": {"profile": "tiny"}}},
@@ -90,9 +85,7 @@ holds the bindings; other profiles are loaded when they are first needed.
 
 ### An agent CLI as the backend
 
-An agent CLI is a text box and Enter, and an input method is a text box in every
-app. With `"backend": "command"`, the input method becomes that CLI's text box.
-Claudish sends the mode's instructions, the profile's context, and your text on
+With `"backend": "command"`, Claudish sends the mode's instructions, the profile's context, and your text on
 stdin; the command's output becomes the candidate, which you accept with Tab:
 
 ```json
@@ -101,11 +94,9 @@ stdin; the command's output becomes the candidate, which you accept with Tab:
 ```
 
 Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
-`llm`, or a script. The command runs without a shell, with the text on stdin. Tool permissions are the CLI's
+`llm`, or a script. Tool permissions are the CLI's
 own; for example, Claude Code's `--allowedTools` in the command list. Agents are
-slow, so the profile's `timeout` applies (`/health` reports it), and typing is
-never blocked while one works. These profiles are reported as hosted unless
-the profile sets `"hosted": false`.
+slow, so the profile's `timeout` applies (`/health` reports it).
 
 Measured on the Spark with Claude Code 2.1.306: an instruct request ("thank
 Priya for fixing the flaky CI job, it saved the release") returned a finished,
@@ -132,8 +123,7 @@ pass `--config FILE`):
 `python -m claudish serve` uses the file's `"profile"`. `--profile claude`
 picks another, and any flag overrides the profile's value. A template path in a
 profile is relative to the config file. To take a key from the environment, name
-its variable with `api_key_env`. Unknown keys, a literal `api_key`,
-and wrong types are rejected at startup. `/health` reports the active profile.
+its variable with `api_key_env`. Unknown keys and wrong types are rejected at startup. `/health` reports the active profile.
 
 ### Window pictures
 
@@ -141,8 +131,7 @@ For apps that publish nothing Claudish can read, an instruction can carry a
 picture of the window you are typing in. In compose, press **F8** before
 Enter: the hint shows "instruct + window picture", and the service captures the
 focused window once, sends it with that one instruction, and lists it in
-"consulted". Nothing is captured without F8, and F8 never carries over to the next
-instruction.
+"consulted". F8 applies to that one instruction.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
   ImageMagick (`sudo apt install x11-utils imagemagick`). On Wayland or macOS,
@@ -157,7 +146,7 @@ instruction.
 Verified with a real capture in both places. On Windows 11 ARM64, a Notepad
 invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
 Spark GPU; "what is the amount due here?" returned "The amount due is 1,250.00
-EUR." in 0.18 s. On X11, the desktop test captures a GTK window with ImageMagick.
+EUR." in 0.18 s.
 
 ### Context
 
@@ -172,11 +161,8 @@ example, the diff of the branch whose PR description you are writing:
 ], "max_context_chars": 6000}}}
 ```
 
-Commands run exactly as configured, without a shell, and only from your config
-file; requests cannot add them. Results are cached for `ttl` seconds (default
-30). A failing or slow provider (`timeout`, default 5 s) is skipped, never
-blocking a rewrite. Context goes into the system prompt, ahead of your text, so a
-local llama.cpp server reuses its prompt cache while you type. Adapters may also
+Results are cached for `ttl` seconds (default 30). A failing or slow provider (`timeout`,
+default 5 s) is skipped. Context goes in the user turn, ahead of your text. Adapters may also
 send the text around the caret as `before`/`after` in `/suggest`.
 
 MCP servers can supply context too (`pip install "claudish-ime[mcp]"`). Claudish
@@ -201,9 +187,8 @@ python -m claudish context test --app firefox --show   # what a binding would re
 ```
 
 Imported servers land under `"mcp_servers"` in your config and are used by name:
-`{"type": "mcp", "server": "github", "tool": "...", "arguments": {...}}`. Secrets
-are never copied: every `env` and header value becomes a `$NAME` reference, and
-`import` lists the variables to set.
+`{"type": "mcp", "server": "github", "tool": "...", "arguments": {...}}`. Every `env` and
+header value becomes a `$NAME` reference, and `import` lists the variables to set.
 
 Apps that publish MCP on a local socket are read with `url` instead of
 `command`: streamable HTTP by default, or `"transport": "sse"`. Headers may use
@@ -213,9 +198,6 @@ Apps that publish MCP on a local socket are read with `url` instead of
 {"type": "mcp", "name": "editor", "url": "http://127.0.0.1:3920/mcp",
  "headers": {"Authorization": "Bearer $EDITOR_MCP_TOKEN"}, "tool": "get_selection"}
 ```
-
-Paired with a binding, this lets an app hand its context to the input method
-without knowing Claudish exists.
 
 For a deterministic demo without a model, use `python -m claudish serve
 --backend rules`. That mode performs simple word substitutions and identifies
@@ -243,10 +225,9 @@ profile:
 - Instructions in the same text box are one **conversation**: later instructions
   see earlier ones, the drafts, and the tool results ("now make it shorter" works).
   The text around the caret goes along fresh each time. A conversation ends when
-  its text box goes away or after 30 idle minutes, and lives only in memory.
+  its text box goes away or after 30 idle minutes.
 - Every call appears in "consulted", such as `notes.ci_status(branch="main")`.
-- The loop is bounded: at most 4 rounds of calls, and 60 s in all. The result is
-  still only a candidate.
+- The loop is bounded: at most 4 rounds of calls, and 60 s in all.
 - It needs an OpenAI-compatible server whose model calls tools (llama.cpp, whose
   chat templates handle tool calls by default, vLLM, Ollama). On the Spark, Qwen2.5-14B called the right tool and
   drafted from its result ("41 tests have passed… test_upload_retry timed out
@@ -286,25 +267,22 @@ pick, and its final answer is a candidate like any other. For Claude Code:
   exits when the text box goes away, after 30 idle minutes, or when the service
   stops. Claudish adds `--session-id` and `--permission-prompt-tool stdio` itself
   (without the latter, Claude Code denies by itself instead of asking you).
-- **The agent gets your Claudish setup, not just its own.** The servers named in
-  the profile's `tools` are passed to it (`--mcp-config`, with your config's own
-  `${VAR}` references, so no secret is written out), under the same policy as the
-  model: `deny` tools are never offered (`--disallowedTools`), `trust` tools run
+- **The agent gets the profile's tools.** The servers named in the profile's `tools` are
+  passed to it (`--mcp-config`), under the same policy as the model:
+  `deny` tools are never offered (`--disallowedTools`), `trust` tools run
   without asking, the rest ask. The profile's `context` and the app's bindings go
   with each instruction, as they do for the model.
 - **The agent sees your text box.** The text around the caret goes with each
   instruction, and with the `[mcp]` extra installed, Claudish gives the agent a
   `textbox` MCP server (read, search) for the rest, so "fix the second paragraph"
-  works in a long document. Its reads run without asking; nothing else can read
-  the text box. Without an agent, the model driver has the same two tools
+  works in a long document. Its reads run without asking. Without an agent, the model driver has the same two tools
   whenever the text box is longer than what it is sent.
 - The agent runs with your Claude Code login, settings, and working directory
   (the service's), and its usage counts against that login. A session is limited to five
   minutes and four at a time.
-- Status: tested end to end in the Linux desktop container (real IBus and GTK)
-  with a scripted agent that speaks Claude Code's stream-json protocol (the
-  message shapes come from the Agent SDK's control protocol), plus the PIME smoke
-  and the macOS doubles, and live against Claude Code (2.1.308). On Windows (Claudish's
+- Status: tested with a scripted agent that speaks Claude Code's stream-json protocol (the
+  message shapes come from the Agent SDK's control protocol), the PIME smoke and the macOS
+  doubles, and live against Claude Code (2.1.308). On Windows (Claudish's
   own PIME) a question shows as it arrives.
 
 ### Helpers: handing a task over
@@ -321,14 +299,13 @@ The model offers it when a task takes more than an answer at the caret, or
 when you ask ("have claude look into why the build fails"), and you are asked
 first: "Send this task to claude?", with No first and then Yes. Yes opens the helper in a new
 terminal window, on a note with the task and what was observed (a terminal's
-screen); nothing is inserted. Not offered when the program is not installed or
+screen). Not offered when the program is not installed or
 the command skips the helper's own permission prompts. Needs a backend with
 tool calls (llama.cpp, any OpenAI-compatible server, or Claude).
 
 With `{session}` in Claude Code's command, Claudish starts it on a session id it
 chose and keeps that in the text box's conversation, so a later "is it done?" in
-the same box can read the helper's latest messages from its own transcript
-(nothing is sent to it):
+the same box can read the helper's latest messages from its own transcript:
 
 ```json
 {"profiles": {"local": {"helper": ["claude", "--session-id", "{session}", "{prompt}"]}}}
@@ -337,7 +314,7 @@ the same box can read the helper's latest messages from its own transcript
 Codex is followed the same way, through the session that mentions the handoff
 note; any other helper can be followed when a tmux launcher names its window
 (`["tmux", "new-window", "-n", "{name}", "{command}"]`): Claudish reads the
-window's last lines, redacted like a terminal screen.
+window's last lines.
 
 Several helpers can be named, each its own tool behind its own question, and a
 `"launcher"` says how they open (`{command}` is the helper's command):
@@ -357,7 +334,7 @@ git status?"); your answer goes back to it.
 ### Tone
 
 cd_AI's default voice is corporate slop: "ok" becomes a paragraph about shared vision and
-synergies, with the message, names and numbers kept. A profile can pick another voice:
+synergies. A profile can pick another voice:
 
 ```json
 {"profiles": {"work": {"backend": "claude", "tone": "critic"}}}
@@ -371,9 +348,8 @@ synergies, with the message, names and numbers kept. A profile can pick another 
 | `bard` | an Elizabethan bard at the playhouse | "Nay, good friend, it cannot be; my answer standeth firm: no." |
 | `proofread` | you, with the typos fixed | "nah" |
 
-`proofread` corrects spelling, typos, grammar and capitals and keeps your words, their order
-and your voice (for dyslexia, a second language, a phone keyboard); continue and instruct are
-plain then. Any other few words work too ("warm and friendly", "plain and concise"); they
+`proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain
+then. Any other few words work too ("warm and friendly", "plain and concise"); they
 replace the voice in each template, without examples. `claudish setup --tone critic` sets it for
 you. The tones are templates like the rest ([Templates](#templates)): change one, or add your own
 under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
@@ -381,8 +357,7 @@ over the tone. Instructions typed in a terminal always get a command line.
 
 ## Modes
 
-Every request names a mode, and every mode only offers a candidate, which you
-accept with Tab or ignore:
+Every request names a mode:
 
 | Mode | You type | The candidate |
 | --- | --- | --- |

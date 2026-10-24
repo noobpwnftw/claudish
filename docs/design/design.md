@@ -9,7 +9,7 @@ demo uses it as is. The design lab (`claudish/web/design.html`, on the site at
 `demo/design.html`) draws every state in a skin per platform (reference, Windows 11, macOS,
 GNOME; light and dark), from the panel descriptions `claudish/composition.py` produces. A skin
 changes only tokens (type, colours, shape, key names). A native input method passes a state when
-its gallery screenshot matches the lab's mock of it (`design.html?platform=macos&state=drafts&solo`).
+it matches the lab's mock of it (`design.html?platform=macos&state=drafts&solo`), checked by hand.
 Where a platform cannot draw something, the design changes for all of them: no per-platform
 substitutes.
 
@@ -22,8 +22,8 @@ text box. No chat window, transcript, history, slash menus, or supervised long t
 new work: does it make one turn at the caret better?
 
 What the model is told, the voice included, is data (`claudish/templates.json`, amended per
-profile): corporate slop by default, or a salesman, a critic, a bard, proofread, or a voice of
-your own. Every voice keeps the message, names and numbers.
+profile): corporate slop by default, or a salesman, a critic, a bard, proofread, or a described
+voice.
 
 ## Two modes, one key grammar
 
@@ -33,16 +33,14 @@ switch shows the mode's tile and name briefly at the caret ("compose · Shift co
 every toast, it lasts two seconds or until the next key, since it was said where the caret was.
 
 - **Compose** (where cd_AI starts): your words are held as the platform's composition (one plain
-  underline) until you choose, as in a CJK input method. You ask on purpose and see that it is
-  working, so a model that takes its time (a hosted one) still fits.
+  underline) until you choose, as in a CJK input method.
 - **Continue**: keys go straight into the app. At a word boundary at the end of a line, the rest
   of the sentence shows in grey after the caret. Tab takes it; typing ignores it; Esc dismisses
   it. With nothing offered, Tab is the app's. Autocomplete only: no tools, no retrieval, no agent;
   its quality is its model's. It suggests only with a model set up for it (a local one, or one a
-  profile routes), since it asks at every pause; otherwise it types as is.
+  profile routes); otherwise it types as is.
 
-cd_AI ships no model: compose uses the one you point it at (a frontier model with your key by
-default; good slop needs one). With none, compose says "no model is set up · claudish setup".
+cd_AI ships no model: compose uses the profile's model (Claude by default). With none, compose says "no model is set up · claudish setup".
 
 | Key | In compose |
 | --- | --- |
@@ -74,15 +72,13 @@ be known before it is pressed).
    safe choice (Deny, No) is listed first and nothing is highlighted: the first ↓ lands on Deny,
    so Allow is always a deliberate ↓↓ Enter. Typed words refuse it with a reason ("or type why
    not", then "Enter deny with reason").
-5. **A focus change** commits what the composition shows (your own words), never the model's,
-   never sends or approves; the exchange is held for that text box (its work goes on) and a passive
-   pill shows on return ("3 drafts ready · Shift+Esc open"); it expires after ten minutes. A result
-   never goes into another box.
-6. **Nothing is lost silently:** a drop says "dropped · Shift+Esc restore".
+5. **A focus change** commits what the composition shows; the exchange is held for that text box
+   and a passive pill shows on return ("3 drafts ready · Shift+Esc open"); it expires after ten
+   minutes.
+6. **A drop** says "dropped · Shift+Esc restore".
 
-A rewrite waits in the panel ("Rewrite"; Tab insert, Esc dismiss): the composition only ever
-holds your own words, because apps commit a visible composition themselves (a click, a focus
-change) and a rewrite there could reach your text without a key.
+A rewrite waits in the panel ("Rewrite"; Tab insert, Esc dismiss); the composition holds your
+words.
 
 ## The panel
 
@@ -116,7 +112,7 @@ reply").
 - The composition is the platform's plain underline (macOS cannot colour it; Wayland cannot style
   it), so a sent instruction looks like one being typed; the panel's "working" says it was sent.
 - The suggestion is cd_AI's own grey text after the caret, in its UI font at the caret's height
-  (only macOS reports the app's font), and only at the end of a line, so it never covers your text.
+  (only macOS reports the app's font), and only at the end of a line.
 - Each platform reports where a composition starts (and the caret without one), so the panel
   anchors there everywhere.
 
@@ -124,12 +120,11 @@ reply").
 
 Windows in Segoe UI Variable at 100%, 150% and 200%, in high contrast and over a dark app; macOS
 in SF Pro, over a busy background, both appearances; GNOME from the Shell stylesheet, with text
-scaling and caret rectangles on Wayland (GTK4, Electron, terminals). The galleries
-(`tests/desktop/{windows,macos,linux-gnome}/gallery.sh`) take one screenshot per lab state.
+scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 
 ## Open
 
-The summon key (Enter or Shift+Enter, a toggle in a native settings UI: G47, G52); how much context continue gets (G48); per-app input
+The summon key (Enter or Shift+Enter: G47); how much context continue gets (G48); per-app input
 profiles (G50: continue's Tab in macOS Terminal); replacing an instruction a focus change left in
 the text when a draft is taken on return (G51);
 screen-reader announcements.

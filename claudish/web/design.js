@@ -5,7 +5,7 @@
 // at its native size, for comparing with a screenshot of the real input method.
 
 const SKINS = {
-  reference: {name: "Reference", note: "The demo's own look: the one every platform follows."},
+  reference: {name: "Reference", note: "The demo's look."},
   windows: {name: "Windows 11", note: "Claudish's PIME draws the panel and the suggestion.", app: "Notepad"},
   macos: {name: "macOS", note: "cd_AI's own panel and suggestion overlay (platforms/macos/panel.py).", app: "TextEdit"},
   gnome: {name: "GNOME", note: "A GNOME Shell extension draws the panel and the suggestion, on X11 and Wayland alike.", app: "Text Editor"},
@@ -17,22 +17,22 @@ const SKINS = {
 // the input method draws.
 const STATES = [
   {id: "continue", title: "Continue: a suggestion", note: "The rest of the sentence after the caret, in grey. Tab takes it; typing ignores it.", before: "Thanks for the review — I'll", ghost: " send the revised draft by Friday."},
-  {id: "compose", title: "Compose: typing", note: "Your words, as any input method's. The keys show from the first key: Enter sends your words away, so it must be known.", before: "Team: ", comp: "running late, start without me"},
-  {id: "rewriting", title: "Compose: rewriting", note: "Your words stay as they are while the model works.", before: "Team: ", comp: "running late, start without me"},
-  {id: "converted", title: "Compose: a rewrite", note: "Your words stay in your text; the rewrite waits in the panel, and only Tab puts it in (a focus change never can).", before: "Team: ", comp: "running late, start without me"},
-  {id: "sent", title: "An instruction, sent", note: "Enter sent it: your words stay underlined at the caret while the model works; the panel says what is happening.", before: "Hi Sam, ", comp: "decline the offsite politely"},
-  {id: "drafts", title: "An instruction's drafts", note: "Three readings, your instruction still underlined at the caret. The first is highlighted; ↓ moves; Tab inserts it (Tab takes the model's text, Enter talks to the model).", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "compose", title: "Compose: typing", note: "Your words, composed. The keys show from the first key.", before: "Team: ", comp: "running late, start without me"},
+  {id: "rewriting", title: "Compose: rewriting", note: "The model works on the rewrite.", before: "Team: ", comp: "running late, start without me"},
+  {id: "converted", title: "Compose: a rewrite", note: "The rewrite shows in the panel; Tab puts it in.", before: "Team: ", comp: "running late, start without me"},
+  {id: "sent", title: "An instruction, sent", note: "Enter sent it. The instruction stays underlined at the caret; the panel says what is happening.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "drafts", title: "An instruction's drafts", note: "Three readings, your instruction still underlined at the caret. The first is highlighted; ↓ moves; Tab inserts it.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "nudged", title: "Enter on a draft", note: "Enter on a draft lights the row's Tab until your next key.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "ask", title: "The model asks", note: "Its question, your instruction still at the caret. Enter takes the highlighted choice, ↓ moves it; or just type.", before: "", comp: "summarize this thread"},
   {id: "reply", title: "Typing a reply", note: "What you type takes your instruction's place at the caret: your reply. The panel now says what you asked; the choices fade.", before: "", comp: "only the last two days", anchor: "comp"},
   {id: "answered", title: "Answered", note: "Your instruction is the composition again, so the panel says only what you answered while the model works on.", before: "", comp: "summarize this thread"},
-  {id: "permission", title: "An approval", note: "What runs is shown in full. Nothing is highlighted; the first ↓ lands on Deny; Allow is ↓↓ Enter.", before: "", comp: "push my branch"},
+  {id: "permission", title: "An approval", note: "The call, in full. Nothing is highlighted; the first ↓ lands on Deny; Allow is ↓↓ Enter.", before: "", comp: "push my branch"},
   {id: "handoff", title: "A handoff", note: "Sending a task to a helper is asked the same way: the first ↓ keeps it here.", before: "", comp: "have claude fix the failing parser test"},
-  {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width. Tab puts it in your text, as Tab takes all the model's text.", before: "", comp: "what does this error mean"},
+  {id: "answer", title: "An answer to read", note: "Several sentences, wrapped to a readable width. Tab puts it in your text.", before: "", comp: "what does this error mean"},
   {id: "progress", title: "An agent at work", note: "One line: what it is doing, and how to stop it.", before: "", comp: "fix the failing parser test"},
   {id: "failed", title: "A failed request", note: "The panel says why; Enter sends it again, Esc brings your instruction back to the caret.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.", before: "~/claudish $ ", comp: "undo my last commit but keep the changes", terminal: true},
-  {id: "dropped", title: "Esc dropped something", note: "Never silently: a drop or a clear says so, briefly, with the key that brings it back.", before: "Hi Sam, ", toast: true},
+  {id: "dropped", title: "Esc dropped something", note: "A drop or a clear says so briefly, with the key that brings it back.", before: "Hi Sam, ", toast: true},
   {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: your instruction went in as you typed it (as a CJK preedit does) and the exchange was held. A pill says what waits; it takes no keys until Shift+Esc opens it.", before: "Hi Sam, decline the offsite politely", toast: true},
   {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.", before: "Thanks for the review — I'll", toast: true},
   {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.", before: "Thanks for the review — I'll", toast: true},
@@ -140,7 +140,7 @@ function render() {
 const DRAWN = [
   ["The suggestion after the caret", "a layered overlay window in Claudish's PIME, at the TSF caret rect", "cd_AI's overlay panel (panel.py), at IMK's caret rect", "the extension's label at the IBus cursor location"],
   ["The composition (plain underline)", "TSF composition", "IMK marked text", "IBus preedit (Wayland text-input)"],
-  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite (GDI cannot anti-alias the rounded keycaps and tile)", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D-Bus (the Shell's IBus popup has no header, keycaps, or tile)"],
+  ["The panel: header, rows, footer, keycaps", "Claudish's PIME candidate window, drawn with Direct2D and DirectWrite", "cd_AI's panel (panel.py): NSVisualEffectView, menu material", "the extension's popup, fed by the engine over D-Bus"],
   ["The mode switch", "the same overlay window", "the same overlay panel", "the extension's label"],
   ["Light and dark", "the apps' theme setting", "the effective appearance", "the shell's colour scheme"],
 ];

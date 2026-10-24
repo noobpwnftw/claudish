@@ -37,8 +37,8 @@ def main():
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(bundle, target, symlinks=True)
         print("Installed:", target)
-        print("Log out/in, then add Claudish under Keyboard → Text Input → Input Sources.")
-        print("Run the model/service separately with python3 scripts/start.py.")
+        print("Log out and back in, then add cd_AI (under English) in System Settings → Keyboard → Text Input → Edit.")
+        print("The service: `claudish setup`, or the bundle's own `Claudish service install`.")
 
 
 if __name__ == "__main__":

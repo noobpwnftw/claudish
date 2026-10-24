@@ -199,7 +199,7 @@ class Composition:
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
                          take="Tab")
-        elif self.offline:  # said from the first key, not found out on Tab: your words stay yours
+        elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is offline",
                          foot=[("Shift+Enter", "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what Enter does must be known)
@@ -335,7 +335,7 @@ class Composition:
         return self.text
 
     def enter(self):
-        """What Enter does (it talks to the model, and never inserts its text): "pass" (the
+        """What Enter does (it talks to the model): "pass" (the
         app's), "submit" (send it as an instruction), "reply" (send what you typed to the model's
         question), "choose" (answer with the highlighted choice), or "wait" (nothing to send: on a
         draft, the row lights Tab, the key that takes it)."""

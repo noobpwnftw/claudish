@@ -39,7 +39,7 @@ killall Claudish 2> /dev/null
 [ -f "$HOME/.config/claudish/config.json" ] || first=1
 "$cd_ai" init > /dev/null 2>&1 || true
 "$cd_ai" service install
-"$cd_ai" register  # added and enabled; which input source you use stays yours to pick
+"$cd_ai" register  # added and enabled, not selected
 # The first install ends in cd_AI's settings in the browser (the key, the voice); an update opens nothing.
 [ -n "$first" ] && "$cd_ai" settings --first
 exit 0
