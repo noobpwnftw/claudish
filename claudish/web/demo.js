@@ -699,6 +699,8 @@ render();
 if (IN_BROWSER) {
   // Nothing is downloaded until the visitor asks; the model is then cached by the browser.
   const model = document.querySelector('meta[name="claudish-model"]')?.content || "A small model";
+  const [, named, size] = model.match(/^(.*?)\s*\((.*)\)$/) || [, model, ""];
+  const offer = size ? `${named}, a ${size} download.` : `${named}.`;  // "Qwen2.5 0.5B, a 491 MB download."
   const strip = document.createElement("section");
   strip.id = "model-strip";
   strip.className = "model-strip";
@@ -709,7 +711,7 @@ if (IN_BROWSER) {
     <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
     <span id="model-progress-label">0%</span></div></div>`;
   document.querySelector(".workspace").before(strip);
-  $("model-copy").textContent = model;
+  $("model-copy").textContent = offer;
   $("load-model").addEventListener("click", loadInBrowser);
   // Only once the model runs: it stops the model (whose files are open while it runs) and deletes them.
   $("remove-model").addEventListener("click", async () => {
@@ -719,7 +721,7 @@ if (IN_BROWSER) {
     await removeStored();
     $("remove-model").hidden = true;
     $("model-strip").classList.remove("ready");
-    $("model-copy").textContent = model;
+    $("model-copy").textContent = offer;
     $("connection").className = "connection";
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("In-browser model"));
     setStatus("Removed the model from this browser.");
