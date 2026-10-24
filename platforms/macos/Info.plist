@@ -9,7 +9,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>org.claudish.inputmethod.Claudish</string>
 	<key>CFBundleName</key>
-	<string>cd_AI</string>
+	<string>Claudish</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

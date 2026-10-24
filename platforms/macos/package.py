@@ -86,6 +86,10 @@ def main():
     bundle = ROOT / "dist/macos/Claudish.app"
     if not bundle.is_dir():
         parser.error("build the bundle first: python platforms/macos/build.py")
+    sources = [p for d in ("claudish", "platforms/macos") for p in (ROOT / d).rglob("*")
+               if p.is_file() and "__pycache__" not in p.parts]
+    if max(p.stat().st_mtime for p in sources) > (bundle / "Contents/Info.plist").stat().st_mtime:
+        parser.error("%s is older than the sources: build it again (platforms/macos/build.py)" % bundle)
     import plistlib
     version = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
     # The architectures the bundle was built for, so Installer refuses a Mac it cannot run on.
