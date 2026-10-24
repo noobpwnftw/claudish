@@ -28,8 +28,8 @@ python -m claudish serve --backend claude                     # claude-opus-5-5
 python -m claudish serve --backend claude --claude-model claude-haiku-5-5
 ```
 
-The Claude backend runs one request at a time, uses low effort, and turns on
-server-side refusal fallbacks (except on Haiku, which has none). No model ships: the starter profile is Claude, and
+The Claude backend runs one request at a time, at low effort, with server-side refusal
+fallbacks on the models that offer them. No model ships: the starter profile is Claude, and
 `--profile local` is the local one.
 
 Change what the model is told with a templates file, for any backend (see
@@ -101,14 +101,13 @@ Instead of passing flags, declare your backends once in
 pass `--config FILE`):
 
 ```json
-{"profile": "local",
+{"profile": "claude",
  "profiles": {
-   "local":  {"backend": "llama"},
-   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "your-model",
-              "templates": "grand.json"},
+   "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "gemma3:4b"},
    "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
               "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},
-   "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"}
+   "local":  {"backend": "llama"}
  }}
 ```
 
@@ -136,7 +135,7 @@ focused window once, sends it with that one instruction, and lists it in
   mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
 
 Verified with a real capture in both places. On Windows 11 ARM64, a Notepad
-intone was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
+invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on the
 Spark GPU; "what is the amount due here?" returned "The amount due is 1,250.00
 EUR." in 0.18 s.
 
