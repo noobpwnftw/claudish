@@ -23,20 +23,20 @@ class ConfigTests(unittest.TestCase):
         return path
 
     def test_no_file_means_defaults_plus_flags(self):
-        name, settings, prompt, _ = config.resolve(overrides={"backend": "rules", "timeout": None})
+        name, settings, templates, _ = config.resolve(overrides={"backend": "rules", "timeout": None})
         self.assertIsNone(name)
         self.assertEqual((settings["backend"], settings["timeout"]), ("rules", 3))
-        self.assertIsNone(prompt)
+        self.assertIsNone(templates)
 
     def test_profile_selection_and_precedence(self):
-        self.write({"system": "Be grand.", "examples": []}, "claudish/grand.json")
+        self.write({"modes": {"rewrite": {"system": "Be grand.", "examples": []}}}, "claudish/grand.json")
         self.write({"profile": "ollama", "profiles": {
             "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
-                       "prompt": "grand.json"},
+                       "templates": "grand.json"},
             "claude": {"backend": "claude", "claude_model": "claude-haiku-5-5"}}})
-        name, settings, prompt, _ = config.resolve()  # found at $XDG_CONFIG_HOME/claudish/config.json
+        name, settings, templates, _ = config.resolve()  # found at $XDG_CONFIG_HOME/claudish/config.json
         self.assertEqual((name, settings["model"]), ("ollama", "qwen2.5:7b"))
-        self.assertEqual(prompt, ("Be grand.", []))  # relative to the config file
+        self.assertEqual(templates["modes"]["rewrite"]["system"], "Be grand.")  # relative to the config file
         name, settings, _, _ = config.resolve(profile="claude", overrides={"claude_model": "claude-opus-5-5"})
         self.assertEqual((name, settings["backend"], settings["claude_model"]),
                          ("claude", "claude", "claude-opus-5-5"))

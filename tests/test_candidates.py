@@ -489,13 +489,14 @@ class RewriterTests(unittest.TestCase):
         from pathlib import Path
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "config.json")
+            path.write_text(json.dumps({"profiles": {"p": {"templates": "words.json"}}}))
             for count, ok in ((1, True), (5, True), (0, False), (6, False), (True, False)):
-                path.write_text(json.dumps({"profiles": {"p": {"modes": {"instruct": {"candidates": count}}}}}))
+                Path(directory, "words.json").write_text(json.dumps({"modes": {"instruct": {"candidates": count}}}))
                 if ok:
-                    _, settings, _, _ = config.resolve(path)
-                    self.assertEqual(Rewriter.from_settings(settings).modes["instruct"]["candidates"], count)
+                    _, settings, templates, _ = config.resolve(path)
+                    self.assertEqual(Rewriter.from_settings(settings, templates).modes["instruct"]["candidates"], count)
                 else:
-                    with self.assertRaisesRegex(ValueError, "1 to 5"):
+                    with self.assertRaisesRegex(ValueError, "from 1 to 5"):
                         config.resolve(path)
 
 

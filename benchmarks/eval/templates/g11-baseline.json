@@ -1,0 +1,16 @@
+{
+  "about": [
+    "G11 rewrite variant 'baseline' (benchmarks/README.md, Prompt experiments)."
+  ],
+  "modes": {
+    "rewrite": {
+      "system": "Rewrite the user's text in polished, slightly verbose English. Keep its meaning, names, numbers and language. Use an em dash where natural. Output only the rewritten text, no explanation.",
+      "examples": [
+        [
+          "We need to think about this.",
+          "This warrants thoughtful consideration—a chance to examine the nuances."
+        ]
+      ]
+    }
+  }
+}

@@ -1,97 +1,82 @@
-"""Invocation modes: what the model does with the typed text. Every mode only offers a candidate."""
-from . import model
+"""Invocation modes: what the model does with the typed text. Every mode only offers a candidate.
 
-CONTINUE_SYSTEM = (
-    "Continue the user's unfinished text with the next few words, in the same language and voice, "
-    "polished and slightly verbose. Output only the words that come next, not the text itself."
-)
-# The text arrives quoted, as a task, not as a message: chat-tuned models otherwise answer it
-# ("hello" -> "Hello! How can I assist you today?") instead of continuing it as the writer.
-CONTINUE_FRAME = 'Text so far: "{text}"\nThe next few words:'
-CONTINUE_EXAMPLES = [
-    # Not the demo's continue sample: a sample equal to an example gets the example's answer back,
-    # which parroted() rightly drops, so the demo would show nothing.
-    {"role": "user", "content": CONTINUE_FRAME.replace("{text}", "Sorry for the slow reply on")},
-    {"role": "assistant", "content": "the budget—this week got away from me."},
-    {"role": "user", "content": CONTINUE_FRAME.replace("{text}", "Hello everyone, ")},
-    {"role": "assistant", "content": "I hope this finds you well—a quick update on the release."},
-]
-INSTRUCT_SYSTEM = (
-    "The user typed an instruction for text they want to write. Write that text, ready to send, "
-    "in polished and slightly verbose English with a fondness for em dashes. Use the reference "
-    "context for names, terms, and facts, and add no facts, promises, or commitments the user did "
-    "not give. Refer to people by name, or as they/them unless their pronouns are given. Output "
-    "only the text itself, with no preamble or notes."
-)
-# The actions without a voice, for boxes that are not prose (a terminal, a URL, a number): what
-# goes there has no style to polish, and the box's description says what it takes.
-PLAIN = {
-    "rewrite": "Rewrite the user's text. Keep its meaning, names, numbers and language. "
-               "Output only the rewritten text, no explanation.",
-    "continue": "Continue the user's unfinished text with the next few words. Output only the words that "
-                "come next, not the text itself.",
-    "instruct": "The user typed an instruction. Write what it asks for, ready to use where the caret is. Use "
-                "the reference material for names, terms, and facts, and add no facts, promises, or "
-                "commitments the user did not give. Output only that text, with no preamble or notes.",
-}
-INSTRUCT_EXAMPLES = [
-    {"role": "user", "content": "decline the meeting politely, propose thursday"},
-    {"role": "assistant", "content": "Thank you for the invitation—unfortunately, I can't make that time. "
-                                     "Would Thursday work instead?"},
-]
+The words for each mode are data, in claudish/templates.json; a profile's "templates" file has the
+same shape and replaces only what it names (docs/configuration.md#templates)."""
+import copy
+import json
+from pathlib import Path
+
+TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
+MODE_KEYS = {"system", "plain", "frame", "examples", "max_tokens", "candidates", "note"}
+SECTIONS = {"about", "modes", "tones", "box"}
 
 
-# Named tones: "plain" for everyday writing, and "fix" for correcting without rewriting (for
-# dyslexia, a phone keyboard, or a second language: your words stay yours).
-PRESETS = {"plain": "plain, natural", "fix": "plain, natural"}
-FIX_SYSTEM = (
-    "Correct the spelling, typos, grammar, punctuation, and capitalisation of the user's text. "
-    "Keep their words, word order, meaning, and voice; add nothing and leave out nothing. If it is "
-    "already correct, return it unchanged. Output only the corrected text."
-)
+def load(path):
+    """A templates file, checked: the shipped shape, naming only what it changes."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    where = "templates %s" % path
+    if not isinstance(data, dict) or set(data) - SECTIONS:
+        raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))
+    for name, mode in (data.get("modes") or {}).items():
+        if not isinstance(mode, dict) or set(mode) - MODE_KEYS:
+            raise ValueError("%s: mode %r takes only %s" % (where, name, ", ".join(sorted(MODE_KEYS))))
+        if name not in TEMPLATES["modes"] and not mode.get("system"):
+            raise ValueError('%s: new mode %r needs a "system"' % (where, name))
+        if "system" in mode and not (isinstance(mode["system"], str) and mode["system"].strip()):
+            raise ValueError("%s: mode %r needs a non-empty system" % (where, name))
+        if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
+                   for pair in mode.get("examples", [])):
+            raise ValueError("%s: mode %r examples must be [input, answer] string pairs" % (where, name))
+        for key, low, high in (("max_tokens", 1, None), ("candidates", 1, 5)):
+            value = mode.get(key)
+            if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and value >= low
+                                          and (high is None or value <= high)):
+                raise ValueError("%s: mode %r %s must be an integer%s" % (
+                    where, name, key, " from %d to %d" % (low, high) if high else ""))
+    return data
 
 
-def toned(tone):
-    """The templates in another voice (a profile's "tone", such as "plain and concise", or a preset:
-    "plain", "fix"), for rewrite, continue, and instruct. Claudish's voice (polished, slightly
-    verbose, em dashes) is the default and the identity; the examples teach that voice, so a tone
-    goes without them. "fix" corrects instead of rewriting."""
-    words = PRESETS.get(tone, tone)
-    voices = {
-        "rewrite": ("Rewrite the user's text in %s English. Keep its meaning, names, numbers and language. "
-                    "Output only the rewritten text, no explanation." % words, []),
-        "continue": ("Continue the user's unfinished text with the next few words, in the same language, "
-                     "%s. Output only the words that come next, not the text itself." % words, []),
-        "instruct": ("The user typed an instruction for text they want to write. Write that text, ready to "
-                     "send, in %s English. Use the reference context for names, terms, and facts, and add no "
-                     "facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text "
-                     "itself, with no preamble or notes." % words, []),
-    }
-    if tone == "fix":
-        voices["rewrite"] = (FIX_SYSTEM, [])
-    return voices
+def merged(override=None):
+    """The shipped templates with a profile's over them, mode by mode and key by key."""
+    words = copy.deepcopy(TEMPLATES)
+    for section in ("modes", "tones", "box"):
+        for key, value in ((override or {}).get(section) or {}).items():
+            if isinstance(value, dict) and isinstance(words[section].get(key), dict):
+                words[section][key] = dict(words[section][key], **value)
+            else:
+                words[section][key] = value
+    return words
 
 
-def defaults(rewrite_prompt=None, tone=None):
-    """name -> {"system", "examples", "max_tokens", "candidates"}; max_tokens None means the backend's default.
+def messages(pairs, frame=None):
+    """[input, answer] pairs as chat turns, the input in the mode's frame."""
+    return [{"role": role, "content": frame.replace("{text}", text) if frame and role == "user" else text}
+            for source, answer in pairs for role, text in (("user", source), ("assistant", answer))]
 
-    candidates: how many readings to offer. An instruction is sent on purpose and its result
-    is awaited, so it offers a short list to pick from (1-3); while you type, one at a time.
-    tone: a voice other than Claudish's (see toned); a rewrite template from --prompt wins."""
-    system, examples = rewrite_prompt or (model.SYSTEM, model.EXAMPLES)
-    voices = toned(tone) if tone else {}
-    if tone and rewrite_prompt is None:
-        system, examples = voices["rewrite"]
-    continued, continue_examples = voices.get("continue") or (CONTINUE_SYSTEM, CONTINUE_EXAMPLES)
-    instructed, instruct_examples = voices.get("instruct") or (INSTRUCT_SYSTEM, INSTRUCT_EXAMPLES)
-    return {
-        "rewrite": {"system": system, "plain": PLAIN["rewrite"], "examples": examples, "max_tokens": None,
-                    "candidates": 1},
-        "continue": {"system": continued, "plain": PLAIN["continue"], "examples": continue_examples,
-                     "max_tokens": 24, "candidates": 1, "frame": CONTINUE_FRAME},
-        "instruct": {"system": instructed, "plain": PLAIN["instruct"], "examples": instruct_examples,
-                     "max_tokens": 400, "candidates": 3},
-    }
+
+def defaults(override=None, tone=None):
+    """name -> {"system", "plain", "examples", "max_tokens", "candidates", "custom", "box"[, "frame"]}.
+
+    max_tokens None means the backend's default. candidates: how many readings to offer (an
+    instruction is sent on purpose and awaited, so it offers a short list; while you type, one).
+    tone: a voice other than Claudish's ("plain", "fix", or your words), which replaces each
+    mode's voice and its examples (they teach Claudish's); a mode's own system in the profile's
+    templates wins over it, and is used as written in any box (custom)."""
+    words = merged(override)
+    own = (override or {}).get("modes") or {}
+    specs = {}
+    for name, mode in words["modes"].items():
+        system, examples = mode["system"], mode.get("examples", [])
+        custom = "system" in (own.get(name) or {})
+        if tone and not custom and name in words["tones"]["voice"]:
+            voice = words["tones"]["voice"][name].replace("{tone}", words["tones"]["named"].get(tone, tone))
+            system, examples = (words["tones"]["fix"] if tone == "fix" and name == "rewrite" else voice), []
+        specs[name] = {"system": system, "plain": mode.get("plain") or system,
+                       "examples": messages(examples, mode.get("frame")), "max_tokens": mode.get("max_tokens"),
+                       "candidates": mode.get("candidates") or 1, "custom": custom, "box": words["box"]}
+        if mode.get("frame"):
+            specs[name]["frame"] = mode["frame"]
+    return specs
 
 
 def finish(mode, text, output):

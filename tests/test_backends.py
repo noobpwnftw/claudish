@@ -8,7 +8,8 @@ import unittest
 from unittest.mock import patch
 from urllib.request import urlopen
 
-from claudish.model import EXAMPLES, SYSTEM, Rewriter, load_prompt
+from claudish import modes
+from claudish.model import Rewriter
 from claudish.server import make_server
 
 
@@ -51,7 +52,9 @@ class ClaudeBackendTests(unittest.TestCase):
         self.assertEqual(result["usage"], {"input_tokens": 90, "output_tokens": 12})
         call = self.sdk.calls[0]
         self.assertEqual(call["model"], "claude-opus-5-5")
-        self.assertEqual((call["system"], call["messages"]), (SYSTEM, EXAMPLES + [{"role": "user", "content": "Ship it."}]))
+        rewrite = modes.defaults()["rewrite"]
+        self.assertEqual((call["system"], call["messages"]),
+                         (rewrite["system"], rewrite["examples"] + [{"role": "user", "content": "Ship it."}]))
         self.assertEqual(call["output_config"], {"effort": "low"})
         self.assertEqual((call["fallbacks"], call["betas"]), ("default", ["server-side-fallback-2026-07-01"]))
         self.assertNotIn("temperature", call)
@@ -140,21 +143,23 @@ class PromptTemplateTests(unittest.TestCase):
         return handle.name
 
     def test_custom_template_reaches_both_backends(self):
-        prompt = load_prompt(self.write({"system": "Be grand.", "examples": [["hi", "Greetings—hello."]]}))
-        self.assertEqual(prompt[1], [{"role": "user", "content": "hi"},
-                                     {"role": "assistant", "content": "Greetings—hello."}])
+        templates = modes.load(self.write({"modes": {"rewrite": {"system": "Be grand.",
+                                                                 "examples": [["hi", "Greetings—hello."]]}}}))
+        turns = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Greetings—hello."}]
         sdk = FakeSDK()
         with patch.dict("sys.modules", {"anthropic": sdk.module}):
-            Rewriter("claude", prompt=prompt).rewrite("so")
+            Rewriter("claude", templates=templates).rewrite("so")
         self.assertEqual(sdk.calls[0]["system"], "Be grand.")
-        self.assertEqual(sdk.calls[0]["messages"][:2], prompt[1])
-        _, _, payload = EndpointBackendTests.call(self, Rewriter("openai", prompt=prompt))
+        self.assertEqual(sdk.calls[0]["messages"][:2], turns)
+        _, _, payload = EndpointBackendTests.call(self, Rewriter("openai", templates=templates))
         self.assertEqual(payload["messages"][0], {"role": "system", "content": "Be grand."})
 
     def test_malformed_templates_are_rejected(self):
-        for data in [{"examples": []}, {"system": " "}, {"system": "x", "examples": [["only one"]]}]:
-            with self.assertRaises(ValueError):
-                load_prompt(self.write(data))
+        for data in [{"rewrite": {"system": "x"}}, {"modes": {"rewrite": {"system": " "}}},
+                     {"modes": {"rewrite": {"examples": [["only one"]]}}}, {"modes": {"haiku": {"max_tokens": 9}}},
+                     {"modes": {"rewrite": {"temperature": 1}}}, {"modes": {"instruct": {"candidates": 6}}}]:
+            with self.assertRaises(ValueError, msg=data):
+                modes.load(self.write(data))
 
 
 class CommandBackendTests(unittest.TestCase):

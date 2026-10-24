@@ -92,6 +92,17 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(result["text"], "As requested—fix, having read the terminal.")
         self.assertIn("terminal screen (3 lines)", result["consulted"])
 
+    def test_the_shipped_templates_are_a_valid_templates_file(self):
+        from claudish.modes import load
+        self.assertEqual(load(Path(modes.__file__).with_name("templates.json")), modes.TEMPLATES)
+        self.assertEqual(set(modes.defaults()), {"rewrite", "continue", "instruct"})
+
+    def test_a_profile_can_reword_the_box_too(self):
+        rewriter = Rewriter(max_tokens=64, templates={"box": {"at_caret": "Write it for the caret."}})
+        _, payload = self.call(rewriter, "decline politely", "instruct", before="Hi Sam,")
+        self.assertTrue(payload["messages"][0]["content"].endswith("Write it for the caret."))
+        self.assertEqual(rewriter.modes["instruct"]["box"]["kinds"], modes.TEMPLATES["box"]["kinds"])
+
     def test_the_tone_is_claudish_unless_a_profile_sets_another(self):
         claudish = Rewriter(max_tokens=64)
         self.assertIn("em dash", claudish.modes["rewrite"]["system"])
@@ -104,8 +115,9 @@ class ModeTests(unittest.TestCase):
         fix = Rewriter(max_tokens=64, tone="fix")  # corrects, keeps your words
         self.assertIn("Keep their words", fix.modes["rewrite"]["system"])
         self.assertIn("plain, natural", fix.modes["instruct"]["system"])
-        custom = Rewriter(max_tokens=64, prompt=("Translate to French.", []), tone="plain")
-        self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # --prompt wins
+        custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
+        self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
+        self.assertIn("plain, natural", custom.modes["continue"]["system"])  # the tone, where it names nothing
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
@@ -157,10 +169,10 @@ class ModeTests(unittest.TestCase):
         rewriter = Rewriter(max_tokens=64)
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
-        self.assertEqual(payload["messages"][0]["content"], modes.CONTINUE_SYSTEM)
+        self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"])
         self.assertEqual(payload["max_tokens"], 24)
         _, payload = self.call(rewriter, "decline politely", "instruct")
-        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.INSTRUCT_SYSTEM, 400))
+        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"], 400))
         _, payload = self.call(rewriter, "so", "rewrite")
         self.assertEqual(payload["max_tokens"], 64)
         with self.assertRaisesRegex(ValueError, "unknown mode"):
@@ -169,19 +181,24 @@ class ModeTests(unittest.TestCase):
     def test_profile_overrides_and_new_modes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "haiku.json").write_text(json.dumps({"system": "Answer in a haiku.", "examples": []}))
+            (root / "words.json").write_text(json.dumps({"modes": {
+                "instruct": {"max_tokens": 900}, "haiku": {"system": "Answer in a haiku.", "max_tokens": 60}}}))
             path = root / "config.json"
-            path.write_text(json.dumps({"profiles": {"p": {"modes": {
-                "instruct": {"max_tokens": 900}, "haiku": {"prompt": "haiku.json", "max_tokens": 60}}}}}))
-            _, settings, prompt, context = config.resolve(path)
-            rewriter = Rewriter(prompt=prompt, context=context, modes=settings["modes"])
-            self.assertEqual(rewriter.modes["instruct"]["max_tokens"], 900)
-            self.assertEqual(rewriter.modes["instruct"]["system"], modes.INSTRUCT_SYSTEM)
+            path.write_text(json.dumps({"profiles": {"p": {"templates": "words.json"}}}))
+            _, settings, templates, context = config.resolve(path)
+            rewriter = Rewriter(templates=templates, context=context, modes=settings["modes"])
+            self.assertEqual(rewriter.modes["instruct"]["max_tokens"], 900)  # only what the file names
+            self.assertEqual(rewriter.modes["instruct"]["system"], modes.TEMPLATES["modes"]["instruct"]["system"])
             _, payload = self.call(rewriter, "autumn", "haiku")
             self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), ("Answer in a haiku.", 60))
-            for spec, message in [({"haiku": {}}, "needs a"), ({"instruct": {"temperature": 1}}, "takes only"),
-                                  ({"instruct": {"max_tokens": "9"}}, "integer")]:
-                path.write_text(json.dumps({"profiles": {"p": {"modes": spec}}}))
+            for words, message in [({"modes": {"haiku": {}}}, "needs a"), ({"modes": {"instruct": {"temperature": 1}}}, "takes only"),
+                                   ({"modes": {"instruct": {"max_tokens": "9"}}}, "integer")]:
+                (root / "words.json").write_text(json.dumps(words))
+                with self.assertRaisesRegex(ValueError, message):
+                    config.resolve(path)
+            for profile, message in [({"modes": {"instruct": {"max_tokens": 900}}}, "takes only"),
+                                     ({"prompt": "words.json"}, "now")]:
+                path.write_text(json.dumps({"profiles": {"p": profile}}))
                 with self.assertRaisesRegex(ValueError, message):
                     config.resolve(path)
 

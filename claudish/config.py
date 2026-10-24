@@ -5,7 +5,7 @@
   "profiles": {
     "local":  {"backend": "llama"},
     "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
-    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "prompt": "grand.json"}
+    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "templates": "grand.json"}
   }
 }
 
@@ -16,16 +16,16 @@ import os
 from pathlib import Path
 
 from .context import Binding, Context
-from .model import load_prompt
+from . import modes as invocation
 
 BACKENDS = ("llama", "openai", "claude", "command", "rules")
 DEFAULTS = {"backend": "llama", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
-            "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "prompt": None,
+            "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "prompt": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
+         "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
 
 def default_path():
@@ -34,9 +34,10 @@ def default_path():
 
 
 def resolve(path=None, profile=None, overrides=None):
-    """Return (profile name, settings, prompt, context) from the file, then non-None overrides.
+    """Return (profile name, settings, templates, context) from the file, then non-None overrides.
 
-    settings["modes"] becomes name -> {"system", "examples", "max_tokens"} overrides for Rewriter."""
+    templates: the profile's templates file, read (modes.load), or None for the shipped ones;
+    settings["modes"] becomes name -> {"profile"}: which profile answers a mode."""
     settings, name, base, servers, known = dict(DEFAULTS), None, Path.cwd(), {}, set()
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
@@ -60,6 +61,9 @@ def resolve(path=None, profile=None, overrides=None):
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)
+        if "prompt" in entry:
+            raise ValueError('profile %r: "prompt" is now "templates", a file in the shape of '
+                             "claudish/templates.json (docs/configuration.md#templates)" % name)
         unknown = sorted(set(entry) - set(DEFAULTS))
         if unknown:
             raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
@@ -78,39 +82,23 @@ def resolve(path=None, profile=None, overrides=None):
         if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
             raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')
         settings["command"] = [os.path.expanduser(part) for part in command]
-    prompt = None
-    if settings["prompt"]:
-        prompt_path = Path(settings["prompt"]).expanduser()
-        if not prompt_path.is_absolute() and not (overrides or {}).get("prompt"):
-            prompt_path = base / prompt_path  # Template paths in a profile are relative to the file.
-        prompt = load_prompt(prompt_path)
+    templates = None
+    if settings["templates"]:
+        templates_path = Path(settings["templates"]).expanduser()
+        if not templates_path.is_absolute() and not (overrides or {}).get("templates"):
+            templates_path = base / templates_path  # Paths in a profile are relative to the file.
+        templates = invocation.load(templates_path)
     modes = {}
     for mode, spec in (settings["modes"] or {}).items():
-        if not isinstance(spec, dict) or set(spec) - {"prompt", "max_tokens", "candidates", "profile"}:
-            raise ValueError('profile %r: mode %r takes only "prompt", "max_tokens", "candidates", and "profile"'
-                             % (name, mode))
-        override = {}
-        if spec.get("profile") is not None:
-            # Which AI answers this mode (a small model for continue, a strong one for instructions).
-            if not isinstance(spec["profile"], str) or (known and spec["profile"] not in known):
-                raise ValueError("profile %r: mode %r names profile %r, which is not in the config"
-                                 % (name, mode, spec["profile"]))
-            override["profile"] = spec["profile"]
-        if spec.get("prompt"):
-            mode_path = Path(spec["prompt"]).expanduser()
-            override["system"], override["examples"] = load_prompt(mode_path if mode_path.is_absolute() else base / mode_path)
-        if spec.get("max_tokens") is not None:
-            if not isinstance(spec["max_tokens"], int) or isinstance(spec["max_tokens"], bool):
-                raise ValueError("profile %r: mode %r max_tokens must be an integer" % (name, mode))
-            override["max_tokens"] = spec["max_tokens"]
-        if spec.get("candidates") is not None:
-            if not (isinstance(spec["candidates"], int) and not isinstance(spec["candidates"], bool)
-                    and 1 <= spec["candidates"] <= 5):
-                raise ValueError("profile %r: mode %r candidates must be 1 to 5" % (name, mode))
-            override["candidates"] = spec["candidates"]
-        if mode not in ("rewrite", "continue", "instruct") and "system" not in override and "profile" not in override:
-            raise ValueError('profile %r: new mode %r needs a "prompt"' % (name, mode))
-        modes[mode] = override
+        # Which AI answers this mode (a small model for continue, a strong one for instructions);
+        # what it is asked is in the templates.
+        if not isinstance(spec, dict) or set(spec) != {"profile"}:
+            raise ValueError('profile %r: mode %r takes only "profile" (its words, budget and candidates '
+                             'are in "templates")' % (name, mode))
+        if not isinstance(spec["profile"], str) or (known and spec["profile"] not in known):
+            raise ValueError("profile %r: mode %r names profile %r, which is not in the config"
+                             % (name, mode, spec["profile"]))
+        modes[mode] = {"profile": spec["profile"]}
     settings["modes"] = modes
     context = None
     if settings["context"]:
@@ -123,7 +111,7 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError("profile %r: binding for %r names profile %r, which is not in the config"
                              % (name, binding.pattern, binding.profile))
     settings["mcp_servers"] = servers
-    return name, settings, prompt, context
+    return name, settings, templates, context
 
 
 STARTER = {
@@ -131,7 +119,7 @@ STARTER = {
         "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
         "Keys never go in this file: name an environment variable with api_key_env.",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
-        "prompt, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
+        "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
     ],
     "profile": "local",
     "profiles": {

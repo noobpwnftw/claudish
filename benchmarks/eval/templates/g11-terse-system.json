@@ -1,0 +1,28 @@
+{
+  "about": [
+    "G11 rewrite variant 'terse-system' (benchmarks/README.md, Prompt experiments)."
+  ],
+  "modes": {
+    "rewrite": {
+      "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Polished, slightly verbose, with an em dash (—). Output only the rewrite.",
+      "examples": [
+        [
+          "We need to think about this.",
+          "This warrants thoughtful consideration—a chance to examine the nuances."
+        ],
+        [
+          "thanks, see you at 9",
+          "Thank you—I look forward to seeing you at 9."
+        ],
+        [
+          "Don't push to main.",
+          "Please do not push to main—a little restraint goes a long way."
+        ],
+        [
+          "Nos vemos el lunes.",
+          "Nos vemos el lunes—será un placer."
+        ]
+      ]
+    }
+  }
+}

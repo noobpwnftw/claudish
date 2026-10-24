@@ -2,9 +2,9 @@
 
 Models, profiles, context, MCP servers, tools, window pictures, and agent sessions.
 
-## Backends and rewrite templates
+## Backends
 
-Claudish supplies the plumbing: the input method, a rewrite template, and the
+Claudish supplies the plumbing: the input method, its templates, and the
 service between them. The model is your choice, and how well it follows the
 template depends on that model. `benchmarks/evaluate.py` measures any backend
 on the same cases.
@@ -35,12 +35,9 @@ only where you point the service. A non-loopback `--model-url` and the Claude
 backend are reported as `"hosted": true` in `/health`, and the browser demo
 labels them as hosted. Local inference remains the default.
 
-Replace the rewrite template with `--prompt FILE` for any backend:
-
-```json
-{"system": "Rewrite, do not reply. Keep names and numbers exactly. Use an em dash.",
- "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]}
-```
+Change what the model is told with a templates file, for any backend (see
+[Templates](#templates)): `claudish serve --templates FILE`, or a profile's
+`"templates"`.
 
 ### Supported text boxes
 
@@ -126,7 +123,7 @@ pass `--config FILE`):
  "profiles": {
    "local":  {"backend": "llama"},
    "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
-              "prompt": "grand.json"},
+              "templates": "grand.json"},
    "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
               "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},
    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"}
@@ -378,8 +375,8 @@ order, and your voice (for dyslexia, a second language, or a phone keyboard);
 continue and instruct are plain then. Any other words work too ("warm and
 friendly", "formal British"). The tone replaces the voice in the rewrite,
 continue, and instruct templates, and Claudish's own examples, which teach its
-voice, are left out. `claudish setup --tone fix` sets it for you. A rewrite template from
-`--prompt` or the profile's `"prompt"` wins over it. Instructions typed in a
+voice, are left out. `claudish setup --tone fix` sets it for you. A mode's own
+`"system"` in the profile's templates wins over the tone. Instructions typed in a
 terminal always get a command line.
 
 ## Modes
@@ -394,10 +391,27 @@ accept with Tab or ignore:
 | `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
 
 The browser demo has a mode switch. Adapters send `"mode"` in `/suggest`, and
-`/health` lists the modes. A profile can replace any mode's template or token
-budget, or add a mode of its own:
+`/health` lists the modes. A profile's templates can change any mode, or add one
+of its own; its `"modes"` says only which profile answers a mode (above).
+
+## Templates
+
+Every word cd_AI says to a model is in
+[`claudish/templates.json`](../claudish/templates.json): each mode's `system`
+prompt, the `plain` one for boxes that are not prose (a terminal, a URL, a
+number), `examples` as `[input, answer]` pairs, a `frame` around your text
+(`{text}`), `max_tokens` and `candidates` (how many readings to offer, 1 to 5);
+the tones; and the wording about the text box (`box`). A templates file has the
+same shape and names only what it changes, mode by mode and key by key:
 
 ```json
-{"profiles": {"p": {"modes": {"instruct": {"max_tokens": 900},
-                               "haiku": {"prompt": "haiku.json", "max_tokens": 60}}}}}
+{"modes": {"rewrite": {"system": "Rewrite, do not reply. Keep names and numbers exactly. Use an em dash.",
+                       "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]},
+           "instruct": {"max_tokens": 900},
+           "haiku": {"system": "Answer in a haiku.", "max_tokens": 60}}}
 ```
+
+Name it in a profile (`"templates": "words.json"`, relative to the config file)
+or pass `claudish serve --templates words.json`. A mode's own `system` is used
+as written in every box, without the `plain` one. The evaluation's variants
+(`benchmarks/eval/templates/`) are templates files too.

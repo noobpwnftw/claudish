@@ -13,31 +13,6 @@ from urllib.request import Request, build_opener, ProxyHandler
 RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
 RECENT_SECONDS = 600
 
-SYSTEM = (
-    "Rewrite the user's text in polished, slightly verbose English. "
-    "Keep its meaning, names, numbers and language. Use an em dash where natural. "
-    "Output only the rewritten text, no explanation."
-)
-
-EXAMPLES = [
-    {"role": "user", "content": "We need to think about this."},
-    {"role": "assistant", "content": "This warrants thoughtful consideration—a chance to examine the nuances."},
-]
-
-
-def load_prompt(path):
-    """Read a rewrite template: {"system": "...", "examples": [["input", "rewrite"], ...]}."""
-    with open(path, encoding="utf-8") as source:
-        data = json.load(source)
-    system, examples = data.get("system"), data.get("examples", [])
-    if not isinstance(system, str) or not system.strip():
-        raise ValueError("prompt file needs a non-empty \"system\" string")
-    if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
-               for pair in examples):
-        raise ValueError("prompt \"examples\" must be [input, rewrite] string pairs")
-    return system, [message for source_text, rewrite in examples for message in (
-        {"role": "user", "content": source_text}, {"role": "assistant", "content": rewrite})]
-
 
 def rules(text):
     """Explicit model-free demo, not a substitute for neural rewriting."""
@@ -174,7 +149,7 @@ class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
     @classmethod
-    def from_settings(cls, settings, prompt=None, context=None, profile=None):
+    def from_settings(cls, settings, templates=None, context=None, profile=None):
         """Build from config.resolve() output. ValueError if the profile's key variable is unset;
         ImportError if the claude backend lacks the Anthropic SDK."""
         api_key = None
@@ -183,7 +158,7 @@ class Rewriter:
             if not api_key:
                 raise ValueError("environment variable %s is not set" % settings["api_key_env"])
         rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
-                       settings["model"], api_key, settings["timeout"], prompt, context, settings["modes"],
+                       settings["model"], api_key, settings["timeout"], templates, context, settings["modes"],
                        settings["command"], settings["hosted"], settings["bindings"], settings.get("tone"))
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
@@ -200,7 +175,7 @@ class Rewriter:
         return rewriter
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
-                 claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, prompt=None,
+                 claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, templates=None,
                  context=None, modes=None, command=None, hosted=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend
@@ -209,7 +184,6 @@ class Rewriter:
         self.model = model
         self.api_key = api_key
         self.timeout = timeout
-        self.system, self.examples = prompt or (SYSTEM, EXAMPLES)
         self.context = context
         self.bindings = list(bindings)
         from .sessions import Sessions
@@ -228,14 +202,12 @@ class Rewriter:
         self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
-        # name -> {"system", "examples", "max_tokens"}; a profile may replace any mode's template.
-        custom = prompt is not None  # a --prompt rewrite template wins over a tone
-        self.modes = invocation.defaults((self.system, self.examples) if custom or not tone else None, tone)
-        self.modes["rewrite"]["custom"] = custom
-        for name, override in (modes or {}).items():
-            self.modes[name] = dict(self.modes.get(name, {"max_tokens": None}), **override)
-            if "system" in override:
-                self.modes[name]["custom"] = True  # a profile's own template is used as written, in any box
+        # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
+        self.modes = invocation.defaults(templates, tone)
+        for name, route in (modes or {}).items():  # which profile answers a mode
+            if name not in self.modes:
+                raise ValueError("mode %r is routed, but no template has it" % name)
+            self.modes[name]["profile"] = route["profile"]
         self.finish = invocation.finish
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
@@ -325,11 +297,12 @@ class Rewriter:
                                                     self.agent_mcp_config(kept))
             # The same description of the text box a model gets, and the same observations.
             box = self.box("instruct", app, purpose, before, after, screen=screen)
-            context = box.describe("instruct", retrieval=bool(textbox))
+            words = self.modes["instruct"]["box"]
+            context = box.describe("instruct", retrieval=bool(textbox), words=words)
             if textbox and (box.before or box.after):
                 context += " The textbox tools (read, search) see all of it."
             if box.observations:
-                context += "\n\n" + box.material("").strip()
+                context += "\n\n" + box.material("", words).strip()
             policy = self.toolbox.policy() if self.toolbox else {}
             return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy)
         from .conversation import ModelDriver
@@ -408,7 +381,7 @@ class Rewriter:
         tools = mode == "instruct" and self.backend in ("llama", "openai", "claude") and bool(self.toolbox or local)
         prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
         examples = spec["examples"] if box.prose or spec.get("custom") else []
-        said = box.material(spec["frame"].replace("{text}", text) if spec.get("frame") else text)
+        said = box.material(spec["frame"].replace("{text}", text) if spec.get("frame") else text, spec["box"])
         history = list(conversation.messages) if conversation is not None else []
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []

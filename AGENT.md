@@ -91,11 +91,14 @@ after a context reset and continue from verified state rather than starting over
 
 - `claudish/composition.py`: shared text, candidate, and revision state.
 - `claudish/client.py`: debounced, coalescing background requests.
-- `claudish/model.py`: default rewrite template, `load_prompt` for `--prompt`
-  files, and the backends: any OpenAI-compatible server (`llama`/`openai`), Claude
-  through the official SDK (`claude`, optional `[claude]` extra), and `rules`.
-- `benchmarks/evaluate.py` and `eval/cases.json`: the fidelity evaluation, used to
-  compare models and templates; `benchmarks/prompt_variants.py` scores templates.
+- `claudish/templates.json`: every word cd_AI says to a model (each mode's template,
+  the tones, the text-box wording); a profile's `"templates"` file (or `--templates`)
+  replaces only what it names. `claudish/modes.py` loads and merges them.
+- `claudish/model.py`: the backends: any OpenAI-compatible server (`llama`/`openai`),
+  Claude through the official SDK (`claude`, optional `[claude]` extra), and `rules`.
+- `benchmarks/evaluate.py` and `eval/cases.json` (rewrite), `evaluate_continue.py` and
+  `eval/continue_cases.json` (continue), `judge.py` (calibrated on hand labels): the
+  evaluation, used to compare models and templates (a variant is a templates file).
 - `claudish/server.py`: loopback service and browser-demo assets.
 - `claudish/web/`: buildless HTML/CSS/JS; system/light/dark themes; no cookies or
   persistent browser preference. Keep user text out of persistent storage.

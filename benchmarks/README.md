@@ -96,10 +96,10 @@ build.
 ## Prompt experiments (G11)
 
 The aim was to make the default model add em dashes without losing meaning.
-[`prompt_variants.py`](prompt_variants.py) scores the system-prompt and example
-variants in [`eval/prompt-variants.json`](eval/prompt-variants.json) directly
-against llama-server, using the same cases and checks. Results for Qwen2.5 0.5B
-on the Spark:
+Each variant is a templates file, [`eval/templates/g11-*.json`](eval/templates/),
+run through the service (`claudish serve --templates FILE`) and scored by
+`evaluate.py` with the same cases and checks. Results for Qwen2.5 0.5B on the
+Spark (41 cases, before the evaluation became English only):
 
 | Variant | Pass checks | Added em dash | Failure seen on reading the outputs |
 | --- | ---: | ---: | --- |

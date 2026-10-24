@@ -1,0 +1,36 @@
+{
+  "about": [
+    "G11 rewrite variant 'varied' (benchmarks/README.md, Prompt experiments)."
+  ],
+  "modes": {
+    "rewrite": {
+      "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates what is already said. Output only the rewrite.",
+      "examples": [
+        [
+          "We need to think about this.",
+          "This warrants thoughtful consideration—a chance to examine the nuances."
+        ],
+        [
+          "thank you so much",
+          "Thank you—my gratitude is considerable."
+        ],
+        [
+          "Don't push to main.",
+          "Please do not push to main—it must remain untouched."
+        ],
+        [
+          "the server is down",
+          "The server is down—currently unreachable."
+        ],
+        [
+          "Lena fixed 2 bugs.",
+          "Lena has fixed 2 bugs—two defects, resolved."
+        ],
+        [
+          "ok",
+          "Understood—entirely."
+        ]
+      ]
+    }
+  }
+}

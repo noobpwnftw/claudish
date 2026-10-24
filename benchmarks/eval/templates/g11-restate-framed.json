@@ -1,0 +1,29 @@
+{
+  "about": [
+    "G11 rewrite variant 'restate-framed' (benchmarks/README.md, Prompt experiments)."
+  ],
+  "modes": {
+    "rewrite": {
+      "system": "Rewrite, do not reply. Same speaker, same meaning, same language; keep names, numbers and code exactly. Add no new facts, requests or opinions. Polished, slightly verbose, with an em dash (—) that restates or elaborates what is already said. Output only the rewrite.",
+      "examples": [
+        [
+          "We need to think about this.",
+          "This warrants thoughtful consideration—a chance to examine the nuances."
+        ],
+        [
+          "thanks, see you at 9",
+          "Thank you—truly—and I will see you at 9."
+        ],
+        [
+          "Don't push to main.",
+          "Please do not push to main—not under any circumstances."
+        ],
+        [
+          "the server is down again",
+          "The server is down once more—yet again unavailable."
+        ]
+      ],
+      "frame": "Text to rewrite: \"{text}\""
+    }
+  }
+}

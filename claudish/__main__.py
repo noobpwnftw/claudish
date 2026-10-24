@@ -27,8 +27,8 @@ def main():
     serve.add_argument("--api-key-env", metavar="NAME",
                        help="Environment variable holding a bearer key for --model-url")
     serve.add_argument("--timeout", type=float, help="Seconds to wait for --model-url")
-    serve.add_argument("--prompt", metavar="FILE",
-                       help='Rewrite template JSON: {"system": "...", "examples": [["in", "out"], ...]}')
+    serve.add_argument("--templates", metavar="FILE",
+                       help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
     serve.add_argument("--port", type=int, default=18765)
     serve.add_argument("--max-tokens", type=int)
     rewrite = commands.add_parser("rewrite")
@@ -118,22 +118,22 @@ def main():
     if args.command == "serve":
         # Only real flags override the profile; other profile keys (and args.command, the
         # subcommand's name) must not.
-        flags = ("backend", "claude_model", "model_url", "model", "api_key_env", "timeout", "prompt", "max_tokens")
+        flags = ("backend", "claude_model", "model_url", "model", "api_key_env", "timeout", "templates", "max_tokens")
         overrides = {key: getattr(args, key) for key in flags}
         try:
-            profile, settings, prompt, context = config.resolve(args.config, args.profile, overrides)
+            profile, settings, templates, context = config.resolve(args.config, args.profile, overrides)
         except (OSError, ValueError) as exc:
             parser.error(str(exc))
         try:
-            rewriter = Rewriter.from_settings(settings, prompt, context, profile)
+            rewriter = Rewriter.from_settings(settings, templates, context, profile)
         except ValueError as exc:
             parser.error(str(exc))
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         def load(name):
             """Another profile of this config, for an app a binding routes to it."""
-            _, routed, routed_prompt, routed_context = config.resolve(args.config, name)
-            return Rewriter.from_settings(routed, routed_prompt, routed_context, name)
+            _, routed, routed_templates, routed_context = config.resolve(args.config, name)
+            return Rewriter.from_settings(routed, routed_templates, routed_context, name)
         rewriter.loader = load
         from .client import write_token
         server = make_server(rewriter, args.port, write_token())

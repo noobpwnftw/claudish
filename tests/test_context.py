@@ -83,7 +83,7 @@ class ContextTests(unittest.TestCase):
             rewriter.rewrite("ok", before="Dear Zoë,")
             messages = json.loads(opener.return_value.open.call_args.args[0].data)["messages"]
         system, turn = messages[0]["content"], messages[-1]["content"]
-        self.assertTrue(system.startswith(rewriter.system))
+        self.assertTrue(system.startswith(rewriter.modes["rewrite"]["system"]))
         self.assertIn("Dear Zoë,▮", system)  # the text box is described in the system prompt
         # What was observed goes next to the user's words, fenced as material.
         self.assertIn("Fjordline: the ferry company.", turn)
