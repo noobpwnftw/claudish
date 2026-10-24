@@ -51,8 +51,10 @@ def register(path, bundle_id):
 
 
 def enable(bundle_id):
-    """Enable them (macOS asks the person once: "Allow … to enable …?"). Returns the statuses."""
-    return [carbon.TISEnableInputSource(source) for source in sources(bundle_id)]
+    """Enable those not enabled yet (macOS asks the person: "Allow … to enable …?"); a reinstall
+    over an enabled cd_AI asks nothing. Returns the statuses."""
+    return [carbon.TISEnableInputSource(source) for source in sources(bundle_id)
+            if not prop(source, "kTISPropertyInputSourceIsEnabled")]
 
 
 def select(bundle_id, tries=3):

@@ -253,7 +253,14 @@ async def check(args):
             await expect(window).to_contain_text("Rewrite", timeout=10000)  # typed, then Tab: the rewrite waits in the panel
 
             await page.set_viewport_size({"width": 390, "height": 844})
-            assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
+            try:  # the panel is placed again on the resize event, which the browser fires after this
+                await page.wait_for_function("() => document.documentElement.scrollWidth <= window.innerWidth",
+                                             timeout=2000)
+            except Exception:
+                wide = await page.evaluate("""() => [...document.querySelectorAll('body *')]
+                    .filter(e => e.getBoundingClientRect().right > window.innerWidth + 1 && e.getClientRects().length)
+                    .slice(0, 4).map(e => e.tagName + '#' + e.id + '.' + e.className + ' right ' + Math.round(e.getBoundingClientRect().right))""")
+                raise AssertionError("wider than the phone: %s" % wide)
             if args.screenshots:
                 await page.screenshot(path=str(args.screenshots / "mobile.png"), full_page=True)
             assert not errors, errors
