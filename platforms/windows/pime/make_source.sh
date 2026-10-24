@@ -1,6 +1,6 @@
 #!/bin/sh
 # PIME (EasyIME/PIME) at the pinned commit with Claudish's patches applied, zipped for a Windows
-# build (tests/desktop/windows/jobs/build-pime.ps1). Usage: make_source.sh OUT.zip
+# build (build-pime.ps1, beside this file, on Windows). Usage: make_source.sh OUT.zip
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../.." && pwd)

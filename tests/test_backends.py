@@ -95,7 +95,7 @@ class ClaudeBackendTests(unittest.TestCase):
     def test_health_reports_hosted_backend(self):
         for backend, hosted in [("claude", True), ("rules", False)]:
             server = make_server(Rewriter(backend), 0)
-            thread = threading.Thread(target=server.serve_forever)
+            thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
             thread.start()
             try:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:

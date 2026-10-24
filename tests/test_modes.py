@@ -226,7 +226,7 @@ class ModeTests(unittest.TestCase):
         routed.profile, routed.loader = "main", lambda name: Rewriter("llama")
         self.assertTrue(routed.continues(None))
         server = make_server(hosted, 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         try:
             request = Request("http://127.0.0.1:%s/suggest" % server.server_port, headers={"Content-Type": "application/json"},
@@ -241,7 +241,7 @@ class ModeTests(unittest.TestCase):
 
     def test_service_modes_in_rules_mode(self):
         server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         try:
             url = "http://127.0.0.1:%s" % server.server_port

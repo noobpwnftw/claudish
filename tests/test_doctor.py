@@ -102,7 +102,7 @@ class GeneralChecks(unittest.TestCase):
 
     def test_service_check_reports_the_running_service(self):
         server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         try:
             with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port):

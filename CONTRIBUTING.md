@@ -39,25 +39,13 @@ typed text goes only to a backend the user configured. Local is the default.
 
 ## Checks
 
-`scripts/check.py` runs everything this machine can run and reports PASS, FAIL,
-or SKIP with a reason:
+`python scripts/check.py` runs the unit tests, compile, diff check, IBus and PIME smokes, and the
+settings page in Chromium, each in under 5 seconds (about six in all), and reports PASS, FAIL, or
+SKIP with a reason. It is the merge gate. A test workflow slower than that is not one we run: make
+it faster or drop it. Real typing on Linux, Windows and macOS is checked by hand.
 
-| Command | Adds | When |
-| --- | --- | --- |
-| `python scripts/check.py` | unit tests, compile, diff check, IBus and PIME smokes (and the `[claude,mcp]` extras tests if a venv has them) | while iterating |
-| `… --model` | a real llama.cpp model: rewrite, the 41-case fidelity evaluation, the Playwright browser demo | before merging |
-| `… --desktop` | real typing in a container: Xvfb, the real `ibus-daemon`, a GTK app, `xdotool` keys | any adapter or installer change |
-
-Platform coverage beyond Linux:
-
-- **Windows:** `tests/desktop/windows` runs Windows 11 on ARM under qemu/KVM:
-  `vm.sh start`; once, `vm.sh run jobs/setup.ps1` and `jobs/buildtools.ps1`; for each
-  change, `vm.sh sync`, `vm.sh pime` and `vm.sh run jobs/build-pime.ps1` (when the PIME
-  patches change), `vm.sh run jobs/deploy.ps1`, then `jobs/typing.ps1` (Notepad),
-  `typing-edge.ps1` and `typing-terminal.ps1`; `gallery.sh` takes the screenshots.
-- **macOS:** the Cocoa-double tests run everywhere; `tests/desktop/macos/driver.py`
-  types into a real app on a Mac (`gallery.sh` takes the screenshots over VNC); a
-  bundle build runs on GitHub CI. Remote CI is opt-in: push a branch named `ci/<topic>`.
+Windows' PIME is built from source with `platforms/windows/pime/make_source.sh` and, on Windows
+with the Visual Studio C++ tools (`buildtools.ps1`), `build-pime.ps1`.
 
 Changes to templates or models are measured, not argued: `benchmarks/evaluate.py`
 for fidelity, `benchmarks/judge.py` (a larger local model, calibrated against

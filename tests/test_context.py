@@ -91,7 +91,7 @@ class ContextTests(unittest.TestCase):
 
     def test_service_validates_caret_text(self):
         server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         try:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
@@ -144,7 +144,7 @@ class BindingTests(unittest.TestCase):
             {"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}]}}}), encoding="utf-8")
         _, settings, _, _ = config.resolve(path)
         server = make_server(Rewriter("rules", bindings=settings["bindings"]), 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         try:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
@@ -261,7 +261,7 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(loaded, ["plain"])
             self.assertIs(slack.sessions, main.sessions)  # one service: shared sessions and conversations
             server = make_server(main, 0)
-            thread = threading.Thread(target=server.serve_forever)
+            thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
             thread.start()
             try:
                 url = "http://127.0.0.1:%d/suggest" % server.server_port

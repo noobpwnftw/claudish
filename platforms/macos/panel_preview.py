@@ -3,7 +3,6 @@ descriptions the lab draws (claudish/web/lab-states.js, generated from compositi
 comparing the native renderer with design.html#macos state by state. Not part of the input method.
 
   python3 panel_preview.py [seconds per state]       # on a Mac: watch, or screenshot each
-  tests/desktop/macos/gallery.sh OUT preview          # the host captures each over VNC
 
 Each state is announced in /tmp/claudish-gallery-state (the gallery protocol); with an answer in
 /tmp/claudish-gallery-ack it moves on at once."""

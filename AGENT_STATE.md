@@ -19,6 +19,13 @@ macOS the Download button (.pkg, ad-hoc signed; Open Anyway in Privacy & Securit
 26.6) first and a curl one-liner second; a settings window, not a wizard; avoid feature creep.
 G57-G60 tabled.
 
+## Checks (owner, 2026-10-24)
+
+The gate is `python scripts/check.py`, about six seconds, every step under 5 s. Test workflows that
+took longer are gone (the real-model eval, browser and static demos, extras run, the Linux
+containers, the Windows and Mac VM rigs, remote CI); real typing is checked by hand. Long jobs run
+in the background and block only the merge they gate. Get the thing to work before anything else.
+
 ## Verified (latest)
 
 - G61 macOS (branch `agent/mac-package`): `platforms/macos/package.py` builds `cd_AI.pkg` (36 MB,

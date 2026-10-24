@@ -243,7 +243,7 @@ def main():
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_called_once()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, and agent questions included (native TSF typing: tests/desktop/windows)")
+    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, and agent questions included")
 
 
 if __name__ == "__main__":

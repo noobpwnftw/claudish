@@ -1,6 +1,6 @@
 # Build Claudish's patched PIME (platforms/windows/pime) and install its text service over the
 # released PIME: the DLLs for Win32, x64 and ARM64 processes, and textService.py. Needs
-# jobs/buildtools.ps1 to have finished and the patched source in the shared folder (vm.sh pime).
+# buildtools.ps1 to have finished and the patched source (make_source.sh) unpacked beside it.
 $source = 'C:\pime-src'
 Remove-Item $source -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive \\host.lan\Data\pime-src.zip $source

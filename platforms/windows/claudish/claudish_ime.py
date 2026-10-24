@@ -132,7 +132,7 @@ class ClaudishTextService(TextService):
                 self.setToast(pill, 3)
 
     def preview(self):
-        """Test plumbing (the gallery, tests/desktop/windows/jobs/gallery.ps1): with the design lab's
+        """Screenshot plumbing: with the design lab's
         states at PREVIEW, each F12 draws the next one with the real panel, to compare with the lab.
         Without that file F12 is the app's."""
         if not os.path.exists(PREVIEW):

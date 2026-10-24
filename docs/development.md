@@ -12,7 +12,7 @@ for inputs, outputs, fidelity, and model comparisons.
 Status:
 
 - **Linux:** verified end to end with the real `ibus-daemon`, a GTK app, and real
-  key events in containers (`scripts/check.py --desktop`): X11 with GTK and Qt, and
+  key events in containers (2026-10): X11 with GTK and Qt, and
   GNOME Shell 46 on Wayland, headless, with IBus started by the shell and keys typed
   through Mutter's RemoteDesktop API; plus `claudish service` under a real systemd
   user manager (the scenario counts are in the README). KDE is not yet tested. On GNOME, a
@@ -22,10 +22,9 @@ Status:
 - **Windows:** verified on Windows 11 ARM64 in a KVM VM through Claudish's
   patched PIME: classic Notepad 15/15, Edge 14/14 with one known issue (a
   shortcut right after a cleared field can lose the composed word), Windows
-  Terminal and the classic console 4/4. x64 hardware is untested;
-  CI runs the unit tests on Windows.
-- **macOS:** real typing on macOS 26 in a UTM VM (tests/desktop/macos), plus
-  event-routing tests with Cocoa test doubles and a bundle build in CI.
+  Terminal and the classic console 4/4. x64 hardware is untested.
+- **macOS:** real typing on macOS 26 in a UTM VM (12 scenarios, installed by its package), plus
+  event-routing tests with Cocoa test doubles.
 - **Browser demo:** tested with real inference in Chromium.
 
 ## Implementation
@@ -64,14 +63,13 @@ own licenses. Their source and weights are dependencies, not part of this Git re
 
 ## Verify
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for the architecture, which check to run for which change, and how to report bugs.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the architecture and how to report bugs.
 
 ```sh
-python scripts/check.py           # tests, compile, IBus and PIME smokes (fetches pinned PIME source)
-python scripts/check.py --model   # also: real model, rewrite, fidelity eval, browser demo
+python scripts/check.py   # tests, compile, IBus and PIME smokes, the settings page: about six seconds
 ```
 
-The individual checks:
+Every check takes under 5 seconds; a slower test workflow is not one we run. The individual checks:
 
 ```sh
 python -m unittest discover -s tests -v
@@ -80,62 +78,18 @@ python -m compileall -q claudish platforms scripts
 dbus-run-session -- /usr/bin/python3 tests/ibus_smoke.py
 # Either OS, with PIME's Python source available:
 python tests/pime_smoke.py --pime-source /path/to/PIME/python/textService.py
+# The settings page in Chromium, against a service in a throwaway config directory:
+python tests/settings_page.py
 ```
 
-Optional browser acceptance test, with the demo running and Playwright/Chromium
-installed in your development environment:
+The macOS routing tests use test doubles and do not verify Cocoa, InputMethodKit, or native
+application behavior. Real typing is checked by hand on each OS: a text editor, a browser, a
+terminal, focus switches, selection and caret movement, shortcut keys, password fields, the service
+stopped, and switching input methods. On macOS, install the package and log out and back in first.
 
-```sh
-python tests/browser_demo.py
-# Or use an existing Chromium and save desktop/mobile screenshots:
-python tests/browser_demo.py --executable /path/to/chromium --screenshots .tools/demo-screenshots
-```
+## Debugging on macOS
 
-This checks actual backend inference, keyboard commits, the dash toggle,
-clipboard, stale-result rejection, error recovery, and mobile overflow.
-
-Remote CI covers Windows, Linux, and macOS, plus a macOS bundle build, native
-controller import, and signature check. It is opt-in: push a `ci/*` branch or run
-the workflow manually. The macOS routing tests use test
-doubles and do not verify Cocoa, InputMethodKit, or native application behavior.
-Native desktop acceptance should
-cover a text editor, browser, terminal, focus switches, selection/caret movement,
-shortcut keys, secure fields, service failure, and input-method switching.
-
-## Real typing on macOS
-
-`tests/desktop/macos` types into a small Cocoa test app (`app.py`) with Quartz
-key events (real US key codes, so they go through the input method), and reads
-the text back from a file: no Apple Events, so no Automation permission. Verified
-on macOS 26.6 in a UTM VM (Apple Virtualization): 7 scenarios, three runs in a row.
-
-macOS asks a person before a third-party input method is enabled ("Allow … to
-enable cd_AI?"), and asks again after the bundle changes. So it cannot run on CI
-runners, which nobody can click on. GitHub's macOS runners did deliver the keys,
-and registered and enabled the bundle, before stopping at that dialog. When the
-rig needs it, it prints `>>> click Allow`, waits, then closes System Settings and
-brings its window back. It also refocuses its window before typing, and stops
-rather than type into another app.
-
-On a Mac or macOS VM with a logged-in desktop session, Python 3.12 from
-python.org, and Accessibility for the process that runs the driver (over SSH:
-`/usr/libexec/sshd-keygen-wrapper`):
-
-```sh
-.tools/macos-build-venv/bin/python -m pip install "pyobjc-framework-Quartz>=10,<13"
-tests/desktop/macos/remote.sh       # from your machine: syncs this tree, runs a whole cycle there
-```
-
-A cycle has two phases with a logout between them, as macOS needs after installing or updating an
-input method: `cycle.sh install` builds the bundle and `cd_AI.pkg` and installs the package over
-whatever is installed; `remote.sh` then restarts the Mac (a test Mac set to log in by itself, with
-passwordless sudo); `cycle.sh test` runs the rig against the same bundle's rules service in the
-login service's place, and hands the port back afterwards. On a Mac by hand: `cycle.sh install`,
-log out and in, `cycle.sh test`. The first install of a build asks "Allow … to enable cd_AI?"; the
-rig waits for it. macOS starts an input method on demand and not again after a crash, so the rig
-starts it (`open -g`) when it is not running.
-
-For debugging, `touch ~/Library/Logs/cd_AI-trace.log` before cd_AI starts makes
+`touch ~/Library/Logs/cd_AI-trace.log` before cd_AI starts makes
 it log event kinds and errors there (never typed text); remove the file to stop.
 (`launchctl setenv CLAUDISH_TRACE` does not reach an input method that macOS or
 `open -g` starts.) Exceptions

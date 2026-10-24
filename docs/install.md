@@ -54,7 +54,7 @@ silicon, the local model below made slop as well as anything we tried.
 4. **Log out and back in**, add **cd_AI — Claudish** in your input sources, and type: Tab asks
    for the rewrite, Enter sends an instruction. The keys are in the [README](../README.md#keys).
 
-Verified end to end on Ubuntu 24.04 under systemd in a container (`tests/desktop/linux-systemd`).
+Verified end to end on Ubuntu 24.04 under systemd in a container.
 
 **Another model:** `python3 -m claudish init` writes `~/.config/claudish/config.json` with
 profiles to start from: `claude` (the default), `ollama` (any OpenAI-compatible server, local or
@@ -166,7 +166,7 @@ have it), and install the
 an x86 program; without that runtime it finds an ARM64 `vcruntime140.dll` on your
 `PATH` (Python for ARM64 puts one there) and fails with error `0xc000007b`, so every
 PIME input method types plain text. Verified on Windows 11 ARM64 (build 26100) in
-classic Notepad: 9 typing scenarios, `tests/desktop/windows`.
+classic Notepad: 9 typing scenarios.
 
 To remove Claudish, remove its input profile in Windows settings, then remove
 `PIME\python\input_methods\claudish`. Keep PIME itself if you use other PIME input

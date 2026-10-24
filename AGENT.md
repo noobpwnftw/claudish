@@ -126,47 +126,31 @@ after a context reset and continue from verified state rather than starting over
 
 ## Verification
 
-The Spark is the test machine. `python scripts/check.py --model` runs the
-unit tests, compile, diff check, IBus and PIME smokes, a real-model rewrite, the
-fidelity evaluation, and the browser demo in seconds. It is the merge gate; add
-`--desktop` for adapter changes (real IBus and GTK typing in a container). Use
-`python scripts/check.py` without `--model` while iterating. Use the Spark's
-inference freely for local test workflows: evaluations, larger models, local
-judges.
+The Spark is the test machine. `python scripts/check.py` runs the unit tests,
+compile, diff check, IBus and PIME smokes, and the settings page in a real
+browser, in about six seconds. It is the merge gate.
 
-For template or model changes, run `benchmarks/evaluate.py` and read the outputs,
-not only the scores: the mechanical checks miss meaning changes.
+Every check takes under 5 seconds (owner, 2026-10-24): a test workflow that
+takes longer is not one we run, so make a check faster or drop it rather than
+wait on it. Long jobs (evaluations, builds on another machine) run in the
+background while work continues; nothing blocks on them but the merge they
+gate. There is no remote CI and no desktop rig: real typing on Linux, Windows
+and macOS is checked by hand on the machines the owner provides.
 
-For browser changes, use `tests/browser_demo.py` against a running service when
-Playwright/Chromium are available. Check both themes, keyboard controls, mobile
-layout, failure recovery, and stale results as relevant. For native work, use
-the documented IBus/PIME checks and native platform builds. Test actual target
-applications when hardware is available. Add meaningful regression coverage for
-bugs and state transitions; avoid tests that merely mirror trivial code.
+For template or model changes, run `benchmarks/evaluate.py` in the background
+and read the outputs, not only the scores: the mechanical checks miss meaning
+changes. Use the Spark's inference freely for that.
 
-Use the Spark for cross-platform work where it can: containers for Linux
-desktops, and qemu/KVM (aarch64) for Windows on ARM. macOS needs Apple
-hardware, so it stays on remote CI. Remote CI is opt-in: it runs only for `ci/*`
-branches or a manual dispatch. Run one for `main` before notable merges, since
-Windows-only failures are invisible locally.
-Paused (owner, 2026-10-24): the Check workflow is disabled on GitHub until the onboarding
-milestones (G61-G63, G45) are made; `gh workflow enable Check` restores it. Until then, push no
-`ci/*` branches; the merge gate is `check.py --model` plus, for adapter or packaging changes, the
-platform's rig on its VM (macOS: `tests/desktop/macos/remote.sh`; Windows: the qemu VM).
-Push a `ci/<topic>` branch when a change touches the Windows or macOS adapters,
-packaging, or anything the Spark cannot run. It provides the only Windows and
-macOS coverage. Only report remote CI as passing after every job of the run for
-the actual commit has a conclusion: a run's summary can read "success" while jobs
-are still queued, so check the jobs (`gh api .../runs/ID/jobs`).
+Add meaningful regression coverage for bugs and state transitions; avoid tests
+that merely mirror trivial code.
 
 ## Git and external actions
 
 Work inside this project and preserve owner edits. Prefer small commits on
 `agent/<goal>` branches. The owner has authorized (2026-10-22) local commits,
 pushing branches, merging to `main`, and revising this file and the roadmap.
-Merge to `main` after `python scripts/check.py --model` passes on the merged
-result (plus a `ci/*` run when the change needs Windows or macOS coverage); push
-`main` as a fast-forward. The presence of
+Merge to `main` after `python scripts/check.py` passes on the merged result;
+push `main` as a fast-forward. The presence of
 credentials alone grants no further authority. Force-pushing your own `agent/*`
 and `ci/*` branches is fine (owner, 2026-10-23); `main` stays fast-forward. Do
 not delete remote branches, publish releases/packages, deploy public services, or change

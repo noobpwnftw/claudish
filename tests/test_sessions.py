@@ -22,7 +22,7 @@ class ServiceTests(unittest.TestCase):
         self.rewriter = Rewriter("rules")
         self.rewriter.session_command = AGENT
         self.server = make_server(self.rewriter, 0)
-        thread = threading.Thread(target=self.server.serve_forever)
+        thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         self.addCleanup(thread.join)
         self.addCleanup(self.rewriter.conversations.close)

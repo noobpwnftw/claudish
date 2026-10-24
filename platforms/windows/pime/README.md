@@ -20,9 +20,8 @@ libIME2 with the patches here. A released PIME is not supported. The patches add
 The Python side (`python/textService.py`) gains `setTimer(ms)`, `onTimer()`,
 `self.textBefore`/`self.textAfter`, and the header and footer.
 
-Build (in the Windows VM, see docs/development.md): `tests/desktop/windows/vm.sh pime`
-prepares the patched source, then `vm.sh run tests/desktop/windows/jobs/build-pime.ps1 1400`
-builds the text service for Win32, x64, and ARM64 with the Visual Studio 2022 C++ tools
-(`jobs/buildtools.ps1` installs them) and installs it over PIME's released files.
+Build: `make_source.sh OUT.zip` prepares the patched source; on Windows, `build-pime.ps1` builds
+the text service for Win32, x64, and ARM64 with the Visual Studio 2022 C++ tools
+(`buildtools.ps1` installs them) and installs it over PIME's released files.
 
 Upstream: the patches are kept here, not proposed upstream yet.

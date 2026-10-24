@@ -100,7 +100,7 @@ class RewriterTests(unittest.TestCase):
 class ServerTests(unittest.TestCase):
     def test_look_is_validated(self):
         server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         opener = build_opener(ProxyHandler({}))
 

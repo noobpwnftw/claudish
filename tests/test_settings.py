@@ -104,7 +104,7 @@ class ServiceTests(Home):
             return Rewriter("rules", tone=self.builds[-1][1].get("tone"))
         self.server_reload = [reload]  # a test can swap in one that fails
         self.server = make_server(Rewriter("rules"), 0, reload=lambda: self.server_reload[0](), config_path=self.path)
-        thread = threading.Thread(target=self.server.serve_forever)
+        thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
         self.addCleanup(thread.join)
         self.addCleanup(self.server.server_close)
