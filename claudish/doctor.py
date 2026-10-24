@@ -15,6 +15,7 @@ from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
+INSTALL_PY = ROOT / "platforms/linux/install.py"  # the full path: these fixes run from anywhere
 SERVICE = "http://127.0.0.1:18765"
 
 
@@ -117,12 +118,12 @@ def check_ime_linux():
     component = user if user.is_file() else system if system.is_file() else None
     if component is None:
         return [("Input method", "fail", "the Claudish IBus component is not registered",
-                 "/usr/bin/python3 platforms/linux/install.py   (then log out and back in)")]
+                 "/usr/bin/python3 %s   (then log out and back in)" % INSTALL_PY)]
     text = component.read_text(encoding="utf-8", errors="replace")
     engine = text.split('&quot;')[1] if '&quot;' in text else ""
     if engine and not Path(engine).is_file():
         results.append(("Input method", "fail", "the registered engine %s no longer exists (moved checkout?)" % engine,
-                        "re-run platforms/linux/install.py from the current checkout"))
+                        "/usr/bin/python3 %s" % INSTALL_PY))
     else:
         results.append(("Input method", "ok", "registered (%s)" % component, None))
     if component == user:
@@ -132,8 +133,8 @@ def check_ime_linux():
             results.append(("IBus search path", "fail",
                             "this session's IBUS_COMPONENT_PATH does not include %s, so IBus cannot see Claudish" % user.parent,
                             "log out and back in (installed: %s); if your session ignores environment.d: "
-                            "sudo /usr/bin/python3 platforms/linux/install.py --system" % environment
-                            if environment.is_file() else "re-run platforms/linux/install.py, then log out and back in"))
+                            "sudo /usr/bin/python3 %s --system" % (environment, INSTALL_PY)
+                            if environment.is_file() else "/usr/bin/python3 %s, then log out and back in" % INSTALL_PY))
         else:
             results.append(("IBus search path", "ok", "includes the user component directory", None))
     try:
