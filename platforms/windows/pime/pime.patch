@@ -1,5 +1,45 @@
+diff --git a/PIMELauncher/src/main.rs b/PIMELauncher/src/main.rs
+index d544c52..774cb28 100644
+--- a/PIMELauncher/src/main.rs
++++ b/PIMELauncher/src/main.rs
+@@ -36,7 +36,7 @@ async fn run_watchdog(original_args: &[String]) {
+ 
+     info!("Watchdog started. Monitoring worker...");
+ 
+-    let event_name = get_per_session_name("PIMELauncher2_QuitEvent");
++    let event_name = get_per_session_name("cdAI_Launcher_QuitEvent");
+     let (quit_tx, mut quit_rx) = tokio::sync::mpsc::channel::<()>(1);
+     
+     std::thread::spawn(move || {
+@@ -99,7 +99,7 @@ fn signal_quit_event() {
+     use windows::Win32::Foundation::CloseHandle;
+     use windows::Win32::System::Threading::{CreateEventW, SetEvent};
+ 
+-    let event_name = get_per_session_name("PIMELauncher2_QuitEvent");
++    let event_name = get_per_session_name("cdAI_Launcher_QuitEvent");
+     let mut name_utf16: Vec<u16> = event_name.encode_utf16().collect();
+     name_utf16.push(0);
+ 
+@@ -243,7 +243,7 @@ async fn main() {
+ 
+     // Ensure single instance (using a named mutex)
+     // The Watchdog process (parent) holds this mutex.
+-    let mutex_name = get_per_session_name("PIMELauncher2_WatchdogMutex");
++    let mutex_name = get_per_session_name("cdAI_Launcher_WatchdogMutex");
+     let _mutex = if !args.is_worker {
+         match create_single_instance_mutex(&mutex_name) {
+             Ok(m) => Some(m),
+@@ -311,7 +311,7 @@ fn setup_error_mode() {
+ /// Core logic for the PIME Worker process.
+ async fn run_worker() {
+     let username = get_windows_username();
+-    let pipe_name = format!(r"\\.\pipe\{}\PIME\Launcher", username);
++    let pipe_name = format!(r"\\.\pipe\{}\cd_AI\Launcher", username);
+ 
+     info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
+ 
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..4bfcca0 100644
+index 7829c72..8b02912 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,14 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -248,6 +288,15 @@ index 7829c72..4bfcca0 100644
  
  	json ret;
  	callRpcMethod(req, ret);
+@@ -804,7 +975,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+ 	}
+ 
+ 	pipeName += username.get();
+-	pipeName += L"\\PIME\\";
++	pipeName += L"\\cd_AI\\";  // Claudish: cd_AI's launcher, not a PIME installed beside it
+ 	pipeName += baseName;
+ 	return pipeName;
+ }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
 index feb9813..12eb1d5 100644
 --- a/PIMETextService/PIMEClient.h
@@ -285,10 +334,26 @@ index feb9813..12eb1d5 100644
  	State state_;
  };
 diff --git a/PIMETextService/PIMEImeModule.cpp b/PIMETextService/PIMEImeModule.cpp
-index 3e09587..ecd1639 100644
+index 3e09587..1e5b6ab 100644
 --- a/PIMETextService/PIMEImeModule.cpp
 +++ b/PIMETextService/PIMEImeModule.cpp
-@@ -46,7 +46,7 @@ static const GUID g_inputDisplayAttributeGuid =
+@@ -35,18 +35,18 @@ using json = nlohmann::json;
+ namespace PIME {
+ 
+ namespace {
+-// CLSID of our Text service
+-// {35F67E9D-A54D-4177-9697-8B0AB71A9E04}
++// CLSID of our Text service: cd_AI's own, so it is registered beside PIME rather than over it
++// {62D8D2ED-5004-44D6-9FAE-B4DE895D953E}
+ const GUID g_textServiceClsid = 
+-{ 0x35f67e9d, 0xa54d, 0x4177, { 0x96, 0x97, 0x8b, 0xa, 0xb7, 0x1a, 0x9e, 0x4 } };
++{ 0x62d8d2ed, 0x5004, 0x44d6, { 0x9f, 0xae, 0xb4, 0xde, 0x89, 0x5d, 0x95, 0x3e } };
+ 
+-// {53BCC437-ED0E-4D7D-9B46-57CAB8A9F255}
++// {DE613FAB-E080-452F-A221-EAED0B579F2F} (cd_AI's own, as the CLSID)
+ static const GUID g_inputDisplayAttributeGuid = 
+-{ 0x53bcc437, 0xed0e, 0x4d7d, { 0x9b, 0x46, 0x57, 0xca, 0xb8, 0xa9, 0xf2, 0x55 } };
++{ 0xde613fab, 0xe080, 0x452f, { 0xa2, 0x21, 0xea, 0xed, 0x0b, 0x57, 0x9f, 0x2f } };
  
  static std::vector<Ime::ComPtr<Ime::DisplayAttributeInfo>> createDisplayAttrInfos() {
      auto inputAttrib = Ime::ComPtr<Ime::DisplayAttributeInfo>::make(g_inputDisplayAttributeGuid);
@@ -297,6 +362,28 @@ index 3e09587..ecd1639 100644
  	return {std::move(inputAttrib)};
  }
  
+@@ -55,15 +55,13 @@ static std::vector<Ime::ComPtr<Ime::DisplayAttributeInfo>> createDisplayAttrInfo
+ ImeModule::ImeModule(HMODULE module):
+ 	Ime::ImeModule(module, g_textServiceClsid, createDisplayAttrInfos()) {
+ 	wchar_t path[MAX_PATH];
+-	HRESULT result;
+-	// get the program data directory
+-	// try C:\program files (x86) first
+-	result = ::SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILESX86, NULL, 0, path);
+-	if(result != S_OK) // failed, fall back to C:\program files
+-		result = ::SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES, NULL, 0, path);
+-	if(result == S_OK) { // program files folder is found
++	// Claudish: the program directory is where this DLL's folder is (<root>\<arch>\PIMETextService.dll),
++	// so cd_AI's PIME lives in cd_AI's own folder, beside any PIME installed in Program Files (x86).
++	DWORD length = ::GetModuleFileNameW(module, path, MAX_PATH);
++	if (length > 0 && length < MAX_PATH) {
+ 		programDir_ = path;
+-		programDir_ += L"\\PIME";
++		programDir_ = programDir_.substr(0, programDir_.find_last_of(L'\\'));  // <root>\<arch>
++		programDir_ = programDir_.substr(0, programDir_.find_last_of(L'\\'));  // <root>
+ 
+ 		// load backend information
+ 		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
 index 28d8286..ef45425 100644
 --- a/PIMETextService/PIMETextService.cpp

@@ -14,8 +14,8 @@ git -C "$work" submodule update -q --init libIME2
 git -C "$work/libIME2" reset -q && git -C "$work/libIME2" checkout -q -f . && git -C "$work/libIME2" clean -qfdx
 git -C "$work" apply "$here/pime.patch"
 git -C "$work/libIME2" apply "$here/libime2.patch"
-# Only the text service is rebuilt (the released launcher stays): drop the x86-only launcher block,
-# which needs Rust and git.
+# The launcher is built by build-pime.ps1 with cargo (its own pipe and names, a static runtime), not
+# through CMake: drop CMake's x86-only launcher block, which needs Rust and git.
 python3 - "$work/CMakeLists.txt" <<'PY'
 import re, sys
 path = sys.argv[1]
@@ -25,5 +25,6 @@ text = re.sub(r'# only build the following components for 32-bit x86 platform.*?
 open(path, "w").write(text)
 PY
 rm -f "$1"
-(cd "$work" && zip -qr "$1" CMakeLists.txt version.txt PIMETextService libIME2 json python/textService.py -x '*/.git/*')
+(cd "$work" && zip -qr "$1" CMakeLists.txt version.txt PIMETextService PIMELauncher libIME2 json python/textService.py \
+  -x '*/.git/*' 'PIMELauncher/target/*' 'PIMELauncher/cargo_check.log')
 echo "PIME $(echo "$commit" | cut -c1-7) + patches -> $1"

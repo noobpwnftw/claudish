@@ -1,13 +1,13 @@
 """Build cd_AI-setup.exe (G61): one installer for Windows on x64 and ARM64, no Python to install.
 
-python platforms/windows/package.py [--pime-root "C:\\Program Files (x86)\\PIME"] [--out dist\\windows]
+python platforms/windows/package.py [--pime-root C:\\PIME-build] [--out dist\\windows]
 
 Run on Windows with Python 3.10+, internet access, and Inno Setup 6 (ISCC.exe). It assembles:
-- cd_AI's PIME (platforms/windows/pime: the released PIME with Claudish's text service built over
-  it, as build-pime.ps1 leaves it), with cd_AI as its only input method;
+- cd_AI's PIME (platforms/windows/pime: a released PIME's files with cd_AI's text service and
+  launcher built over them by build-pime.ps1, each with cd_AI's own names), with cd_AI as its only
+  input method;
 - an embeddable Python for each of x64 and ARM64 with cd_AI and the Anthropic SDK, for the
   service; the installer copies the one for the machine's architecture;
-- the Visual C++ runtime PIME's x86 launcher needs (an ARM64 Windows lacks it);
 then compiles cd_AI.iss. The installer asks for an administrator once (the text service is
 registered for the machine), and does the rest as the person installing: cd_AI added to their
 input sources, a starter config, the service at every login, and cd_AI's settings in the browser.
@@ -26,8 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 ARCHES = {"x64": ("amd64", "win_amd64"), "arm64": ("arm64", "win_arm64")}  # embeddable zip, wheel platform
-RUNTIME = "https://aka.ms/vs/17/release/vc_redist.x86.exe"
-TEXT_SERVICE = "{35F67E9D-A54D-4177-9697-8B0AB71A9E04}"  # PIME's (PIMETextService/PIMEImeModule.cpp)
+TEXT_SERVICE = "{62D8D2ED-5004-44D6-9FAE-B4DE895D953E}"  # cd_AI's PIME's own (pime.patch, PIMEImeModule.cpp)
 
 
 def download(url):
@@ -66,7 +65,7 @@ def pime(pime_root, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--pime-root", type=Path, default=Path(r"C:\Program Files (x86)\PIME"))
+    parser.add_argument("--pime-root", type=Path, default=Path(r"C:\PIME-build"), help="build-pime.ps1's tree")
     parser.add_argument("--out", type=Path, default=ROOT / "dist/windows")
     parser.add_argument("--iscc", type=Path, default=Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"))
     args = parser.parse_args()
@@ -87,7 +86,6 @@ def main():
         for arch in ARCHES:
             python_for(arch, payload / ("python-" + arch), wheels)
     pime(args.pime_root, payload / "PIME")
-    (payload / "vc_redist.x86.exe").write_bytes(download(RUNTIME))
     script = (HERE / "cd_AI.iss").read_text(encoding="utf-8")
     for key, value in (("VERSION", version), ("TEXT_SERVICE", TEXT_SERVICE), ("PROFILE", profile)):
         script = script.replace("@%s@" % key, value)

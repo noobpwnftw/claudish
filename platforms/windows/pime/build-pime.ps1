@@ -1,6 +1,9 @@
-# Build Claudish's patched PIME (platforms/windows/pime) and install its text service over the
-# released PIME: the DLLs for Win32, x64 and ARM64 processes, and textService.py. Needs
-# buildtools.ps1 to have finished and the patched source (make_source.sh) unpacked beside it.
+# Build cd_AI's PIME (platforms/windows/pime): the text service for Win32, x64 and ARM64 processes,
+# and the launcher, both with cd_AI's own names (CLSID, pipe, mutex) so they live beside any PIME.
+# Writes them into a PIME tree (a released PIME's files, which supply its Python and the rest) that
+# platforms/windows/package.py packages. Needs buildtools.ps1 to have finished and the patched source
+# (make_source.sh) at \\host.lan\Data\pime-src.zip.
+param([string]$Tree = 'C:\PIME-build')
 $source = 'C:\pime-src'
 Remove-Item $source -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive \\host.lan\Data\pime-src.zip $source
@@ -19,20 +22,28 @@ foreach ($arch in 'Win32', 'x64', 'ARM64') {
   if ($failed) { throw "build $arch failed" }
   "built $arch"
 }
+# The launcher: x86 (it runs on every Windows, as PIME's does), the C runtime linked in (no
+# Visual C++ runtime to install).
+$cargo = "$env:USERPROFILE\.cargo\bin\cargo.exe"
+if (-not (Test-Path $cargo)) {
+  cmd /c "`"$source\PIMELauncher\rustup-init.exe`" -y --profile minimal > `"$source\rustup.log`" 2>&1"
+}
+cmd /c "`"$env:USERPROFILE\.cargo\bin\rustup.exe`" target add i686-pc-windows-msvc > `"$source\rustup-target.log`" 2>&1"
+$env:RUSTFLAGS = '-C target-feature=+crt-static'
+Push-Location "$source\PIMELauncher"
+cmd /c "`"$cargo`" build --release --target i686-pc-windows-msvc > `"$source\cargo.log`" 2>&1"
+$failed = $LASTEXITCODE
 Pop-Location
-# Install: loaded DLLs cannot be overwritten, but they can be renamed; new processes load the new ones.
-$pime = "${env:ProgramFiles(x86)}\PIME"
-$targets = @{ 'Win32' = "$pime\x86"; 'x64' = "$pime\x64"; 'ARM64' = "$pime\arm64" }
+if ($failed) { Get-Content "$source\cargo.log" -Tail 30; throw 'launcher build failed' }
+"built the launcher"
+Pop-Location
+$targets = @{ 'Win32' = "$Tree\x86"; 'x64' = "$Tree\x64"; 'ARM64' = "$Tree\arm64" }
 foreach ($arch in $targets.Keys) {
-  $built = Get-ChildItem "$source\build-$arch\PIMETextService\Release\PIMETextService*.dll"
-  foreach ($dll in $built) {
-    $target = Join-Path $targets[$arch] $dll.Name
-    if (Test-Path $target) { Move-Item $target "$target.$(Get-Date -Format yyyyMMddHHmmss).old" -Force }
-    Copy-Item $dll.FullName $target
-    "installed $($dll.Name) -> $($targets[$arch])"
+  foreach ($dll in Get-ChildItem "$source\build-$arch\PIMETextService\Release\PIMETextService*.dll") {
+    Copy-Item $dll.FullName (Join-Path $targets[$arch] $dll.Name) -Force
+    "$($dll.Name) -> $($targets[$arch])"
   }
 }
-Copy-Item "$source\python\textService.py" "$pime\python\textService.py" -Force
-Get-Process PIMELauncher -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Process "$pime\PIMELauncher.exe"
-"PIME patched; launcher restarted"
+Copy-Item "$source\PIMELauncher\target\i686-pc-windows-msvc\release\PIMELauncher.exe" "$Tree\PIMELauncher.exe" -Force
+Copy-Item "$source\python\textService.py" "$Tree\python\textService.py" -Force
+"cd_AI's PIME is in $Tree"
