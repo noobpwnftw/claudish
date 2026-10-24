@@ -18,10 +18,13 @@ No release has been made yet. What a first release would contain:
   (InputMethodKit), each drawing the panel the design lab shows.
 - **Terminals:** an instruction at a terminal prompt ("fix") sees the screen, read through the
   accessibility APIs.
-- **Models:** no model ships. Claude by default, any OpenAI-compatible server, an agent CLI (Claude Code), or a local one:
+- **Models:** no model ships. Claude by default, any OpenAI-compatible server, Claude Code or
+  Codex subscriptions, another agent CLI, or a local one:
   `setup --profile local` downloads llama.cpp and Gemma 4 E4B. MCP tools. How the models were chosen:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
-- **Setup:** `claudish setup`, `claudish doctor`, `claudish service`.
+- **Setup:** `claudish setup`, `claudish doctor`, `claudish service`. Settings selects models and
+  subscriptions, follows startup and failures, and lets you try a rewrite before typing in an app.
+  Its controls become usable once the Settings session is ready.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
 
 Tested on Linux (X11 and GNOME Wayland in containers), Windows 11 ARM64 and macOS 26 in VMs; see

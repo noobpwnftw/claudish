@@ -16,7 +16,10 @@ one-line instructions answered at the caret, in every app, with the model you co
 | G45 | **The panels match the design lab**, state by state | Each platform checked in both themes |
 
 Settings now shows subscription startup and failures, offers a first rewrite, and preserves a
-subscription profile's settings when reselected. Native TextEdit and terminal-handoff recordings
+subscription profile's settings when reselected. Controls wait for the Settings session before
+accepting clicks. Packages built from `04cac81` pass update/reboot, Settings rewrites and native
+Tab/Tab acceptance on macOS Apple silicon and Windows ARM64; fresh-account installs and a Windows
+subscription still need checking. Native TextEdit and terminal-handoff recordings
 are in the README and site. The [inventory and current evidence](docs/development.md#implementation)
 separate the merge gate, VM typing and model measurements. Keep them current as changes land.
 

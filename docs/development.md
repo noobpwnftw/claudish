@@ -57,8 +57,8 @@ the rigs; it is not part of the shipped source.
 As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
 release. The merge gate runs 268 unit tests, both adapter smokes and the settings browser check.
 The browser check includes subscription startup/failure/retry, a first rewrite and stale example
-responses. CLI protocol tests use stand-ins; they do not establish account access. Separate browser
-runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
+responses, including a delayed Settings session before controls become usable. CLI protocol tests
+use stand-ins; they do not establish account access. Separate browser runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
 2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
 at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
 
@@ -66,15 +66,28 @@ The TextEdit recording shows a rewrite accepted with Tab. The Terminal recording
 question, the handoff command inserted at the prompt, Claude Code starting in the invoice project,
 and its fix passing the fixture's test. These are actual Mac VM captures. Windows ARM64 has
 install/update/restart and six instruction/focus/tool flows checked; Linux has the six Docker
-typing scenarios below. Installed bundles must be rebuilt to include subsequent source changes.
+typing scenarios below.
+
+The macOS Apple-silicon package and Windows ARM64 installer were rebuilt from `04cac81` on
+2026-10-25, update-installed and checked again after reboot. Installed Settings produced a real
+rewrite through Claude Code on macOS (3.22 s, one request) and the Gemma API in Windows Edge.
+TextEdit and Notepad both previewed `ok` on Tab and inserted the result on a second Tab. These
+were existing rig accounts, with working model access; they do not establish a fresh-account or
+browser-download install. Windows has no subscription CLI installed, so its subscription path
+remains unchecked. The macOS rig now selects Claude Code; its other profiles remain available.
+
+Candidate packages, source commit, SHA-256 hashes and screenshots are retained locally in
+`dist/candidates/04cac81/manifest.json` and its adjacent `evidence/` directory. They are not
+published downloads. A separate isolated source-service check with no config or credentials
+confirmed that Settings opens and a rewrite reports the missing model/key.
 
 The next checks, in order, are in [ROADMAP.md](../ROADMAP.md). In particular:
 
-- Run first-use Settings through a logged-in subscription on each installed package, then accept
-  `ok` in a native editor after the required restart/login. Keep the browser's UI-state tests and
-  native typing evidence separate.
-- Prepare downloadable release candidates. A funded Anthropic-key rewrite and its failure states
-  remain unchecked on the installed Mac and Windows packages; publishing requires the owner.
+- Repeat installation and model selection on fresh accounts, then a Settings rewrite and native
+  acceptance after restart/login. Exercise a Windows subscription when a logged-in CLI is present.
+- Integrate the release preparation with current main and check the download/install path.
+  A funded Anthropic-key rewrite and its failure states remain unchecked on the installed Mac
+  and Windows packages; publishing requires the owner.
 - Check Windows x64, both native panel themes against the design lab, and current Wayland
   behavior. The documented macOS Terminal continue/Tab limitation remains.
 
