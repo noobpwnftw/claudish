@@ -114,11 +114,11 @@
         <div class="eyebrow">05 / BRING YOUR OWN INTELLIGENCE</div>
         <h2 id="byoi">The caret is model-agnostic.</h2>
         <ul class="features">
-          <li><b>Yours to choose.</b> Claude with your API key (the default setup: good slop needs a frontier model), any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
+          <li><b>Yours to choose.</b> Claude with your API key (the default: it works on any computer), any OpenAI-compatible server, or an agent CLI. Hosted backends are labelled.</li>
           <li><b>Or local.</b> <code>setup --profile local</code> downloads llama.cpp and Gemma 4 E4B (4.9 GB), checksum-verified. Nothing leaves your machine, and continue suggests at every pause.</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app: the PR diff in your editor, the ticket in your browser. Import the MCP servers you already use with Claude.</li>
           <li><b>Tools and agents.</b> An instruction may call your MCP tools, ask you a question, or hand the task to Claude Code or another agent. You approve every side effect.</li>
-          <li><b>Restraint.</b> It runs only on what you type, looks at the screen only when you press F8, and never inserts anything you did not accept. Password fields bypass it.</li>
+          <li><b>Restraint.</b> It runs only on what you type, sees a window only when you press F8 (and, at a terminal prompt, the terminal's last lines, unless you turn that off), and never inserts anything you did not accept. Password fields bypass it.</li>
         </ul>
       </section>
 
@@ -132,7 +132,7 @@
 
 1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop.
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
-3. Install it with the Claude SDK: `python -m pip install --user -e ".[claude]"`.
+3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
 4. cd_AI ships no model: it is set up for Claude with my own API key. Check whether I have one where a service started at login can read it (`ant auth login`, or ANTHROPIC_API_KEY in my user environment). If not, show me how to set it for this OS (docs/install.md, Quick start) and wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
 5. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
 6. Run `python -m claudish setup --yes`. It writes a config, checks the model, registers the input method, and starts Claudish at login.
@@ -145,8 +145,9 @@ Make no mistakes.</pre>
         <h3 class="by-hand">Or by hand</h3>
         <pre class="commands">git clone https://github.com/noobpwnftw/claudish
 cd claudish
-python3 -m pip install --user -e ".[claude]"
-python3 -m claudish setup</pre>
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[claude]"
+.venv/bin/python -m claudish setup</pre>
         <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
       </section>
 

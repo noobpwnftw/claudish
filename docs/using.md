@@ -116,7 +116,9 @@ on Linux, UI Automation on Windows, the AX API on macOS), only when you press
 Tab or Enter in compose, never on continue's pauses (continue stays quiet in
 terminals), and never at a password prompt. On macOS the service's Python needs
 the Accessibility permission; on Linux the desktop's accessibility bus must run
-(GNOME and KDE run it). A profile's `"read_terminal": false` turns reading off.
+(GNOME and KDE run it). The lines go to the profile's model, so with a hosted one (the default
+Claude) they leave your machine; what looks like a key, a token or a password is replaced first,
+a best effort, not a guarantee. A profile's `"read_terminal": false` turns reading off.
 Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
 Terminal.app.
 

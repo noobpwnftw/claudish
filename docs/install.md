@@ -6,15 +6,21 @@ version is in the [README](../README.md#install).
 ## Quick start
 
 You need Python 3.10+, git, and a model to point it at. cd_AI ships no model: out of the box it
-is set up for Claude with your own API key, since good slop needs a frontier model.
+is set up for Claude with your own API key, which works on any computer. With a GPU or Apple
+silicon, the local model below made slop as well as anything we tried.
 
-1. **Get it**, with the Claude SDK:
+1. **Get it**, with the Claude SDK, in a virtual environment of its own (current Ubuntu, Debian
+   and Homebrew Pythons refuse a plain `pip install`):
 
    ```sh
    git clone https://github.com/noobpwnftw/claudish
    cd claudish
-   python3 -m pip install --user -e ".[claude]"
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -e ".[claude]"
    ```
+
+   On Windows the venv's Python is `.venv\Scripts\python`. Run every `claudish` command below
+   with it; the login service setup installs runs on it too.
 
 2. **Give it your key.** Claudish runs as a background service started at login, so it cannot see
    a key you `export` in a terminal or put in your shell profile. It never stores keys in its own
@@ -35,7 +41,7 @@ is set up for Claude with your own API key, since good slop needs a frontier mod
 3. **Run setup:**
 
    ```sh
-   python3 -m claudish setup
+   .venv/bin/python -m claudish setup
    ```
 
    It shows each step and asks before doing it: write a config (profile `claude`), import MCP

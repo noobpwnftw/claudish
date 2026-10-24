@@ -29,9 +29,10 @@ straight in, with the rest of the sentence offered. Where you want none of it,
 switch that app to your usual keyboard: input sources are chosen per app.
 
 cd_AI ships no model: point it at one. Claude with your own key is the default
-setup, and good slop needs a frontier model; any OpenAI-compatible server or an
-agent CLI works too, and `claudish setup --profile local` downloads Gemma 4 E4B, a
-local model that makes slop as well as anything we tried (it wants a GPU or Apple silicon). Continue suggests only with a local model, or where you route one
+setup, since it works on any computer; any OpenAI-compatible server or an agent CLI
+works too, and `claudish setup --profile local` downloads Gemma 4 E4B, a local model
+that made slop as well as anything we tried (quick on a GPU or Apple silicon, 3–4 s on
+a CPU alone). Continue suggests only with a local model, or where you route one
 for it. The model can read
 context (files, commands, MCP servers) and, when you ask, look things up or run an
 agent whose questions arrive as choices.
@@ -53,8 +54,9 @@ agent, or:
 ```sh
 git clone https://github.com/noobpwnftw/claudish
 cd claudish
-python3 -m pip install --user -e ".[claude]"
-python3 -m claudish setup
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[claude]"
+.venv/bin/python -m claudish setup
 ```
 
 It is set up for Claude with your own key: run `ant auth login`, or set `ANTHROPIC_API_KEY` in

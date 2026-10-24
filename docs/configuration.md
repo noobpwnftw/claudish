@@ -33,7 +33,8 @@ server-side refusal fallbacks (except on Haiku, which has none). It never
 offers a declined or truncated rewrite; your wording stays. Typed text goes
 only where you point the service. A non-loopback `--model-url` and the Claude
 backend are reported as `"hosted": true` in `/health`, and the browser demo
-labels them as hosted. Local inference remains the default.
+labels them as hosted. No model ships: the starter profile is Claude with your own key, and
+`--profile local` is the local one.
 
 Change what the model is told with a templates file, for any backend (see
 [Templates](#templates)): `claudish serve --templates FILE`, or a profile's
@@ -279,8 +280,8 @@ pick, and its final answer is a candidate like any other. For Claude Code:
     "--permission-prompts", "host"]}}}
 ```
 
-- *"is my branch clean?"* → `Allow — Bash: git status` / `Deny`: **1** allows that one
-  call, **2** denies it (the agent carries on without it), or type a reply and
+- *"is my branch clean?"* → `Deny` / `Allow — Bash: git status`: ↓ to a choice and Enter
+  answers (Allow is a deliberate ↓↓ Enter; Deny lets the agent carry on without it), or type a reply and
   press Enter: it denies the call with your words as the reason ("use git diff
   instead"), so the agent can adjust. Nothing runs without
   your choice unless your own Claude Code settings already allow it.

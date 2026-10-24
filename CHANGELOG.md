@@ -22,8 +22,8 @@ No release has been made yet. What a first release would contain:
   Claudish.
 - **Terminals:** an instruction at a terminal prompt ("fix") sees the screen, read through the
   accessibility APIs; nothing is installed in the shell.
-- **Bring your own model:** no model ships. Claude with your own key by default (good slop needs a
-  frontier model), any OpenAI-compatible server, an agent CLI (Claude Code), or a local one:
+- **Bring your own model:** no model ships. Claude with your own key by default (it works on any
+  computer), any OpenAI-compatible server, an agent CLI (Claude Code), or a local one:
   `setup --profile local` downloads llama.cpp and Gemma 4 E4B (pinned, SHA-256 verified). MCP
   tools under a trust and deny policy; hosted backends are labelled. How the models were chosen:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
