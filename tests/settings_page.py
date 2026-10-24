@@ -39,6 +39,8 @@ async def check(args, home, port):
         assert "#" not in page.url, "the token stays out of the address"
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")  # the rules backend, in words
         await expect(page.locator("input[name=choice][value=claude]")).to_be_checked()
+        for name in ("Claude Code", "Codex"):  # subscriptions, through their commands (not clicked here)
+            await expect(page.get_by_text(name, exact=True)).to_be_visible()
         await expect(page.locator("#key-state")).to_have_text("Not set")
         await expect(page.get_by_text("A Claude subscription, through the claude command.", exact=False)).to_be_visible()
         if args.screenshots:

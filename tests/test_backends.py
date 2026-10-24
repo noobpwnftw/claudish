@@ -237,6 +237,9 @@ class CommandBackendTests(unittest.TestCase):
             rewriter = Rewriter("command", command=[str(Path(folder, "gone", "claude")), "-p"])
             with patch("claudish.settings.claude_code", return_value=str(claude)):
                 self.assertIn("fine", rewriter.run_command("it is fine"))
+            codex = Rewriter("command", command=[str(Path(folder, "old", "codex")), "exec", "-"])
+            with patch("claudish.settings.codex", return_value=str(claude)):  # the same stand-in
+                self.assertIn("fine", codex.run_command("it is fine"))
 
     def test_serve_cli_keeps_the_profile_command(self):
         import os

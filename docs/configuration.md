@@ -94,6 +94,15 @@ not have your shell's PATH), for a Claude subscription:
                               "command": ["/home/me/.local/bin/claude", "-p", "--model", "haiku", "--output-format", "text"]}}}
 ```
 
+The **Codex** choice writes the same kind of profile for a ChatGPT subscription; `codex exec` reads
+the text on `-` (stdin) and works read-only in cd_AI's config folder:
+
+```json
+{"profiles": {"codex": {"backend": "command", "timeout": 60,
+                        "command": ["/home/me/.local/bin/codex", "exec", "--skip-git-repo-check", "--ephemeral",
+                                    "-s", "read-only", "-C", "/home/me/.config/claudish", "-"]}}}
+```
+
 A longer-running agent, for instructions:
 
 ```json

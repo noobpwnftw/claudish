@@ -70,6 +70,36 @@ class SettingsTests(Home):
         name, resolved, _, _ = config.resolve()
         self.assertEqual((name, resolved["backend"]), ("claude-code", "command"))
 
+    def test_codex_for_a_chatgpt_subscription(self):
+        with patch.object(settings, "codex", return_value=None):
+            self.assertEqual(settings.state()["codex"], settings.NO_CODEX)
+            with self.assertRaisesRegex(ValueError, "codex was not found"):  # not switched to what cannot answer
+                settings.apply({"choice": "codex"})
+        self.assertFalse(self.path.exists())
+        with patch.object(settings, "codex", return_value="/opt/codex/bin/codex"):
+            state = settings.apply({"choice": "codex"})
+        self.assertEqual((state["choice"], state["codex"]), ("codex", None))
+        command = self.written()["profiles"]["codex"]["command"]
+        # The full path, and cd_AI's config folder to work in (not wherever the service started).
+        self.assertEqual(command[:2], ["/opt/codex/bin/codex", "exec"])
+        self.assertEqual((command[command.index("-C") + 1], command[-1]), (str(self.path.parent), "-"))
+        name, resolved, _, _ = config.resolve()
+        self.assertEqual((name, resolved["backend"]), ("codex", "command"))
+
+    def test_the_extension_copy_is_the_command_not_a_helper_beside_it(self):
+        with tempfile.TemporaryDirectory() as home:
+            folder = Path(home, ".vscode-server/extensions/openai.chatgpt-26.1/bin/linux-aarch64")
+            folder.mkdir(parents=True)
+            for name in ("codex-code-mode-host", "codex"):
+                Path(folder, name).write_text("")
+                Path(folder, name).chmod(0o755)
+            with patch.object(Path, "home", return_value=Path(home)), patch("shutil.which", return_value=None):
+                self.assertEqual(settings.codex(), str(folder / "codex"))
+
+    def test_the_newest_extension_copy_comes_first(self):
+        self.assertGreater(settings.version_order("/x/openai.chatgpt-26.1021.2/codex"),
+                           settings.version_order("/x/openai.chatgpt-26.999.9/codex"))
+
     def test_a_model_server_on_this_computer(self):
         with patch.object(settings, "check_server", return_value="nothing answers at http://127.0.0.1:1234"):
             with self.assertRaisesRegex(ValueError, "nothing answers"):  # not switched to a server that is not there

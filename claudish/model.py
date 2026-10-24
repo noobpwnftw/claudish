@@ -569,10 +569,11 @@ class Rewriter:
 
     def run_command(self, prompt):
         """An agent CLI (claude -p, ollama run, ...): the prompt on stdin, never through a shell."""
-        command = list(self.command)
-        if os.path.basename(command[0]).startswith("claude") and not os.path.exists(command[0]):
-            from .settings import claude_code  # an update moved it (Claude Code, or its VS Code copy)
-            command[0] = claude_code() or command[0]
+        command = [os.path.expanduser(part) if part.startswith("~") else part for part in self.command]
+        name = os.path.basename(command[0]).lower()
+        if name.startswith(("claude", "codex")) and not os.path.exists(command[0]):
+            from . import settings  # an update moved it (the CLI, or its VS Code extension's copy)
+            command[0] = (settings.codex() if name.startswith("codex") else settings.claude_code()) or command[0]
         try:
             done = subprocess.run(command, input=prompt, capture_output=True, text=True,
                                   errors="replace", timeout=self.timeout)

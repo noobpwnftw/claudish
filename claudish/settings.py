@@ -1,8 +1,9 @@
 """The settings window's model (G62): what it shows, and the few changes it makes to config.json.
 
 The window offers the model (Claude with an API key, Claude Code's `claude` command for a Claude
-subscription, or any OpenAI-compatible API) and the tone. The models map onto the starter's
-profiles: "claude", "claude-code", and "ollama" for any OpenAI-compatible server.
+subscription, Codex's `codex` command for a ChatGPT subscription, or any OpenAI-compatible API) and
+the tone. The models map onto the starter's profiles: "claude", "claude-code", "codex", and
+"ollama" for any OpenAI-compatible server.
 A config whose default is another profile is shown as that profile and left to its file.
 The key is saved by claudish/keys.py.
 """
@@ -16,24 +17,42 @@ from urllib.parse import urlsplit
 from . import config, keys
 from .modes import TEMPLATES
 
-CHOICES = {"claude": "claude", "claude-code": "claude-code", "server": "ollama"}  # choice -> starter profile
-MANAGED = ("claude", "claude-code", "ollama", "local")  # the profiles whose tone the window sets
+CHOICES = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "server": "ollama"}  # choice -> profile
+MANAGED = ("claude", "claude-code", "codex", "ollama", "local")  # the profiles whose tone the window sets
 NO_CLAUDE_CODE = "claude was not found: install Claude Code, then log in"
+NO_CODEX = "codex was not found: install Codex, then log in"
 
 
-def claude_code():
-    """The `claude` command's full path, or None: on PATH, or where Claude Code installs it (a login
-    service may not have the shell's PATH, so the profile keeps the full path)."""
-    found = shutil.which("claude")
+def command_path(name, extension_glob):
+    """A CLI's full path, or None: on PATH, or where its installers put it (a login service may not
+    have the shell's PATH, so a profile keeps the full path). extension_glob: its VS Code copy."""
+    found = shutil.which(name)
     if found:
         return str(Path(found).absolute())  # the link, not its target: an update moves the target
     home = Path.home()
-    places = [home / ".local/bin/claude", home / ".local/bin/claude.exe", home / ".claude/local/claude", Path("/usr/local/bin/claude"),
-              Path("/opt/homebrew/bin/claude"), home / ".npm-global/bin/claude",
-              Path(os.environ.get("APPDATA", home / "AppData/Roaming")) / "npm/claude.cmd"]
-    places += sorted((Path(p) for p in glob.glob(str(home / ".vscode*/extensions/anthropic.claude-code-*/"
-                                                      "resources/native-binary/claude*"))), reverse=True)
+    npm = Path(os.environ.get("APPDATA", home / "AppData/Roaming")) / "npm"
+    places = [home / ".local/bin" / name, home / ".local/bin" / (name + ".exe"), home / (".%s/local" % name) / name,
+              home / (".%s/bin" % name) / name, Path("/usr/local/bin") / name, Path("/opt/homebrew/bin") / name,
+              home / ".npm-global/bin" / name, npm / (name + ".cmd")]
+    places += sorted((Path(p) for p in glob.glob(str(home / extension_glob))  # the command, not its helpers
+                      if Path(p).name in (name, name + ".exe")), key=version_order, reverse=True)
     return next((str(p) for p in places if p.is_file() and os.access(p, os.X_OK)), None)
+
+
+def version_order(path):
+    """The newest extension first: its folder's version as numbers (2.1.310 after 2.1.99)."""
+    import re
+    return [int(part) for part in re.findall(r"\d+", str(path))]
+
+
+def claude_code():
+    """The `claude` command's full path, or None."""
+    return command_path("claude", ".vscode*/extensions/anthropic.claude-code-*/resources/native-binary/claude*")
+
+
+def codex():
+    """The `codex` command's full path, or None."""
+    return command_path("codex", ".vscode*/extensions/openai.chatgpt-*/bin/*/codex*")
 
 
 def read(path=None):
@@ -55,7 +74,8 @@ def state(path=None):
     profiles = data.get("profiles") or {}
     name = data.get("profile") or next(iter(profiles), None)
     entry = profiles.get(name) or {}
-    choice = {"claude": "claude", "claude-code": "claude-code", "ollama": "server", "local": "local"}.get(name, "other")
+    choice = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "ollama": "server",
+              "local": "local"}.get(name, "other")
     server = profiles.get("ollama") or config.STARTER["profiles"]["ollama"]
     tone = entry.get("tone") or "corporate"
     return {
@@ -71,6 +91,7 @@ def state(path=None):
         "server_problem": check_server(server.get("model_url", ""), server.get("model")) if choice == "server" else None,
         "server_models": listed(server.get("model_url", "")) if choice == "server" else [],
         "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
+        "codex": None if codex() else NO_CODEX,
     }
 
 
@@ -191,6 +212,15 @@ def apply(changes, path=None):
             raise ValueError(NO_CLAUDE_CODE)
         entry = profiles.setdefault("claude-code", dict(config.STARTER["profiles"]["claude-code"]))
         entry["command"] = [command] + list(entry.get("command") or config.STARTER["profiles"]["claude-code"]["command"])[1:]
+    if changes.get("choice") == "codex":
+        command = codex()
+        if not command:
+            raise ValueError(NO_CODEX)
+        entry = profiles.setdefault("codex", dict(config.STARTER["profiles"]["codex"]))
+        arguments = list(entry.get("command") or config.STARTER["profiles"]["codex"]["command"])[1:]
+        if "-C" in arguments:  # it works in cd_AI's config folder, not wherever the service started
+            arguments[arguments.index("-C") + 1] = str(path.parent)
+        entry["command"] = [command] + arguments
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))

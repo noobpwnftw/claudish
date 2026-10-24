@@ -31,7 +31,7 @@ function say(id, text, bad) {
 function ready(state) {
   const backend = (state.service || {}).backend;
   return (backend === "claude" && state.key !== "missing") || ((backend === "openai" || backend === "llama") && !state.server_problem)
-    || (backend === "command" && state.choice === "claude-code");
+    || (backend === "command" && (state.choice === "claude-code" || state.choice === "codex"));
 }
 
 function status(state) {
@@ -40,6 +40,7 @@ function status(state) {
   if (state.server_problem) return [state.server_problem.charAt(0).toUpperCase() + state.server_problem.slice(1) + ".", "bad"];
   if (backend === "openai" || backend === "llama") return [`Ready: ${state.server.model || "your model"} writes for you.`, "good"];
   if (backend === "command" && state.choice === "claude-code") return ["Ready: Claude Code writes for you.", "good"];
+  if (backend === "command" && state.choice === "codex") return ["Ready: Codex writes for you.", "good"];
   if (backend === "none") return ["Pick a model below to start.", ""];
   return ["cd_AI is running.", ""];
 }
@@ -140,9 +141,10 @@ async function change(body, message, done) {
 document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
   if (radio.value === "claude") {
     change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.");
-  } else if (radio.value === "claude-code") {
+  } else if (radio.value === "claude-code" || radio.value === "codex") {
     $("claude").hidden = $("server").hidden = true;
-    change({choice: "claude-code"}, "model-message", "cd_AI now writes with Claude Code.").then((done) => {
+    const name = radio.value === "codex" ? "Codex" : "Claude Code";
+    change({choice: radio.value}, "model-message", `cd_AI now writes with ${name}.`).then((done) => {
       if (!done && shown) render(shown);  // not switched: the radio goes back to what is in use
     });
   } else {  // an API must answer before cd_AI switches to it: fill it in first

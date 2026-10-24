@@ -174,6 +174,8 @@ class ClaudeKeyChecks(unittest.TestCase):
             self.skipTest("needs the Anthropic SDK")
         self.assertIn("pick Claude Code", self.check("/usr/bin/claude")[2])
         self.assertNotIn("Claude Code", self.check(None)[2])
+        with patch("claudish.settings.codex", return_value="/usr/bin/codex"):
+            self.assertIn("pick Codex", self.check(None)[2])
 
 
 if __name__ == "__main__":
