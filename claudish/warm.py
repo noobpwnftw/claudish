@@ -30,9 +30,12 @@ class Lines:
         threading.Thread(target=self.pump, args=(stream,), daemon=True).start()
 
     def pump(self, stream):
-        for line in stream:
-            self.queue.put(line)
-        self.queue.put(None)
+        try:
+            for line in stream:
+                self.queue.put(line)
+        finally:
+            stream.close()
+            self.queue.put(None)
 
     def next(self, deadline):
         """The next line, None at end of output; TimeoutError past the deadline."""
@@ -51,6 +54,7 @@ class Warm:
         self.restart_after = restart_after
         self.state = "stopped"
         self.lock = threading.Lock()
+        self.lifecycle = threading.RLock()
         self.stopped = threading.Event()
 
     def start(self):
@@ -62,39 +66,64 @@ class Warm:
     def warm_up(self):
         with self.lock:
             try:
+                self.check_running()
                 self.launch()
                 self.exchange(READY, 60)
-                self.ready()
-                self.state = "warm"
+                self.finish()
             except Exception as exc:
-                self.state = "failed: %s" % (exc,)
+                with self.lifecycle:
+                    self.kill(force=True)
+                    self.state = "stopped" if self.stopped.is_set() else "failed: %s" % (exc,)
+
+    def check_running(self):
+        if self.stopped.is_set():
+            raise RuntimeError("cd_AI is stopping")
+
+    def finish(self):
+        self.check_running()
+        self.ready()
+        with self.lifecycle:
+            self.check_running()
+            self.state = "warm"
+
+    def spawn(self, *args, **kwargs):
+        with self.lifecycle:
+            self.check_running()
+            if self.cwd:
+                os.makedirs(self.cwd, exist_ok=True)
+            self.process = spawn(*args, **kwargs)
+            self.lines = Lines(self.process.stdout)
 
     def ask(self, prompt, timeout):
         """One rewrite, as its own conversation; RuntimeError with words for the panel."""
         with self.lock:
-            if self.stopped.is_set():
-                raise RuntimeError("cd_AI is stopping")
-            if not self.alive():
-                self.state = "restarting"
-                self.launch()
             try:
+                self.check_running()
+                if not self.alive():
+                    self.state = "restarting"
+                    self.launch()
                 text = self.exchange(prompt, timeout)
+                self.finish()
             except TimeoutError:
-                self.kill(force=True)  # a stuck one is not reused
-                self.state = "restarting"
+                self.failed()  # a stuck one is not reused
                 raise RuntimeError("%s took longer than %g s" % (self.name, timeout))
-            except RuntimeError:
-                self.kill()
-                self.state = "restarting"
+            except (RuntimeError, OSError) as exc:
+                self.failed()
+                if isinstance(exc, OSError):
+                    raise RuntimeError("%s: %s" % (self.name, exc)) from exc
                 raise
-            self.ready()
-            self.state = "warm"
             return text
+
+    def failed(self):
+        with self.lifecycle:
+            self.kill(force=True)
+            self.state = "stopped" if self.stopped.is_set() else "restarting"
 
     def stop(self):
         self.stopped.set()
-        self.kill()
-        self.state = "stopped"
+        with self.lifecycle:
+            self.kill(force=True)
+            self.state = "stopped"
 
     def binary(self):
         """The CLI's path; found again when an update moved it (as run_command does)."""
@@ -104,6 +133,21 @@ class Warm:
             name = os.path.basename(program).lower()
             program = (settings.codex() if name.startswith("codex") else settings.claude_code()) or program
         return program
+
+    def kill(self, force=False):
+        with self.lifecycle:
+            process, self.process = self.process, None
+            if process is not None and process.poll() is None:
+                try:
+                    if force:
+                        raise TimeoutError
+                    process.stdin.close()  # the end of its input: it ends
+                    process.wait(3)
+                except Exception:
+                    process.kill()
+                    process.wait(3)
+            if process is not None and process.stdin is not None:
+                process.stdin.close()
 
 
 class ClaudeCode(Warm):
@@ -123,24 +167,28 @@ class ClaudeCode(Warm):
     def launch(self):
         import subprocess
         self.kill()
-        self.process = spawn(self.argv(), "Claude Code", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                             bufsize=1, cwd=self.cwd)
-        self.lines = Lines(self.process.stdout)
+        self.spawn(self.argv(), "Claude Code", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                   stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
+                   bufsize=1, cwd=self.cwd)
 
     def alive(self):
-        return self.process is not None and self.process.poll() is None
+        process = self.process
+        return process is not None and process.poll() is None
 
     def exchange(self, prompt, timeout):
+        self.check_running()
+        process, lines = self.process, self.lines
+        if process is None:
+            raise RuntimeError("Claude Code ended")
         deadline = time.monotonic() + timeout
         message = {"type": "user", "message": {"role": "user", "content": prompt}}
         try:
-            self.process.stdin.write(json.dumps(message) + "\n")
-            self.process.stdin.flush()
-        except OSError:
+            process.stdin.write(json.dumps(message) + "\n")
+            process.stdin.flush()
+        except (OSError, ValueError):
             raise RuntimeError("Claude Code ended: %s" % self.why())
         while True:
-            line = self.lines.next(deadline)
+            line = lines.next(deadline)
             if line is None:
                 raise RuntimeError("Claude Code ended: %s" % self.why())
             try:
@@ -162,18 +210,6 @@ class ClaudeCode(Warm):
         except Exception:
             return "no reason given"
 
-    def kill(self, force=False):
-        process, self.process = self.process, None
-        if process is not None and process.poll() is None:
-            try:
-                if force:
-                    raise TimeoutError
-                process.stdin.close()  # the end of its input: it ends
-                process.wait(3)
-            except Exception:
-                process.kill()
-                process.wait(3)
-
 
 class Codex(Warm):
     """`codex app-server`: one process; each request a new ephemeral, read-only thread."""
@@ -193,22 +229,25 @@ class Codex(Warm):
     def launch(self):
         import subprocess
         self.kill()
-        self.process = spawn(self.argv(), "Codex", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                             bufsize=1, cwd=self.cwd)
-        self.lines = Lines(self.process.stdout)
+        self.spawn(self.argv(), "Codex", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                   stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
+                   bufsize=1, cwd=self.cwd)
         self.served = 0
         self.call("initialize", {"clientInfo": {"name": "claudish", "version": "0.1"}}, time.monotonic() + 30)
         self.send({"jsonrpc": "2.0", "method": "initialized"})
 
     def alive(self):
-        return self.process is not None and self.process.poll() is None
+        process = self.process
+        return process is not None and process.poll() is None
 
     def send(self, message):
+        process = self.process
+        if process is None:
+            raise RuntimeError("Codex ended")
         try:
-            self.process.stdin.write(json.dumps(message) + "\n")
-            self.process.stdin.flush()
-        except OSError:
+            process.stdin.write(json.dumps(message) + "\n")
+            process.stdin.flush()
+        except (OSError, ValueError):
             raise RuntimeError("Codex ended")
 
     def call(self, method, params, deadline, collect=None):
@@ -273,18 +312,6 @@ class Codex(Warm):
         self.served += 1
         if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then
             self.launch()
-
-    def kill(self, force=False):
-        process, self.process = self.process, None
-        if process is not None and process.poll() is None:
-            try:
-                if force:
-                    raise TimeoutError
-                process.stdin.close()  # the end of its input: it ends
-                process.wait(3)
-            except Exception:
-                process.kill()
-                process.wait(3)
 
 
 def make(backend, command, model=None, cwd=None):
