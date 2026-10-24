@@ -39,8 +39,18 @@ The templates are in one file: `claudish templates` prints it, and `claudish ini
 
 ## Install
 
-**macOS:** until there is a download, build the installer on a Mac (Python 3.10+ from python.org;
-macOS offers to install git the first time):
+**Linux** (IBus only, a preview; fcitx5 is not supported yet), as your user:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
+```
+
+It installs into `~/.local/share/claudish`, puts the `claudish` command in `~/.local/bin`, and ends
+in cd_AI's settings (the key, the tone). Then log out and back in, and add **English → cd_AI —
+Claudish** in **Settings → Keyboard → Input Sources**.
+
+**macOS** (Apple silicon): the installer is `cd_AI.pkg`. Until the first release, build it on a
+Mac with Python 3.10+ from python.org:
 
 ```sh
 git clone https://github.com/noobpwnftw/claudish && cd claudish
@@ -48,34 +58,16 @@ python3 platforms/macos/build.py && python3 platforms/macos/package.py
 open dist/macos/cd_AI.pkg
 ```
 
-It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a tone.
-Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
+It installs cd_AI for you alone and ends in cd_AI's settings. Then log out and back in.
+[More](docs/install.md#macos-input-method).
 
-**Linux** (developer preview, IBus only; fcitx5 is not supported yet): one line:
+**Windows** (11, x64 and ARM64): the installer is `cd_AI-setup.exe`. Until the first release it is
+built from source ([how](docs/install.md#windows-input-method)); the input method comes only from
+it. It ends in cd_AI's settings; then restart, and pick cd_AI with Win+Space.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
-```
-
-It installs into `~/.local/share/claudish`, puts the `claudish` command in `~/.local/bin`, and
-ends in cd_AI's settings.
-
-**Windows:** `cd_AI-setup.exe`, built with `platforms\windows\package.py` until there is a download
-([how](docs/install.md#windows-input-method)), installs cd_AI with its own Python, adds it to your
-input sources and ends in its settings; sign out and in, then Win+Space. For development, paste the
-prompt from [claudish.io](https://claudish.io/#install) into a coding agent, or:
-
-```powershell
-git clone https://github.com/noobpwnftw/claudish
-cd claudish
-py -m venv .venv
-.venv\Scripts\python -m pip install -e ".[claude]"
-.venv\Scripts\python -m claudish setup
-```
-
-Setup runs `claudish doctor` and opens cd_AI's settings in your browser: paste your Claude key and
-pick a tone. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
-instead: `claudish setup --profile local`.
+All three end in the same settings page: paste an Anthropic API key, or the address of another
+model API. A local model instead: `claudish setup --profile local`. Details, uninstalling, and a
+source checkout for development: [docs/install.md](docs/install.md).
 
 ## Keys
 
@@ -92,15 +84,15 @@ instead: `claudish setup --profile local`.
 
 ## Status
 
-| Platform | Tested |
+| Platform | Supported |
 | --- | --- |
-| macOS (IMK) | Apple silicon, macOS 26 in a VM: the package installs, and after a logout "ok" + Tab rewrites in TextEdit; the offline panel. Intel Macs: not yet |
-| Windows (PIME/TSF) | Windows 11 ARM64 in a VM: the installer, and after a restart "ok" + Tab rewrites in Notepad; Edge, Windows Terminal and the console earlier. x64: not yet tested |
-| Linux (IBus) | preview: the one-line installer in a clean Ubuntu 24.04 container; real typing (GTK, Qt, GNOME Terminal on X11, GNOME on Wayland) last verified in containers before 2026-10-24 |
+| macOS | Apple silicon, macOS 26. Intel Macs are not supported yet. |
+| Windows | Windows 11 ARM64; x64 builds but is not yet tested. |
+| Linux | IBus, a preview. |
 
-Claudish is preparing its first release, 0.1.0; the [roadmap](ROADMAP.md) says what
-is next. It is maintained by an AI agent (Claude Code) under its owner's direction
-([AGENT.md](AGENT.md)).
+The first release, 0.1.0, is in preparation; the [roadmap](ROADMAP.md) says what is next. How each
+platform is tested: [docs/development.md](docs/development.md#testing). cd_AI is maintained by an
+AI agent (Claude Code) under its owner's direction ([AGENT.md](AGENT.md)).
 
 ## More
 

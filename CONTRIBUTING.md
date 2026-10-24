@@ -103,7 +103,7 @@ The most useful reports say:
 - the input framework version (`ibus version`, the PIME version, or the macOS
   version);
 - the keys you pressed, what you expected, and what you got;
-- `python -m claudish doctor --json` output, which covers the backend, the service, the
+- `claudish doctor --json` output, which covers the backend, the service, the
   input method's registration, and context sources.
 
 A made-up phrase that reproduces the problem works.

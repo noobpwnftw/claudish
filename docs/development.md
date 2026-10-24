@@ -2,18 +2,23 @@
 
 How Claudish is built and tested. See also [CONTRIBUTING](../CONTRIBUTING.md) and the [roadmap](../ROADMAP.md).
 
-## Status
+## Testing
 
-- **Linux:** verified with the real `ibus-daemon` and real key events in containers before
-  2026-10-24: X11 with GTK and Qt, and GNOME Shell 46 on Wayland. KDE is not yet tested. On
-  GNOME, a composition left in a field when you click another one lands in the field you
-  clicked: GNOME commits it after GTK has moved focus, as for every input method.
-- **Windows:** verified on Windows 11 ARM64 in a KVM VM through Claudish's
-  patched PIME: classic Notepad 15/15, Edge 14/14 with one known issue (a
-  shortcut right after a cleared field can lose the composed word), Windows
+`python scripts/check.py` is the merge gate (unit tests, the IBus and PIME smokes, the settings
+page in Chromium; each step under 5 s). Installs are checked on each OS:
+
+- **macOS:** macOS 26 on Apple silicon, in a UTM VM: the package installs, and after a logout "ok"
+  + Tab rewrites in TextEdit; cd_AI stays enabled and its service comes back after a restart; the
+  offline panel. Earlier, 12 typing scenarios; event-routing tests with Cocoa test doubles.
+- **Windows:** Windows 11 ARM64 in a KVM VM: install, restart, update over it, restart; "ok" + Tab
+  rewrites in Notepad each time, and cd_AI installs beside PIME's Chewing. Earlier, classic Notepad
+  15/15, Edge 14/14 (a shortcut right after a cleared field could lose the composed word), Windows
   Terminal and the classic console 4/4. x64 hardware is untested.
-- **macOS:** real typing on macOS 26 in a UTM VM (12 scenarios, installed by its package), plus
-  event-routing tests with Cocoa test doubles.
+- **Linux:** the one-line installer in a clean Ubuntu 24.04 container. Real typing with the real
+  `ibus-daemon` (X11 with GTK and Qt, GNOME Shell 46 on Wayland) was verified in containers before
+  2026-10-24; KDE is not yet tested. On GNOME, a composition left in a field when you click another
+  one lands in the field you clicked: GNOME commits it after GTK has moved focus, as for every
+  input method.
 - **Browser demo:** tested with real inference in Chromium.
 
 ## Implementation

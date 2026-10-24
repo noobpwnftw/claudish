@@ -21,7 +21,7 @@ No release has been made yet. What a first release would contain:
 - **Models:** no model ships. Claude by default, any OpenAI-compatible server, an agent CLI (Claude Code), or a local one:
   `setup --profile local` downloads llama.cpp and Gemma 4 E4B. MCP tools. How the models were chosen:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
-- **Setup:** `python -m claudish setup`, `claudish doctor`, `claudish service`.
+- **Setup:** `claudish setup`, `claudish doctor`, `claudish service`.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
 
 Tested on Linux (X11 and GNOME Wayland in containers), Windows 11 ARM64 and macOS 26 in VMs; see

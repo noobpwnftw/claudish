@@ -13,23 +13,26 @@ Use any OpenAI-compatible server and any model, such as llama.cpp, vLLM, Ollama,
 LM Studio, or a hosted endpoint:
 
 ```sh
-python -m claudish serve --backend openai --model-url http://127.0.0.1:11434 --model your-model
+claudish serve --backend openai --model-url http://127.0.0.1:11434 --model your-model
 # A remote endpoint, with a key read from an environment variable that you name:
-python -m claudish serve --backend openai --model-url https://api.example.com \
+claudish serve --backend openai --model-url https://api.example.com \
     --model some-model --api-key-env EXAMPLE_API_KEY --timeout 10
 ```
 
-Or use Claude through the official SDK. It is an optional dependency. Set
-`ANTHROPIC_API_KEY`, or run `ant auth login`.
+Or use Claude through the official SDK, which every installer includes (in a source checkout:
+`.venv/bin/python -m pip install -e ".[claude]"`). The key comes from cd_AI's settings,
+`ANTHROPIC_API_KEY`, or `ant auth login`.
 
 ```sh
-pip install "claudish-ime[claude]"
-python -m claudish serve --backend claude                     # claude-opus-5-5
-python -m claudish serve --backend claude --claude-model claude-haiku-5-5
+claudish serve --backend claude                     # claude-opus-5-5
+claudish serve --backend claude --claude-model claude-haiku-5-5
 ```
 
-For a deterministic demo without a model, use `python -m claudish serve
---backend rules`. That mode performs simple word substitutions and identifies
+`claudish` is cd_AI's command line ([where it is on each OS](install.md#the-claudish-command)).
+These run a service in the foreground; the login service (`claudish service install`) runs the
+config's profile instead.
+
+For a deterministic demo without a model, use `claudish serve --backend rules`. That mode performs simple word substitutions and identifies
 itself as `rules` in API responses. It does not perform neural rewriting.
 
 The Claude backend runs one request at a time, at low effort, with server-side refusal
@@ -115,7 +118,7 @@ pass `--config FILE`):
  }}
 ```
 
-`python -m claudish serve` uses the file's `"profile"`. `--profile claude`
+`claudish serve` uses the file's `"profile"`. `--profile claude`
 picks another, and any flag overrides the profile's value. A template path in a
 profile is relative to the config file. To take a key from the environment, name
 its variable with `api_key_env`. Unknown keys and wrong types are rejected at startup. `/health` reports the active profile.
@@ -129,9 +132,10 @@ focused window once, sends it with that one instruction, and lists it in
 "consulted". F8 applies to that one instruction.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
-  ImageMagick (`sudo apt install x11-utils imagemagick`). On Wayland or macOS,
-  set the profile's `"look_command"` to a program that writes a PNG of the
-  focused window to stdout, such as a `grim` or `screencapture` wrapper.
+  ImageMagick (`sudo apt install x11-utils imagemagick`). Elsewhere, set the profile's
+  `"look_command"` to a program that writes a PNG of the focused window to stdout: on macOS a
+  `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
+  Wayland lets no program capture a window without asking, so F8 has no picture there.
 - **Backends:** `claude` and any OpenAI-compatible server with a vision model.
   For llama.cpp, start a vision model with its projector, for example
   [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
@@ -160,7 +164,7 @@ Results are cached for `ttl` seconds (default 30). A failing or slow provider (`
 default 5 s) is skipped. Context goes in the user turn, ahead of your text. Adapters may also
 send the text around the caret as `before`/`after` in `/suggest`.
 
-MCP servers can supply context too (`pip install "claudish-ime[mcp]"`). Claudish
+MCP servers can supply context too. They need the MCP SDK: after the one-line install on Linux, `~/.local/share/claudish/.venv/bin/python -m pip install -e "$HOME/.local/share/claudish[mcp]"`; in a checkout, `.venv/bin/python -m pip install -e ".[mcp]"`. Claudish
 starts the configured stdio server, calls one tool or reads one resource, and
 caches the text:
 
@@ -176,9 +180,9 @@ caches the text:
 Already using MCP servers with Claude? Bring them along:
 
 ```sh
-python -m claudish mcp import            # from Claude Desktop, Claude Code (~/.claude.json), and ./.mcp.json
-python -m claudish mcp list              # connect to each server; show its tools and resources
-python -m claudish context test --app thunderbird --show   # what a binding would read in that app
+claudish mcp import            # from Claude Desktop, Claude Code (~/.claude.json), and ./.mcp.json
+claudish mcp list              # connect to each server; show its tools and resources
+claudish context test --app thunderbird --show   # what a binding would read in that app
 ```
 
 Imported servers land under `"mcp_servers"` in your config and are used by name:
@@ -356,7 +360,8 @@ Every request names a mode:
 | `continue` | the start of a sentence | your text plus the next few words |
 | `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
 
-The browser demo has a mode switch. Adapters send `"mode"` in `/suggest`, and
+At the caret, compose's Tab asks for `rewrite`, its Enter sends `instruct`, and continue mode
+(a Shift tap) asks for `continue`. Adapters send `"mode"` in `/suggest`, and
 `/health` lists the modes. A profile's templates can change any mode, or add one
 of its own; its `"modes"` says only which profile answers a mode (above).
 

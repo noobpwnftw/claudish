@@ -56,20 +56,20 @@ The page calls the same service as the desktop adapters. If your browser runs on
 machine, forward TCP port **18765** (the VS Code Ports tab or SSH), then open the
 forwarded localhost URL. Keep the local port at 18765.
 
-For a model-free UI demo: `python -m claudish serve --backend rules`, then open
+For a model-free UI demo: `claudish serve --backend rules`, then open
 the same URL. The page labels this as rules mode.
 
 From a second terminal:
 
 ```sh
-python -m claudish rewrite "This is very important."
-python -m claudish bench --runs 12
+claudish rewrite "This is very important."
+claudish bench --runs 12
 ```
 
 To use a llama-server that is already running:
 
 ```sh
-python -m claudish serve --model-url http://127.0.0.1:18766
+claudish serve --model-url http://127.0.0.1:18766
 ```
 
 ## Static demo: the model in your browser
@@ -135,7 +135,7 @@ Claude Code in VS Code.
   chat box. On macOS, VS Code and other Chromium apps share only about 100
   characters around the caret with an input method, which is plenty for a
   message.
-- **Instruct** turns a one-line task into the message: "tell it to add a test for
+- **Compose, then Enter** turns a one-line task into the message: "tell it to add a test for
   the retry" becomes a full request, drafted at the caret for you to send.
 - **The code you are looking at** comes from F8 (a picture of the window, for a
   vision model) or from MCP servers you configure for Claudish; Claudish does not

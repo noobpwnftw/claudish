@@ -34,5 +34,5 @@ body:
     id: doctor
     attributes:
       label: claudish doctor --json
-      description: "The output of `python -m claudish doctor --json` (on macOS: `~/Library/Input\\ Methods/Claudish.app/Contents/MacOS/Claudish doctor --json`)."
+      description: "The output of `claudish doctor --json` (on macOS: `~/Library/Input\\ Methods/Claudish.app/Contents/MacOS/Claudish doctor --json`)."
       render: json
