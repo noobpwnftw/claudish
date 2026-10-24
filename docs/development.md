@@ -14,8 +14,8 @@ page in Chromium; each step under 5 s). Installs are checked on each OS:
   rewrites in Notepad each time, and cd_AI installs beside PIME's Chewing. Earlier, classic Notepad
   15/15, Edge 14/14 (a shortcut right after a cleared field could lose the composed word), Windows
   Terminal and the classic console 4/4. x64 hardware is untested.
-- **Linux:** the one-line installer in a clean Ubuntu 24.04 container. Real typing with the real
-  `ibus-daemon` (X11 with GTK and Qt, GNOME Shell 46 on Wayland) was verified in containers before
+- **Linux:** the one-line installer in a clean Ubuntu 24.04 container. The Docker rig below checks
+  real IBus typing with GTK and Qt on X11 (2026-10-25). GNOME Shell 46 on Wayland was checked before
   2026-10-24; KDE is not yet tested. On GNOME, a composition left in a field when you click another
   one lands in the field you clicked: GNOME commits it after GTK has moved focus, as for every
   input method.
@@ -75,6 +75,26 @@ The macOS routing tests use test doubles and do not verify Cocoa, InputMethodKit
 application behavior. Real typing is checked by hand on each OS: a text editor, a browser, a
 terminal, focus switches, selection and caret movement, shortcut keys, password fields, the service
 stopped, and switching input methods. On macOS, install the package and log out and back in first.
+
+### Linux Docker rig
+
+Build the Ubuntu 24.04 desktop image once, then run individual typing scenarios. Each check
+starts Xvfb, the real IBus engine and service, and a GTK or Qt application; it exits within five
+seconds. The `rules` backend supplies the rewrite so these checks do not need a model server.
+
+```sh
+sh tests/rigs/linux/run.sh build
+sh tests/rigs/linux/run.sh check compose
+sh tests/rigs/linux/run.sh check bypass
+sh tests/rigs/linux/run.sh check password
+sh tests/rigs/linux/run.sh check focus
+sh tests/rigs/linux/run.sh check offline
+sh tests/rigs/linux/run.sh check qt-selection
+```
+
+The checks cover Tab accepting a rewrite, Shift+Enter keeping the original words, password
+typing, a focus change during composition, keeping words when the service stops, and restoring
+a Qt selection with Esc. The rig does not check a desktop panel, Wayland, or model quality.
 
 ## Debugging on macOS
 
