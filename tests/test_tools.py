@@ -83,7 +83,7 @@ class RewriterTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = Path(directory.name, "config.json")
-        path.write_text(json.dumps({"mcp_servers": SERVER, "profiles": {"p": dict({"tools": ["notes"]}, **profile)}}))
+        path.write_text(json.dumps({"mcp_servers": SERVER, "profiles": {"p": dict({"backend": "llama", "tools": ["notes"]}, **profile)}}))
         return config.resolve(path)
 
     def test_instructions_use_the_loop_and_list_the_calls(self):
