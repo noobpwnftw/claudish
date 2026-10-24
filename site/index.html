@@ -130,13 +130,13 @@
           <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
           <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
 
-1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop.
+1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop. On macOS, do only this instead: clone the repository (step 2), run `python3 platforms/macos/build.py` and `python3 platforms/macos/package.py` there, open `dist/macos/cd_AI.pkg`, and tell me the installer does the rest: its last step opens cd_AI's settings, where I paste my Claude key myself; then I log out and back in.
 2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
 3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
-4. cd_AI ships no model: it is set up for Claude with my own API key. Check whether I have one where a service started at login can read it (`ant auth login`, or ANTHROPIC_API_KEY in my user environment). If not, show me how to set it for this OS (docs/install.md, Quick start) and wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
-5. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
-6. Run `python -m claudish setup --yes`. It writes a config, checks the model, registers the input method, and starts Claudish at login.
-7. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows, a build on macOS), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
+4. Run `python -m claudish setup --dry-run`, show me the plan, and ask me before continuing.
+5. Run `python -m claudish setup --yes`. It writes a config, registers the input method, and starts Claudish at login.
+6. If setup says a step needs me (sudo on Linux, an administrator PowerShell or the PIME installer on Windows), show me the exact command and why. Do not run anything with sudo or as administrator yourself.
+7. cd_AI ships no model: it is set up for Claude with my own API key. Run `python -m claudish settings`: it opens cd_AI's settings in my browser, where I paste the key myself (cd_AI checks it with Anthropic and keeps it where its service reads it). Wait for me. Never ask me to paste the key to you, never print it, and never write it into a file.
 8. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
 9. Finish by telling me to log out and back in, add "cd_AI — Claudish" in my input sources, and the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Enter sends my words as an instruction, Shift+Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.
 
@@ -147,8 +147,9 @@ Make no mistakes.</pre>
 cd claudish
 python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[claude]"
-.venv/bin/python -m claudish setup</pre>
-        <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
+.venv/bin/python -m claudish setup
+.venv/bin/python -m claudish settings</pre>
+        <p class="body small">Setup asks before each step and skips what is already done; <code>--dry-run</code> shows the plan. Settings opens in your browser: paste your Claude key there and pick a voice. On macOS, the installer does all of this. Details in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
       </section>
 
       <section class="section" aria-labelledby="status">
@@ -157,7 +158,7 @@ python3 -m venv .venv
         <table class="status">
           <tr><td>Linux (IBus)</td><td>Verified with real typing in containers: GTK, Qt, and GNOME Terminal on X11 (41 scenarios), GNOME on Wayland (16). KDE is not yet tested.</td></tr>
           <tr><td>Windows (PIME/TSF)</td><td>Verified on Windows 11 ARM64: Notepad, Edge, Windows Terminal, and the classic console; setup end to end. x64 hardware untested.</td></tr>
-          <tr><td>macOS (IMK)</td><td>Verified with real typing on macOS 26 in a VM (11 scenarios). The app is not notarized yet.</td></tr>
+          <tr><td>macOS (IMK)</td><td>Verified with real typing on macOS 26 in a VM (12 scenarios), installed by its package. The package is not notarized: macOS asks you to open it anyway once.</td></tr>
           <tr><td>Browser demo</td><td>The model runs in the page, through WebAssembly.</td></tr>
         </table>
       </section>

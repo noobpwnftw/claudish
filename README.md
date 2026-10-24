@@ -48,8 +48,19 @@ and MCP servers per app, tools it may call, an agent to hand a task to
 
 ## Install
 
-Paste the prompt from [claudish.io](https://claudish.io/#install) into a coding
-agent, or:
+**macOS:** until there is a download, build the installer on a Mac (Python 3.10+ from python.org)
+and open it:
+
+```sh
+python3 platforms/macos/build.py && python3 platforms/macos/package.py
+open dist/macos/cd_AI.pkg
+```
+
+It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
+Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
+
+**Linux and Windows** (installers are next): paste the prompt from
+[claudish.io](https://claudish.io/#install) into a coding agent, or:
 
 ```sh
 git clone https://github.com/noobpwnftw/claudish
@@ -57,13 +68,14 @@ cd claudish
 python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[claude]"
 .venv/bin/python -m claudish setup
+.venv/bin/python -m claudish settings
 ```
 
-It is set up for Claude with your own key: run `ant auth login`, or set `ANTHROPIC_API_KEY` in
-your user environment, where a service started at login can read it ([how, per
-OS](docs/install.md#quick-start)). Setup shows each step and asks before doing it, skips what is
-already done, and ends with `claudish doctor`. Then log out and back in, and add **cd_AI —
-Claudish** in your input sources. A local model instead: `claudish setup --profile local`.
+Setup shows each step and asks before doing it, skips what is already done, and ends with
+`claudish doctor`. `claudish settings` opens cd_AI's settings in your browser: paste your Claude
+key (checked with Anthropic, kept where the service reads it, never in the config) and pick a
+voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
+instead: `claudish setup --profile local`.
 
 ## Keys
 

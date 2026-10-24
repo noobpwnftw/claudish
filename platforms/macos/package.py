@@ -26,8 +26,8 @@ POSTINSTALL = """#!/bin/sh
 app="$2/Claudish.app"
 [ -d "$app" ] || app="$HOME/Library/Input Methods/Claudish.app"
 cd_ai="$app/Contents/MacOS/Claudish"
-# A reinstall: stop the old build, as Squirrel's installer does; macOS starts the new input method
-# on the next key, and the service is started again below.
+# A reinstall: stop the old build, as Squirrel's installer does, and start the service again below.
+# As with Squirrel, logging out and back in finishes an install or an update (docs/install.md).
 launchctl bootout "gui/$(id -u)/com.claudish.service" 2> /dev/null
 killall Claudish 2> /dev/null
 [ -f "$HOME/.config/claudish/config.json" ] || first=1

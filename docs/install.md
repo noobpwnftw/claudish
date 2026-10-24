@@ -190,9 +190,10 @@ open dist/macos/cd_AI.pkg
 
 `cd_AI.pkg` installs for you alone (`~/Library/Input Methods`, no administrator password) and does
 the rest: a starter config, the service at every login, and cd_AI added to your input sources and
-selected, with no logout. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's
-settings open at the end: paste your Claude key, pick a voice. **Settings…** in the input menu
-opens them again. Installing over an older cd_AI stops the old one, replaces it, and asks nothing.
+selected. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's settings open at
+the end: paste your Claude key, pick a voice. Then **log out and back in**, as after installing or
+updating any macOS input method: until then macOS keeps its old list of input sources (and, after
+an update, the old cd_AI). **Settings…** in the input menu opens the settings again.
 
 The package is ad-hoc signed, not notarized. A copy downloaded with a browser is blocked the first
 time ("Not Opened"); **System Settings → Privacy & Security → Open Anyway** lets it through.

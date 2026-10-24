@@ -1,9 +1,11 @@
 #!/bin/sh
-# One macOS test cycle, on the Mac: build, install cd_AI.pkg over whatever is installed, run the rig,
-# and leave cd_AI installed as a user's would be. Nothing stale: the package's postinstall stops the
-# old build. Nothing colliding: for the run, the login service gives the port to the same bundle's
-# rules service (the rig's deterministic backend), and gets it back afterwards.
-# tests/desktop/macos/cycle.sh [driver arguments]; the log ends with "cycle exit N".
+# A macOS test cycle, on the Mac, in two phases with a logout between them, as macOS needs after
+# installing or updating an input method (Squirrel's notes say the same; docs/install.md):
+#   cycle.sh install         build, and install cd_AI.pkg over whatever is installed
+#   (log out and back in: remote.sh restarts the Mac, which logs in by itself)
+#   cycle.sh test [args]     the rig against the same bundle's rules service in the login
+#                            service's place, which gets the port back afterwards; args go to driver.py
+# Each phase's log ends with "cycle exit N".
 cd "$(dirname "$0")/../../.." || exit 1
 python=.tools/macos-build-venv/bin/python
 domain=gui/$(id -u)
@@ -11,12 +13,17 @@ agent=$HOME/Library/LaunchAgents/com.claudish.service.plist
 cd_ai="$HOME/Library/Input Methods/Claudish.app/Contents/MacOS/Claudish"
 port=18765
 finish() { echo "cycle exit $1"; exit "$1"; }
+phase=$1; shift
 
-echo "== build"
-$python platforms/macos/build.py > /tmp/claudish-build.log 2>&1 || { tail -5 /tmp/claudish-build.log; finish 1; }
-$python platforms/macos/package.py > /tmp/claudish-package.log 2>&1 || { tail -5 /tmp/claudish-package.log; finish 1; }
-echo "== install"
-installer -pkg dist/macos/cd_AI.pkg -target CurrentUserHomeDirectory 2>&1 | tail -1
+if [ "$phase" = install ]; then
+  echo "== build"
+  $python platforms/macos/build.py > /tmp/claudish-build.log 2>&1 || { tail -5 /tmp/claudish-build.log; finish 1; }
+  $python platforms/macos/package.py > /tmp/claudish-package.log 2>&1 || { tail -5 /tmp/claudish-package.log; finish 1; }
+  echo "== install"
+  installer -pkg dist/macos/cd_AI.pkg -target CurrentUserHomeDirectory 2>&1 | tail -1
+  finish 0
+fi
+[ "$phase" = test ] || { echo "usage: cycle.sh install | test [driver arguments]"; exit 2; }
 
 echo "== rules service"
 launchctl bootout "$domain/com.claudish.service" 2> /dev/null
