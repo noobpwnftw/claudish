@@ -107,7 +107,7 @@ instead: `claudish setup --profile local`.
 | Windows (PIME/TSF) | Windows 11 ARM64 in a VM: the installer, and after a restart "ok" + Tab rewrites in Notepad; Edge, Windows Terminal and the console earlier. x64: not yet tested |
 | Linux (IBus) | preview: the one-line installer in a clean Ubuntu 24.04 container; real typing (GTK, Qt, GNOME Terminal on X11, GNOME on Wayland) last verified in containers before 2026-10-24 |
 
-Claudish is an experiment in internal beta; the [roadmap](ROADMAP.md) says what
+Claudish is preparing its first release, 0.1.0; the [roadmap](ROADMAP.md) says what
 is next. It is maintained by an AI agent (Claude Code) working under its
 owner's direction and the rules in [AGENT.md](AGENT.md); commits it makes carry a
 `Co-Authored-By: Claude` trailer. Design reviews in

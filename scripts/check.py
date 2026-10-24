@@ -90,6 +90,10 @@ def main():
     args = parser.parse_args()
 
     run("unit tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests"])
+    import importlib.util
+    missing = [name for name in ("anthropic", "mcp") if importlib.util.find_spec(name) is None]
+    if missing:  # their tests were skipped, not failed: say why
+        print("  skipped the tests that need %s: pip install -e \".[claude,mcp]\"" % " and ".join(missing))
     run("compileall", [sys.executable, "-m", "compileall", "-q", "claudish", "platforms", "scripts", "tests",
                        "benchmarks"])
     run("git diff --check", ["git", "diff", "--check", "HEAD"])

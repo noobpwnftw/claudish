@@ -1,9 +1,21 @@
 # Contributing to Claudish
 
-Claudish is a small codebase: about 1,000 lines of Python in `claudish/` plus
-three thin platform adapters. Most changes touch one layer. This guide shows
-where things live, which checks prove a change works, and what a useful bug
-report contains.
+Claudish is a compact codebase: about 5,400 lines of Python in `claudish/` and 2,700 in three
+platform adapters (`platforms/`). Most changes touch one layer. This guide shows how to get set up,
+where things live, which checks prove a change works, what to pick up, and what a useful bug report
+contains.
+
+## Getting set up
+
+```sh
+git clone https://github.com/noobpwnftw/claudish && cd claudish
+python3 -m venv .venv && .venv/bin/python -m pip install -e ".[claude,mcp]"
+.venv/bin/python scripts/check.py      # the merge gate, about six seconds
+```
+
+Python 3.10 or newer. Without the `[claude,mcp]` extras the tests that need those SDKs are skipped,
+and check.py says so. The settings page check needs Playwright with Chromium
+(`--browser-python` names a Python that has it).
 
 ## How a keystroke becomes a candidate
 
@@ -17,7 +29,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 - **`claudish/composition.py`** holds the typed text, the candidate, the
   revision counter, and the mode. Every edit bumps the revision; a model result
   for an older revision is dropped. All three adapters share this file, and it
-  must stay Python 3.6-compatible for PIME's embedded Python.
+  also runs inside PIME's own Python on Windows (3.12), with no third-party packages.
 - **`claudish/client.py`** is one background worker per adapter. It debounces
   (180 ms), coalesces, and never blocks an input event.
 - **`claudish/server.py`** is the loopback HTTP service: `/suggest` and `/health`,
@@ -26,7 +38,14 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
   template. **`modes.py`** holds the invocation modes (rewrite, continue,
   instruct); **`context.py`** holds the context providers (file, command, MCP,
   caret text); **`config.py`** loads profiles.
-- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs (G35).
+- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs (G35);
+  **`capture.py`** takes the window picture F8 asks for.
+- **Instructions and agents:** **`turn.py`** answers one instruction (tools in **`tools.py`**),
+  **`conversation.py`** keeps a text box's turns, **`sessions.py`** and **`agent.py`** run an agent
+  CLI (Claude Code) as a session, and **`textbox.py`**/**`textbox_mcp.py`** give it the text box.
+- **Setup and settings:** **`setup.py`** (`claudish setup`), **`doctor.py`**, **`service.py`** (the
+  login service), **`settings.py`** and **`keys.py`** (the settings page and where keys are kept),
+  **`mcp_setup.py`**.
 - **`platforms/linux/engine.py`** (IBus), **`platforms/windows/claudish/`**
   (PIME/TSF), and **`platforms/macos/controller.py`** (InputMethodKit) translate
   key events. Keep them thin: logic shared by all three belongs in
@@ -35,7 +54,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 The guarantees every change must keep: typed text is never lost; a candidate is
 only offered, and accepted explicitly (Tab); a stale result never replaces newer
 text; a failure leaves your wording available; secure fields are bypassed; and
-typed text goes only to a backend the user configured. Local is the default.
+typed text goes only to a backend the user configured. No model ships: the user picks one.
 
 ## Checks
 
@@ -66,8 +85,19 @@ the scores.
   `Provider.read`. Providers come only from the config file, and a failing one
   must be skipped, never fatal.
 - **An adapter key:** implement it in all three adapters, and test it in
-  `tests/test_macos_adapter.py`, `tests/ibus_smoke.py`, `tests/pime_smoke.py`,
-  and the desktop drivers.
+  `tests/test_macos_adapter.py`, `tests/ibus_smoke.py` and `tests/pime_smoke.py`, then type it by
+  hand on each OS.
+
+## Picking something up
+
+Open goals are in [ROADMAP.md](ROADMAP.md), each with what "done" means; the queued ones not marked
+for the owner are free to take. Say in an issue what you mean to do before a large change. A pull
+request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
+
+The project is maintained by an AI agent (Claude Code) under the owner's direction. Its working
+files are in the repository, so its decisions are on record: [AGENT.md](AGENT.md) (its mandate and
+rules), [AGENT_STATE.md](AGENT_STATE.md) (where the work stands), and `CLAUDE.md` (which points the
+agent at AGENT.md). It reviews pull requests against the same gate and the guarantees above.
 
 ## Bug reports
 

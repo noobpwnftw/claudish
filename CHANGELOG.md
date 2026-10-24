@@ -16,9 +16,9 @@ No release has been made yet. What a first release would contain:
 - **The words are yours:** everything cd_AI says to a model is in one templates file;
   `claudish init` writes one of your own to change, and `claudish templates` prints what a profile
   ends up with.
-- **Input methods** for Linux (IBus, with a GNOME Shell extension drawing the panel), Windows
-  (Claudish's own patched PIME, the only one supported), and macOS (InputMethodKit), each drawing
-  the panel the design lab shows. Nothing is inserted until you take it; password fields bypass
+- **Input methods** for Linux (IBus, with a GNOME Shell extension drawing the panel), Windows (a
+  build of PIME that is part of cd_AI and installs beside any PIME you have), and macOS
+  (InputMethodKit), each drawing the panel the design lab shows. Nothing is inserted until you take it; password fields bypass
   Claudish.
 - **Terminals:** an instruction at a terminal prompt ("fix") sees the screen, read through the
   accessibility APIs; nothing is installed in the shell.
