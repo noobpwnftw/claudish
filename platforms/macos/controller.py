@@ -23,7 +23,7 @@ TRACE = os.environ.get("CLAUDISH_TRACE") or next(
 
 def trace(*fields):
     if TRACE:
-        with open(TRACE, "a") as out:
+        with open(TRACE, "a", encoding="utf-8") as out:
             out.write("%.3f %s\n" % (time.time(), " ".join(str(f) for f in fields)))
 
 
@@ -108,6 +108,16 @@ class ClaudishInputController(IMKInputController):
 
     def menu(self):
         """The input menu's items for cd_AI (the menu bar's input source menu)."""
+        try:
+            menu = self.build_menu()
+            trace("menu", [str(item.title()) for item in menu.itemArray()])
+            return menu
+        except Exception:
+            trace("menu failed", traceback.format_exc())
+            raise
+
+    @objc.python_method
+    def build_menu(self):
         from AppKit import NSMenu, NSMenuItem
         menu = NSMenu.alloc().initWithTitle_("cd_AI")
         # macOS can ask a controller that has not been set up for a client yet: no mode to tick then.
@@ -118,7 +128,6 @@ class ClaudishInputController(IMKInputController):
             item.setTarget_(self)
             item.setState_(1 if current == mode else 0)
             menu.addItem_(item)
-        menu.addItem_(NSMenuItem.separatorItem())
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
         item.setTarget_(self)
         menu.addItem_(item)
