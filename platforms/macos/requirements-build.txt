@@ -3,3 +3,4 @@ pyobjc-framework-Cocoa>=10,<13
 pyobjc-framework-InputMethodKit>=10,<13
 anthropic>=2
 certifi
+mcp>=1
