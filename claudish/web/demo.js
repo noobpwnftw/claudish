@@ -667,7 +667,8 @@ async function loadInBrowser() {
       $("model-progress-label").textContent = `${percent}%`;
     }, (text) => { note = text; });
     strip.classList.replace("loading", "ready");
-    $("model-copy").textContent = note || "Ready. Type below.";
+    const name = (document.querySelector('meta[name="claudish-model"]')?.content || "The model").replace(/\s*\(.*\)$/, "");
+    $("model-copy").textContent = note || `${name} is ready. Type below.`;
     $("remove-model").hidden = false;
     $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Model ready in browser"));
     $("connection").className = "connection online";
