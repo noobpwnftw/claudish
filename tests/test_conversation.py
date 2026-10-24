@@ -221,9 +221,8 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["No", "Yes"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
-        template, note, launcher, session, window, where = launch.call_args.args
+        template, note, launcher, session, window = launch.call_args.args
         self.assertIsNone(launcher)
-        self.assertIsNone(where)  # not a terminal: the helper starts in the home folder
         self.assertEqual(session, "")  # no {session} in the template: nothing to follow up on
         self.assertEqual(template, ["claude", "{prompt}"])
         self.assertTrue(note.startswith(folder))

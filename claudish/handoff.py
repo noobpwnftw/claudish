@@ -206,16 +206,14 @@ def line(template, note, session=""):
     return " ".join(words)
 
 
-def launch(template, note, launcher=None, session="", name="", folder=None):
+def launch(template, note, launcher=None, session="", name=""):
     """Open the helper on the note in a new terminal window; True when one opened. The arguments go
     as a list (no shell parses them), except on macOS, where Terminal runs a checked line. A
     profile's launcher says how instead (["tmux", "new-window", "{command}"], ["ghostty", "-e",
-    "{command}"]): {command} becomes the helper's arguments. folder: where it starts (a terminal's own
-    folder, when the instruction came from one), else the home folder."""
+    "{command}"]): {command} becomes the helper's arguments."""
     import platform
     import subprocess
-    argv, system = arguments(template, note, session), platform.system()
-    home = folder if folder and os.path.isdir(folder) else os.path.expanduser("~")
+    argv, home, system = arguments(template, note, session), os.path.expanduser("~"), platform.system()
     if launcher:
         commands = [[part for item in launcher
                      for part in (argv if item == "{command}" else [item.replace("{name}", name)])]]
@@ -223,10 +221,8 @@ def launch(template, note, launcher=None, session="", name="", folder=None):
         text = line(template, note, session)
         if text is None:
             return False
-        import shlex
-        script = "cd %s && %s" % (shlex.quote(home), text)
-        commands = [["osascript", "-e", 'tell application "Terminal" to do script "%s"'
-                     % script.replace("\\", "\\\\").replace('"', '\\"'), "-e", 'tell application "Terminal" to activate']]
+        commands = [["osascript", "-e", 'tell application "Terminal" to do script "cd ~ && %s"'
+                     % text.replace("\\", "\\\\").replace('"', '\\"'), "-e", 'tell application "Terminal" to activate']]
     elif system == "Windows":
         commands = [["wt.exe", "-d", home] + argv, ["cmd.exe", "/c", "start", "", "/d", home, "cmd.exe", "/k"] + argv]
     else:

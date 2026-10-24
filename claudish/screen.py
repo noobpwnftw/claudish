@@ -10,7 +10,6 @@ Linux: AT-SPI (the accessibility bus GNOME and KDE run). Windows: UI Automation 
 macOS: the AX API through pyobjc; the service's Python needs the Accessibility permission.
 Keep importable on PIME's Python 3.6: adapters use `is_terminal` for quiet continue.
 """
-import os
 import re
 import sys
 import time
@@ -110,33 +109,6 @@ def read(app=None):
         return None
     return redact(screen)[0]
 
-
-def folder(app=None):
-    """The working folder of the focused terminal window, or None: macOS Terminal and iTerm publish it
-    as the window's document (the folder in its title bar)."""
-    import sys
-    if sys.platform != "darwin" or not (app and is_terminal(app)):
-        return None
-    try:
-        from urllib.parse import unquote, urlsplit
-        from AppKit import NSRunningApplication
-        from ApplicationServices import (AXIsProcessTrusted, AXUIElementCopyAttributeValue,
-                                         AXUIElementCreateApplication)
-        if not AXIsProcessTrusted():
-            return None
-        for application in NSRunningApplication.runningApplicationsWithBundleIdentifier_(app) or []:
-            element = AXUIElementCreateApplication(application.processIdentifier())
-            error, window = AXUIElementCopyAttributeValue(element, "AXFocusedWindow", None)
-            if error or window is None:
-                continue
-            error, document = AXUIElementCopyAttributeValue(window, "AXDocument", None)
-            if not error and document and str(document).startswith("file://"):
-                path = unquote(urlsplit(str(document)).path)
-                if os.path.isdir(path):
-                    return path.rstrip("/") or "/"
-    except Exception:
-        return None
-    return None
 
 def read_atspi(app):
     import gi
