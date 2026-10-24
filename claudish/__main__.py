@@ -72,6 +72,7 @@ def main():
     shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, your key, the voice")
     shown.add_argument("--url", default="http://127.0.0.1:18765")
     shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
+    shown.add_argument("--first", action="store_true", help="With the first-run line (log out, then Tab)")
     recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
                                  "(in the service's memory only)")
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
@@ -90,9 +91,13 @@ def main():
     args = parser.parse_args(argv)
     if args.command == "settings":
         from .client import settings_url
-        try:
-            url = settings_url(args.url)
-        except OSError:
+        for attempt in range(20):  # just installed, the service may still be starting
+            try:
+                url = settings_url(args.url) + ("&first=1" if args.first else "")
+                break
+            except OSError:
+                time.sleep(0.5)
+        else:
             sys.exit("cd_AI's service is not running, so there are no settings to open. "
                      "Start it with `claudish service install` (or `claudish serve`).")
         if args.print:

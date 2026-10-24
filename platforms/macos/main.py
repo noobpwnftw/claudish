@@ -2,8 +2,7 @@
 
 Started by macOS, it is the input method. With arguments it is the rest of cd_AI, so one bundle
 with its own Python is all an install needs (G61): `Claudish serve|init|key|setup|doctor|...` run
-the claudish command line, `Claudish register` adds and enables the input source, and
-`Claudish settings` opens the settings window.
+the claudish command line, and `Claudish register` adds and enables the input source.
 """
 import os
 import sys
@@ -24,9 +23,6 @@ def command_line():
     """The bundle run with arguments: True when it handled them."""
     if len(sys.argv) < 2:
         return False
-    if sys.argv[1] == "settings":
-        import settings_window
-        sys.exit(settings_window.show(first="--first" in sys.argv))
     if sys.argv[1] == "register":
         import sources
         bundle = NSBundle.mainBundle()

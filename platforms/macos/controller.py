@@ -147,12 +147,19 @@ class ClaudishInputController(IMKInputController):
             self.switch_mode(client)
 
     def showSettings_(self, sender):
-        """Its own process (settings_window.py): a window and menus of its own, apart from typing."""
+        """cd_AI's settings, the same page on every OS, in the browser. Asking the service for the
+        page's link happens off the main thread: the input method never waits on it."""
         import subprocess
-        from Foundation import NSBundle
-        subprocess.Popen([str(NSBundle.mainBundle().executablePath()), "settings"], stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        trace("settings opened")
+        import threading
+        from claudish.client import settings_url
+
+        def open_it():
+            try:
+                subprocess.run(["/usr/bin/open", settings_url()], check=False, timeout=10)
+                trace("settings opened")
+            except Exception:
+                trace("settings failed", traceback.format_exc().splitlines()[-1])
+        threading.Thread(target=open_it, daemon=True).start()
 
     @objc.python_method
     def stop(self):

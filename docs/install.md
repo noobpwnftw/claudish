@@ -41,8 +41,8 @@ silicon, the local model below made slop as well as anything we tried.
    .venv/bin/python -m claudish settings
    ```
 
-   It opens the settings in your browser (on macOS, **Settings…** in the input menu opens them
-   in a window). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
+   It opens the settings in your browser (later, **Settings…** in the input menu opens them
+   again on macOS). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
    where the service reads it (the Keychain on macOS, a file only you can read beside the config
    elsewhere), and uses it from your next keystroke. It never goes into the config. The same
    page picks the voice, or a model server on this computer instead of Claude.

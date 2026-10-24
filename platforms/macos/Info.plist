@@ -51,11 +51,8 @@
 	<string>Claudish_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>ClaudishInputController</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>cd_AI sends what you compose to the model API you chose, here a computer on your network.</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSPrincipalClass</key>

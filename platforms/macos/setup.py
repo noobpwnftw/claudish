@@ -14,8 +14,7 @@ setup(
     version="0.1.0",
     app=[{"script": "main.py", "dest_base": "Claudish"}],
     options={"py2app": {"plist": info,
-                        "includes": ["controller", "panel", "sources", "settings_window", "InputMethodKit", "AppKit",
-                                     "Foundation", "WebKit"],
+                        "includes": ["controller", "panel", "sources", "InputMethodKit", "AppKit", "Foundation"],
                         # the Claude backend, for the service the bundle also runs (G61)
                         # certifi as files, not zipped: the HTTP client opens its cacert.pem by path
                         "packages": ["claudish", "anthropic", "certifi"],
