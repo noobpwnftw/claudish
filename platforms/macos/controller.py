@@ -110,11 +110,13 @@ class ClaudishInputController(IMKInputController):
         """The input menu's items for cd_AI (the menu bar's input source menu)."""
         from AppKit import NSMenu, NSMenuItem
         menu = NSMenu.alloc().initWithTitle_("cd_AI")
+        # macOS can ask a controller that has not been set up for a client yet: no mode to tick then.
+        current = getattr(getattr(self, "state", None), "mode", None)
         # The two modes, the current one ticked, as input methods list theirs (a Shift tap switches too).
         for title, action, mode in (("Compose", "chooseCompose:", "compose"), ("Continue", "chooseContinue:", "continue")):
             item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, "")
             item.setTarget_(self)
-            item.setState_(1 if self.state.mode == mode else 0)
+            item.setState_(1 if current == mode else 0)
             menu.addItem_(item)
         menu.addItem_(NSMenuItem.separatorItem())
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
@@ -131,7 +133,7 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def choose(self, mode):
         client = self.client()
-        if self.state.mode != mode and client is not None:
+        if getattr(self, "state", None) is not None and self.state.mode != mode and client is not None:
             self.switch_mode(client)
 
     def showSettings_(self, sender):
