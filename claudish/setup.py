@@ -234,8 +234,10 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
             missing.append(label)
         if state != "todo" or dry_run:
             continue
-        if label == "Starts at login" and set(missing) & {"llama.cpp", "Model"}:
-            # A login service without its model would only fail at every login.
+        local = any(step[0] == "llama.cpp" for step in steps)
+        if label == "Starts at login" and local and set(missing) & {"llama.cpp", "Model"}:
+            # A local model's service without the model would only fail at every login. (A key is
+            # different: it is saved in the settings, which the running service serves.)
             print("  not yet: the model needs setting up first (%s)" % ", ".join(m for m in missing if m in ("llama.cpp", "Model")))
             continue
         if not (yes or ask("  %s?" % detail[0].upper() + detail[1:])):

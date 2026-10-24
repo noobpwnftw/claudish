@@ -61,20 +61,25 @@ open dist/macos/cd_AI.pkg
 It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
 Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
 
-**Linux and Windows** (developer preview until their installers are ready): paste the prompt from
-[claudish.io](https://claudish.io/#install) into a coding agent, or:
+**Linux** (developer preview, IBus): one line, no sudo (it names any system package to add first):
 
 ```sh
-git clone https://github.com/noobpwnftw/claudish
-cd claudish
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[claude]"
-.venv/bin/python -m claudish setup
-.venv/bin/python -m claudish settings
+curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
 ```
 
-Setup shows each step and asks before doing it, skips what is already done, and ends with
-`claudish doctor`. `claudish settings` opens cd_AI's settings in your browser: paste your Claude
+**Windows** (developer preview until its installer is ready): paste the prompt from
+[claudish.io](https://claudish.io/#install) into a coding agent, or:
+
+```powershell
+git clone https://github.com/noobpwnftw/claudish
+cd claudish
+py -m venv .venv
+.venv\Scripts\python -m pip install -e ".[claude]"
+.venv\Scripts\python -m claudish setup
+```
+
+Setup shows each step and asks before doing it, skips what is already done, runs
+`claudish doctor`, and opens cd_AI's settings in your browser: paste your Claude
 key (checked with Anthropic, kept where the service reads it, never in the config) and pick a
 voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
 instead: `claudish setup --profile local`.

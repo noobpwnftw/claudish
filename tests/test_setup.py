@@ -63,8 +63,8 @@ class SetupTests(unittest.TestCase):
                                          "Input method": "todo", "Starts at login": "todo"})
         _, out = self.quiet(yes=True)
         self.assertIn('Model needs you: pip install "claudish-ime[claude]"', out)
-        self.service_run.assert_not_called()  # not at every login while it has no model
-        self.assertIn("not yet: the model needs setting up first (Model)", out)
+        self.service_run.assert_called_once()  # without a key too: the key goes in the settings it serves
+        self.assertNotIn("not yet", out)
 
     def test_a_local_model_is_an_optional_profile(self):
         self.assertEqual(self.states("local"), {"Config": "todo", "Tone": "done", "MCP servers": "skip",
