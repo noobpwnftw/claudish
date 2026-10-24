@@ -35,7 +35,7 @@ def download(url):
 
 
 def python_for(arch, target, wheels):
-    """An embeddable Python at target, with cd_AI and its Claude extra in Lib\\site-packages."""
+    """An embeddable Python at target, with cd_AI and its Claude and MCP extras in Lib\\site-packages."""
     version = "%d.%d.%d" % sys.version_info[:3]  # this Python's own version has an embeddable build
     embed, platform = ARCHES[arch]
     zipfile.ZipFile(io.BytesIO(download("https://www.python.org/ftp/python/%s/python-%s-embed-%s.zip"
@@ -45,7 +45,7 @@ def python_for(arch, target, wheels):
     pth.write_text(pth.read_text().replace("#import site", "import site") + "Lib\\site-packages\n")
     subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--target", str(target / "Lib/site-packages"),
                     "--platform", platform, "--python-version", "%d.%d" % sys.version_info[:2],
-                    "--implementation", "cp", "--only-binary=:all:", "anthropic>=2", *map(str, wheels)], check=True)
+                    "--implementation", "cp", "--only-binary=:all:", "anthropic>=2", "mcp>=2", *map(str, wheels)], check=True)
 
 
 def pime(pime_root, target):
