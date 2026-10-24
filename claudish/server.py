@@ -1,5 +1,6 @@
 import hmac
 import json
+import sys
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
@@ -340,6 +341,10 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
     class Server(ThreadingHTTPServer):
         daemon_threads = True
+        # On Windows SO_REUSEADDR lets a second process bind a port already in use (on Linux and macOS
+        # it only reuses one in TIME_WAIT): a second `serve` would start beside the first and replace
+        # its token. Without it, the second one finds the port taken and leaves.
+        allow_reuse_address = sys.platform != "win32"
 
         def server_bind(self):
             # HTTPServer looks up the host's name (socket.getfqdn), a reverse lookup that on macOS
