@@ -85,6 +85,20 @@ class SettingsTests(Home):
         name, resolved, _, _ = config.resolve()
         self.assertEqual((name, resolved["backend"]), ("codex", "codex"))  # kept running (claudish/warm.py)
 
+    def test_reselecting_a_subscription_keeps_its_model_and_custom_settings(self):
+        for choice, finder in (("claude-code", "claude_code"), ("codex", "codex")):
+            with self.subTest(choice=choice), patch.object(settings, finder, return_value="/new/" + choice):
+                settings.apply({"choice": choice})
+                data = self.written()
+                data["profiles"][choice].update(model="chosen-model", timeout=42, tone="critic", read_terminal=False)
+                self.path.write_text(json.dumps(data))
+                settings.apply({"choice": "claude"})
+                settings.apply({"choice": choice})
+                profile = self.written()["profiles"][choice]
+                self.assertEqual(profile["command"], ["/new/" + choice])
+                self.assertEqual((profile["model"], profile["timeout"], profile["tone"], profile["read_terminal"]),
+                                 ("chosen-model", 42, "critic", False))
+
     def test_the_extension_copy_is_the_command_not_a_helper_beside_it(self):
         with tempfile.TemporaryDirectory() as home:
             folder = Path(home, ".vscode-server/extensions/openai.chatgpt-26.1/bin/linux-aarch64")

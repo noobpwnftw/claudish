@@ -32,7 +32,9 @@ async def check(args, home, port):
     config = Path(home) / "claudish" / "config.json"
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(executable_path=args.executable)
+        expect.set_options(timeout=1000)
         page = await browser.new_page(viewport={"width": 560, "height": 800})
+        page.set_default_timeout(1000)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.goto(url)
@@ -79,13 +81,80 @@ async def check(args, home, port):
         await expect(bare.locator("#status")).to_contain_text("Settings…")
         await page.reload()  # the window keeps its own settings token
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")
+
+        # The native subscription backends report their own names and lifecycle state. Exercise
+        # the page's real fetch/render path; no CLI login or model is needed for these UI states.
+        lifecycle = {"backend": "claude-code", "model": "warm"}
+
+        async def subscription_state(route):
+            if route.request.url.endswith("/settings") and route.request.method != "POST":
+                await route.continue_()
+                return
+            response = await route.fetch()
+            data = await response.json()
+            data.update(choice=lifecycle["backend"], service=dict(lifecycle))
+            await route.fulfill(response=response, json=data)
+
+        async def health(route):
+            await route.fulfill(json={"backend": lifecycle["backend"], "model": "warm"})
+
+        async def rewrite(route):
+            body = route.request.post_data_json
+            await route.fulfill(json={"text": "A rewrite of " + body["text"]})
+
+        await page.route("**/settings/state", subscription_state)
+        await page.route("**/settings", subscription_state)
+        await page.route("**/health", health)
+        await page.route("**/suggest", rewrite)
+        for backend, name in (("claude-code", "Claude Code"), ("codex", "Codex")):
+            lifecycle.update(backend=backend, model="warm")
+            await page.reload()
+            await expect(page.locator("#status")).to_have_text(f"Ready: {name} writes for you.")
+            await page.locator("#try-text").fill("hello")
+            await page.locator("#try button").click()
+            await expect(page.locator("#sample")).to_have_text("“hello” → “A rewrite of hello”")
+        lifecycle["model"] = "failed: login required"
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text("Codex could not start: login required")
+        await expect(page.locator("#try button")).to_be_enabled()  # retry after logging in
+        await page.locator("#try button").click()
+        await expect(page.locator("#status")).to_have_text("Ready: Codex writes for you.")
+        lifecycle["model"] = "starting"
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text("Starting Codex…")
+        await expect(page.locator("#status")).to_have_text("Ready: Codex writes for you.")
+
+        # A late response from the previous model must not overwrite a newer example.
+        pending, release = asyncio.Event(), asyncio.Event()
+
+        async def delayed_rewrite(route):
+            text = route.request.post_data_json["text"]
+            if text == "old":
+                pending.set()
+                await release.wait()
+            await route.fulfill(json={"text": "A rewrite of " + text})
+
+        await page.route("**/suggest", delayed_rewrite)
+        await page.locator("#try-text").fill("old")
+        await page.locator("#try button").click()
+        await asyncio.wait_for(pending.wait(), 1)
+        # render invalidates the old example when settings change; use the real tone save.
+        await page.locator("#try-text").fill("new")
+        await page.get_by_text("Bard", exact=True).click()
+        await expect(page.locator("#tone-message")).to_have_text("Bard it is.")
+        release.set()
+        await expect(page.locator("#sample")).not_to_contain_text("A rewrite of old")
+        await page.locator("#try button").click()
+        await expect(page.locator("#sample")).to_have_text("“new” → “A rewrite of new”")
+
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)
         await expect(reused.locator("#status")).to_contain_text("expired")
         assert not errors, errors
         await browser.close()
     print("Settings page passed: ticket kept out of the address and good once, tones (named, described), "
-          "a model server (nothing there: not switched; then switched), reload, narrow window, no ticket no settings")
+          "a model server (nothing there: not switched; then switched), subscription startup/failure/retry, "
+          "first rewrite, stale example ignored, reload, narrow window, no ticket no settings")
 
 
 class Models(BaseHTTPRequestHandler):

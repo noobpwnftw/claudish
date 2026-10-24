@@ -28,29 +28,67 @@ function say(id, text, bad) {
   $(id).classList.toggle("bad", Boolean(bad));
 }
 
+function subscription(state) {
+  const names = {"claude-code": "Claude Code", codex: "Codex"};
+  const backend = (state.service || {}).backend;
+  return names[backend] || (backend === "command" ? names[state.choice] : null);
+}
+
 function ready(state) {
   const backend = (state.service || {}).backend;
   return (backend === "claude" && state.key !== "missing") || ((backend === "openai" || backend === "llama") && !state.server_problem)
-    || (backend === "command" && (state.choice === "claude-code" || state.choice === "codex"));
+    || (subscription(state) && (!(state.service || {}).model || state.service.model === "warm"));
 }
 
 function status(state) {
   const backend = (state.service || {}).backend;
+  const name = subscription(state);
+  if (name) {
+    const model = state.service.model || "warm";
+    if (model.startsWith("failed:")) return [`${name} could not start: ${model.slice(7).trim()}`, "bad"];
+    if (model === "starting" || model === "restarting") return [`${model === "starting" ? "Starting" : "Restarting"} ${name}…`, ""];
+    if (model === "stopped") return [`${name} is stopped. Pick it again below to start it.`, "bad"];
+    return [`Ready: ${name} writes for you.`, "good"];
+  }
   if (backend === "claude") return state.key === "missing" ? ["Add your Claude key below to start.", ""] : ["Ready: Claude writes for you.", "good"];
   if (state.server_problem) return [state.server_problem.charAt(0).toUpperCase() + state.server_problem.slice(1) + ".", "bad"];
   if (backend === "openai" || backend === "llama") return [`Ready: ${state.server.model || "your model"} writes for you.`, "good"];
-  if (backend === "command" && state.choice === "claude-code") return ["Ready: Claude Code writes for you.", "good"];
-  if (backend === "command" && state.choice === "codex") return ["Ready: Codex writes for you.", "good"];
   if (backend === "none") return ["Pick a model below to start.", ""];
   return ["cd_AI is running.", ""];
 }
 
-let shown = null;
-function render(state) {
-  shown = state;
+let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer;
+function showStatus(state) {
   const [line, kind] = status(state);
   $("status").textContent = line;
   $("status").className = kind;
+  $("try").querySelector("button").disabled = !ready(state) &&
+    !(subscription(state) && (state.service.model || "").startsWith("failed:"));
+}
+
+function followStartup(version) {
+  if (!shown || !["starting", "restarting"].includes((shown.service || {}).model)) return;
+  healthTimer = setTimeout(async () => {
+    try {
+      const service = await call("/health");
+      if (version !== viewVersion) return;
+      shown.service = service;
+      showStatus(shown);
+      followStartup(version);
+    } catch (error) {
+      if (version === viewVersion) say("status", error.message, true);
+    }
+  }, 500);
+}
+
+function render(state) {
+  shown = state;
+  viewVersion++;
+  sampleVersion++;  // an older model or tone must never supply the displayed example
+  clearTimeout(healthTimer);
+  $("sample").hidden = true;
+  showStatus(state);
+  followStartup(viewVersion);
   $("next").hidden = !recall("cd_AI-first");
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
@@ -112,20 +150,43 @@ function toneRow(value, title, about) {
   return row;
 }
 
-async function sample() {
+async function sample(manual = false) {
   // One real rewrite in the chosen tone: what Tab will do, before you log out and try it.
-  if (!shown || !ready(shown)) return;
+  if (!shown || (!ready(shown) && !(manual && subscription(shown)))) return;
+  const text = $("try-text").value.trim();
+  if (!text) return;
+  const version = ++sampleVersion;
+  const button = $("try").querySelector("button");
+  button.disabled = true;
   $("sample").hidden = false;
-  $("sample").textContent = "Trying it: “ok” becomes…";
+  $("sample").textContent = `Trying it: “${text}” becomes…`;
   try {
-    const answer = await call("/suggest", {text: "ok", mode: "rewrite"});
-    $("sample").textContent = `Trying it: “ok” becomes “${answer.text}”`;
+    const answer = await call("/suggest", {text, mode: "rewrite"});
+    if (version !== sampleVersion) return;
+    if (!answer.text) throw new Error("no rewrite was returned");
+    $("sample").textContent = `“${text}” → “${answer.text}”`;
   } catch (error) {
+    if (version !== sampleVersion) return;
     $("sample").textContent = `The model did not answer: ${error.message}.`;
+  } finally {
+    if (version === sampleVersion) {
+      if (subscription(shown)) {
+        try {
+          const service = await call("/health");
+          if (version !== sampleVersion) return;
+          shown.service = service;
+          showStatus(shown);
+          followStartup(viewVersion);
+        } catch (error) { /* the rewrite already reports a service failure */ }
+      }
+      button.disabled = false;
+    }
   }
 }
 
 async function change(body, message, done) {
+  sampleVersion++;
+  $("sample").hidden = true;
   say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the API…" : "");
   try {
     render(await call("/settings", body));
@@ -134,6 +195,7 @@ async function change(body, message, done) {
     return true;
   } catch (error) {
     say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);
+    if (shown) showStatus(shown);
     return false;  // what you filled in stays, to correct
   }
 }
@@ -168,6 +230,10 @@ $("server").addEventListener("submit", (event) => {
   event.preventDefault();
   change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
          "model-message", "cd_AI now writes with this API.").then((done) => { if (done) $("server-key").value = ""; });
+});
+$("try").addEventListener("submit", (event) => {
+  event.preventDefault();
+  sample(true);
 });
 
 async function start() {

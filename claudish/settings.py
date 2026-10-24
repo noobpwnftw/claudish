@@ -212,11 +212,9 @@ def apply(changes, path=None):
             if not command:  # like a server that is not there: no switch to a model that cannot answer
                 raise ValueError(missing)
             # Kept running beside the service (claudish/warm.py); the full path, so the login service
-            # finds it without the shell's PATH. A tone set earlier stays.
-            tone = (profiles.get(choice) or {}).get("tone")
-            profiles[choice] = dict(config.STARTER["profiles"][choice], command=[command])
-            if tone:
-                profiles[choice]["tone"] = tone
+            # finds it without the shell's PATH. Keep the profile's model, tone and other settings.
+            entry = profiles.setdefault(choice, dict(config.STARTER["profiles"][choice]))
+            entry.update(backend=choice, command=[command])
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))
