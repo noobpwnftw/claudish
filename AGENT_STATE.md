@@ -1,6 +1,6 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-24, `main` at `ff4876c`. An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-24, `main` at `a372df3`. An interactive session on the Spark; no 24/7 runner.
 
 ## Settled
 
@@ -13,12 +13,12 @@ per-platform duct tape; the CJK input-method reviewers weigh most on keys.
 
 ## Current task
 
-Next up, in order: G54 (slop becomes the shipped voice), G55 (Gemma 4 E4B as the local model),
-G56 (onboarding as a funnel, then a reviewer poll on it). Owner direction today: cd_AI is a slop
-keyboard on day 1 and a framework you discover by day 3; compose by default; no model ships
-(Claude with your own key by default, a local model is an optional extra step for savvy users);
-continue suggests only with a local or routed model; English only; the site stays a mix of slop
-and serious; the `ant` CLI is left to savvy users.
+Done today: G54 (voices), G55 (Gemma 4 E4B local), G56 (onboarding funnel, the poll in
+docs/research/2026-10-24-onboarding-poll.md). Next candidates from the poll, by value: G37 (a real
+Mac app with a first run; the install wall for everyone but developers), G58 (SECURITY.md), G59
+(voices without friction), G57 (a share card), G60 (fcitx5). Owner answers today: the terminal's
+lines stay on with any model; Enter keeps summoning (the CJK habit is a later setting, G47, and
+swapping moves every Enter action); setup asks for a voice once; the panel does not name it.
 
 ## Verified (latest)
 
