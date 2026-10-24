@@ -128,6 +128,7 @@ class ClaudishInputController(IMKInputController):
             item.setTarget_(self)
             item.setState_(1 if current == mode else 0)
             menu.addItem_(item)
+        menu.addItem_(NSMenuItem.separatorItem())
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
         item.setTarget_(self)
         menu.addItem_(item)

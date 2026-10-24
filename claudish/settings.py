@@ -42,14 +42,15 @@ def state(path=None):
     return {
         "profile": name, "choice": choice,
         "key": key_state(), "key_where": keys.where(),
-        "server": {"url": server.get("model_url", ""), "model": server.get("model") or ""},
+        "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
+                   "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
         "config": str(path or config.default_path()),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
         # connection on this computer answers at once).
         "server_problem": check_server(server.get("model_url", ""), server.get("model")) if choice == "server" else None,
-        "server_models": server_models(server.get("model_url", "")) or [],
+        "server_models": listed(server.get("model_url", "")) if choice == "server" else [],
     }
 
 
@@ -72,22 +73,45 @@ def check_key(key):
     return None
 
 
-def server_models(url):
-    """The models an OpenAI-compatible server at url has, or None when nothing answers there."""
+LOADING = "loading"  # server_models: the server answers, and is still loading its model
+UNAUTHORIZED = "unauthorized"  # server_models: it wants a (valid) API key
+
+
+def server_models(url, key=None):
+    """The models an OpenAI-compatible server at url has, LOADING while it is still loading one
+    (llama.cpp answers 503 then), or None when nothing answers there. key: its API key, if any
+    (by default the one saved for this address)."""
+    from urllib.error import HTTPError
     from urllib.request import Request, build_opener, ProxyHandler
+    key = key or keys.server_key(url)
+    headers = {"Authorization": "Bearer " + key} if key else {}
     try:
-        with build_opener(ProxyHandler({})).open(Request(url.rstrip("/") + "/v1/models"), timeout=3) as response:
+        with build_opener(ProxyHandler({})).open(Request(url.rstrip("/") + "/v1/models", headers=headers),
+                                                 timeout=5) as response:
             listing = json.load(response)
         return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
+    except HTTPError as exc:
+        return LOADING if exc.code == 503 else UNAUTHORIZED if exc.code in (401, 403) else None
     except Exception:
         return None
 
 
-def check_server(url, model=None):
+def listed(url, key=None):
+    """The server's models, or none while it loads or when nothing answers."""
+    models = server_models(url, key)
+    return models if isinstance(models, list) else []
+
+
+def check_server(url, model=None, key=None):
     """None when the server answers at url and has the model (or names none), else why not."""
-    models = server_models(url)
+    models = server_models(url, key)
     if models is None:
-        return "nothing answers at %s: start Ollama (or your server) first" % url
+        return "nothing answers at %s" % url
+    if models == UNAUTHORIZED:
+        return "%s wants an API key, and did not accept this one" % url if key or keys.server_key(url) \
+            else "%s wants an API key" % url
+    if models == LOADING:
+        return "the server at %s is still loading its model: try again in a moment" % url
     if model and models and model not in models:
         return "the server has no model %r; it has: %s" % (model, ", ".join(models))
     return None
@@ -111,19 +135,22 @@ def apply(changes, path=None):
         keys.store(key.strip())
     if "server" in changes:
         server = changes["server"]
-        url, model = (server.get("url", ""), server.get("model", "")) if isinstance(server, dict) else ("", "")
+        url, model, server_key = (server.get("url", ""), server.get("model", ""), server.get("key") or None) \
+            if isinstance(server, dict) else ("", "", None)
+        if server_key is not None and (not isinstance(server_key, str) or len(server_key) > 400
+                                       or any(c.isspace() for c in server_key.strip())):
+            raise ValueError("paste the whole key, without spaces")
+        server_key = server_key.strip() if server_key else None
         parts = urlsplit(url.strip()) if isinstance(url, str) else None
         if not parts or parts.scheme not in ("http", "https") or not parts.hostname:
-            raise ValueError("the server's address starts with http://, such as http://127.0.0.1:11434")
-        if parts.scheme == "http" and parts.hostname not in ("127.0.0.1", "localhost", "::1"):
-            raise ValueError("a server on another computer needs https://, or what you type crosses the network unencrypted")
+            raise ValueError("an address starts with http:// or https://, such as http://127.0.0.1:11434")
         if not isinstance(model, str) or len(model) > 200:
             raise ValueError("a model's name is a short string")
         if not model.strip():  # the server's only model, or a list to pick from
-            models = server_models(url.strip()) or []
+            models = listed(url.strip(), server_key)
             if len(models) != 1:
-                raise ValueError("pick the model to use: " + ", ".join(models) if models else
-                                 "nothing answers at %s: start Ollama (or your server) first" % url.strip())
+                raise ValueError("pick the model to use: " + ", ".join(models[:20]) if models else
+                                 check_server(url.strip(), key=server_key) or "name the model to use")
             model = models[0]
         entry = profiles.setdefault("ollama", dict(config.STARTER["profiles"]["ollama"]))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
@@ -131,9 +158,12 @@ def apply(changes, path=None):
         raise ValueError("unknown choice")
     if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "ollama"):
         server = profiles.get("ollama", config.STARTER["profiles"]["ollama"])
-        problem = check_server(server["model_url"], server.get("model"))
+        problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
+                               if isinstance(changes.get("server"), dict) else None)
         if problem:  # switching to a server that is not there would leave every rewrite failing
             raise ValueError(problem)
+    if "server" in changes and server_key:  # accepted by the server: saved for its address only
+        keys.store(server_key, keys.server_name(profiles["ollama"]["model_url"]))
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))

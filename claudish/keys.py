@@ -12,8 +12,11 @@ SECURITY = "/usr/bin/security"
 
 
 def key_file(name):
+    import hashlib
     from .config import default_path
-    return default_path().with_name("%s.key" % name)
+    # A server's name is its address: a file name of its hash.
+    plain = name if name.isidentifier() else "server-" + hashlib.sha256(name.encode()).hexdigest()[:16]
+    return default_path().with_name("%s.key" % plain)
 
 
 def stored(name="anthropic"):
@@ -42,6 +45,15 @@ def store(key, name="anthropic"):
     # file or a log.
     subprocess.run([SECURITY, "add-generic-password", "-U", "-s", SERVICE, "-a", name, "-w", key],
                    check=True, capture_output=True, timeout=10)
+
+
+def server_name(url):
+    """A model API's key is saved for its address: it goes to no other."""
+    return "server " + url.strip().rstrip("/")
+
+
+def server_key(url):
+    return stored(server_name(url)) if url else None
 
 
 def where(name="anthropic"):

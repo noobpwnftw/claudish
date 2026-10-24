@@ -24,7 +24,7 @@
         </label>
         <label class="row choice">
           <input type="radio" name="choice" value="server">
-          <span><strong>A model you run yourself</strong><small>Advanced: Ollama, LM Studio or llama.cpp on this computer.</small></span>
+          <span><strong>Another model API</strong><small>Any OpenAI-compatible API: OpenAI, OpenRouter, Groq, or your own Ollama, LM Studio or llama.cpp.</small></span>
         </label>
         <p class="row note" id="other" hidden></p>
       </div>
@@ -46,14 +46,18 @@
       <form class="group" id="server" hidden>
         <div class="row field">
           <label for="url">Address</label>
-          <input id="url" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
+          <input id="url" type="url" spellcheck="false" placeholder="https://api.openai.com or http://127.0.0.1:11434">
+        </div>
+        <div class="row field">
+          <label for="server-key">API key</label>
+          <input id="server-key" type="password" autocomplete="off" spellcheck="false" placeholder="If it needs one">
         </div>
         <div class="row field">
           <label for="model">Model</label>
           <input id="model" type="text" spellcheck="false" list="models" placeholder="The server's model">
           <datalist id="models"></datalist>
         </div>
-        <div class="row actions"><button type="submit">Use this server</button></div>
+        <div class="row actions"><span class="value" id="server-key-state"></span><button type="submit">Use this API</button></div>
       </form>
       <p class="message" id="model-message" role="alert"></p>
       <p class="sample" id="sample" hidden></p>

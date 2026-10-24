@@ -161,6 +161,9 @@ class Rewriter:
             api_key = os.environ.get(settings["api_key_env"])
             if not api_key:
                 raise ValueError("environment variable %s is not set" % settings["api_key_env"])
+        elif settings["backend"] == "openai":
+            from .keys import server_key
+            api_key = server_key(settings["model_url"])  # saved in the settings window for this address
         rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
                        settings["model"], api_key, settings["timeout"], templates, context, settings["modes"],
                        settings["command"], settings["hosted"], settings["bindings"], settings.get("tone"))

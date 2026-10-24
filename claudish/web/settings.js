@@ -61,6 +61,7 @@ function render(state) {
   $("key-state").classList.toggle("good", state.key !== "missing");
   if (document.activeElement !== $("url")) $("url").value = state.server.url;
   if (document.activeElement !== $("model")) $("model").value = state.server.model;
+  $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.key_where}` : "";
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   voices(state);
 }
@@ -122,7 +123,7 @@ async function sample() {
 }
 
 async function change(body, message, done) {
-  say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the server…" : "");
+  say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the API…" : "");
   try {
     render(await call("/settings", body));
     say(message, done);
@@ -137,10 +138,10 @@ async function change(body, message, done) {
 document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
   if (radio.value === "claude") {
     change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.");
-  } else {  // a server must answer before cd_AI switches to it: fill it in first
+  } else {  // an API must answer before cd_AI switches to it: fill it in first
     $("claude").hidden = true;
     $("server").hidden = false;
-    say("model-message", "Fill in your server, then Use this server.");
+    say("model-message", "Fill in the API, then Use this API.");
   }
 }));
 $("claude").addEventListener("submit", async (event) => {
@@ -156,8 +157,8 @@ $("claude").addEventListener("submit", async (event) => {
 });
 $("server").addEventListener("submit", (event) => {
   event.preventDefault();
-  change({server: {url: $("url").value, model: $("model").value}, choice: "server"}, "model-message",
-         "cd_AI now writes with your server.");
+  change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
+         "model-message", "cd_AI now writes with this API.").then((done) => { if (done) $("server-key").value = ""; });
 });
 
 async function start() {

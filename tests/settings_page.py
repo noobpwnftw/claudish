@@ -53,17 +53,17 @@ async def check(args, home, port):
         await expect(page.locator("#voice-message")).to_have_text("Voice saved.")
         assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "plain and friendly"
 
-        await page.get_by_text("A model you run yourself").click()  # the form first: nothing switched yet
+        await page.get_by_text("Another model API").click()  # the form first: nothing switched yet
         await expect(page.locator("#server")).to_be_visible()
         assert json.loads(config.read_text())["profile"] == "claude"
         await page.locator("#url").fill("http://127.0.0.1:%d" % free_port())  # nothing there
         await page.locator("#model").fill("gemma-4")
         await page.locator("#server button").click()
-        await expect(page.locator("#model-message")).to_contain_text("Nothing answers")
+        await expect(page.locator("#model-message")).to_contain_text("Nothing answers at")
         assert json.loads(config.read_text())["profile"] == "claude"  # not switched to a server that is not there
         await page.locator("#url").fill(args.server)
         await page.locator("#server button").click()
-        await expect(page.locator("#model-message")).to_have_text("cd_AI now writes with your server.")
+        await expect(page.locator("#model-message")).to_have_text("cd_AI now writes with this API.")
         profile = json.loads(config.read_text())["profiles"]["ollama"]
         assert (profile["model_url"], profile["model"]) == (args.server, "gemma-4"), profile
         await expect(page.locator("#status")).not_to_have_class("bad")  # it answers (this service's flag keeps rules)

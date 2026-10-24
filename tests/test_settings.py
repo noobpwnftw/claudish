@@ -61,13 +61,34 @@ class SettingsTests(Home):
         self.assertFalse(self.path.exists())
         with patch.object(settings, "check_server", return_value=None):
             state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
-        self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4"}))
+        self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4", "key": "missing"}))
         self.assertEqual(self.written()["profile"], "ollama")
         self.assertEqual(config.resolve()[1]["model_url"], "http://127.0.0.1:1234")
-        for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "},
-                       {"url": "http://192.168.1.9:11434", "model": "x"}):  # unencrypted over the network
+        for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "}):
             with self.assertRaises(ValueError):
                 settings.apply({"server": server})
+
+    @unittest.skipIf(sys.platform == "darwin", "the Keychain on macOS")
+    def test_another_model_api_with_its_key_saved_for_its_address_only(self):
+        sent = []
+
+        def models(url, key=None):
+            sent.append(key)
+            return ["gpt-5-mini"] if key == "sk-good" else settings.UNAUTHORIZED
+        with patch.object(settings, "server_models", models):
+            with self.assertRaisesRegex(ValueError, "wants an API key"):
+                settings.apply({"server": {"url": "https://api.example.com", "model": "", "key": "sk-bad"},
+                                "choice": "server"})
+            self.assertIsNone(keys.server_key("https://api.example.com"))  # refused: not saved
+            state = settings.apply({"server": {"url": "https://api.example.com/", "model": "", "key": "sk-good"},
+                                    "choice": "server"})
+        self.assertEqual(state["server"]["model"], "gpt-5-mini")  # the API's only model
+        self.assertEqual(keys.server_key("https://api.example.com"), "sk-good")
+        self.assertIsNone(keys.server_key("https://elsewhere.example.com"))
+        self.assertNotIn("sk-good", self.path.read_text())  # never in the config
+        from claudish.model import Rewriter
+        rewriter = Rewriter.from_settings(config.resolve()[1])
+        self.assertEqual(rewriter.api_key, "sk-good")  # the backend sends it
 
     def test_a_key_anthropic_refuses_is_not_saved(self):
         with patch.object(settings, "check_key", return_value="Anthropic did not accept that key"), \
