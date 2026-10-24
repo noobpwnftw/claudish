@@ -19,7 +19,8 @@ async function call(path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `the service answered ${response.status}`);
+  const said = data.said && data.said !== "the request failed" ? data.said : "";  // plain words when they say more
+  if (!response.ok) throw new Error(said || data.error || `the service answered ${response.status}`);
   return data;
 }
 

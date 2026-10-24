@@ -22,6 +22,17 @@ def failure(error):
     error = str(error or "").lower()
     if "no model is set up" in error:
         return "no model is set up · claudish setup"
+    # What a new Claude key meets first (Anthropic's own words in the error), said plainly.
+    if "credit balance" in error:
+        return "no credit on your Anthropic account · console.anthropic.com"
+    if "no claude credentials" in error:
+        return "no Claude key yet · Settings…"
+    if "authentication" in error or "x-api-key" in error or "error code: 401" in error:
+        return "Anthropic did not accept the key · Settings…"
+    if "rate limit" in error or "error code: 429" in error:
+        return "too many requests · try again in a moment"
+    if "overloaded" in error or "error code: 529" in error:
+        return "Anthropic is busy · try again in a moment"
     if any(word in error for word in ("refused", "unreachable", "offline", "connect", "not running")):
         return "the model is offline"
     if "timed out" in error or "timeout" in error:

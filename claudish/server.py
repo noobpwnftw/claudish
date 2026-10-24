@@ -336,7 +336,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 answerer = rewriter.route(app, mode) if trusted else rewriter  # which AI answers here
                 result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted)
             except Exception as exc:
-                return self.reply(503, {"error": str(exc)})
+                from .composition import failure
+                return self.reply(503, {"error": str(exc), "said": failure(exc)})  # said: in the panel's words
             self.reply(200, dict(result, hosted=answerer.hosted_name))  # the panel says where it came from
 
     class Server(ThreadingHTTPServer):

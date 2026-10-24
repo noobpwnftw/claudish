@@ -24,6 +24,19 @@ class CompositionTests(unittest.TestCase):
         state.offer(state.revision, "A nuanced perspective.")
         self.assertEqual(state.commit(True), "A nuanced perspective.")
 
+    def test_what_a_new_claude_key_meets_is_said_plainly(self):
+        from claudish.composition import failure
+        said = {
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit "
+            "balance is too low to access the Anthropic API.'}}": "no credit on your Anthropic account · console.anthropic.com",
+            "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}":
+                "Anthropic did not accept the key · Settings…",
+            "no Claude credentials: set ANTHROPIC_API_KEY or run `ant auth login`": "no Claude key yet · Settings…",
+            "Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error'}}": "Anthropic is busy · try again in a moment",
+        }
+        for error, words in said.items():
+            self.assertEqual(failure(error), words)
+
     def test_offline_is_said_from_the_first_key_and_nothing_else_changes(self):
         """Owner poll, 2026-10-24: as cloud input methods grey out their cloud part, compose says the
         service is offline before Tab fails; your words stay held, Shift+Enter keeps them."""
