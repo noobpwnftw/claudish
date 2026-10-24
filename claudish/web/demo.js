@@ -10,7 +10,7 @@ const PREEDIT = $("preedit"), CARET = $("caret"), GHOST = $("ghost"), PLACEHOLDE
 const MAX = 512;
 const HINTS = {
   continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey; Tab takes it. Tap Shift to compose.",
-  compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Enter sends it as an instruction; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
+  compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Enter asks the model to do it; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
 };
 const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
 // [label, mode, text, the key that finishes it]
@@ -116,6 +116,15 @@ function changed() {
 
 async function ask(revision) {
   if (revision !== state.revision) return;
+  if (IN_BROWSER && !browserBackend) {  // nothing to ask yet: the Run button is the next step, not an error
+    state.working = false;
+    if (!live()) state.asked = null;
+    setStatus("Run the model in this browser first: the button above.");
+    $("load-model")?.classList.add("attention");
+    setTimeout(() => $("load-model")?.classList.remove("attention"), 1600);
+    render();
+    return;
+  }
   const text = state.text, mode = live() ? "continue" : state.asked, started = performance.now();
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), Math.max(15000, serviceTimeout * 1000 + 2000));
