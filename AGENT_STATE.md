@@ -1,7 +1,8 @@
 # Maintainer handoff
 
-Checkpoint 2026-10-24, `main` at `626fe8d`: the visual pass merged (every native's lab preview
-reviewed against the lab). An interactive session on the Spark; no 24/7 runner.
+Checkpoint 2026-10-24, `main` at `1218e2a`: templates are data, cd_AI starts in compose, the
+panel anchors at the composition's start; G53 (choosing models) is running. An interactive session
+on the Spark; no 24/7 runner.
 
 ## Settled
 
@@ -14,15 +15,22 @@ per-platform duct tape; the CJK input-method reviewers weigh most on keys.
 
 ## Current task
 
-G45, the visual pass: every presentation (lab, demo, homepage, docs, the three natives) brought to
-the settled design and checked against the lab by reviewers with gallery screenshots, then merged.
+G53, choosing the models by a careful evaluation (owner: no hunches; English only, cd_AI is the
+English input method). Owner's leaning, pending the results: compose by default (done) with a
+frontier model behind it, taking the latency. Runs in the scratchpad (not in the repo): 14 models
+(13 local + Claude Haiku via `claude -p`) x 3 template sets on 80 rewrite and 86 continue cases;
+judged by Gemma 4 26B + Qwen2.5-14B (rewrite, 94% agreement with hand labels when both must pass)
+and Gemma 4 26B + Qwen3-30B (continue, 91% with the checks); `benchmarks/compare.py` picks a
+template per model on the dev half and scores the test half. Latency: GB10, CPU-only 4 threads,
+and wllama in Chromium (`benchmarks/browser_latency.py`). Next: the report in benchmarks/, then
+the defaults follow it.
 
 ## Verified (latest)
 
-- Gate `scripts/check.py --model` 10/10 (`--desktop` 13/13 just before) and CI 5/5 on `626fe8d`.
-- Lab previews (`gallery.sh OUT preview`) reviewed state by state against the lab: Windows 20/20
-  (the legend's em dash fixed: MSVC reads source as cp1252, so non-ASCII literals are `\u` escapes),
-  macOS 20/20, GNOME 8/8. Demo footer stays on one line at 390/768/1280.
+- `1218e2a`: gate `check.py --model` 10/10, CI 5/5; desktop rigs Linux 41/41, GNOME 16/16 (the
+  anchor checks), Windows 15/15 + terminal 4/4, macOS 11/11.
+- Templates refactor (`6b53191`): every prompt byte-identical to before, across tones, modes and
+  box kinds.
 
 ## Open, waiting, or parked
 
@@ -45,7 +53,9 @@ the settled design and checked against the lab by reviewers with gallery screens
   patched PIME, built there with VS Build Tools. Loop: `vm.sh sync` (the last commit), `vm.sh pime`
   and `vm.sh run jobs/build-pime.ps1 900` when the patches change, `vm.sh run jobs/deploy.ps1
   300`, `vm.sh run jobs/typing.ps1 400`; `gallery.sh OUT`; `vmscreen.sh OUT.png`.
-- Models in `models/` (untracked): Qwen 0.5B/1.5B/14B, Qwen3-30B-A3B, Qwen2.5-VL-3B. Extras venv
+- Models in `models/` (untracked): Qwen 0.5B/1.5B/14B, Qwen3-30B-A3B, Qwen2.5-VL-3B, Gemma 4
+  (E2B, E4B, 12B, 26B-A4B; QAT Q4_0, Apache-2.0; thinking off with `--chat-template-kwargs
+  '{"enable_thinking":false}'`), Gemma 3 270M/1B, Qwen3.5 0.8B/2B, LFM2.5 350M/1.2B. Extras venv
   `.tools/claude-venv`; browser venv `.tools/browser-venv`.
 - claudish.io: site/ plus the static demo at /demo/, deployed by .github/workflows/pages.yml on
   every push to main.
