@@ -2,6 +2,8 @@
 
 English goes in. Em dashes come out.
 
+!["ok", Tab: the rewrite in cd_AI's panel; Tab again puts it in (macOS, TextEdit)](docs/cd_AI.gif)
+
 An input method that puts a language model at the caret of every app, on Linux,
 Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 
