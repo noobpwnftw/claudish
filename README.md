@@ -49,42 +49,28 @@ and MCP servers per app, tools it may call, an agent to hand a task to
 
 ## Install
 
-**macOS:** until there is a download, build the installer on a Mac (Python 3.10+ from python.org;
-macOS offers to install git the first time):
+Download from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest); each
+file's SHA-256 is in `SHA256SUMS` beside it. cd_AI ships no model: it asks for your Claude key (an
+[Anthropic API key](https://console.anthropic.com/settings/keys), billed separately from a Claude
+subscription) or another model API, in its settings at the end of the install.
 
-```sh
-git clone https://github.com/noobpwnftw/claudish && cd claudish
-python3 platforms/macos/build.py && python3 platforms/macos/package.py
-open dist/macos/cd_AI.pkg
-```
+- **macOS** (Apple silicon): **cd_AI.pkg**. It is not signed by Apple, so macOS blocks it the first
+  time: click **Done** (not Move to Trash), open **System Settings → Privacy & Security**, scroll
+  down, click **Open Anyway**, and once more **Open Anyway**. The installer asks for no password and
+  ends in cd_AI's settings. Then log out and back in, and pick **cd_AI** in the input menu.
+- **Windows 11** (tested on ARM64; x64 not yet): **cd_AI-setup.exe**. It is not signed, so
+  SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. It asks for
+  an administrator once and ends in cd_AI's settings. Then restart, and pick **cd_AI** with
+  Win+Space. Where PIME is installed with other input methods, it stops rather than replace them.
+- **Linux** (preview, IBus): one line, no sudo; it names any system package to add first.
 
-It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
-Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
+  ```
 
-**Linux** (developer preview, IBus): one line, no sudo (it names any system package to add first):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
-```
-
-**Windows:** `cd_AI-setup.exe`, built with `platforms\windows\package.py` until there is a download
-([how](docs/install.md#windows-input-method)), installs cd_AI with its own Python, adds it to your
-input sources and ends in its settings; sign out and in, then Win+Space. For development, paste the
-prompt from [claudish.io](https://claudish.io/#install) into a coding agent, or:
-
-```powershell
-git clone https://github.com/noobpwnftw/claudish
-cd claudish
-py -m venv .venv
-.venv\Scripts\python -m pip install -e ".[claude]"
-.venv\Scripts\python -m claudish setup
-```
-
-Setup shows each step and asks before doing it, skips what is already done, runs
-`claudish doctor`, and opens cd_AI's settings in your browser: paste your Claude
-key (checked with Anthropic, kept where the service reads it, never in the config) and pick a
-voice. Then log out and back in, and add **cd_AI — Claudish** in your input sources. A local model
-instead: `claudish setup --profile local`.
+**From source:** [docs/install.md](docs/install.md) builds the macOS package and the Windows
+installer, and sets up a checkout with `claudish setup`, for development or a model of your own
+(`claudish setup --profile local`).
 
 ## Keys
 

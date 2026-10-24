@@ -1,11 +1,12 @@
 #!/bin/sh
 # cd_AI on Linux in one line (G61), until there are packages:
-#   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
 # It clones (or updates) cd_AI into ~/.local/share/claudish, makes its own Python environment there,
 # and runs `claudish setup`, which asks before each step and ends in cd_AI's settings (your key,
 # the voice). Nothing here uses sudo: a missing system package is named, with the line to install it.
 set -e
 home=${CLAUDISH_HOME:-$HOME/.local/share/claudish}
+ref=${CLAUDISH_REF:-v0.1.0}  # the release this script belongs to: what was tested is what installs
 
 missing=""
 command -v git > /dev/null || missing="$missing git"
@@ -19,9 +20,9 @@ if [ -n "$missing" ]; then
 fi
 
 if [ -d "$home/.git" ]; then
-  git -C "$home" pull --ff-only --quiet
+  git -C "$home" fetch --quiet --tags origin && git -C "$home" checkout --quiet "$ref"
 else
-  git clone --quiet "${CLAUDISH_REPO:-https://github.com/noobpwnftw/claudish}" "$home"
+  git clone --quiet --branch "$ref" "${CLAUDISH_REPO:-https://github.com/noobpwnftw/claudish}" "$home"
 fi
 cd "$home"
 [ -x .venv/bin/python ] || python3 -m venv .venv

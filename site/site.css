@@ -67,6 +67,7 @@ tr:first-child td{border-top:0}
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:13px;line-height:1.7}
 .prompt pre{padding:18px 20px;color:var(--output-text)}
 .by-hand{margin-top:34px}
+.downloads{list-style:none;padding:0;margin:22px 0 14px;display:grid;gap:16px}.downloads li{display:grid;gap:6px;justify-items:start}.downloads span{font-size:14px;color:var(--muted);text-wrap:pretty}.downloads code{font-size:12.5px;overflow-wrap:anywhere;border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--editor-bg)}
 .commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg)}
 code{font-family:var(--mono);font-size:12px}
 .page-footer{border-top:1px solid var(--line);padding:22px 0 30px;display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.4px;line-height:1.6}
