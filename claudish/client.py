@@ -58,7 +58,7 @@ def settings_url(url="http://127.0.0.1:18765"):
     minute, and only for settings. The page trades it for its own settings token and drops it from
     the address; a fragment is never sent to the service. OSError when no service answers."""
     request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers())
-    with OPENER.open(request, timeout=3) as response:
+    with OPENER.open(request, timeout=10) as response:  # a service just started at login is slow at first
         ticket = json.load(response)["ticket"]
     return "%s/settings#ticket=%s" % (url.rstrip("/"), ticket)
 
@@ -225,8 +225,8 @@ class Suggestions:
                     self.condition.wait(remaining)
                     continue
                 self.pending = None
-            if len(text.strip()) < 3:
-                continue
+            if not text.strip() or (mode == "continue" and len(text.strip()) < 3):
+                continue  # continue asks by itself at every pause, so not for a word or two; Tab asks for anything
             try:
                 # A sent instruction runs as an agent session when the profile has an agent.
                 if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after, purpose):

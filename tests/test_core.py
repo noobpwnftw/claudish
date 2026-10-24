@@ -79,8 +79,29 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_tab_asks_for_a_short_word_continue_does_not(self):
+        """"ok" is the README's own example: a rewrite asked for with Tab is sent whatever its length;
+        continue, which asks by itself at every pause, waits for a few characters."""
+        sent = []
+        with patch("claudish.client.suggest", lambda text, *a, **k: sent.append((text, k.get("mode"))) or {"text": "Sure."}):
+            worker = Suggestions(debounce=0.01)
+            try:
+                worker.schedule(1, "ok", mode="continue")
+                time.sleep(0.05)
+                worker.schedule(2, "ok", mode="rewrite", immediate=True)
+                deadline = time.monotonic() + 1
+                result = None
+                while result is None and time.monotonic() < deadline:
+                    result = worker.poll()
+                    time.sleep(0.001)
+                self.assertEqual(result, (2, {"text": "Sure."}))
+                self.assertEqual(sent, [("ok", "rewrite")])
+            finally:
+                worker.close()
+
 
 class ServiceTests(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         cls.server = make_server(Rewriter("rules"), 0)
