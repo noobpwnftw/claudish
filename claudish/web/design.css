@@ -83,4 +83,4 @@ body.solo .shell{padding:0;max-width:none}
 .drawn th,.drawn td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--line)}
 .drawn tr:first-child th{font-family:var(--mono);font-size:11px;letter-spacing:.8px;color:var(--muted);font-weight:400}
 .drawn td{color:var(--label)}
-@media(max-width:650px){.drawn table{font-size:12px}}
+@media(max-width:650px){.drawn table{font-size:12px}.drawn th,.drawn td{overflow-wrap:anywhere;padding-right:8px}}

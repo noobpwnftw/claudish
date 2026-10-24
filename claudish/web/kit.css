@@ -27,7 +27,7 @@
    who asks or what this is, then the content as is), the rows (the highlighted one tinted, with
    an accent bar and the key that takes it, so it never depends on colour alone), and one footer:
    the AI tile, then each key with its verb. Sized to its content. */
-.k-panel{position:absolute;z-index:3;box-sizing:border-box;min-width:var(--k-min);max-width:var(--k-max);width:max-content;
+.k-panel{position:absolute;z-index:3;box-sizing:border-box;min-width:var(--k-min);max-width:min(var(--k-max),calc(100vw - 32px));width:max-content;
   padding:var(--k-pad);background:var(--k-surface);color:var(--k-text);border:1px solid var(--k-border);
   border-radius:var(--k-radius);box-shadow:var(--k-shadow);-webkit-backdrop-filter:var(--k-backdrop);backdrop-filter:var(--k-backdrop);
   font-family:var(--k-font);font-size:var(--k-size);line-height:var(--k-line);text-align:left;font-synthesis:none}
@@ -59,6 +59,7 @@
 .k-take{position:absolute;right:var(--k-row-x);top:50%;transform:translateY(-50%);font-size:var(--k-small);color:var(--k-muted)}
 .k-take .k-cap{margin-right:0}
 .k-foot{display:flex;flex-wrap:nowrap;align-items:center;gap:4px clamp(7px,2vw,12px);padding:var(--k-row-y) var(--k-row-x) calc(var(--k-row-y) - 1px);font-size:var(--k-small);color:var(--k-muted)}
+@media(max-width:360px){.k-foot{flex-wrap:wrap}}  /* a phone: the keys wrap rather than leave the panel */
 .k-head+.k-foot,.k-row+.k-foot{margin-top:2px}
 .k-hint{white-space:nowrap}
 .k-cap{display:inline-block;font-size:var(--k-cap-size);font-weight:var(--k-cap-weight,inherit);line-height:1.25;padding:var(--k-cap-pad);margin-right:5px;border:var(--k-cap-border);border-radius:4px;color:var(--k-text)}

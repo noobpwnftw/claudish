@@ -1,7 +1,6 @@
 // In-browser backend for the static demo: llama.cpp compiled to WebAssembly (wllama), same templates
 // as the service (templates.json is generated from claudish/modes.py).
-// wllama loads only when the model runs: the page imports this module on every visit to measure
-// what is stored.
+// The page imports this module when you run the model or remove it; wllama loads only to run it.
 const WLLAMA = "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js";
 
 const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm" };

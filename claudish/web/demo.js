@@ -305,6 +305,7 @@ function key(name, shift = false) {
       change(state.dropped); state.dropped = ""; state.editing = true; render();
       return true;
     }
+    if (shift) return false;  // nothing to bring back: the key is the page's, as in composition.py
     if (!state.text) return false;
     if (sent() && state.reply) {  // what you typed goes, and says so; Shift+Esc brings it back
       state.dropped = state.reply; state.droppedReply = true; state.reply = ""; render(); dropped(); return true;
@@ -459,8 +460,13 @@ sink.addEventListener("keydown", (event) => {
     return;  // copy, cut, and paste arrive as events below
   }
   if (event.altKey) return;
-  if (event.key === "Shift") { if (!event.repeat) shiftDownAt = performance.now(); return; }
+  if (event.key === "Shift") {
+    // Right after another key it is rolled typing (a fast capital), not a tap: composition.py's rule.
+    if (!event.repeat) shiftDownAt = performance.now() - typedAt < ROLLED_SHIFT_MS ? null : performance.now();
+    return;
+  }
   shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
+  typedAt = performance.now();
   const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
     .includes(event.key) || (state.asked === "instruct" && state.candidates.length > 1 && (event.key === "ArrowUp" || event.key === "ArrowDown"));
   if (named) {
@@ -471,6 +477,8 @@ sink.addEventListener("keydown", (event) => {
 });
 // A Shift tap switches mode, as Shift switches English and pinyin in a Chinese input method.
 let shiftDownAt = null;
+let typedAt = -Infinity;
+const ROLLED_SHIFT_MS = 300;
 sink.addEventListener("keyup", (event) => {
   if (event.key !== "Shift") return;
   const tapped = shiftDownAt !== null && performance.now() - shiftDownAt <= SHIFT_TAP_MS;
@@ -510,6 +518,11 @@ sink.addEventListener("copy", (event) => clip(event, false));
 sink.addEventListener("cut", (event) => clip(event, true));
 function paste(text) {
   stopTyping();
+  if (sent() && text && (state.reply + text).length <= MAX) {  // a reply: the exchange stays open
+    state.reply += text;
+    render();
+    return;
+  }
   if (!live() && text && (state.text + text).length <= MAX) {
     // Rewrite and instruct: pasted words join the composition, to be rewritten (Tab) or sent
     // (Enter) like typed ones. The installed input method's counterpart is a selection.
@@ -546,6 +559,7 @@ function offsetAt(x, y) {
 }
 let dragging = false;
 $("editor").addEventListener("mousedown", (event) => {
+  shiftDownAt = null;  // Shift+click extends a selection: not a tap
   if (event.target.closest(".candidate-window")) return;
   event.preventDefault();  // any button keeps the keyboard here (a right click used to lose it)
   sink.focus();
