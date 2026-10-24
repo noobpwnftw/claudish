@@ -136,7 +136,20 @@ This adapter does not support an Fcitx-only session or a raw terminal console.
 
 ## Windows input method
 
-Install [PIME](https://github.com/EasyIME/PIME) **with its Python backend** first.
+**The installer.** `cd_AI-setup.exe` installs everything for x64 and ARM64 Windows: cd_AI's PIME
+(the text service, for every app), a Python of its own for the service, and cd_AI in your input
+sources. It asks for an administrator once; the rest is yours: a starter config, the service at
+every login, and cd_AI's settings in your browser (your key, the voice). Then sign out and back in,
+or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
+loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
+"Windows protected your PC"; **More info → Run anyway** lets it through.
+
+Until there is a download, it is built on Windows with Python 3.10+ and Inno Setup 6, over cd_AI's
+PIME (below, built from source): `python platforms\windows\package.py` writes
+`dist\windows\cd_AI-setup.exe`. Verified on Windows 11 ARM64: a first install, a restart, and "ok"
++ Tab in Notepad rewritten through the model API the settings point at.
+
+**By hand** (development): install [PIME](https://github.com/EasyIME/PIME) **with its Python backend** first.
 PIME supplies the native Windows Text Services Framework component. Claudish
 provides a Python service loaded by that component, rather than a keyboard hook.
 

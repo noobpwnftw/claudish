@@ -67,8 +67,10 @@ Then log out and back in, as after any input method. [More](docs/install.md#maco
 curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
 ```
 
-**Windows** (developer preview until its installer is ready): paste the prompt from
-[claudish.io](https://claudish.io/#install) into a coding agent, or:
+**Windows:** `cd_AI-setup.exe`, built with `platforms\windows\package.py` until there is a download
+([how](docs/install.md#windows-input-method)), installs cd_AI with its own Python, adds it to your
+input sources and ends in its settings; sign out and in, then Win+Space. For development, paste the
+prompt from [claudish.io](https://claudish.io/#install) into a coding agent, or:
 
 ```powershell
 git clone https://github.com/noobpwnftw/claudish
