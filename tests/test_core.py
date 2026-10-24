@@ -227,7 +227,7 @@ class PanelNamesTests(unittest.TestCase):
         from claudish.model import api_name
         self.assertEqual([api_name(h) for h in ("api.openai.com", "openrouter.ai", "10.0.0.249", "192.168.1.5",
                                                  "models.example.com")],
-                         ["OpenAI", "OpenRouter", "your network", "your network", "models.example.com"])
+                         ["OpenAI", "OpenRouter", "10.0.0.249", "192.168.1.5", "models.example.com"])
 
 
 if __name__ == "__main__":

@@ -154,19 +154,10 @@ KNOWN_APIS = {"api.openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "api.gr
 
 
 def api_name(host):
-    """A model API as the panel names it: the service's name, "your network" for an address on it
-    (not a bare IP), else its host."""
-    import ipaddress
+    """A model API as the panel names it: the service's name, else its host."""
     if not host:
         return "a hosted model"
-    if host in KNOWN_APIS:
-        return KNOWN_APIS[host]
-    try:
-        if ipaddress.ip_address(host).is_private:
-            return "your network"
-    except ValueError:
-        pass
-    return host
+    return KNOWN_APIS.get(host, host)
 
 
 class Rewriter:
