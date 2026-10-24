@@ -166,3 +166,82 @@ llama-server -m models/Qwen2.5-14B-Instruct-Q4_K_M.gguf --port 18766 -ngl 99
 python benchmarks/judge.py --calibrate
 python benchmarks/judge.py --results benchmarks/eval/spark-small.json
 ```
+
+## Choosing the models (G53, 2026-10-24)
+
+The question: which model makes cd_AI's default voice, full corporate slop that keeps the
+message, and which autocompletes. English only (cd_AI is the English input method).
+
+**Method.** 14 candidates, each through the real service with the slop templates
+([`eval/templates/g53-slop.json`](eval/templates/g53-slop.json)): 13 local GGUFs on llama-server
+(Q4, thinking off) and Claude Haiku through the `claude` CLI. Cases: 80 rewrites
+([`eval/cases.json`](eval/cases.json)) and 86 unfinished sentences
+([`eval/continue_cases.json`](eval/continue_cases.json)). A case passes when it passes the
+mechanical checks (`evaluate.py --slop`: names, numbers, negation, no preamble, sane length;
+`evaluate_continue.py --slop`: something offered, a clean join, no talk about the task, no
+invented pronoun) and the judge passes it. The judge is Gemma 4 26B, chosen by agreement with hand
+labels: rewrite 92% on pass or fail (82 labels), continue 86% (110), slop 90% (110,
+[`eval/slop_labels.json`](eval/slop_labels.json)); Qwen2.5-14B reached 60% on slop and Qwen3-30B
+76% on continue. Cases split in halves by a hash of their id; the table reports the test half.
+Every output and verdict: [`eval/g53-slop-results.json`](eval/g53-slop-results.json).
+
+Rewrite, in the slop voice (test half, 41 cases; latency on the GB10 GPU):
+
+| Model | Size | Pass | 95% interval | Median |
+| --- | ---: | ---: | ---: | ---: |
+| Gemma 4 26B-A4B | 14 GB | 39/41 (95%) | 84–99% | 0.70 s |
+| Gemma 4 E4B | 4.9 GB | 38/41 (93%) | 81–97% | 0.59 s |
+| Gemma 4 12B | 6.5 GB | 38/41 (93%) | 81–97% | 1.28 s |
+| Qwen3-30B-A3B | 18 GB | 34/41 (83%) | 69–91% | 1.01 s |
+| Claude Haiku (CLI) | hosted | 33/41 (80%) | 66–90% | 2.9 s |
+| Gemma 4 E2B | 3.2 GB | 25/41 (61%) | 46–74% | 0.34 s |
+| Qwen3.5-2B | 1.2 GB | 18/41 (44%) | 30–59% | 0.39 s |
+| Gemma 3 1B | 0.8 GB | 16/41 (39%) | 26–54% | 0.21 s |
+| LFM2.5-1.2B | 0.7 GB | 10/41 (24%) | 14–39% | 0.17 s |
+| Qwen3.5-0.8B | 0.5 GB | 7/41 (17%) | 9–31% | 0.16 s |
+| Gemma 3 270M, LFM2.5-350M | 0.2 GB | 3/41 (7%) | 3–19% | 0.06 s |
+| Qwen2.5-1.5B | 1.1 GB | 2/41 (5%) | 1–16% | 0.15 s |
+| Qwen2.5-0.5B (the old default) | 0.5 GB | 1/41 (2%) | 0–13% | 0.08 s |
+
+Continue, in the slop voice (test half, 47 cases):
+
+| Model | Pass | 95% interval | Median |
+| --- | ---: | ---: | ---: |
+| Qwen3-30B-A3B | 45/47 (96%) | 86–99% | 0.78 s |
+| Gemma 4 12B | 44/47 (94%) | 83–98% | 1.03 s |
+| Gemma 4 E4B | 43/47 (91%) | 80–97% | 0.39 s |
+| Gemma 4 26B-A4B | 42/47 (89%) | 77–95% | 0.82 s |
+| Gemma 4 E2B | 39/47 (83%) | 70–91% | 0.24 s |
+| Claude Haiku (CLI) | 34/47 (72%) | 58–83% | 3.0 s |
+| Qwen2.5-1.5B | 33/47 (70%) | 56–81% | 0.11 s |
+| every other model | ≤ 20/47 | | |
+
+Latency where people run it, through the service, median over 20 cases each (rewrite / continue):
+
+| Model | CPU only, 4 threads | In the browser (wllama, 20 cores) |
+| --- | ---: | ---: |
+| Qwen2.5-0.5B | 0.27 / 0.23 s | 0.47 / 0.44 s (13 s to load) |
+| LFM2.5-350M | 0.25 / 0.20 s | 0.45 / 0.65 s |
+| Qwen2.5-1.5B | 0.91 / 0.94 s | 0.91 / 0.94 s (26 s to load) |
+| Qwen3.5-2B | 1.4 / 1.5 s | 6.2 / 4.6 s |
+| Gemma 4 E2B | 1.5 / 1.7 s | too large for wllama (3.3 GB) |
+| Qwen3-30B-A3B | 2.1 / 3.0 s | |
+| Gemma 4 E4B | 3.1 / 4.0 s | |
+| Gemma 4 26B-A4B | 3.3 / 3.0 s | |
+
+**Read with care.** The judge is a Gemma, and Gemma models lead; reading their outputs and
+Haiku's side by side, the lead is real: Haiku's misses are mostly meaning flipped by its
+cheerfulness ("I'm really frustrated with this bug" became "I'm truly thrilled to be circling
+back on this bug"; "this release was a mess" became upbeat), which the rubric rightly fails.
+Haiku ran through the CLI with its examples as a transcript, not as chat turns, and only Haiku of
+the hosted models was tried. Some mechanical failures are strictness on both sides ("30s" written
+"30 seconds", "3 of 40 failed" restated as "37 passed"). Every local number is one GB10, one run,
+greedy decoding.
+
+**Conclusions.** Nothing under 1B parameters makes usable slop (≤ 7%), so a small bundled model
+was never going to carry the voice; shipping none and asking for a model is right. Gemma 4 E4B
+(Apache-2.0, 4.9 GB) does slop as well as anything tried, frontier included, at 0.6 s on a GPU but
+3–4 s on a CPU alone: the local model worth recommending to people with a GPU or Apple silicon,
+in place of Qwen2.5-0.5B. For autocomplete at every pause, Gemma 4 E2B (83%, 0.24 s on a GPU) or
+E4B (91%, 0.39 s). The earlier fidelity runs (the "polished, slightly verbose" voice) measured a
+bar the project no longer aims at and are not reported here.

@@ -33,8 +33,9 @@ def numbers(text):
     return {float(NUMBER_WORDS.get(token.lower(), token)) for token in NUMBER.findall(text)}
 
 
-def check(case, output):
-    """Return the names of failed fidelity checks for one rewrite."""
+def check(case, output, slop=False):
+    """Return the names of failed fidelity checks for one rewrite. slop: the voice may balloon
+    (a paragraph for "ok"); only truncation and a runaway answer fail its length."""
     source = case["text"]
     failures = ["missing:" + item for item in case.get("keep", []) if item not in output]
     if case.get("any_of") and not any(word in output for word in case["any_of"]):
@@ -47,12 +48,15 @@ def check(case, output):
         failures.append("preamble")
     if len(output) > 1 and output[0] in QUOTES and output[-1] in QUOTES and source[0] not in QUOTES:
         failures.append("quoted")
-    if not 0.6 <= len(output) / len(source) <= max(4.0, 40 / len(source)):
+    if slop:
+        if len(output) < 0.6 * len(source) or len(output) > 600:
+            failures.append("length")
+    elif not 0.6 <= len(output) / len(source) <= max(4.0, 40 / len(source)):
         failures.append("length")
     return failures
 
 
-def score(cases, outputs):
+def score(cases, outputs, slop=False):
     rows = []
     for case, (output, error, wall_ms) in zip(cases, outputs):
         row = {"id": case["id"], "category": case["category"], "input": case["text"], "wall_ms": wall_ms}
@@ -60,7 +64,7 @@ def score(cases, outputs):
             row.update(error=error, failures=["error"])
         else:
             changed = output.strip().lower() != case["text"].strip().lower()
-            row.update(output=output, failures=check(case, output), changed=changed,
+            row.update(output=output, failures=check(case, output, slop), changed=changed,
                        em_dash="—" in output and "—" not in case["text"])
         rows.append(row)
     ok = [row for row in rows if not row["failures"]]
@@ -86,6 +90,7 @@ def main():
     parser.add_argument("--cases", type=Path, default=root / "benchmarks/eval/cases.json")
     parser.add_argument("--label", required=True, help="Model and settings, recorded in the output")
     parser.add_argument("--output", type=Path, help="Write full JSON results here")
+    parser.add_argument("--slop", action="store_true", help="The voice is full slop: no length ceiling but 600 characters")
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding="utf-8"))
     try:
@@ -100,7 +105,7 @@ def main():
         except HTTPError as exc:
             output, error = None, json.load(exc).get("error", str(exc))
         outputs.append((output, error, round((time.perf_counter() - start) * 1000, 2)))
-    report = {"label": args.label, **score(cases, outputs)}
+    report = {"label": args.label, "slop": args.slop, **score(cases, outputs, args.slop)}
     if args.output:
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     summary = {key: value for key, value in report.items() if key != "results"}

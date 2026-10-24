@@ -4,6 +4,7 @@ larger local model (G12, G53).
 python benchmarks/judge.py --calibrate                       # agreement with hand labels
 python benchmarks/judge.py --results eval/spark-small.json   # judge an evaluate.py report
 python benchmarks/judge.py --task continue --calibrate       # the same for continue
+python benchmarks/judge.py --task slop --results R.json      # a rewrite in the slop voice
 
 Any OpenAI-compatible server works; llama.cpp constrains the reply to the JSON schema.
 Texts are sent only to --model-url (default: loopback).
@@ -35,6 +36,25 @@ Answer with one verdict:
 Check the language first: if the rewrite is not in the original's language, answer "language"
 even when the meaning matches. Judge strictly: if anything is added or lost, it is not "same".""",
     },
+    "slop": {
+        "labels": ["slop", "tame", "changed", "adds", "reply"],
+        "file": "slop_labels.json",
+        "pair": "Original: %s\nSlop rewrite: %s",
+        "system": """You check an automatic rewrite that is meant to be deliberately over-the-top corporate
+"slop", as a joke: the same message, inflated with effusive buzzwords, em dashes and grandiosity.
+Inflation is the point: flourish, enthusiasm and generic corporate phrases ("align on our shared
+vision", "unlock meaningful synergies") are expected, and they are not added facts. Decide whether
+it keeps the message, and whether it is really slop.
+
+Answer with one verdict:
+- slop: the same message (a yes stays a yes, a no stays a no, a question stays a question; the same addressee; every name, number, date, code term and URL kept), unmistakably inflated into over-the-top corporate prose.
+- tame: the same message, but only lightly polished: it does not read as over-the-top slop.
+- changed: the message is lost or altered: a yes or a no flipped or softened into its opposite, a name, number, date, action or addressee dropped or changed, or a question turned into a statement.
+- adds: it commits the writer to something concrete they did not say: a new fact, date, number, promise or request (generic enthusiasm and buzzwords do not count).
+- reply: it answers or reacts to the original instead of restating it as its writer (for example "Thanks!" becomes "You're welcome!").
+
+Check the meaning first: a changed message is "changed" however funny it is.""",
+    },
     "continue": {
         "labels": ["good", "echo", "off", "reply", "meta"],
         "file": "continue_labels.json",
@@ -42,8 +62,8 @@ even when the meaning matches. Judge strictly: if anything is added or lost, it 
         "system": """You check an autocomplete suggestion: the words an input method offers to put right
 after what the writer has typed so far. The writer takes it with one key or ignores it. A good
 suggestion reads as the writer's own next words: it follows on from the text, joins it cleanly
-(spacing, capitalisation, punctuation), and keeps its voice; it may be polished or slightly
-verbose, and it may say something new, as any continuation does.
+(spacing, capitalisation, punctuation); it may be polished, verbose or deliberately over the top
+whatever the text's own tone, and it may say something new, as any continuation does.
 
 Answer with one verdict:
 - good: the text followed by the suggestion reads as one natural piece of writing by the writer.
@@ -99,7 +119,7 @@ def main():
                "verdicts": dict(Counter(row["verdict"] for row in rows))}
     if args.calibrate:
         exact = sum(row["verdict"] == row["label"] for row in rows)
-        best = TASKS[args.task]["labels"][0]  # "same", "good": the verdict that passes
+        best = TASKS[args.task]["labels"][0]  # "same", "slop", "good": the verdict that passes
         binary = sum((row["verdict"] == best) == (row["label"] == best) for row in rows)
         summary.update(exact_agreement=round(exact / len(rows), 3), pass_vs_not_agreement=round(binary / len(rows), 3),
                        confusion={"%s->%s" % key: count for key, count in sorted(Counter(
