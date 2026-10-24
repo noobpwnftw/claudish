@@ -152,6 +152,21 @@ class ServiceTests(Home):
         except HTTPError as exc:
             return exc.code, json.load(exc)
 
+    def test_a_hand_edit_of_the_config_is_taken_up_at_the_next_request(self):
+        import os
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "p", "profiles": {"p": {"backend": "rules", "tone": "bard"}}}))
+        os.utime(self.path, ns=(1, 1))  # a change the folder's stamp sees, whatever the clock
+        self.assertEqual(self.call("/health")[0], 200)
+        self.assertEqual(self.builds[-1][1]["tone"], "bard")
+        count = len(self.builds)
+        self.call("/health")
+        self.assertEqual(len(self.builds), count)  # unchanged: not rebuilt
+        self.path.write_text("{not json")  # a broken edit leaves the service as it was
+        os.utime(self.path, ns=(2, 2))
+        self.server_reload[0] = lambda: (_ for _ in ()).throw(ValueError("bad config"))
+        self.assertEqual(self.call("/health")[0], 200)
+
     def test_the_page_is_public_its_settings_are_not(self):
         status, page = self.call("/settings", token=False)
         self.assertEqual(status, 200)

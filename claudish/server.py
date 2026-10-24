@@ -20,6 +20,11 @@ def checked_purpose(purpose):
     return purpose
 
 
+def _config_default():
+    from .config import default_path
+    return default_path()
+
+
 def make_server(rewriter, port=18765, token=None, reload=None, config_path=None):
     """token: what the input methods send (client.write_token() for a real service); a fresh one
     when None. Without it, a request is the demo's: text and a mode only, without the profile's
@@ -39,6 +44,34 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         fresh.sessions, fresh.conversations, fresh.recent = rewriter.sessions, rewriter.conversations, rewriter.recent
         rewriter = fresh
         server.rewriter = fresh
+        stamps[0] = stamp()
+
+    def stamp():
+        """When the config folder's JSON files (config.json, templates.json) last changed."""
+        folder = (config_path or _config_default()).parent
+        try:
+            return tuple(sorted((path.name, path.stat().st_mtime_ns) for path in folder.glob("*.json")))
+        except OSError:
+            return ()
+
+    stamps = [stamp()]
+    import threading
+    rebuilding = threading.Lock()
+
+    def edited():
+        """A hand edit of config.json or a templates file: taken up at the next request. One that
+        does not build leaves the service as it was, and says why."""
+        if reload is None or stamp() == stamps[0]:
+            return
+        with rebuilding:
+            if stamp() == stamps[0]:
+                return  # another request took it up
+            stamps[0] = stamp()
+            try:
+                swap()
+                print("Took up the edited config.", flush=True)
+            except Exception as exc:
+                print("The edited config was not taken up: %s" % (exc,), file=sys.stderr, flush=True)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -186,6 +219,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             return self.reply(200, {"events": events, "done": done})
 
         def do_GET(self):
+            edited()
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
             if self.path in ("/favicon.ico", "/favicon.png"):
@@ -288,6 +322,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             return self.reply(200, {"token": session})
 
         def do_POST(self):
+            edited()
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
             if self.path.startswith(("/sessions", "/conversations/", "/recent/")):

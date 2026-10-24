@@ -119,8 +119,12 @@ def resolve(path=None, profile=None, overrides=None):
 
 STARTER = {
     "about": [
-        "Claudish profiles. Pick one with `claudish serve --profile NAME`; \"profile\" is the default.",
-        "Keys never go in this file: name an environment variable with api_key_env.",
+        "cd_AI's profiles; \"profile\" is the one the service runs (cd_AI's settings change it too).",
+        "claude: Anthropic's API, with the key saved in cd_AI's settings (`claudish settings`).",
+        "ollama: any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, a hosted API): set model_url,",
+        "  and model when the server has several. A key: saved in the settings, or api_key_env.",
+        "local: the llama.cpp server and Gemma 4 E4B that `claudish setup --profile local` installs.",
+        "agent: an agent CLI that reads the text on stdin (here Claude Code's `claude -p`).",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
         "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
     ],
@@ -138,10 +142,10 @@ STARTER = {
 # Beside the starter config: the templates a profile reads over cd_AI's own, to find and change.
 STARTER_TEMPLATES = {
     "about": [
-        "Your templates. cd_AI's own are in claudish/templates.json; this file names only what you change,",
+        "Templates over cd_AI's own (claudish/templates.json): this file names only what it changes,",
         "mode by mode and key by key. `claudish templates` prints what a profile ends up with. To switch",
         "tone, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
-        "proofread, or one of yours below. docs/configuration.md#templates has the rest.",
+        "proofread, or one named below. docs/configuration.md#templates has the rest.",
     ],
     "tones": {"named": {"mine": {
         "about": "A tone to edit: set \"tone\": \"mine\" in config.json, then rewrite this one.",

@@ -31,8 +31,10 @@ class CompositionTests(unittest.TestCase):
             "balance is too low to access the Anthropic API.'}}": "no credit on your Anthropic account · console.anthropic.com",
             "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}":
                 "Anthropic did not accept the key · Settings…",
-            "no Claude credentials: set ANTHROPIC_API_KEY or run `ant auth login`": "no Claude key yet · Settings…",
+            "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY": "no Claude key yet · Settings…",
             "Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error'}}": "Anthropic is busy · try again in a moment",
+            "HTTP Error 401: Unauthorized": "the model API did not accept the key · Settings…",
+            "<urlopen error [Errno -5] No address associated with hostname>": "no such address for the model · Settings…",
         }
         for error, words in said.items():
             self.assertEqual(failure(error), words)

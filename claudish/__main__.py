@@ -21,7 +21,7 @@ def main():
     # The flags below override the profile; their defaults live in config.DEFAULTS.
     serve.add_argument("--backend", choices=config.BACKENDS,
                        help="llama/openai: any OpenAI-compatible server at --model-url; "
-                            "claude: the Anthropic API (credentials from ANTHROPIC_API_KEY or `ant auth login`)")
+                            "claude: the Anthropic API (the key saved in cd_AI's settings, or ANTHROPIC_API_KEY)")
     serve.add_argument("--claude-model")
     serve.add_argument("--model-url")
     serve.add_argument("--model", help="Model name to request from an OpenAI-compatible server")
@@ -158,7 +158,8 @@ def main():
             path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
         print("and %s: the words cd_AI says to a model, editable (claudish templates shows them)."
               % path.with_name("templates.json"))
-        print("Try one: claudish serve --profile ollama   (or claude, agent)")
+        print("Pick the model in cd_AI's settings (`claudish settings`), or edit \"profile\" in the file;"
+              " a running service takes up an edit at its next request.")
         return
     if args.command == "templates":
         from . import modes as invocation

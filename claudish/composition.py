@@ -29,6 +29,13 @@ def failure(error):
         return "no Claude key yet · Settings…"
     if "authentication" in error or "x-api-key" in error or "error code: 401" in error:
         return "Anthropic did not accept the key · Settings…"
+    if "http error 401" in error or "http error 403" in error:  # an OpenAI-compatible server's answer
+        return "the model API did not accept the key · Settings…"
+    if "http error 404" in error:
+        return "the model API has no such model or address · Settings…"
+    if any(words in error for words in ("name or service not known", "no address associated", "nodename nor servname",
+                                        "getaddrinfo failed")):
+        return "no such address for the model · Settings…"
     if "rate limit" in error or "error code: 429" in error:
         return "too many requests · try again in a moment"
     if "overloaded" in error or "error code: 529" in error:

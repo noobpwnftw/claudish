@@ -92,7 +92,7 @@ class Claude:
         except TypeError as exc:
             if "authentication" not in str(exc):
                 raise
-            raise RuntimeError("no Claude credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from exc
+            raise RuntimeError("no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY") from exc
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude declined this; your wording is unchanged")
         reply = {"content": "".join(block.text for block in response.content if block.type == "text").strip()}
@@ -115,7 +115,7 @@ class Claude:
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
                 raise
-            raise RuntimeError("no Claude credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from exc
+            raise RuntimeError("no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY") from exc
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude declined this rewrite; your wording is unchanged")
         if response.stop_reason == "max_tokens":
@@ -173,16 +173,16 @@ class Rewriter:
 
     @classmethod
     def from_settings(cls, settings, templates=None, context=None, profile=None):
-        """Build from config.resolve() output. ValueError if the profile's key variable is unset;
-        ImportError if the claude backend lacks the Anthropic SDK."""
-        api_key = None
-        if settings["api_key_env"]:
-            api_key = os.environ.get(settings["api_key_env"])
-            if not api_key:
-                raise ValueError("environment variable %s is not set" % settings["api_key_env"])
-        elif settings["backend"] == "openai":
+        """Build from config.resolve() output; ImportError if the claude backend lacks the Anthropic SDK."""
+        api_key = os.environ.get(settings["api_key_env"]) if settings["api_key_env"] else None
+        if not api_key and settings["backend"] == "openai":
             from .keys import server_key
             api_key = server_key(settings["model_url"])  # saved in the settings window for this address
+        if settings["api_key_env"] and not api_key:
+            # The service still starts (a login service that exits is no input method at all); the
+            # server says no to each request until a key is there.
+            print("%s is not set, and no key is saved for %s: set it, or save the key in cd_AI's settings"
+                  % (settings["api_key_env"], settings["model_url"]), file=sys.stderr, flush=True)
         rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
                        settings["model"], api_key, settings["timeout"], templates, context, settings["modes"],
                        settings["command"], settings["hosted"], settings["bindings"], settings.get("tone"))
@@ -368,6 +368,22 @@ class Rewriter:
         return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose, screen), text,
                                    one_line=kind == "terminal")
 
+    def server_model(self, headers):
+        """A profile without "model": the server's only model (Ollama, LM Studio and hosted APIs
+        want one named; llama.cpp does not). Asked once. None when the server lists none."""
+        if not hasattr(self, "listed_model"):
+            try:
+                with self.opener.open(Request(self.endpoint + "/v1/models", headers=headers), timeout=5) as response:
+                    names = [m.get("id") for m in json.load(response).get("data", []) if isinstance(m, dict)]
+            except (OSError, ValueError, AttributeError):
+                names = []
+            names = [n for n in names if isinstance(n, str)]
+            if len(names) > 1:
+                raise RuntimeError('%s has several models (%s): name one with "model" in the profile, or pick it '
+                                   "in cd_AI's settings" % (self.endpoint, ", ".join(names[:8])))
+            self.listed_model = names[0] if names else None
+        return self.listed_model
+
     def request_headers(self):
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -376,11 +392,15 @@ class Rewriter:
 
     def chat(self, payload, headers, image=None, timeout=None):
         """(the first choice, usage) from /v1/chat/completions; timeout: seconds, else the profile's."""
-        req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
         # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
         # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
         if self.opener is None:
             self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
+        if "model" not in payload and self.backend == "openai":
+            named = self.server_model(headers)
+            if named:
+                payload = dict(payload, model=named)
+        req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
         try:
             with self.opener.open(req, timeout=timeout or self.timeout) as response:
                 data = json.load(response)

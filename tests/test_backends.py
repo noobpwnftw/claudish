@@ -117,9 +117,9 @@ class EndpointBackendTests(unittest.TestCase):
     def call(self, rewriter):
         reply = {"choices": [{"message": {"content": "Indeed—so."}, "finish_reason": "stop"}]}
         with patch("claudish.model.build_opener") as opener:
-            opener.return_value.open.return_value = BytesIO(json.dumps(reply).encode())
+            opener.return_value.open.side_effect = lambda *args, **kwargs: BytesIO(json.dumps(reply).encode())
             self.assertEqual(rewriter.rewrite("so")["text"], "Indeed—so.")
-            request = opener.return_value.open.call_args.args[0]
+            request = opener.return_value.open.call_args_list[-1].args[0]  # the chat request (a nameless model asks /v1/models first)
             return opener.call_args.args, request, json.loads(request.data)
 
     def test_local_server_any_model_and_no_proxy(self):
@@ -138,6 +138,38 @@ class EndpointBackendTests(unittest.TestCase):
         self.assertEqual(request.get_header("Authorization"), "Bearer k-123")
         self.assertEqual(handlers, ())  # default opener: system proxy settings apply
 
+
+    def test_without_a_model_name_the_servers_only_model_is_used(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        listed, sent = [["gemma3:4b"]], []
+
+        class Ollama(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.reply({"data": [{"id": name} for name in listed[0]]})
+
+            def do_POST(self):
+                sent.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                self.reply({"choices": [{"message": {"content": "Indeed—ok."}, "finish_reason": "stop"}]})
+
+            def reply(self, data):
+                body = json.dumps(data).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Ollama)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = "http://127.0.0.1:%d" % server.server_port
+        self.assertEqual(Rewriter("openai", url).rewrite("ok")["text"], "Indeed—ok.")
+        self.assertEqual(sent[0]["model"], "gemma3:4b")  # Ollama refuses a request without one
+        listed[0] = ["gemma3:4b", "qwen3:8b"]
+        with self.assertRaisesRegex(RuntimeError, 'several models .*name one with "model"'):
+            Rewriter("openai", url).rewrite("ok")
 
 class PromptTemplateTests(unittest.TestCase):
     def write(self, data):
