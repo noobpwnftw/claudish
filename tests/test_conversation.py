@@ -196,6 +196,15 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
         self.assertEqual(result["text"], "git stash")
 
+    def test_an_unanswered_question_ends_the_instruction(self):
+        """A model told "no answer" asks again: the instruction stops instead of holding its session."""
+        again = answer(calls=[("user__ask", {"question": "Shall I?"})])
+        model = Scripted(again, again, again, again, again)
+        with patch("claudish.conversation.QUESTION_SECONDS", 0.2):
+            asked, result = self.drive(model, [])
+        self.assertEqual((result["type"], result["text"]), ("error", "no answer, so the instruction stopped"))
+        self.assertLessEqual(len(model.sent), 2)  # it stops at the next call, not after every round
+
     def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
         import os
         import tempfile

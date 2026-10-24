@@ -112,10 +112,10 @@ class ModelDriver:
                 "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
                 approve=lambda *call: self.approve(session, *call),
                 progress=lambda summary: self.progress(session, summary), local=local, serial=False)
-        except RuntimeError:
+        except Exception as exc:  # with MCP servers open, a stop arrives wrapped in an exception group
             if self.cancelled:
                 return
-            if not (self.inserted or self.handed):
+            if not (isinstance(exc, RuntimeError) and (self.inserted or self.handed)):
                 raise
             result = {"consulted": []}  # the model said nothing after an answer was chosen or a helper opened
         if self.cancelled:
@@ -195,8 +195,10 @@ class ModelDriver:
         self.pending[key] = waiter
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
                      label=label, body=text if body is None else body, code=code, read=read)
-        if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the session's slot is not held forever
+        if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the instruction ends, as on Esc
             self.pending.pop(key, None)
+            self.cancel()  # a model told "no answer" asks again; the loop stops at its next call
+            session.emit("error", text="no answer, so the instruction stopped")
             return 1, "no answer"
         return waiter[1] or (1, "cancelled")
 
