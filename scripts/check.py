@@ -47,14 +47,34 @@ def run(name, command):
     return process
 
 
+def units():
+    """The unit tests, one process per file, all at once: the step stays within LIMIT."""
+    files = sorted(path.name for path in (ROOT / "tests").glob("test_*.py"))
+    running = [(name, subprocess.Popen([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", name],
+                                       cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True))
+               for name in files]
+    failed, count = [], 0
+    for name, process in running:
+        output = process.communicate()[0]
+        count += sum(int(line.split()[1]) for line in output.splitlines() if line.startswith("Ran "))
+        if process.returncode:
+            failed.append(name)
+            print(output)
+    print("Ran %d tests in %d files%s" % (count, len(files), ": FAILED " + ", ".join(failed) if failed else ""))
+    raise SystemExit(1 if failed else 0)
+
+
 def skip(name, reason):
     results.append((name, "SKIP", reason))
 
 
 def patched_pime_source(source):
     """The pinned textService.py with Claudish's PIME patch applied (its Python part), or None."""
-    work = Path(tempfile.mkdtemp(prefix="claudish-pime-"))  # outside the checkout: git apply inside a
-    (work / "python").mkdir()                                # repository skips paths outside its folder
+    # Outside the checkout (git apply inside a repository skips paths outside its folder), and the
+    # same folder every run.
+    work = Path(tempfile.gettempdir()) / ("claudish-pime-%d" % os.getuid() if hasattr(os, "getuid") else "claudish-pime")
+    shutil.rmtree(work, ignore_errors=True)
+    (work / "python").mkdir(parents=True)
     target = work / "python/textService.py"
     shutil.copy(source, target)
     applied = subprocess.run(["git", "apply", "--include=python/textService.py",
@@ -66,7 +86,7 @@ def pime_source():
     target = ROOT / ".tools/pime/textService.py"
     if not target.is_file():
         try:
-            data = urlopen(PIME_URL, timeout=30).read()
+            data = urlopen(PIME_URL, timeout=LIMIT).read()
         except OSError as exc:
             return None, "cannot download PIME textService.py: %s" % exc
         if hashlib.sha256(data).hexdigest() != PIME_SHA256:
@@ -87,9 +107,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--browser-python", help="Python with Playwright installed")
     parser.add_argument("--chromium", help="Chromium executable for Playwright")
+    parser.add_argument("--units", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.units:
+        return units()
 
-    run("unit tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests"])
+    run("unit tests", [sys.executable, __file__, "--units"])
     import importlib.util
     missing = [name for name in ("anthropic", "mcp") if importlib.util.find_spec(name) is None]
     if missing:  # their tests were skipped, not failed: say why

@@ -73,7 +73,8 @@ class Claude:
                 options["tools"] = [{"name": name, "input_schema": {"type": "object", "properties": {}}} for name in used]
                 options["tool_choice"] = {"type": "none"}
         try:
-            response = self.client.beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
+            # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
+            response = self.client.with_options(timeout=60.0).beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
                                                         system=system, messages=conversation,
                                                         output_config={"effort": "low"}, **options)
         except TypeError as exc:

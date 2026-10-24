@@ -106,10 +106,15 @@ class ModelDriver:
         local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
         self.handed = self.inserted = None
-        result = rewriter.answer(
-            "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
-            approve=lambda *call: self.approve(session, *call),
-            progress=lambda summary: session.emit("progress", text=summary), local=local, serial=False)
+        try:
+            result = rewriter.answer(
+                "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
+                approve=lambda *call: self.approve(session, *call),
+                progress=lambda summary: session.emit("progress", text=summary), local=local, serial=False)
+        except RuntimeError:
+            if not (self.inserted or self.handed):
+                raise
+            result = {"consulted": []}  # the model said nothing after an answer was chosen or a helper opened
         if self.cancelled:
             return
         if self.inserted:  # an answer you read and chose to insert

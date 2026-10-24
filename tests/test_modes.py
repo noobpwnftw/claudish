@@ -20,6 +20,7 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(modes.finish("continue", "It works", "—mostly."), "It works—mostly.")
         self.assertEqual(modes.finish("continue", "Thanks for", "Thanks for the review."), "Thanks for the review.")
         self.assertEqual(modes.finish("continue", "Thanks", "  "), "")
+        self.assertEqual(modes.finish("continue", "我今天", "去了商店。"), "我今天去了商店。")  # no space in CJK
         self.assertEqual(modes.finish("instruct", "say hi", "Hello—truly."), "Hello—truly.")
         # An echo of the text's last words (any case), quotes, and stray punctuation after a space.
         self.assertEqual(modes.finish("continue", "hello ", "Hello, how are you today?"), "hello how are you today?")

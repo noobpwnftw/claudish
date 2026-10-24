@@ -109,7 +109,9 @@ def finish(mode, text, output):
         output = output.lstrip(",;: ")  # "hello " + ", how are you" reads "hello how are you"
     if not output:
         return ""
-    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" else " "
+    import unicodedata
+    wide = any(unicodedata.east_asian_width(c) in "WF" for c in (text[-1:] or " ", output[0]))  # CJK: no spaces
+    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide else " "
     return text + joiner + output
 
 

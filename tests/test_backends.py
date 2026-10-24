@@ -32,6 +32,9 @@ class FakeSDK:
                 sdk.options = options
                 self.beta = types.SimpleNamespace(messages=types.SimpleNamespace(create=sdk.create))
 
+            def with_options(self, **options):
+                return self
+
         self.module = types.ModuleType("anthropic")
         self.module.Anthropic = Anthropic
 
