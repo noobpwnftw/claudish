@@ -39,3 +39,14 @@ the service token; a change the service cannot use is undone; setup ends in the 
 - What a local model needs on a typical Mac: the test VM (4 GB, 4 virtual cores) cannot hold
   Gemma 4 E4B, so "a model you run yourself" stays an advanced option, unmeasured there.
 - A persistent mode indicator beyond the menu's tick (the Rime user); the CJK-style Enter (G47).
+
+## Follow-up: when the service is down (three reviewers)
+
+Asked whether compose should keep holding words (A), put them in as typed on a failure (B), or type
+like a plain keyboard while the service is unreachable (C): the Rime user and the Mac input-method
+developer chose A with a background check that says "offline" from the first key, as cloud input
+methods grey out their cloud part (C changes the mode under your fingers, B commits what you did not
+ask for); the product manager chose C but with held words kept, which is the same in practice. Done:
+the worker checks /health every few seconds off the input thread; the panel says "cd_AI is offline"
+with Shift+Enter to keep.
+

@@ -77,6 +77,9 @@ class Composition:
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Enter answer it
         self.status = ""  # what the agent is doing, or its draft so far
         self.error = ""  # why the last request failed, in plain words
+        # The service does not answer (the adapter copies Suggestions.offline here): composing says so
+        # from the first key, as cloud input methods grey out their cloud part; nothing else changes.
+        self.offline = False
         self.hosted = ""  # the hosted model the shown result came from ("Claude"); "" when local
 
     def change(self, text):
@@ -186,6 +189,9 @@ class Composition:
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
                          take="Tab",
                          mark=self.hosted and "from %s · hosted" % self.hosted)
+        elif self.offline:  # said from the first key, not found out on Tab: your words stay yours
+            shown.update(tile="warn", failed="cd_AI is offline",
+                         foot=[("Shift+Enter", "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
                              + ([("Esc", "drop")] if self.editing else [("Shift+Enter", "keep")]))

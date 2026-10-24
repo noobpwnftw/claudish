@@ -43,6 +43,7 @@ def main():
         with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \
                 patch("pime_claudish.claudish_ime.focused_app", return_value="notepad.exe"):
             worker_class.return_value.poll.return_value = None
+            worker_class.return_value.offline = False
             service = ClaudishTextService(None)
             reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
             # The mode in the taskbar's input indicator; its menu and a click switch it.

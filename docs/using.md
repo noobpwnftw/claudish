@@ -38,7 +38,9 @@ Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,
 platforms/windows/pime, calls back when it does). Short phrases work best: the buffer is
 limited to 512 characters and generation to 64 tokens. A truncated or failed
-rewrite is never offered; Shift+Enter still keeps your words.
+rewrite is never offered; Shift+Enter still keeps your words. When cd_AI's service does not
+answer (stopped, or just after a laptop wakes), the panel says "cd_AI is offline" from your first
+key, rather than when Tab fails; compose works as always, and Shift+Enter keeps what you typed.
 
 ## Browser demo
 

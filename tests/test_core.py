@@ -24,6 +24,21 @@ class CompositionTests(unittest.TestCase):
         state.offer(state.revision, "A nuanced perspective.")
         self.assertEqual(state.commit(True), "A nuanced perspective.")
 
+    def test_offline_is_said_from_the_first_key_and_nothing_else_changes(self):
+        """Owner poll, 2026-10-24: as cloud input methods grey out their cloud part, compose says the
+        service is offline before Tab fails; your words stay held, Shift+Enter keeps them."""
+        state = Composition()
+        state.offline = True
+        for char in "hi there":
+            state.insert(char)
+        shown = state.panel()
+        self.assertEqual((shown["tile"], shown["failed"]), ("warn", "cd_AI is offline"))
+        self.assertEqual(shown["foot"][0], ("Shift+Enter", "keep"))
+        self.assertEqual((state.text, state.commit()), ("hi there", "hi there"))
+        state.offline = False
+        state.insert("x")
+        self.assertIn(("Tab", "rewrite"), state.panel()["foot"])
+
     def test_edit_focus_and_commit_invalidate_old_results(self):
         state = Composition()
         state.insert("x")
@@ -78,6 +93,16 @@ class WorkerTests(unittest.TestCase):
                 release.set()
                 worker.close()
                 worker.thread.join(1)
+
+    def test_the_worker_knows_when_the_service_is_offline(self):
+        worker = Suggestions(endpoint="http://127.0.0.1:9")  # nothing listens on the discard port
+        try:
+            deadline = time.monotonic() + 2
+            while not worker.offline and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(worker.offline)
+        finally:
+            worker.close()
 
     def test_tab_asks_for_a_short_word_continue_does_not(self):
         """"ok" is the README's own example: a rewrite asked for with Tab is sent whatever its length;

@@ -108,8 +108,23 @@ class Suggestions:
         self.closed = False
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
+        self.offline = False  # the service did not answer its last check
+        self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
+        threading.Thread(target=self._watch, daemon=True).start()
+
+    def _watch(self, every=3.0):
+        """Whether the service answers, checked off the input thread every few seconds, so the panel
+        says it is offline from the first key (a refused connection on this computer fails at once)."""
+        while True:
+            try:
+                with OPENER.open(self.endpoint + "/health", timeout=1):
+                    self.offline = False
+            except Exception:
+                self.offline = True
+            if self.stopped.wait(every):
+                return
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
                  purpose=None):
@@ -150,6 +165,7 @@ class Suggestions:
 
     def close(self):
         """The text box went away: stop, and end its conversation (off the input thread)."""
+        self.stopped.set()
         with self.condition:
             self.closed = True
             self.pending = None

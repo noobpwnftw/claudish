@@ -328,6 +328,8 @@ class ClaudishTextService(TextService):
 
     def poll_results(self):
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
+        if self.worker:
+            self.state.offline = self.worker.offline  # the service stopped or came back
         result = self.worker.poll() if self.worker else None
         if result:
             revision, data = result

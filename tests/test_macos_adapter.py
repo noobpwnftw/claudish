@@ -150,6 +150,7 @@ class Worker:
     def __init__(self):
         self.result = None
         self.closed = False
+        self.offline = False
         self.modes = []
 
     def answer(self, session, question, choice=None, text=None):

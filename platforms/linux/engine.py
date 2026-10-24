@@ -127,6 +127,10 @@ class ClaudishEngine(IBus.Engine):
         self.timer = GLib.timeout_add(40, self.poll)
 
     def poll(self):
+        if self.composition.offline != self.suggestions.offline:  # the service stopped or came back
+            self.composition.offline = self.suggestions.offline
+            if self.composition.text and not self.composition.live:
+                self.render()
         result = self.suggestions.poll()
         if result:
             revision, data = result
