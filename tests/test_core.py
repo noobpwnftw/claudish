@@ -141,10 +141,10 @@ class WorkerTests(unittest.TestCase):
             if answer:
                 raise answer
             return contextlib.nullcontext()
-        worker = Suggestions(endpoint="http://127.0.0.1:9")
-        worker.close()  # its own watcher stops; this test drives one
-        worker.stopped, worker.offline = threading.Event(), False
         with patch("claudish.client.OPENER.open", opened):
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            worker.close()  # its own watcher stops; this test drives one
+            worker.stopped = threading.Event()
             watcher = threading.Thread(target=worker._watch, kwargs={"every": 0.005})
             watcher.start()
             for _ in range(40):
