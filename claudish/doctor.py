@@ -1,7 +1,7 @@
 """`claudish doctor`: check the whole chain, from model to input method, and say how to fix each problem.
 
 Each check returns (status, detail, fix): "ok", "warn" (works, but not as intended), "fail" (broken),
-or "skip" (not applicable here). Nothing here sends typed text anywhere or prints secrets.
+or "skip" (not applicable here).
 """
 import json
 import os

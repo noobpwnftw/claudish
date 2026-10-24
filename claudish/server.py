@@ -16,7 +16,7 @@ def checked_purpose(purpose):
     if purpose is not None and not (isinstance(purpose, str) and purpose.isidentifier() and len(purpose) <= 32):
         raise ValueError("purpose must be a short name")
     if purpose in ("password", "pin"):
-        raise ValueError("secure fields are never sent")  # the adapters stay out of them too
+        raise ValueError("not for this field")
     return purpose
 
 
@@ -39,7 +39,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
-            pass  # Do not log typed text.
+            pass
 
         def reply(self, code, data):
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -61,11 +61,11 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 pass
 
         def trusted(self):
-            """Sent by an input method (it can read the token file), not just any local process."""
+            """Sent by an input method."""
             return hmac.compare_digest(self.headers.get("X-Claudish-Token") or "", token)
 
         def settings_trusted(self):
-            """The settings page's own token (it opens nothing else), or the service token."""
+            """The settings page's token, or the service token."""
             sent = self.headers.get("X-Claudish-Settings") or ""
             return self.trusted() or any(hmac.compare_digest(sent, known) for known in list(settings_tokens))
 
@@ -77,7 +77,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
         def json_request(self, limit=32768):
             """The checked JSON body of a request from this machine's own pages, or None after replying."""
-            origin = self.headers.get("Origin")  # the local demo may call its own API; websites may not
+            origin = self.headers.get("Origin")
             if origin is not None and origin != "http://" + self.headers["Host"]:
                 return self.reply(403, {"error": "cross-origin requests are not accepted"})
             if self.headers.get("Sec-Fetch-Site") == "cross-site":
@@ -154,8 +154,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
         def textbox(self, key, data):
             """POST /conversations/ID/textbox {op: read|search, ...}: the conversation's text box, for
-            its agent (claudish textbox-mcp). Only with the conversation's token: the text box is
-            typed text, so other local processes may not read it."""
+            its agent (claudish textbox-mcp). With the conversation's token."""
             conversation = rewriter.conversations.find(key)
             token = self.headers.get("X-Claudish-Token") or ""
             if conversation is None or not hmac.compare_digest(token, conversation.token):
@@ -218,7 +217,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 from .model import RECENT_SECONDS
                 import time as clock
                 while rewriter.recent and clock.time() - rewriter.recent[0]["time"] > RECENT_SECONDS:
-                    rewriter.recent.popleft()  # what you typed is not kept longer than this
+                    rewriter.recent.popleft()
                 return self.reply(200, {"recent": list(rewriter.recent)})
             if self.path == "/health":
                 return self.reply(200, self.health())
@@ -258,7 +257,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             return self.reply(200, dict(shown, service=self.health()))
 
         def post_ticket(self):
-            """`claudish settings` (it can read the token file) asks for a ticket to put in the page's
+            """`claudish settings` asks for a ticket to put in the page's
             address; the page trades it, once and within a minute, for a token for settings only."""
             import time as clock
             if self.path == "/settings/ticket":
@@ -290,7 +289,6 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return self.post_ticket()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})
-            # The local demo may call its own API; other websites may not.
             origin = self.headers.get("Origin")
             if origin is not None and origin != "http://" + self.headers["Host"]:
                 return self.reply(403, {"error": "cross-origin requests are not accepted"})
@@ -349,7 +347,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
         def server_bind(self):
             # HTTPServer looks up the host's name (socket.getfqdn), a reverse lookup that on macOS
-            # can go out over multicast DNS and raise the Local Network privacy prompt. Loopback
+            # can go out over multicast DNS and raise a macOS prompt. Loopback
             # needs no name.
             TCPServer.server_bind(self)
             self.server_name, self.server_port = "localhost", self.server_address[1]

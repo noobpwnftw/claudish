@@ -67,7 +67,6 @@ class Provider:
             headers = spec.get("headers") or {}
             if not (isinstance(headers, dict) and all(isinstance(v, str) for v in headers.values())):
                 raise ValueError("mcp headers must map names to strings")
-            # "$NAME" values come from the environment, so tokens stay out of the config file.
             self.headers = {key: os.path.expandvars(value) for key, value in headers.items()}
             self.timeout = float(spec.get("timeout", 5))
             self.cwd, self.name = None, spec.get("name") or spec["url"]
@@ -105,7 +104,6 @@ class Provider:
             env = spec.get("env") or {}
             if not (isinstance(env, dict) and all(isinstance(v, str) for v in env.values())):
                 raise ValueError("mcp env must map names to strings")
-            # "$NAME" values come from the environment, so tokens stay out of the config file.
             self.env = {key: os.path.expandvars(value) for key, value in env.items()}
             if getattr(self, "listing", False):
                 self.name = spec.get("name") or "listing"

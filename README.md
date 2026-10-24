@@ -39,8 +39,7 @@ agent whose questions arrive as choices.
 
 ## Voices and templates
 
-Every word cd_AI says to a model is in one
-file you can read and change: `claudish templates` prints it, and `claudish init` writes a
+The templates are in one file: `claudish templates` prints it, and `claudish init` writes a
 `templates.json` to edit. Pick another voice (`salesman`, `critic`, `bard`, or
 `proofread`, which only fixes your typos), or write one. Then give it context: files, commands
 and MCP servers per app, tools it may call, an agent to hand a task to

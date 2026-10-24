@@ -9,7 +9,7 @@
   }
 }
 
-Keys are never stored here: name an environment variable with "api_key_env". With no file, no model
+A key comes from an environment variable named by "api_key_env". With no file, no model
 is set up (backend "none"): compose says so, and continue only types.
 """
 import json

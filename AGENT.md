@@ -84,7 +84,7 @@ counts, fabricated benchmarks, or a constantly growing feature list.
 Use `AGENT_STATE.md` for a compact handoff: current task, last verified revision,
 checks and results, blockers, next action, and owned processes or external work
 still running. Write after meaningful checkpoints, not every keystroke. Never
-store tokens, private user text, or full transient logs there. Read the handoff
+store full transient logs there. Read the handoff
 after a context reset and continue from verified state rather than starting over.
 
 ## Project facts and invariants
@@ -106,12 +106,9 @@ after a context reset and continue from verified state rather than starting over
   and InputMethodKit adapters. Never block an input event on model inference.
 - Stale model results must not replace newer text. Candidate acceptance is
   explicit. Failed inference must leave original wording available. Protect
-  focus changes, shortcuts, secure fields, and Unicode composition semantics.
+  focus changes, shortcuts, password fields, and Unicode composition semantics.
 - Claudish is an interface to model backends the user configures: local
-  servers with any model, or hosted APIs with the user's own keys. Local
-  inference is the default. Typed text goes only to a backend the user
-  explicitly configured, and the demo and `/health` say when it is hosted. Do
-  not add analytics, record keystrokes, or expose the service on the network.
+  servers with any model, or hosted APIs. Claude is the default.
 - Claudish supplies the rewrite template and plumbing; whether a model follows
   the template well is a property of that model. Measure models with the
   evaluation set rather than engineering around them.

@@ -13,9 +13,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 OPENER = build_opener(ProxyHandler({}))
 
 def token_path():
-    """The service's token: written by the service at start (readable by this user only) and sent by
-    the input methods, so other local processes cannot make the service read a text box, a
-    terminal, or a window, or answer an agent's questions."""
+    """The service's token: written by the service at start and sent by the input methods."""
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
     return os.path.join(base, "claudish", "service-token")
 
@@ -29,8 +27,7 @@ def read_token():
 
 
 def write_private(path, text):
-    """Replace path with text, readable by this user only: a fresh temporary file (never one left
-    behind with another mode), then a rename."""
+    """Replace path with text: a fresh temporary file, then a rename."""
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     temporary = str(path) + ".tmp"
     try:
@@ -46,7 +43,7 @@ def write_private(path, text):
 
 
 def write_token(token=None):
-    """This service run's token (a new one when None), in a file only this user can read."""
+    """This service run's token (a new one when None), in its file."""
     import secrets
     token = token or secrets.token_urlsafe(32)
     write_private(token_path(), token)
@@ -54,9 +51,8 @@ def write_token(token=None):
 
 
 def settings_url(url="http://127.0.0.1:18765"):
-    """The settings page of a running service, with a ticket in the fragment: good once, for a
-    minute, and only for settings. The page trades it for its own settings token and drops it from
-    the address; a fragment is never sent to the service. OSError when no service answers."""
+    """The settings page of a running service, with a ticket in the fragment, which the page
+    trades for its settings token. OSError when no service answers."""
     request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers())
     with OPENER.open(request, timeout=10) as response:  # a service just started at login is slow at first
         ticket = json.load(response)["ticket"]

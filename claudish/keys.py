@@ -1,8 +1,7 @@
-"""API keys where the service can read them and config.json never holds them (G61, G62).
+"""API keys where the service can read them (G61, G62).
 
 The environment comes first (ANTHROPIC_API_KEY, or a profile's api_key_env); then the key saved in
-cd_AI's settings: the Keychain on macOS, elsewhere a file beside the config that only this user can
-read. A service started at login sees no shell variables, so a saved key is how one reaches it.
+cd_AI's settings: the Keychain on macOS, elsewhere a file beside the config. A service started at login sees no shell variables, so a saved key is how one reaches it.
 """
 import subprocess
 import sys

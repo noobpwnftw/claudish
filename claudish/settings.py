@@ -4,7 +4,7 @@ The window offers three things (docs/research/2026-10-24-install-poll.md): the C
 voice, and a model server on this computer instead of Claude. They map onto the starter's
 profiles: "claude", and "ollama" for any OpenAI-compatible server (Ollama, LM Studio, llama.cpp).
 A config whose default is another profile is shown as that profile and left to its file.
-The key is saved by claudish/keys.py and never written here.
+The key is saved by claudish/keys.py.
 """
 import json
 import os

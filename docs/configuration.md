@@ -141,9 +141,8 @@ For apps that publish nothing Claudish can read, an instruction can carry a
 picture of the window you are typing in. In compose, press **F8** before
 Enter: the hint shows "instruct + window picture", and the service captures the
 focused window once, sends it with that one instruction, and lists it in
-"consulted". Nothing is captured without F8, F8 never carries over to the next
-instruction, password fields never reach Claudish, and the picture is not stored
-or logged.
+"consulted". Nothing is captured without F8, and F8 never carries over to the next
+instruction.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
   ImageMagick (`sudo apt install x11-utils imagemagick`). On Wayland or macOS,
@@ -191,8 +190,7 @@ caches the text:
  "ttl": 120, "timeout": 15}
 ```
 
-`"$NAME"` values in `env` are read from your environment, so tokens stay out of
-the config file. Use `"resource": "uri"` instead of `"tool"` to read a resource.
+`"$NAME"` values in `env` are read from your environment. Use `"resource": "uri"` instead of `"tool"` to read a resource.
 
 Already using MCP servers with Claude? Bring them along:
 
@@ -323,8 +321,7 @@ The model offers it when a task takes more than an answer at the caret, or
 when you ask ("have claude look into why the build fails"), and you are asked
 first: "Send this task to claude?", with No first and then Yes. Yes opens the helper in a new
 terminal window, on a note with the task and what was observed (a terminal's
-screen, redacted), in a file only you can read; nothing is inserted. The note
-never goes on a command line. Not offered when the program is not installed or
+screen); nothing is inserted. Not offered when the program is not installed or
 the command skips the helper's own permission prompts. Needs a backend with
 tool calls (llama.cpp, any OpenAI-compatible server, or Claude).
 
@@ -399,7 +396,7 @@ of its own; its `"modes"` says only which profile answers a mode (above).
 
 ## Templates
 
-Every word cd_AI says to a model is in
+The templates are in
 [`claudish/templates.json`](../claudish/templates.json): each mode's `system`
 prompt, the `plain` one for boxes that are not prose (a terminal, a URL, a
 number), `examples` as `[input, answer]` pairs, a `frame` around your text

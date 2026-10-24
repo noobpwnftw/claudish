@@ -3,7 +3,7 @@
 claudish mcp import [--dry-run] [--replace]   copy servers from Claude Desktop / Claude Code into the config
 claudish mcp list                             connect to each configured server; show its tools and resources
 claudish context test --app NAME              which bindings match NAME, and what each provider returns
-Secrets are never copied: env and header values become "$NAME" references to your environment.
+Env and header values become "$NAME" references to your environment.
 """
 import json
 import os
@@ -44,7 +44,7 @@ def variable(*parts):
 
 
 def sanitize(name, server):
-    """(server for our config, [environment variables to set]). No secret value is copied."""
+    """(server for our config, [environment variables to set])."""
     needed, clean = [], {}
     if server.get("url"):
         clean["url"] = server["url"]
@@ -99,7 +99,7 @@ def import_servers(path=None, dry_run=False, replace=False):
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         print("Wrote %s." % path)
     if needed:
-        print("Secrets were not copied. Set these in the environment Claudish runs in: %s" % ", ".join(sorted(needed)))
+        print("Set these in the environment Claudish runs in: %s" % ", ".join(sorted(needed)))
     if imported:
         print('Next: `claudish mcp list` shows their tools; use one in a profile\'s "context" or a binding, e.g.\n'
               '  {"type": "mcp", "server": "%s", "tool": "TOOL", "arguments": {}}' % imported[0])

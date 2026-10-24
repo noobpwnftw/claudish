@@ -1,8 +1,7 @@
 """A picture of the focused window, taken only when an instruction asks for it (F8 in instruct mode).
 
 The service runs as the user on the same desktop, so it captures the window the input method is
-typing into. The PNG goes to the configured backend with that one request; it is never stored or
-logged. Linux X11 uses ImageMagick's `import`; Windows uses PrintWindow; elsewhere (Wayland, macOS)
+typing into. The PNG goes to the configured backend with that one request. Linux X11 uses ImageMagick's `import`; Windows uses PrintWindow; elsewhere (Wayland, macOS)
 a profile sets `look_command`, a program that writes a PNG of the focused window to stdout.
 """
 import os

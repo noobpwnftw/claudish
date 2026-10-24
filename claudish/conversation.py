@@ -207,9 +207,7 @@ class ModelDriver:
         return "Shown to the user. Reply with just: OK"
 
     def ask_user(self, session, arguments):
-        """The model's own question, shown as is but marked as the model's: it can never look like
-        one of Claudish's permission questions, and what you type in reply is redacted before it
-        goes back (a question must not be a way to collect a secret)."""
+        """The model's own question, shown as is and marked as the model's."""
         from .screen import redact
         labels = [str(c)[:80] for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
         labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]

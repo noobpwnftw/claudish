@@ -1,8 +1,7 @@
 "use strict";
 // The settings window (claudish/settings.py has the model). `claudish settings` and the macOS
-// window open this page with a ticket in the fragment, which is never sent anywhere: the page
-// trades it, once, for a token that opens settings only, keeps that for this window (a reload
-// keeps working), and drops the ticket from the address.
+// window open this page with a ticket in the fragment; the page trades it for a settings token,
+// keeps that for this window, and drops the ticket from the address.
 const fragment = new URLSearchParams(location.hash.slice(1));
 history.replaceState(null, "", location.pathname);
 const $ = (id) => document.getElementById(id);

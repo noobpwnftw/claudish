@@ -36,8 +36,7 @@ replace newer text, including after composition ends.
 
 The service calls a persistent llama.cpp model with greedy decoding, a short
 style prompt, one example, and prompt caching. Network access is unnecessary
-after downloading dependencies and weights. Default inference and typing traffic
-stay on loopback. Typed text is not written to the service's access logs. Model
+after downloading dependencies and weights. Model
 rewrites can change meaning; they are candidates accepted explicitly with Tab.
 The system prompt and example are in `claudish/model.py`.
 

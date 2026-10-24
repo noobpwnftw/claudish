@@ -96,7 +96,7 @@ multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.
 A purpose-trained model of about 150 MB is planned (ROADMAP G21).
 
-## What was sent
+## Recent requests
 
 `claudish recent` shows the service's last few requests: the mode and the text
 box, which profile and backend answered, what was

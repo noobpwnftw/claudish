@@ -83,7 +83,7 @@ def step_mcp():
     new = sorted(set(found) - set(have))
     if not new:
         return "done", "all %d already imported" % len(found), None
-    return "todo", "import %s from your Claude setup (secrets become $VARIABLES)" % ", ".join(new), \
+    return "todo", "import %s from your Claude setup (values become $VARIABLES)" % ", ".join(new), \
         lambda: mcp_setup.import_servers()
 
 

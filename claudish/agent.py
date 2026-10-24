@@ -57,7 +57,6 @@ class AgentProcess:
         if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):
             session = ["--resume", self.session_id] if self.started else ["--session-id", self.session_id]
         if self.mcp_config and self.config_file is None:
-            # A private file, not an argument: the config carries the conversation's token.
             descriptor, self.config_file = tempfile.mkstemp(prefix="claudish-mcp-", suffix=".json")
             with os.fdopen(descriptor, "w", encoding="utf-8") as config:
                 json.dump(self.mcp_config, config)

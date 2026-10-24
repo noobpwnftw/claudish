@@ -30,13 +30,10 @@ TERMINALS = {
 }
 
 
-# A terminal waiting for a secret (sudo, ssh, gpg, a database client): its screen is not sent.
 SECRET_PROMPT = re.compile(r"(password|passphrase|passcode|\bpin\b|verification code|otp)[^\n]{0,60}:\s*$", re.I)
 
 
-# Secrets that are already on screen (an exported token, a key printed by a tool): replaced before
-# the screen goes anywhere. A best effort for well-known shapes, not a guarantee. (pattern, whether
-# its first group, a name such as "DB_PASSWORD=", stays.)
+# (pattern, whether its first group, a name such as "DB_PASSWORD=", stays.)
 SECRETS = [(re.compile(pattern), keeps_name) for pattern, keeps_name in (
     (r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)", False),
     (r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", False),                        # AWS access key ids
