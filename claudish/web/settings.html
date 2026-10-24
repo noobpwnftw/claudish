@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cd_AI Settings</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="/settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="/favicon.png" alt="" width="40" height="40">
+      <div>
+        <h1>cd_AI</h1>
+        <p id="status" role="status">Loading…</p>
+      </div>
+    </header>
+
+    <section aria-labelledby="model-title">
+      <h2 id="model-title">Model</h2>
+      <div class="group">
+        <label class="row choice">
+          <input type="radio" name="choice" value="claude">
+          <span><strong>Claude</strong><small>Anthropic's models, with your API key. The best slop.</small></span>
+        </label>
+        <label class="row choice">
+          <input type="radio" name="choice" value="server">
+          <span><strong>A model server on this computer</strong><small>Ollama, LM Studio or llama.cpp: anything that speaks the OpenAI API.</small></span>
+        </label>
+        <p class="row note" id="other" hidden></p>
+      </div>
+
+      <form class="group" id="claude" hidden>
+        <div class="row">
+          <label for="key">API key</label>
+          <span class="value" id="key-state"></span>
+        </div>
+        <div class="row field">
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a key: sk-ant-…" aria-describedby="key-help">
+          <button type="submit">Save</button>
+        </div>
+        <p class="row note" id="key-help">No key yet? Make one at console.anthropic.com, under API keys. cd_AI checks it with Anthropic before saving it, and never writes it to its config.</p>
+      </form>
+
+      <form class="group" id="server" hidden>
+        <div class="row field">
+          <label for="url">Address</label>
+          <input id="url" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
+        </div>
+        <div class="row field">
+          <label for="model">Model</label>
+          <input id="model" type="text" spellcheck="false" placeholder="qwen2.5:7b">
+        </div>
+        <div class="row actions"><button type="submit">Save</button></div>
+      </form>
+      <p class="message" id="model-message" role="alert"></p>
+    </section>
+
+    <section aria-labelledby="voice-title">
+      <h2 id="voice-title">Voice</h2>
+      <div class="group" id="voices"></div>
+      <p class="message" id="voice-message" role="alert"></p>
+    </section>
+
+    <footer>
+      <p>These settings live in <code id="config"></code>; templates.json beside it changes the words themselves.</p>
+    </footer>
+  </main>
+</body>
+</html>

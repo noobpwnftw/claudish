@@ -4,7 +4,7 @@ python platforms/macos/package.py [--out dist/macos/cd_AI.pkg]
 
 The package installs for the current user only (~/Library/Input Methods), so it asks for no
 administrator password, and its postinstall stops a cd_AI already running (a reinstall) and does
-the first run with the bundle's own command line:
+the first run (ending, on a first install, in the settings window) with the bundle's own command line:
 a starter config (an existing one is kept), the service at every login, and the input source added
 and enabled (macOS asks once: "Allow … to enable cd_AI?"). Ad-hoc signed like the bundle: a
 browser download is blocked once, and System Settings > Privacy & Security > Open Anyway lets it
@@ -30,9 +30,12 @@ cd_ai="$app/Contents/MacOS/Claudish"
 # on the next key, and the service is started again below.
 launchctl bootout "gui/$(id -u)/com.claudish.service" 2> /dev/null
 killall Claudish 2> /dev/null
+[ -f "$HOME/.config/claudish/config.json" ] || first=1
 "$cd_ai" init > /dev/null 2>&1 || true
 "$cd_ai" service install
 "$cd_ai" register
+# The first install ends in the settings window (the key, the voice); an update opens nothing.
+[ -n "$first" ] && open -n "$app" --args settings
 exit 0
 """
 

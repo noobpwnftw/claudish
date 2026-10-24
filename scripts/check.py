@@ -81,6 +81,11 @@ def port_free(port):
         return probe.connect_ex(("127.0.0.1", port)) != 0
 
 
+def chromium_path(args):
+    return args.chromium or next(iter(sorted(glob.glob(os.path.expanduser(
+        "~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome")))), None)
+
+
 def model_checks(args):
     if not (port_free(18765) and port_free(18766)):
         return skip("model", "ports 18765/18766 are in use; stop the running service first")
@@ -105,8 +110,7 @@ def model_checks(args):
                 results[-1] = ("fidelity eval", "PASS", "%d/%d pass checks, median %.0f ms" % (
                     data["faithful"], data["cases"], data["median_ms"]))
         browser = args.browser_python or ROOT / ".tools/browser-venv/bin/python"
-        chromium = args.chromium or next(iter(sorted(glob.glob(os.path.expanduser(
-            "~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome")))), None)
+        chromium = chromium_path(args)
         if not Path(browser).is_file():
             skip("browser demo", "no Playwright Python (pass --browser-python)")
         else:
@@ -161,6 +165,13 @@ def main():
             results.append(("PIME smoke", "FAIL", "platforms/windows/pime/pime.patch does not apply to the pinned PIME"))
     else:
         skip("PIME smoke", reason)
+    browser = Path(args.browser_python) if args.browser_python else ROOT / ".tools/browser-venv/bin/python"
+    if browser.is_file():  # its own service and config directory: no model, and never yours
+        chromium = chromium_path(args)
+        run("settings page", [str(browser), "tests/settings_page.py"] + (["--executable", chromium] if chromium else []),
+            timeout=120)
+    else:
+        skip("settings page", "no Playwright Python (pass --browser-python)")
     if args.model:
         model_checks(args)
     if args.desktop:

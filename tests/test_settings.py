@@ -1,0 +1,147 @@
+import json
+import os
+import stat
+import sys
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request, build_opener, ProxyHandler
+
+from claudish import config, keys, settings
+from claudish.model import Rewriter
+from claudish.server import make_server
+
+
+class Home(unittest.TestCase):
+    """A config directory of its own, and no key in the environment."""
+
+    def setUp(self):
+        home = tempfile.TemporaryDirectory()
+        self.addCleanup(home.cleanup)
+        environment = patch.dict(os.environ, {"XDG_CONFIG_HOME": home.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+        for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+            os.environ.pop(name, None)
+        if sys.platform == "darwin":  # never the real Keychain
+            store = patch.object(keys, "stored", return_value=None)
+            store.start()
+            self.addCleanup(store.stop)
+        self.path = config.default_path()
+
+    def written(self):
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+
+class SettingsTests(Home):
+    def test_before_any_config_it_shows_the_starter_and_writes_nothing(self):
+        state = settings.state()
+        self.assertEqual((state["choice"], state["key"], state["tone"]), ("claude", "missing", "corporate"))
+        self.assertEqual([tone["name"] for tone in state["tones"]][:1], ["corporate"])
+        self.assertFalse(self.path.exists())
+
+    def test_a_voice_goes_to_every_profile_the_window_manages_and_corporate_clears_it(self):
+        settings.apply({"tone": "critic"})
+        profiles = self.written()["profiles"]
+        self.assertEqual({profiles[n].get("tone") for n in ("claude", "ollama", "local")}, {"critic"})
+        self.assertNotIn("tone", profiles["agent"])  # not the window's
+        self.assertTrue(self.path.with_name("templates.json").is_file())  # the starter's, as init writes it
+        state = settings.apply({"tone": "plain and friendly"})
+        self.assertEqual((state["tone"], state["own_words"]), ("plain and friendly", True))
+        settings.apply({"tone": "corporate"})
+        self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
+
+    def test_a_model_server_on_this_computer(self):
+        state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
+        self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4"}))
+        self.assertEqual(self.written()["profile"], "ollama")
+        self.assertEqual(config.resolve()[1]["model_url"], "http://127.0.0.1:1234")
+        for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "}):
+            with self.assertRaises(ValueError):
+                settings.apply({"server": server})
+
+    def test_a_key_anthropic_refuses_is_not_saved(self):
+        with patch.object(settings, "check_key", return_value="Anthropic did not accept that key"), \
+                patch.object(keys, "store") as store:
+            with self.assertRaisesRegex(ValueError, "did not accept"):
+                settings.apply({"key": "sk-ant-wrong"})
+        store.assert_not_called()
+
+    @unittest.skipIf(sys.platform == "darwin", "the Keychain on macOS")
+    def test_an_accepted_key_is_saved_for_this_user_only_and_never_in_the_config(self):
+        with patch.object(settings, "check_key", return_value=None):
+            state = settings.apply({"key": " sk-ant-good "})
+        self.assertEqual((state["key"], keys.stored()), ("saved", "sk-ant-good"))
+        self.assertEqual(stat.S_IMODE(keys.key_file("anthropic").stat().st_mode), 0o600)
+        self.assertFalse(self.path.exists())  # the key alone writes no config
+        with self.assertRaises(ValueError):
+            settings.apply({"key": "sk-ant one two"})
+
+    def test_only_the_windows_settings(self):
+        for changes in ({"backend": "rules"}, {"choice": "agent"}, {"tone": "two\nlines"}):
+            with self.assertRaises(ValueError):
+                settings.apply(changes)
+
+
+class ServiceTests(Home):
+    """The window's requests over HTTP: token-gated, and the service takes the change up at once."""
+
+    def setUp(self):
+        super().setUp()
+        self.builds = []
+
+        def reload():
+            self.builds.append(config.resolve())
+            return Rewriter("rules", tone=self.builds[-1][1].get("tone"))
+        self.server = make_server(Rewriter("rules"), 0, reload=reload, config_path=self.path)
+        thread = threading.Thread(target=self.server.serve_forever)
+        thread.start()
+        self.addCleanup(thread.join)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.opener = build_opener(ProxyHandler({}))
+
+    def call(self, path, body=None, token=True, origin=None):
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["X-Claudish-Token"] = self.server.token
+        if origin:
+            headers["Origin"] = origin
+        request = Request("http://127.0.0.1:%d%s" % (self.server.server_port, path),
+                          json.dumps(body).encode() if body is not None else None, headers)
+        try:
+            with self.opener.open(request, timeout=10) as response:
+                raw = response.read()
+                return response.status, json.loads(raw) if response.headers.get_content_type() == "application/json" else raw
+        except HTTPError as exc:
+            return exc.code, json.load(exc)
+
+    def test_the_page_is_public_its_settings_are_not(self):
+        status, page = self.call("/settings", token=False)
+        self.assertEqual(status, 200)
+        self.assertIn(b"cd_AI Settings", page)
+        self.assertEqual(self.call("/settings/state", token=False)[0], 403)
+        self.assertEqual(self.call("/settings", {"tone": "bard"}, token=False)[0], 403)
+        self.assertEqual(self.call("/settings", {"tone": "bard"}, origin="http://evil.example")[0], 403)
+        self.assertFalse(self.path.exists())
+
+    def test_a_change_is_written_and_taken_up_by_the_next_request(self):
+        status, state = self.call("/settings", {"tone": "bard"})
+        self.assertEqual((status, state["tone"], state["service"]["backend"]), (200, "bard", "rules"))
+        self.assertEqual(len(self.builds), 1)  # built again from the config just written
+        self.assertEqual(self.builds[0][1]["tone"], "bard")
+        status, state = self.call("/settings/state")
+        self.assertEqual((status, state["tone"]), (200, "bard"))
+
+    def test_a_refused_change_says_why_and_changes_nothing(self):
+        status, answer = self.call("/settings", {"server": {"url": "nope", "model": "x"}})
+        self.assertEqual(status, 400)
+        self.assertIn("http://", answer["error"])
+        self.assertEqual(self.builds, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

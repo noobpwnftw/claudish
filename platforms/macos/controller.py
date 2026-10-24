@@ -106,6 +106,23 @@ class ClaudishInputController(IMKInputController):
     def inputControllerWillClose(self):
         self.stop()
 
+    def menu(self):
+        """The input menu's items for cd_AI (the menu bar's input source menu)."""
+        from AppKit import NSMenu, NSMenuItem
+        menu = NSMenu.alloc().initWithTitle_("cd_AI")
+        item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
+        item.setTarget_(self)
+        menu.addItem_(item)
+        return menu
+
+    def showSettings_(self, sender):
+        """Its own process (settings_window.py): a window and menus of its own, apart from typing."""
+        import subprocess
+        from Foundation import NSBundle
+        subprocess.Popen([str(NSBundle.mainBundle().executablePath()), "settings"], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        trace("settings opened")
+
     @objc.python_method
     def stop(self):
         self.active = False

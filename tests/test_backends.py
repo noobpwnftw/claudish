@@ -199,7 +199,7 @@ class CommandBackendTests(unittest.TestCase):
                 json.dump({"profiles": {"agent": {"backend": "command", "command": [sys.executable, "-c", "print(1)"]}}}, out)
             built = {}
 
-            def make_server(rewriter, port, token=None):
+            def make_server(rewriter, port, token=None, **settings_window):
                 built["rewriter"] = rewriter
                 raise SystemExit(0)
 

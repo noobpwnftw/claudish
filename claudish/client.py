@@ -42,6 +42,16 @@ def write_token(token=None):
     return token
 
 
+def settings_url(url="http://127.0.0.1:18765"):
+    """The settings page of a running service, with its token in the fragment (the page keeps it
+    and drops it from the address; a fragment is never sent). OSError when no service answers."""
+    from urllib.request import urlopen
+    with urlopen(url + "/health", timeout=2):
+        pass
+    with open(token_path(), encoding="utf-8") as source:
+        return "%s/settings#token=%s" % (url.rstrip("/"), source.read().strip())
+
+
 def headers():
     sent = {"Content-Type": "application/json"}
     token = read_token()

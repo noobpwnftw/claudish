@@ -67,8 +67,11 @@ def main():
     context_cmd.add_argument("--profile")
     context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
-    commands.add_parser("key", help="Save your Claude API key where the service reads it (macOS: the Keychain); "
-                                     "it is never written to the config")
+    commands.add_parser("key", help="Save your Claude API key where the service reads it (the Keychain on macOS, "
+                                     "a file only you can read elsewhere); never in the config")
+    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, your key, the voice")
+    shown.add_argument("--url", default="http://127.0.0.1:18765")
+    shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
     recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
                                  "(in the service's memory only)")
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
@@ -85,10 +88,23 @@ def main():
     if argv[:1] == ["service"] and "--" in argv:
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
+    if args.command == "settings":
+        from .client import settings_url
+        try:
+            url = settings_url(args.url)
+        except OSError:
+            sys.exit("cd_AI's service is not running, so there are no settings to open. "
+                     "Start it with `claudish service install` (or `claudish serve`).")
+        if args.print:
+            print(url)
+        else:
+            import webbrowser
+            webbrowser.open(url)
+        return
     if args.command == "key":
         import getpass
         import subprocess
-        from .keys import store
+        from .keys import store, where
         value = getpass.getpass("Claude API key (not shown): ").strip()
         if not value:
             sys.exit("No key given; nothing saved.")
@@ -96,7 +112,7 @@ def main():
             store(value)
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             sys.exit(str(exc))
-        print("Saved in the Keychain (cd_AI). cd_AI's service uses it from its next start.")
+        print("Saved in %s. cd_AI's service uses it from its next start." % where())
         return
     if args.command == "recent":
         if args.clear:
@@ -159,27 +175,32 @@ def main():
         # subcommand's name) must not.
         flags = ("backend", "claude_model", "model_url", "model", "api_key_env", "timeout", "templates", "max_tokens")
         overrides = {key: getattr(args, key) for key in flags}
-        try:
-            profile, settings, templates, context = config.resolve(args.config, args.profile, overrides)
-        except (OSError, ValueError) as exc:
-            parser.error(str(exc))
-        try:
-            rewriter = Rewriter.from_settings(settings, templates, context, profile)
-        except ValueError as exc:
-            parser.error(str(exc))
-        except ImportError:
-            parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
+
         def load(name):
             """Another profile of this config, for an app a binding routes to it."""
             _, routed, routed_templates, routed_context = config.resolve(args.config, name)
             return Rewriter.from_settings(routed, routed_templates, routed_context, name)
-        rewriter.loader = load
+
+        def build():
+            """The rewriter for this config and these flags: at start, and again after the settings
+            window changed the config. ValueError, or ImportError without the Anthropic SDK."""
+            profile, settings, templates, context = config.resolve(args.config, args.profile, overrides)
+            built = Rewriter.from_settings(settings, templates, context, profile)
+            built.loader = load
+            return profile, settings, built
+        try:
+            profile, settings, rewriter = build()
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
+        except ImportError:
+            parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         import errno
         import secrets
         from .client import write_token
         token = secrets.token_urlsafe(32)
         try:
-            server = make_server(rewriter, args.port, token)
+            server = make_server(rewriter, args.port, token, reload=lambda: build()[2],
+                                 config_path=Path(args.config) if args.config else config.default_path())
         except OSError as exc:
             if exc.errno != errno.EADDRINUSE:
                 raise

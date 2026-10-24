@@ -47,8 +47,8 @@ class Claude:
     def __init__(self, model):
         import anthropic  # Optional dependency: pip install "claudish-ime[claude]"
         from .keys import stored
-        # Credentials come from ANTHROPIC_API_KEY, the key saved with `claudish key` (the macOS
-        # Keychain: a login service sees no shell variables), or an `ant auth login` profile.
+        # Credentials come from ANTHROPIC_API_KEY, the key saved in cd_AI's settings (claudish/keys.py:
+        # a login service sees no shell variables), or an `ant auth login` profile.
         # A stale suggestion is useless, so fail fast instead of retrying.
         saved = None if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") else stored()
         self.client = anthropic.Anthropic(timeout=10.0, max_retries=0, **({"api_key": saved} if saved else {}))

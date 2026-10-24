@@ -19,12 +19,20 @@ def checked_purpose(purpose):
     return purpose
 
 
-def make_server(rewriter, port=18765, token=None):
+def make_server(rewriter, port=18765, token=None, reload=None, config_path=None):
     """token: what the input methods send (client.write_token() for a real service); a fresh one
     when None. Without it, a request is the demo's: text and a mode only, without the profile's
-    context; sessions and their answers always need it."""
+    context; sessions and their answers always need it. reload: builds the rewriter again from the
+    config, after the settings window changed it (config_path, the file it reads)."""
     import secrets
     token = token or secrets.token_urlsafe(32)
+
+    def swap():
+        """The settings window's changes, from the next request on: every handler reads `rewriter`."""
+        nonlocal rewriter
+        fresh = reload()
+        fresh.url = rewriter.url
+        rewriter = fresh
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -181,13 +189,21 @@ def make_server(rewriter, port=18765, token=None):
                       "/design.html": ("design.html", "text/html; charset=utf-8"),
                       "/design.css": ("design.css", "text/css; charset=utf-8"),
                       "/design.js": ("design.js", "text/javascript; charset=utf-8"),
-                      "/lab-states.js": ("lab-states.js", "text/javascript; charset=utf-8")}
+                      "/lab-states.js": ("lab-states.js", "text/javascript; charset=utf-8"),
+                      "/settings": ("settings.html", "text/html; charset=utf-8"),
+                      "/settings.css": ("settings.css", "text/css; charset=utf-8"),
+                      "/settings.js": ("settings.js", "text/javascript; charset=utf-8")}
             if self.path in assets:
                 filename, content_type = assets[self.path]
                 body = files("claudish").joinpath("web", filename).read_bytes()
                 return self.send_body(200, body, content_type)
             if self.path.startswith("/sessions/"):
                 return self.get_session()
+            if self.path == "/settings/state":
+                if not self.trusted():
+                    return self.reply(403, {"error": "the service token is required"})
+                from . import settings
+                return self.reply(200, dict(settings.state(config_path), service=self.health()))
             if self.path == "/recent":
                 if not self.trusted():
                     return self.reply(403, {"error": "the service token is required"})
@@ -197,20 +213,43 @@ def make_server(rewriter, port=18765, token=None):
                     rewriter.recent.popleft()  # what you typed is not kept longer than this
                 return self.reply(200, {"recent": list(rewriter.recent)})
             if self.path == "/health":
-                return self.reply(200, {"service": "cd_AI", "backend": rewriter.backend,
-                                        "hosted": rewriter.hosted,
-                                        "profile": getattr(rewriter, "profile", None),
-                                        # Which app goes to which profile (the AI that answers there).
-                                        "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},
-                                        "modes": list(rewriter.modes),
-                                        "timeout": rewriter.timeout})
+                return self.reply(200, self.health())
             self.reply(404, {"error": "not found"})
+
+        def health(self):
+            return {"service": "cd_AI", "backend": rewriter.backend, "hosted": rewriter.hosted,
+                    "profile": getattr(rewriter, "profile", None),
+                    # Which app goes to which profile (the AI that answers there).
+                    "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},
+                    "modes": list(rewriter.modes), "timeout": rewriter.timeout}
+
+        def post_settings(self):
+            """The settings window: its changes go to the config (the key to its store), and the
+            service takes them up at once."""
+            if not self.trusted():
+                return self.reply(403, {"error": "the service token is required"})
+            data = self.json_request()
+            if data is None:
+                return None
+            from . import settings
+            try:
+                shown = settings.apply(data, config_path)
+            except ValueError as exc:
+                return self.reply(400, {"error": str(exc)})
+            if reload is not None:
+                try:
+                    swap()
+                except Exception as exc:  # the config as written does not start: say so, keep serving
+                    return self.reply(200, dict(shown, service=self.health(), problem=str(exc)))
+            return self.reply(200, dict(shown, service=self.health()))
 
         def do_POST(self):
             if not self.valid_host():
                 return self.reply(403, {"error": "local host required"})
             if self.path.startswith(("/sessions", "/conversations/", "/recent/")):
                 return self.post_session()
+            if self.path == "/settings":
+                return self.post_settings()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})
             # The local demo may call its own API; other websites may not.

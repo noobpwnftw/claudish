@@ -22,34 +22,34 @@ silicon, the local model below made slop as well as anything we tried.
    On Windows the venv's Python is `.venv\Scripts\python`. Run every `claudish` command below
    with it; the login service setup installs runs on it too.
 
-2. **Give it your key.** Claudish runs as a background service started at login, so it cannot see
-   a key you `export` in a terminal or put in your shell profile. It never stores keys in its own
-   config either. Either of these works:
-
-   - **The Anthropic CLI** (any OS): `ant auth login` saves your credentials in Anthropic's own
-     folder (`~/.config/anthropic/` on Linux and macOS, `%APPDATA%\Anthropic\` on Windows), and
-     the Anthropic SDK inside Claudish finds them there by itself. Nothing else to set.
-   - **An environment variable for your user account**, which the service picks up from your
-     next login:
-     - Linux: create `~/.config/environment.d/anthropic.conf` containing the line
-       `ANTHROPIC_API_KEY=sk-ant-…`, then log out and back in.
-     - Windows: run `setx ANTHROPIC_API_KEY "sk-ant-…"` in a terminal. It saves the variable to
-       your account (not just that terminal); log out and back in so the service starts with it.
-     - macOS: services started at login do not get variables from your shell, and macOS has no
-       simple equivalent; use the Anthropic CLI.
-
-3. **Run setup:**
+2. **Run setup:**
 
    ```sh
    .venv/bin/python -m claudish setup
    ```
 
    It asks which voice you want (corporate slop unless you pick another: `proofread` keeps your
-   words for work), then shows each step and asks before doing it: write a config (profile `claude`), import MCP
-   servers from your Claude setup, check the model, register the input method, start Claudish
-   at login, then run `doctor`. Steps already done are skipped, so it is safe to run again.
-   `--dry-run` shows the plan and `--yes` does it all. Installing the input method on Windows
-   and macOS needs an administrator, so setup prints that command.
+   words for work), then shows each step and asks before doing it: write a config (profile
+   `claude`), import MCP servers from your Claude setup, check the model, register the input
+   method, start Claudish at login, then run `doctor`. Steps already done are skipped, so it is
+   safe to run again. `--dry-run` shows the plan and `--yes` does it all. Installing the input
+   method on Windows and macOS needs an administrator, so setup prints that command.
+
+3. **Give it your key** in cd_AI's settings:
+
+   ```sh
+   .venv/bin/python -m claudish settings
+   ```
+
+   It opens the settings in your browser (on macOS, **Settings…** in the input menu opens them
+   in a window). Paste your Anthropic API key and Save: cd_AI checks it with Anthropic, saves it
+   where the service reads it (the Keychain on macOS, a file only you can read beside the config
+   elsewhere), and uses it from your next keystroke. It never goes into the config. The same
+   page picks the voice, or a model server on this computer instead of Claude.
+
+   Keys from elsewhere work too: `ant auth login` (the Anthropic CLI), or `ANTHROPIC_API_KEY` in
+   your account's environment (a variable you `export` in a terminal does not reach a service
+   started at login).
 
 4. **Log out and back in**, add **cd_AI — Claudish** in your input sources, and type: Tab asks
    for the rewrite, Enter sends an instruction. The keys are in the [README](../README.md#keys).
@@ -179,40 +179,37 @@ through [PyObjC](https://pyobjc.readthedocs.io/en/latest/apinotes/InputMethodKit
 The builder uses py2app to bundle Python, the adapter, and its shared modules
 into `Claudish.app`. The model runs in a separate process as on Windows/Linux.
 
-On a Mac with a framework build of Python 3.10+ (for example, from python.org):
+**The installer.** Until there is a release to download, build it on a Mac with Python 3.10+
+from python.org:
 
 ```sh
-python3 platforms/macos/build.py --install
+python3 platforms/macos/build.py
+python3 platforms/macos/package.py
+open dist/macos/cd_AI.pkg
 ```
 
-This creates an isolated build environment, installs macOS build dependencies,
-builds `dist/macos/Claudish.app`, applies a local ad-hoc signature, and copies it
-to `~/Library/Input Methods/Claudish.app`. It does not change your active input
-source. Omit `--install` to build only. These commands must run on macOS; the
-Spark cannot build or validate a native Mac app bundle.
+`cd_AI.pkg` installs for you alone (`~/Library/Input Methods`, no administrator password) and does
+the rest: a starter config, the service at every login, and cd_AI added to your input sources and
+selected, with no logout. macOS asks once to allow it to enable cd_AI. On a first install, cd_AI's
+settings open at the end: paste your Claude key, pick a voice. **Settings…** in the input menu
+opens them again. Installing over an older cd_AI stops the old one, replaces it, and asks nothing.
 
-Then log out and back in, and add it in **System Settings → Keyboard → Input
-Sources → Edit… → + → English → cd_AI**. macOS asks you to allow a third-party
-input method there; nothing can add it for you. After you update cd_AI, log out
-and back in again: until then macOS keeps using the bundle it loaded (its name,
-its icon, and sometimes the old code).
+The package is ad-hoc signed, not notarized. A copy downloaded with a browser is blocked the first
+time ("Not Opened"); **System Settings → Privacy & Security → Open Anyway** lets it through.
+`installer -pkg cd_AI.pkg -target CurrentUserHomeDirectory` in Terminal installs it without that.
 
-Log out/in, then add Claudish under **System Settings → Keyboard → Text Input →
-Edit → +** (look under English). Choose it using the Input menu or your configured
-input-source shortcut. The service is what setup started at login (`python3 -m claudish service
-status`), or start it by hand with `python3 -m claudish serve`. For a local model on the Mac,
-see [A local model](#a-local-model-optional): the downloaded CPU build uses Metal on Apple
-silicon.
+The bundle is cd_AI's whole command line too: `~/Library/Input Methods/Claudish.app/Contents/MacOS/Claudish`
+takes `doctor`, `settings`, `service status` and the rest. For development, `build.py --install`
+copies only the bundle; then add it by hand in **System Settings → Keyboard → Text Input → Edit →
++** (under English), and log out and in after each update.
 
 The candidate panel refreshes automatically, and the keys are the same as on the
 other platforms (above). Navigation keys and Command or
 Control shortcuts commit the current wording before being passed through.
 Characters typed with Option, such as — and €, stay in the composition.
-Composition edits currently work at the end of the buffer. Secure fields and
-application-specific composition behavior need native acceptance testing.
+Password fields get their keys untouched.
 
-This is a development bundle, not a notarized release installer. Distribution
-to other users needs Developer ID signing and notarization. To uninstall or
-replace it, switch to another input source, remove Claudish from Input Sources,
-remove `~/Library/Input Methods/Claudish.app`, and log out/in. The installer
-refuses to overwrite an existing installed app.
+**Uninstall:** `Claudish service uninstall` (the bundle's command line, above), switch to another
+input source and remove cd_AI from your input sources, then delete
+`~/Library/Input Methods/Claudish.app`. Your config stays in `~/.config/claudish/`, and a saved key
+in the Keychain under "cd_AI".
