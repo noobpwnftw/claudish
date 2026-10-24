@@ -76,6 +76,50 @@ begin
   Result := '';
 end;
 
+{ Gone now, or at the next restart (a file still in use, a folder not yet empty), in that order. }
+procedure Remove(Path: String; Folder: Boolean);
+var
+  Gone: Boolean;
+begin
+  if Folder then
+    Gone := (not DirExists(Path)) or RemoveDir(Path)
+  else
+    Gone := (not FileExists(Path)) or DeleteFile(Path);
+  if not Gone then
+    RestartReplace(Path, '');
+end;
+
+procedure CurUninstallStepChanged(Step: TUninstallStep);
+var
+  Found: TFindRec;
+  Folder: String;
+  Arch: Integer;
+begin
+  { The text service's DLLs are loaded in running apps: what cannot go now goes at the restart. }
+  if Step <> usPostUninstall then
+    exit;
+  for Arch := 0 to 2 do
+  begin
+    case Arch of
+      0: Folder := ExpandConstant('{app}\PIME\x86');
+      1: Folder := ExpandConstant('{app}\PIME\x64');
+      2: Folder := ExpandConstant('{app}\PIME\arm64');
+    end;
+    if FindFirst(Folder + '\*', Found) then
+    try
+      repeat
+        if Found.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0 then
+          Remove(Folder + '\' + Found.Name, False);
+      until not FindNext(Found);
+    finally
+      FindClose(Found);
+    end;
+    Remove(Folder, True);
+  end;
+  Remove(ExpandConstant('{app}\PIME'), True);
+  Remove(ExpandConstant('{app}'), True);
+end;
+
 procedure AsYou(Arguments: String; Wait: TExecWait);
 var
   Code: Integer;
