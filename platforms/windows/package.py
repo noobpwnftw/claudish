@@ -104,6 +104,9 @@ def main():
         script = script.replace("@%s@" % key, value)
     (payload / "cd_AI.iss").write_text(script, encoding="utf-8")
     shutil.copy(HERE / "claudish/icon.ico", payload / "icon.ico")
+    # `claudish` on PATH, as on Linux and macOS: cd_AI's own Python with -m claudish.
+    (payload / "bin").mkdir()
+    (payload / "bin" / "claudish.cmd").write_bytes(b'@"%~dp0..\\python\\python.exe" -m claudish %*\r\n')
     subprocess.run([str(args.iscc), "/Q", "/O" + str(args.out), str(payload / "cd_AI.iss")], check=True)
     print("Built:", args.out / "cd_AI-setup.exe")
 

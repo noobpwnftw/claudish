@@ -32,7 +32,7 @@ Text Input → Edit… → "Automatically switch to a document's input source"; 
 Keyboard → "Switch input sources individually for each window".
 
 A composition is edited at its end. Navigation keys and Ctrl/Alt/Win shortcuts pressed while
-composing commit your words first; on Windows the first such key is consumed, so press it again.
+composing commit your words first, then act.
 Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
 Every platform shows an answer as it arrives (on Windows, Claudish's own PIME,

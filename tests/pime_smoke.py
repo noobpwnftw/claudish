@@ -45,7 +45,11 @@ def main():
             worker_class.return_value.poll.return_value = None
             worker_class.return_value.offline = False
             service = ClaudishTextService(None)
+            replayed = []  # keys pressed again for the app after a commit
+            replaying = patch("pime_claudish.claudish_ime.replay", lambda vk, modifiers=(): replayed.append((vk, modifiers)))
+            replaying.start()
             reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            assert reply["setSelKeys"].strip() == "", reply["setSelKeys"]  # no digits beside drafts
             # The mode in the taskbar's input indicator; its menu and a click switch it.
             button = [b for b in reply["addButton"] if b["id"] == "windows-mode-icon"][0]
             assert button["icon"].endswith("mode-compose.ico") and os.path.exists(button["icon"]), button
@@ -53,7 +57,7 @@ def main():
             reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
             assert service.state.mode == "continue" and reply["changeButton"][0]["icon"].endswith("mode-continue.ico"), reply
             menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
-            assert [(m["text"], m["checked"]) for m in menu[:2]] == [("compose", False), ("continue", True)], menu
+            assert [(m["text"], m["checked"]) for m in menu[:2]] == [("Compose", False), ("Continue", True)], menu
             assert menu[2] == {} and menu[3]["text"] == "Settings…", menu  # a separator, then the settings
             service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
             assert service.state.mode == "compose"
@@ -94,10 +98,13 @@ def main():
             assert reply["compositionString"] == "hello-world"
             # A modifier and a shortcut must not consume or rewrite composition.
             assert not key(0x10, method="filterKeyDown")["return"]
-            # Ctrl/Alt shortcuts mid-composition: commit the wording first, then pass the key on.
+            # Ctrl/Alt shortcuts mid-composition: commit the wording, then the key reaches the app
+            # (taken, then pressed again): one press does both.
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
             reply = key(ord("C"), modifiers=(0x11,))
-            assert reply["commitString"] == "hello-world" and reply["return"], reply  # committed, key consumed
+            assert reply["commitString"] == "hello-world" and reply["return"], reply
+            assert replayed == [(ord("C"), [0x11])], replayed  # with Ctrl, pressed again if let go
+            assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]  # the replay passes
             for char in "hello-world":
                 key(ord(char.upper()), ord(char))
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True
@@ -249,8 +256,39 @@ def main():
                 assert reply.get("commitString") == "s", reply
                 assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
                 print("patched PIME: text around the caret, answers on a timer, input scopes, one conversation per field, password fields")
+            # Another input method takes over: the worker is parked, not closed, and the next cd_AI
+            # instance in this window takes it up, in the same mode. Each instance gets a worker of
+            # its own here, so taking up the parked one is visible.
+            from unittest.mock import MagicMock
+            worker_class.side_effect = lambda: MagicMock(offline=False, **{"poll.return_value": None})
+            parked_worker = service.worker
             service.handleRequest({"method": "onDeactivate"})
-            worker_class.return_value.close.assert_called_once()
+            worker_class.return_value.close.assert_not_called()
+            service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})  # this same instance, again
+            service.follow_document()
+            assert service.worker is parked_worker
+            service.handleRequest({"method": "onDeactivate"})
+            mode = service.state.mode
+            again = ClaudishTextService(None)
+            again.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            again.follow_document()
+            assert again.worker is parked_worker and again.state.mode == mode
+            # As Windows does it: with an instruction out, the switch ends the composition (forced)
+            # and closes the instance, with no onDeactivate; the next instance takes the exchange up,
+            # and Shift+Esc is taken to bring it back.
+            again.state.change("decline politely")
+            again.state.submit()
+            again.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            third = ClaudishTextService(None)
+            third.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            third.keyboardOpen = True
+            states = [0] * 256
+            states[0x10] = 128
+            taken = third.handleRequest({"method": "filterKeyDown", "seqNum": 1, "charCode": 0x1B, "keyCode": 0x1B,
+                                         "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": states})
+            assert taken["return"] and third.worker is parked_worker and third.state.held is not None, taken
+            worker_class.side_effect = None
+            replaying.stop()
         sys.path.remove(temporary)
     print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, and agent questions included")
 

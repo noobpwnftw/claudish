@@ -35,8 +35,97 @@ def mode_icon(mode):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "mode-%s.ico" % mode)
 
 
+def mode_label(mode):
+    return mode.capitalize()  # "Continue", "Compose", as other input methods' indicator menus read
+
+
 def mode_tooltip(mode):
-    return "cd_AI · %s (tap Shift to switch)" % mode
+    return "cd_AI · %s (tap Shift to switch)" % mode_label(mode)
+
+
+# Kept across this process's text service instances: switching to another input method (Chewing,
+# say) ends cd_AI's composition and closes its instance, and switching back makes a new one. The mode
+# you were in, and each window's open exchange with its worker (the conversation, answers on their
+# way), are taken up by the next instance in that window.
+LAST_MODE = [None]
+PARKED = {}  # the foreground window's process id -> (Composition, Suggestions, when)
+UNSEEN = object()  # an instance that has not looked for a parked exchange since it was activated
+
+
+def park(window, state, worker):
+    expire()
+    PARKED[window] = (state, worker, time.monotonic())
+
+
+def expire():
+    from .composition import HELD_SECONDS
+    for window, (_, _, when) in list(PARKED.items()):
+        if time.monotonic() - when > HELD_SECONDS:
+            del PARKED[window]
+
+
+def foreground():
+    """The foreground window's process id, or None (not on Windows)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        pid = wintypes.DWORD()
+        ctypes.windll.user32.GetWindowThreadProcessId(ctypes.windll.user32.GetForegroundWindow(), ctypes.byref(pid))
+        return pid.value or None
+    except (AttributeError, OSError):
+        return None
+
+
+# Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
+EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
+
+
+MODIFIER_KEYS = (0x10, 0x11, 0x12, 0x5B)  # Shift, Ctrl, Alt, Windows
+
+
+def held(event):
+    """The modifiers down with this key."""
+    return [key for key in MODIFIER_KEYS if event.isKeyDown(key)]
+
+
+def replay(vk, modifiers=()):
+    """Press the key again for the app just after cd_AI commits what was composed, so one press of a
+    shortcut or navigation key both commits and acts. A modifier that was down with it and is up by
+    now (a quick tap) is pressed with it again. Nothing is composed by then, so cd_AI lets it through."""
+    import threading
+
+    def send():
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class KEYBDINPUT(ctypes.Structure):
+                _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
+                            ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+
+            class MOUSEINPUT(ctypes.Structure):  # the union's largest member: INPUT's size follows it
+                _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD),
+                            ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+
+            class UNION(ctypes.Union):  # sized for this Python (PIME's backend is a 32-bit Python)
+                _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT)]
+
+            class INPUT(ctypes.Structure):
+                _anonymous_ = ("u",)
+                _fields_ = [("type", wintypes.DWORD), ("u", UNION)]
+
+            user32 = ctypes.windll.user32
+            released = [key for key in modifiers if not user32.GetAsyncKeyState(key) & 0x8000]
+            steps = ([(key, 0) for key in released] + [(vk, 0), (vk, 0x2)]
+                     + [(key, 0x2) for key in reversed(released)])
+            inputs = (INPUT * len(steps))()
+            for index, (key, up) in enumerate(steps):
+                inputs[index].type = 1  # INPUT_KEYBOARD
+                inputs[index].ki = KEYBDINPUT(key, 0, (0x1 if key in EXTENDED_KEYS else 0) | up, 0, 0)
+            user32.SendInput(len(steps), inputs, ctypes.sizeof(INPUT))
+        except (AttributeError, OSError):  # not on Windows
+            pass
+    threading.Timer(0.03, send).start()  # after this reply: the commit lands first
 
 
 def focused_app():
@@ -85,16 +174,21 @@ class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
         self.state = Composition()
+        if LAST_MODE[0] and LAST_MODE[0] != self.state.mode:
+            self.state.mode = LAST_MODE[0]  # back to cd_AI from another input method: the same mode
         self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
         self.worker = None
+        self.adopted_from = UNSEEN
 
     def onActivate(self):
+        keylog("onActivate", id(self), "parked=%s" % list(PARKED))
         if self.worker is None:
             self.worker = Suggestions()
         self.setKeyboardOpen(True)
         # The drafts also go to TSF's candidate list (apps that draw candidates themselves): PIME
-        # lists as many as there are selection keys. Choices are not numbered; the panel is ours.
-        self.setSelKeys("123456789")
+        # lists as many as there are selection keys. Choices are not numbered (digits are text), so
+        # the keys are blanks: nothing shows a number that selects nothing.
+        self.setSelKeys("\u00a0" * 9)
         self.customizeUI(candPerRow=1)
         # The mode in the taskbar's input indicator (PIME's Windows 8+ mode icon); its menu picks one.
         self.addButton("windows-mode-icon", icon=mode_icon(self.state.mode), commandId=MODE_COMMAND,
@@ -104,6 +198,7 @@ class ClaudishTextService(TextService):
         """A Shift tap, or a click or pick on the input indicator: continue <-> compose. Leaving
         compose keeps what you see, as typed."""
         kept = self.state.toggle()
+        LAST_MODE[0] = self.state.mode
         if self.worker:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
@@ -123,14 +218,39 @@ class ClaudishTextService(TextService):
     def onMenu(self, buttonId):
         if buttonId != "windows-mode-icon":
             return None
-        return [{"text": mode, "id": MODE_COMMAND + 1 + index, "checked": mode == self.state.mode}
+        return [{"text": mode_label(mode), "id": MODE_COMMAND + 1 + index, "checked": mode == self.state.mode}
                 for index, mode in enumerate(MODES)] + [{}, {"text": "Settings…", "id": SETTINGS_COMMAND}]
 
     def onDeactivate(self):
+        """Another input method takes over: an open exchange is held, as on a focus change, and
+        parked with its worker for the next cd_AI instance in this app (pause, not stop)."""
+        keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.sent, self.state.held is not None))
+        if self.state.sent:
+            self.state.leave(getattr(self, "last_document", None))
         if self.worker:
-            self.worker.close()
+            park(foreground(), self.state, self.worker)
             self.worker = None
+            self.state = Composition()
         self.state.change("")
+        self.adopted_from = UNSEEN  # activated again (this instance or a new one): look for it again
+
+    def adopt_parked(self):
+        """At the first request after activation: this window's parked exchange and worker, if any."""
+        window = foreground()
+        if self.adopted_from == window:
+            return
+        self.adopted_from = window
+        expire()
+        parked = PARKED.get(window)
+        keylog("adopt", id(self), window, "found=%s" % (parked is not None))
+        if parked is None or parked[1] is self.worker:
+            return
+        del PARKED[window]
+        state, worker, _ = parked
+        if self.worker is not None:
+            self.worker.close()
+        state.mode = self.state.mode
+        self.state, self.worker = state, worker
 
     def sensitive(self):
         """A password field (IS_PASSWORD): cd_AI stays out, as IBus does for its password purpose."""
@@ -138,6 +258,7 @@ class ClaudishTextService(TextService):
 
     def follow_document(self):
         """One conversation per text box: Claudish's PIME names the TSF context of each request."""
+        self.adopt_parked()
         document = getattr(self, "document", None)
         if document and document != getattr(self, "last_document", None):
             if getattr(self, "last_document", None) is not None and self.worker:
@@ -180,6 +301,7 @@ class ClaudishTextService(TextService):
             return True
         if not self.keyboardOpen or self.sensitive():
             return False
+        self.adopt_parked()  # back from another input method: this app's exchange decides what is taken
         if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
             self.shift.press(time.monotonic())
             self.switching = False
@@ -211,8 +333,8 @@ class ClaudishTextService(TextService):
             if event.keyCode not in (0x10, 0x14, 0x77):
                 self.drop_live()
             return False
-        # Shift+Esc with nothing composed: the instruction Esc dropped comes back.
-        restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped)
+        # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
+        restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped or self.state.held)
         return event.isPrintableChar() or bool(self.state.text) or restoring
 
     def drop_live(self):
@@ -358,10 +480,12 @@ class ClaudishTextService(TextService):
             self.setCommitString(chr(event.charCode))
             return True
         if self.shortcut(event):
-            # Commit the wording and consume the key; pressing the shortcut again runs it. Passing
-            # it on (not eaten after the test phase said eaten) made Edge drop the composition.
+            # Commit the wording and take the key (passing it on after the test phase said taken made
+            # Edge drop the composition), then press it again for the app: one press does both.
             self.setCommitString(self.state.commit())
             self.changed()
+            if key not in (0x11, 0x12, 0x5B, 0x5C):
+                replay(key, held(event))
             return True
         if key == 0x0D and event.isKeyDown(0x10) and self.state.text and not self.state.live:
             self.setCommitString(self.state.keep())  # Shift+Enter: as it is, and keep composing
@@ -464,8 +588,11 @@ class ClaudishTextService(TextService):
             self.publish()
             return True
         else:
-            # First navigation key commits; a second performs navigation.
+            # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             self.setCommitString(self.state.commit())
+            self.changed()
+            replay(key, held(event))
+            return True
         self.changed()
         return True
 
@@ -491,10 +618,13 @@ class ClaudishTextService(TextService):
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
         if self.state.sent:
-            # The app ended the composition while an exchange was open (a click, a focus change):
-            # TSF keeps what it showed (your own words, as a CJK preedit), and the exchange is held
-            # for this box, offered on return.
+            # The app ended the composition while an exchange was open (a click, a focus change,
+            # another input method): TSF keeps what it showed (your own words, as a CJK preedit),
+            # and the exchange is held for this box, offered on return. Parked too: switching to
+            # another input method closes this instance, and the next one here takes it up.
             self.state.leave(getattr(self, "last_document", None))
+            if self.worker:
+                park(foreground(), self.state, self.worker)
             return
         self.state.change("")
         if self.worker:

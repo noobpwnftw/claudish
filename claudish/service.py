@@ -36,7 +36,9 @@ def typed():
         return shlex_quote(os.environ["EXECUTABLEPATH"])
     found = shutil.which("claudish")
     here = os.path.join(os.path.dirname(sys.executable), "claudish")
-    if found and os.path.realpath(found) in (os.path.realpath(here), os.path.realpath(here + ".exe")):
+    windows = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "bin", "claudish.cmd")  # the installer's
+    same = lambda path: os.path.normcase(os.path.realpath(path))  # Windows: which() may say claudish.CMD
+    if found and same(found) in (same(here), same(here + ".exe"), same(windows)):
         return "claudish"
     return "%s -m claudish" % shlex_quote(sys.executable)
 

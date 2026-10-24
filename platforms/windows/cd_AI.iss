@@ -29,6 +29,11 @@ WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=no
+ChangesEnvironment=yes
+
+[Messages]
+FinishedLabelNoIcons=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.
+FinishedLabel=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.
 
 [Files]
 ; The text service's DLLs are loaded in every app that takes text: in use, they are replaced at the
@@ -36,9 +41,12 @@ CloseApplications=no
 Source: "PIME\*"; DestDir: "{app}\PIME"; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
 Source: "python-x64\*"; DestDir: "{app}\python"; Check: not IsArm64; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
 Source: "python-arm64\*"; DestDir: "{app}\python"; Check: IsArm64; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
+Source: "bin\claudish.cmd"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 [Registry]
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "cd_AI"; ValueData: """{app}\PIME\PIMELauncher.exe"""; Flags: uninsdeletevalue
+; The `claudish` command, for every account: {app}\bin on the machine's PATH (taken out on uninstall).
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Check: NeedsPath
 
 [Run]
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\PIME\x86\PIMETextService.dll"""; Flags: runhidden waituntilterminated
@@ -61,6 +69,38 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\arm64\PIMETextSe
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+const
+  Environment = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+
+function NeedsPath: Boolean;
+var
+  Path: String;
+begin
+  if not RegQueryStringValue(HKLM, Environment, 'Path', Path) then
+    Path := '';
+  Result := Pos(';' + Uppercase(ExpandConstant('{app}\bin')) + ';', ';' + Uppercase(Path) + ';') = 0;
+end;
+
+procedure LeavePath;
+var
+  Path, Entry: String;
+  At: Integer;
+begin
+  if not RegQueryStringValue(HKLM, Environment, 'Path', Path) then
+    exit;
+  Entry := ExpandConstant('{app}\bin');
+  At := Pos(';' + Uppercase(Entry) + ';', ';' + Uppercase(Path) + ';');
+  if At = 0 then
+    exit;
+  Delete(Path, At, Length(Entry));
+  StringChangeEx(Path, ';;', ';', True);
+  if (Length(Path) > 0) and (Path[1] = ';') then
+    Delete(Path, 1, 1);
+  if (Length(Path) > 0) and (Path[Length(Path)] = ';') then
+    Delete(Path, Length(Path), 1);
+  RegWriteExpandStringValue(HKLM, Environment, 'Path', Path);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
@@ -92,6 +132,8 @@ var
   Folder: String;
   Arch: Integer;
 begin
+  if Step = usUninstall then
+    LeavePath;
   { The text service's DLLs are loaded in running apps: what cannot go now goes at the restart. }
   if Step <> usPostUninstall then
     exit;
