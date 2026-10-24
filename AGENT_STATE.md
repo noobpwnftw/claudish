@@ -28,11 +28,18 @@ in the background and block only the merge they gate. Get the thing to work befo
 
 ## Running (owned)
 
-- llama-server with Gemma 4 E4B on the Spark, bound to the network for the Mac VM's "Another
-  model API" (`http://10.0.0.249:18790`), pid in the scratchpad's gemma-lan.pid. Stop it when the
-  hand tests are done.
+- llama-server with Gemma 4 E4B on the Spark, bound to the network for the Mac and Windows VMs'
+  "Another model API" (`http://10.0.0.249:18790`), pid in the scratchpad's gemma-lan.pid. Stop it
+  when the hand tests are done. The Windows VM's PIME build tree is kept at C:\PIME-build (the
+  installer is built over it); its job runner and helpers are in the scratchpad's win/ folder.
 
 ## Verified (latest)
+
+- 2026-10-24, main: Windows: cd_AI-setup.exe (platforms/windows/package.py, built on the Windows 11
+  ARM64 VM) installs in 20 s; after a restart, "ok" + Tab in Notepad shows the rewrite from Gemma 4
+  on the Spark and a second Tab inserts it (156 s for install, restart and rewrite). Linux:
+  scripts/install.sh in a clean Ubuntu 24.04 container (missing packages named; clone, venv, setup,
+  IBus registration); typing on a Linux desktop not checked since the rigs went.
 
 - 2026-10-24, main: on the Mac VM, a first install opens the settings in the browser with the
   first-run line; after a logout the input menu shows ✓Compose/Continue/Settings…; with "Another
