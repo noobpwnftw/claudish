@@ -13,7 +13,7 @@ Use any OpenAI-compatible server and any model, such as llama.cpp, vLLM, Ollama,
 LM Studio, or a hosted endpoint:
 
 ```sh
-python -m claudish serve --backend openai --model-url http://127.0.0.1:11434 --model qwen2.5:7b
+python -m claudish serve --backend openai --model-url http://127.0.0.1:11434 --model your-model
 # A remote endpoint, with a key read from an environment variable that you name:
 python -m claudish serve --backend openai --model-url https://api.example.com \
     --model some-model --api-key-env EXAMPLE_API_KEY --timeout 10
@@ -126,7 +126,7 @@ pass `--config FILE`):
 {"profile": "local",
  "profiles": {
    "local":  {"backend": "llama"},
-   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "your-model",
               "templates": "grand.json"},
    "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
               "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},

@@ -1,16 +1,21 @@
 "use strict";
-// The settings window (claudish/settings.py has the model). The window opens this page with the
-// service token in the fragment, which is never sent anywhere; it is dropped from the address at
-// once and kept only in this page.
-const token = new URLSearchParams(location.hash.slice(1)).get("token");
+// The settings window (claudish/settings.py has the model). `claudish settings` and the macOS
+// window open this page with a ticket in the fragment, which is never sent anywhere: the page
+// trades it, once, for a token that opens settings only, keeps that for this window (a reload
+// keeps working), and drops the ticket from the address.
+const fragment = new URLSearchParams(location.hash.slice(1));
 history.replaceState(null, "", location.pathname);
 const $ = (id) => document.getElementById(id);
 const VOICE_WORDS = "Your own words";
+const remember = (name, value) => { try { sessionStorage.setItem(name, value); } catch (error) { /* private window */ } };
+const recall = (name) => { try { return sessionStorage.getItem(name); } catch (error) { return null; } };
+if (fragment.get("first")) remember("cd_AI-first", "1");
+let token = recall("cd_AI-settings");
 
-async function call(method, body) {
-  const response = await fetch("/settings" + (method === "GET" ? "/state" : ""), {
-    method,
-    headers: Object.assign({"X-Claudish-Token": token || ""}, body ? {"Content-Type": "application/json"} : {}),
+async function call(path, body) {
+  const response = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: Object.assign({"X-Claudish-Settings": token || ""}, body ? {"Content-Type": "application/json"} : {}),
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await response.json().catch(() => ({}));
@@ -23,15 +28,18 @@ function say(id, text, bad) {
   $(id).classList.toggle("bad", Boolean(bad));
 }
 
+function ready(state) {
+  const backend = (state.service || {}).backend;
+  return (backend === "claude" && state.key !== "missing") || ((backend === "openai" || backend === "llama") && !state.server_problem);
+}
+
 function status(state) {
-  const service = state.service || {};
-  if (state.problem) return [`Saved, but cd_AI could not use it: ${state.problem}`, "bad"];
-  if (service.backend === "claude") {
-    return state.key === "missing" ? ["Ready once you save a Claude key below.", "bad"] : ["Ready: Claude writes for you.", "good"];
-  }
-  if (service.backend === "openai" || service.backend === "llama") return [`Ready: ${state.server.model || "your model"} writes for you.`, "good"];
-  if (service.backend === "none") return ["No model yet: pick one below.", "bad"];
-  return [`Running with the ${service.backend} backend.`, ""];
+  const backend = (state.service || {}).backend;
+  if (backend === "claude") return state.key === "missing" ? ["Add your Claude key below to start.", ""] : ["Ready: Claude writes for you.", "good"];
+  if (state.server_problem) return [state.server_problem.charAt(0).toUpperCase() + state.server_problem.slice(1) + ".", "bad"];
+  if (backend === "openai" || backend === "llama") return [`Ready: ${state.server.model || "your model"} writes for you.`, "good"];
+  if (backend === "none") return ["Pick a model below to start.", ""];
+  return ["cd_AI is running.", ""];
 }
 
 let shown = null;
@@ -40,6 +48,7 @@ function render(state) {
   const [line, kind] = status(state);
   $("status").textContent = line;
   $("status").className = kind;
+  $("next").hidden = !recall("cd_AI-first");
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
   $("server").hidden = state.choice !== "server";
@@ -47,12 +56,12 @@ function render(state) {
   $("other").textContent = state.choice === "local"
     ? "cd_AI uses the local model that `claudish setup --profile local` set up. Pick one above to change that."
     : `cd_AI uses the profile “${state.profile}” from its config. Pick one above to change that.`;
-  $("key-state").textContent = {saved: `Saved in ${state.key_where}`, environment: "From ANTHROPIC_API_KEY",
-                                missing: "Not set"}[state.key];
+  $("key-state").textContent = {saved: `Saved in ${state.key_where}`, missing: "Not set",
+                                environment: "ANTHROPIC_API_KEY in your environment (used before a saved key)"}[state.key];
   $("key-state").classList.toggle("good", state.key !== "missing");
   if (document.activeElement !== $("url")) $("url").value = state.server.url;
   if (document.activeElement !== $("model")) $("model").value = state.server.model;
-  $("config").textContent = state.config;
+  $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   voices(state);
 }
 
@@ -99,40 +108,72 @@ function voiceRow(value, title, about) {
   return row;
 }
 
-async function change(body, message, done) {
-  say(message, body.key ? "Checking the key with Anthropic…" : "");
+async function sample() {
+  // One real rewrite in the chosen voice: what Tab will do, before you log out and try it.
+  if (!shown || !ready(shown)) return;
+  $("sample").hidden = false;
+  $("sample").textContent = "Trying it: “ok” becomes…";
   try {
-    const state = await call("POST", body);
-    render(state);
-    say(message, state.problem ? "" : done);
-    return true;
+    const answer = await call("/suggest", {text: "ok", mode: "rewrite"});
+    $("sample").textContent = `Trying it: “ok” becomes “${answer.text}”`;
   } catch (error) {
-    say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);
-    if (shown) render(shown);
-    return false;
+    $("sample").textContent = `The model did not answer: ${error.message}.`;
   }
 }
 
-document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () =>
-  change({choice: radio.value}, "model-message", radio.value === "claude" ? "cd_AI now writes with Claude." : "cd_AI now writes with your model server.")));
+async function change(body, message, done) {
+  say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the server…" : "");
+  try {
+    render(await call("/settings", body));
+    say(message, done);
+    sample();
+    return true;
+  } catch (error) {
+    say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);
+    return false;  // what you filled in stays, to correct
+  }
+}
+
+document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
+  if (radio.value === "claude") {
+    change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.");
+  } else {  // a server must answer before cd_AI switches to it: fill it in first
+    $("claude").hidden = true;
+    $("server").hidden = false;
+    say("model-message", "Fill in your server, then Use this server.");
+  }
+}));
 $("claude").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = $("claude").querySelector("button");
   button.disabled = true;
-  if (await change({key: $("key").value}, "model-message", "Key saved. Anthropic accepted it.")) $("key").value = "";
+  const environment = shown && shown.key === "environment";
+  if (await change({key: $("key").value}, "model-message", environment
+    ? "Key saved. ANTHROPIC_API_KEY in your environment is still used first." : "Key saved. Anthropic accepted it.")) {
+    $("key").value = "";
+  }
   button.disabled = false;
 });
 $("server").addEventListener("submit", (event) => {
   event.preventDefault();
-  change({server: {url: $("url").value, model: $("model").value}}, "model-message", "Saved.");
+  change({server: {url: $("url").value, model: $("model").value}, choice: "server"}, "model-message",
+         "cd_AI now writes with your server.");
 });
 
-if (!token) {
-  $("status").textContent = "Open this from cd_AI's menu: Settings…";
-  $("status").className = "bad";
-} else {
-  call("GET").then(render).catch((error) => {
-    $("status").textContent = `cd_AI's service did not answer (${error.message}).`;
-    $("status").className = "bad";
-  });
+async function start() {
+  const ticket = fragment.get("ticket");
+  if (ticket) {
+    try {
+      token = (await call("/settings/session", {ticket})).token;
+      remember("cd_AI-settings", token);
+    } catch (error) {
+      if (!token) throw error;
+    }
+  }
+  if (!token) throw new Error("open this from cd_AI's menu (Settings…) or with `claudish settings`");
+  render(await call("/settings/state"));
 }
+start().catch((error) => {
+  $("status").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".";
+  $("status").className = "bad";
+});

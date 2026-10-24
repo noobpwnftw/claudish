@@ -183,6 +183,7 @@ into `Claudish.app`. The model runs in a separate process as on Windows/Linux.
 from python.org:
 
 ```sh
+git clone https://github.com/noobpwnftw/claudish && cd claudish
 python3 platforms/macos/build.py
 python3 platforms/macos/package.py
 open dist/macos/cd_AI.pkg

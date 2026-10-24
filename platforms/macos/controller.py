@@ -110,10 +110,29 @@ class ClaudishInputController(IMKInputController):
         """The input menu's items for cd_AI (the menu bar's input source menu)."""
         from AppKit import NSMenu, NSMenuItem
         menu = NSMenu.alloc().initWithTitle_("cd_AI")
+        # The two modes, the current one ticked, as input methods list theirs (a Shift tap switches too).
+        for title, action, mode in (("Compose", "chooseCompose:", "compose"), ("Continue", "chooseContinue:", "continue")):
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, "")
+            item.setTarget_(self)
+            item.setState_(1 if self.state.mode == mode else 0)
+            menu.addItem_(item)
+        menu.addItem_(NSMenuItem.separatorItem())
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
         item.setTarget_(self)
         menu.addItem_(item)
         return menu
+
+    def chooseCompose_(self, sender):
+        self.choose("compose")
+
+    def chooseContinue_(self, sender):
+        self.choose("continue")
+
+    @objc.python_method
+    def choose(self, mode):
+        client = self.client()
+        if self.state.mode != mode and client is not None:
+            self.switch_mode(client)
 
     def showSettings_(self, sender):
         """Its own process (settings_window.py): a window and menus of its own, apart from typing."""

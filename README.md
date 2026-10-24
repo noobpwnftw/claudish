@@ -26,7 +26,8 @@ Tap Shift to switch, as Shift switches English and pinyin. Nothing is inserted
 until you take it, and your own words are always one key away: Shift+Enter keeps
 them as typed. Continue is a Shift tap away when you want your keys to go
 straight in, with the rest of the sentence offered. Where you want none of it,
-switch that app to your usual keyboard: input sources are chosen per app.
+switch that app to your usual keyboard (the system can remember it per app once you turn that on:
+[how](docs/using.md)).
 
 cd_AI ships no model: point it at one. Claude with your own key is the default
 setup, since it works on any computer; any OpenAI-compatible server or an agent CLI
@@ -48,10 +49,11 @@ and MCP servers per app, tools it may call, an agent to hand a task to
 
 ## Install
 
-**macOS:** until there is a download, build the installer on a Mac (Python 3.10+ from python.org)
-and open it:
+**macOS:** until there is a download, build the installer on a Mac (Python 3.10+ from python.org;
+macOS offers to install git the first time):
 
 ```sh
+git clone https://github.com/noobpwnftw/claudish && cd claudish
 python3 platforms/macos/build.py && python3 platforms/macos/package.py
 open dist/macos/cd_AI.pkg
 ```
@@ -59,7 +61,7 @@ open dist/macos/cd_AI.pkg
 It installs cd_AI for you alone and ends in cd_AI's settings: paste your Claude key, pick a voice.
 Then log out and back in, as after any input method. [More](docs/install.md#macos-input-method).
 
-**Linux and Windows** (installers are next): paste the prompt from
+**Linux and Windows** (developer preview until their installers are ready): paste the prompt from
 [claudish.io](https://claudish.io/#install) into a coding agent, or:
 
 ```sh

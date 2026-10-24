@@ -55,11 +55,17 @@ class SettingsTests(Home):
         self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
 
     def test_a_model_server_on_this_computer(self):
-        state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
+        with patch.object(settings, "check_server", return_value="nothing answers at http://127.0.0.1:1234"):
+            with self.assertRaisesRegex(ValueError, "nothing answers"):  # not switched to a server that is not there
+                settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
+        self.assertFalse(self.path.exists())
+        with patch.object(settings, "check_server", return_value=None):
+            state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
         self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4"}))
         self.assertEqual(self.written()["profile"], "ollama")
         self.assertEqual(config.resolve()[1]["model_url"], "http://127.0.0.1:1234")
-        for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "}):
+        for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "},
+                       {"url": "http://192.168.1.9:11434", "model": "x"}):  # unencrypted over the network
             with self.assertRaises(ValueError):
                 settings.apply({"server": server})
 
@@ -96,7 +102,8 @@ class ServiceTests(Home):
         def reload():
             self.builds.append(config.resolve())
             return Rewriter("rules", tone=self.builds[-1][1].get("tone"))
-        self.server = make_server(Rewriter("rules"), 0, reload=reload, config_path=self.path)
+        self.server_reload = [reload]  # a test can swap in one that fails
+        self.server = make_server(Rewriter("rules"), 0, reload=lambda: self.server_reload[0](), config_path=self.path)
         thread = threading.Thread(target=self.server.serve_forever)
         thread.start()
         self.addCleanup(thread.join)
@@ -104,10 +111,12 @@ class ServiceTests(Home):
         self.addCleanup(self.server.shutdown)
         self.opener = build_opener(ProxyHandler({}))
 
-    def call(self, path, body=None, token=True, origin=None):
+    def call(self, path, body=None, token=True, origin=None, settings=None):
         headers = {"Content-Type": "application/json"}
         if token:
             headers["X-Claudish-Token"] = self.server.token
+        if settings:
+            headers["X-Claudish-Settings"] = settings
         if origin:
             headers["Origin"] = origin
         request = Request("http://127.0.0.1:%d%s" % (self.server.server_port, path),
@@ -135,6 +144,29 @@ class ServiceTests(Home):
         self.assertEqual(self.builds[0][1]["tone"], "bard")
         status, state = self.call("/settings/state")
         self.assertEqual((status, state["tone"]), (200, "bard"))
+
+    def test_the_page_gets_a_ticket_good_once_for_settings_only(self):
+        status, ticket = self.call("/settings/ticket", {})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.call("/settings/ticket", {}, token=False)[0], 403)  # only with the service token
+        status, session = self.call("/settings/session", {"ticket": ticket["ticket"]}, token=False)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.call("/settings/session", {"ticket": ticket["ticket"]}, token=False)[0], 403)  # once
+        self.assertEqual(self.call("/settings/state", token=False, settings=session["token"])[0], 200)
+        self.assertEqual(self.call("/recent", token=False, settings=session["token"])[0], 403)  # settings only
+
+    def test_a_change_the_service_cannot_use_is_undone(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text(json.dumps(config.STARTER))
+        before = self.path.read_bytes()
+
+        def broken():
+            raise ValueError("environment variable NOPE is not set")
+        self.server_reload[0] = broken
+        status, answer = self.call("/settings", {"tone": "bard"})
+        self.assertEqual(status, 400)
+        self.assertIn("nothing changed", answer["error"])
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_a_refused_change_says_why_and_changes_nothing(self):
         status, answer = self.call("/settings", {"server": {"url": "nope", "model": "x"}})

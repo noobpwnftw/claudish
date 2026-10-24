@@ -28,28 +28,39 @@ def read_token():
         return ""
 
 
+def write_private(path, text):
+    """Replace path with text, readable by this user only: a fresh temporary file (never one left
+    behind with another mode), then a rename."""
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    temporary = str(path) + ".tmp"
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as out:
+        if hasattr(os, "fchmod"):
+            os.fchmod(out.fileno(), 0o600)  # whatever the umask
+        out.write(text)
+    os.replace(temporary, path)
+
+
 def write_token(token=None):
     """This service run's token (a new one when None), in a file only this user can read."""
     import secrets
-    path = token_path()
-    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     token = token or secrets.token_urlsafe(32)
-    temporary = path + ".tmp"
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w") as out:
-        out.write(token)
-    os.replace(temporary, path)
+    write_private(token_path(), token)
     return token
 
 
 def settings_url(url="http://127.0.0.1:18765"):
-    """The settings page of a running service, with its token in the fragment (the page keeps it
-    and drops it from the address; a fragment is never sent). OSError when no service answers."""
-    from urllib.request import urlopen
-    with urlopen(url + "/health", timeout=2):
-        pass
-    with open(token_path(), encoding="utf-8") as source:
-        return "%s/settings#token=%s" % (url.rstrip("/"), source.read().strip())
+    """The settings page of a running service, with a ticket in the fragment: good once, for a
+    minute, and only for settings. The page trades it for its own settings token and drops it from
+    the address; a fragment is never sent to the service. OSError when no service answers."""
+    request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers())
+    with OPENER.open(request, timeout=3) as response:
+        ticket = json.load(response)["ticket"]
+    return "%s/settings#ticket=%s" % (url.rstrip("/"), ticket)
 
 
 def headers():

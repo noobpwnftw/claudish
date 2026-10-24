@@ -27,6 +27,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
     import secrets
     token = token or secrets.token_urlsafe(32)
 
+    tickets, settings_tokens = {}, set()  # the settings window's: a ticket (one use, a minute), then a token
+
     def swap():
         """The settings window's changes, from the next request on: every handler reads `rewriter`."""
         nonlocal rewriter
@@ -60,6 +62,11 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         def trusted(self):
             """Sent by an input method (it can read the token file), not just any local process."""
             return hmac.compare_digest(self.headers.get("X-Claudish-Token") or "", token)
+
+        def settings_trusted(self):
+            """The settings page's own token (it opens nothing else), or the service token."""
+            sent = self.headers.get("X-Claudish-Settings") or ""
+            return self.trusted() or any(hmac.compare_digest(sent, known) for known in list(settings_tokens))
 
         def valid_host(self):
             return self.headers.get("Host") in (
@@ -200,7 +207,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             if self.path.startswith("/sessions/"):
                 return self.get_session()
             if self.path == "/settings/state":
-                if not self.trusted():
+                if not self.settings_trusted():
                     return self.reply(403, {"error": "the service token is required"})
                 from . import settings
                 return self.reply(200, dict(settings.state(config_path), service=self.health()))
@@ -226,12 +233,14 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         def post_settings(self):
             """The settings window: its changes go to the config (the key to its store), and the
             service takes them up at once."""
-            if not self.trusted():
+            if not self.settings_trusted():
                 return self.reply(403, {"error": "the service token is required"})
             data = self.json_request()
             if data is None:
                 return None
             from . import settings
+            path = config_path or settings.config.default_path()
+            before = path.read_bytes() if path.is_file() else None
             try:
                 shown = settings.apply(data, config_path)
             except ValueError as exc:
@@ -239,9 +248,35 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             if reload is not None:
                 try:
                     swap()
-                except Exception as exc:  # the config as written does not start: say so, keep serving
-                    return self.reply(200, dict(shown, service=self.health(), problem=str(exc)))
+                except Exception as exc:  # it would not start at the next login either: put it back
+                    if before is None:
+                        path.unlink(missing_ok=True)
+                    else:
+                        path.write_bytes(before)
+                    return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
             return self.reply(200, dict(shown, service=self.health()))
+
+        def post_ticket(self):
+            """`claudish settings` (it can read the token file) asks for a ticket to put in the page's
+            address; the page trades it, once and within a minute, for a token for settings only."""
+            import time as clock
+            if self.path == "/settings/ticket":
+                if not self.trusted():
+                    return self.reply(403, {"error": "the service token is required"})
+                for old in [t for t, expires in tickets.items() if expires < clock.monotonic()]:
+                    tickets.pop(old, None)
+                ticket = secrets.token_urlsafe(24)
+                tickets[ticket] = clock.monotonic() + 60
+                return self.reply(200, {"ticket": ticket})
+            data = self.json_request(limit=1024)
+            if data is None:
+                return None
+            expires = tickets.pop(data.get("ticket") if isinstance(data.get("ticket"), str) else "", 0)
+            if expires < clock.monotonic():
+                return self.reply(403, {"error": "this settings link has expired: open settings again"})
+            session = secrets.token_urlsafe(32)
+            settings_tokens.add(session)
+            return self.reply(200, {"token": session})
 
         def do_POST(self):
             if not self.valid_host():
@@ -250,6 +285,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return self.post_session()
             if self.path == "/settings":
                 return self.post_settings()
+            if self.path in ("/settings/ticket", "/settings/session"):
+                return self.post_ticket()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})
             # The local demo may call its own API; other websites may not.

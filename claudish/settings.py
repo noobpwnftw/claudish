@@ -46,6 +46,10 @@ def state(path=None):
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
         "config": str(path or config.default_path()),
+        # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
+        # connection on this computer answers at once).
+        "server_problem": check_server(server.get("model_url", ""), server.get("model")) if choice == "server" else None,
+        "server_models": server_models(server.get("model_url", "")) or [],
     }
 
 
@@ -56,13 +60,36 @@ def check_key(key):
     except ImportError:
         return "the Anthropic SDK is missing from this install"
     try:
-        anthropic.Anthropic(api_key=key, timeout=10.0, max_retries=0).models.list(limit=1)
+        # Anthropic's own address, whatever ANTHROPIC_BASE_URL says: the key goes nowhere else.
+        anthropic.Anthropic(api_key=key, base_url="https://api.anthropic.com", timeout=10.0,
+                            max_retries=0).models.list(limit=1)
     except anthropic.AuthenticationError:
         return "Anthropic did not accept that key"
     except anthropic.APIConnectionError:
         return "Anthropic could not be reached to check it"
     except anthropic.APIError as exc:
         return "Anthropic answered: %s" % getattr(exc, "message", exc)
+    return None
+
+
+def server_models(url):
+    """The models an OpenAI-compatible server at url has, or None when nothing answers there."""
+    from urllib.request import Request, build_opener, ProxyHandler
+    try:
+        with build_opener(ProxyHandler({})).open(Request(url.rstrip("/") + "/v1/models"), timeout=3) as response:
+            listing = json.load(response)
+        return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
+    except Exception:
+        return None
+
+
+def check_server(url, model=None):
+    """None when the server answers at url and has the model (or names none), else why not."""
+    models = server_models(url)
+    if models is None:
+        return "nothing answers at %s: start Ollama (or your server) first" % url
+    if model and models and model not in models:
+        return "the server has no model %r; it has: %s" % (model, ", ".join(models))
     return None
 
 
@@ -88,13 +115,26 @@ def apply(changes, path=None):
         parts = urlsplit(url.strip()) if isinstance(url, str) else None
         if not parts or parts.scheme not in ("http", "https") or not parts.hostname:
             raise ValueError("the server's address starts with http://, such as http://127.0.0.1:11434")
-        if not isinstance(model, str) or not model.strip() or len(model) > 200:
-            raise ValueError("name the model the server should run, such as qwen2.5:7b")
+        if parts.scheme == "http" and parts.hostname not in ("127.0.0.1", "localhost", "::1"):
+            raise ValueError("a server on another computer needs https://, or what you type crosses the network unencrypted")
+        if not isinstance(model, str) or len(model) > 200:
+            raise ValueError("a model's name is a short string")
+        if not model.strip():  # the server's only model, or a list to pick from
+            models = server_models(url.strip()) or []
+            if len(models) != 1:
+                raise ValueError("pick the model to use: " + ", ".join(models) if models else
+                                 "nothing answers at %s: start Ollama (or your server) first" % url.strip())
+            model = models[0]
         entry = profiles.setdefault("ollama", dict(config.STARTER["profiles"]["ollama"]))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
+    if "choice" in changes and changes["choice"] not in CHOICES:
+        raise ValueError("unknown choice")
+    if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "ollama"):
+        server = profiles.get("ollama", config.STARTER["profiles"]["ollama"])
+        problem = check_server(server["model_url"], server.get("model"))
+        if problem:  # switching to a server that is not there would leave every rewrite failing
+            raise ValueError(problem)
     if "choice" in changes:
-        if changes["choice"] not in CHOICES:
-            raise ValueError("unknown choice")
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))
         data["profile"] = name

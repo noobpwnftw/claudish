@@ -262,4 +262,21 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
     status = doctor.main()
     if platform.system() == "Linux" and any(label == "Input method" and state == "todo" for label, state, _, _ in steps):
         print("\nLog out and back in, then add English → cd_AI — Claudish in your input sources.")
+    settings()
     return status
+
+
+def settings():
+    """Setup ends where the macOS installer does: in cd_AI's settings (the key, the voice), here in
+    the browser. Run by an agent (no terminal), it only says how to open them."""
+    from .client import settings_url
+    try:
+        url = settings_url()
+    except OSError:
+        return  # no service to ask: doctor has said why
+    if not sys.stdin.isatty():
+        print("\nNext: `claudish settings` opens cd_AI's settings, for your Claude key and the voice.")
+        return
+    import webbrowser
+    print("\nOpening cd_AI's settings in your browser: paste your Claude key there and pick a voice.")
+    webbrowser.open(url + "&first=1")

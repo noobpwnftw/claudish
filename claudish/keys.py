@@ -4,7 +4,6 @@ The environment comes first (ANTHROPIC_API_KEY, or a profile's api_key_env); the
 cd_AI's settings: the Keychain on macOS, elsewhere a file beside the config that only this user can
 read. A service started at login sees no shell variables, so a saved key is how one reaches it.
 """
-import os
 import subprocess
 import sys
 
@@ -35,13 +34,8 @@ def stored(name="anthropic"):
 def store(key, name="anthropic"):
     """Save (or replace) the key for this provider."""
     if sys.platform != "darwin":
-        path = key_file(name)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(path.name + ".tmp")
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as out:
-            out.write(key)
-        os.replace(temporary, path)
+        from .client import write_private
+        write_private(key_file(name), key)
         return
     # `security` takes the key as an argument (with -w last and no value it would prompt on the
     # terminal instead); it is briefly in the process list, to this user's processes, and never in a

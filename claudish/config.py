@@ -4,7 +4,7 @@
   "profile": "claude",
   "profiles": {
     "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-    "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
+    "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "your-model"},
     "local":  {"backend": "llama", "templates": "grand.json"}
   }
 }
@@ -127,7 +127,7 @@ STARTER = {
     "profile": "claude",
     "profiles": {
         "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "templates": "templates.json"},
-        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeout": 30,
+        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
         "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
