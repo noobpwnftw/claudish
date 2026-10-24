@@ -137,15 +137,15 @@ This adapter does not support an Fcitx-only session or a raw terminal console.
 ## Windows input method
 
 **The installer.** `cd_AI-setup.exe` installs everything for x64 and ARM64 Windows: cd_AI's PIME
-(the text service, for every app), a Python of its own for the service, and cd_AI in your input
-sources. It asks for an administrator once; the rest is yours: a starter config, the service at
+(the text service, for every app, beside any PIME you have), a Python of its own for the service, and
+cd_AI in your input sources. It asks for an administrator once; the rest is yours: a starter config, the service at
 every login, and cd_AI's settings in your browser (your key, the voice). Then sign out and back in,
 or restart, and pick cd_AI with Win+Space. An update asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one. Unsigned for now: SmartScreen shows
 "Windows protected your PC"; **More info → Run anyway** lets it through. cd_AI brings its own build
-of PIME (its text service), in PIME's own folder: where PIME is already installed with other input
-methods (Chewing, Rime), the installer stops rather than replace them. Uninstalling cd_AI takes it
-out of your input sources too. Tested on ARM64; x64 not yet.
+of PIME (its text service and launcher) as a part of cd_AI, in cd_AI's folder, with names of its own:
+a PIME you already have (Chewing, Rime) keeps working beside it, and uninstalling cd_AI leaves it
+alone. Uninstalling cd_AI takes it out of your input sources too. Tested on ARM64; x64 not yet.
 
 Until there is a download, it is built on Windows with Python 3.10+ and Inno Setup 6, over cd_AI's
 PIME (below, built from source): `python platforms\windows\package.py` writes
