@@ -26,7 +26,17 @@ took longer are gone (the real-model eval, browser and static demos, extras run,
 containers, the Windows and Mac VM rigs, remote CI); real typing is checked by hand. Long jobs run
 in the background and block only the merge they gate. Get the thing to work before anything else.
 
+## Running (owned)
+
+- llama-server with Gemma 4 E4B on the Spark, bound to the network for the Mac VM's "Another
+  model API" (`http://10.0.0.249:18790`), pid in the scratchpad's gemma-lan.pid. Stop it when the
+  hand tests are done.
+
 ## Verified (latest)
+
+- 2026-10-24, main: on the Mac VM, a first install opens the settings in the browser with the
+  first-run line; after a logout the input menu shows ✓Compose/Continue/Settings…; with "Another
+  model API" pointed at Gemma 4 on the Spark, "ok" + Tab in TextEdit shows the rewrite in 0.85 s.
 
 - G61 macOS (branch `agent/mac-package`): `platforms/macos/package.py` builds `cd_AI.pkg` (36 MB,
   ad-hoc, current-user domain, no password). On the VM, `installer -target CurrentUserHomeDirectory`
