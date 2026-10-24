@@ -122,6 +122,13 @@ def main():
             key(ord("A"), ord("A"), "filterKeyDown")  # every key reaches filterKeyDown first
             key(ord("A"), ord("A"))
             assert key(0x10, method="filterKeyUp")["return"] is False and service.state.mode == "continue"
+            # Ctrl+Shift and Alt+Shift switch Windows' layout: never a mode switch, held at press or at release.
+            for chord in (0x11, 0x12):
+                assert key(0x10, method="filterKeyDown", modifiers=(chord,))["return"] is False
+                assert key(0x10, method="filterKeyUp", modifiers=(chord,))["return"] is False
+                assert key(0x10, method="filterKeyDown")["return"] is False
+                assert key(0x10, method="filterKeyUp", modifiers=(chord,))["return"] is False
+            assert service.state.mode == "continue"
             shift_tap()
             for char in "draft":
                 key(ord(char.upper()), ord(char))

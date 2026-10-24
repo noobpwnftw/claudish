@@ -83,6 +83,11 @@ EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5
 MODIFIER_KEYS = (0x10, 0x11, 0x12, 0x5B)  # Shift, Ctrl, Alt, Windows
 
 
+def held_chord(event):
+    """Ctrl, Alt or Win down with Shift: Windows' layout and language switch, not a Shift tap."""
+    return any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
+
+
 def held(event):
     """The modifiers down with this key."""
     return [key for key in MODIFIER_KEYS if event.isKeyDown(key)]
@@ -303,7 +308,7 @@ class ClaudishTextService(TextService):
             return False
         self.adopt_parked()  # back from another input method: this app's exchange decides what is taken
         if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
-            self.shift.press(time.monotonic())
+            self.shift.press(time.monotonic(), chord=held_chord(event))
             self.switching = False
             return False
         self.shift.other()
@@ -431,7 +436,7 @@ class ClaudishTextService(TextService):
             # PIME asks twice for one key-up (TSF's test, then the key itself): the second answer
             # must match the first.
             if self.shift.down_at is not None:
-                self.switching = self.shift.release(time.monotonic())
+                self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
             keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
             return getattr(self, "switching", False)
         return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
