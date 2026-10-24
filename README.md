@@ -61,7 +61,7 @@ subscription) or another model API, in its settings at the end of the install.
 - **Windows 11** (tested on ARM64; x64 not yet): **cd_AI-setup.exe**. It is not signed, so
   SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. It asks for
   an administrator once and ends in cd_AI's settings. Then restart, and pick **cd_AI** with
-  Win+Space. Where PIME is installed with other input methods, it stops rather than replace them.
+  Win+Space. A PIME you already have (Chewing, Rime) keeps working beside it.
 - **Linux** (preview, IBus): one line, no sudo; it names any system package to add first.
 
   ```sh
