@@ -637,6 +637,15 @@ class ClaudishTextService(TextService):
         if self.worker:
             self.worker.schedule(self.state.revision, "")
 
+    def onSetFocus(self):
+        """The app has the keyboard again (Claudish's PIME sends it in an edit session): an exchange
+        held for this text box says so at once, rather than at the next key."""
+        keylog("onSetFocus", getattr(self, "document", None))
+        self.follow_document()
+        pill = self.state.returned(getattr(self, "document", None))
+        if pill:
+            self.setToast(pill, 3)
+
     def onKeyboardStatusChanged(self, opened):
         super().onKeyboardStatusChanged(opened)
         self.keyboardOpen = opened

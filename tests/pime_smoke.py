@@ -301,6 +301,16 @@ def main():
             taken = third.handleRequest({"method": "filterKeyDown", "seqNum": 1, "charCode": 0x1B, "keyCode": 0x1B,
                                          "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": states})
             assert taken["return"] and third.worker is parked_worker and third.state.held is not None, taken
+            # Back in a text box after a focus change: what waits there says so when the app has the
+            # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
+            back = ClaudishTextService(None)
+            back.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            back.handleRequest({"method": "onSetFocus", "document": "7"})
+            back.state.change("decline politely")
+            back.state.submit()
+            back.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            reply = back.handleRequest({"method": "onSetFocus", "document": "7"})
+            assert said(reply, "Shift+Esc"), reply
             worker_class.side_effect = None
             replaying.stop()
         sys.path.remove(temporary)

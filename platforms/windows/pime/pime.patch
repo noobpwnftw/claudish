@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..c854708 100644
+index 7829c72..d319547 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -176,7 +176,7 @@ index 7829c72..c854708 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +443,86 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +443,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -239,6 +239,28 @@ index 7829c72..c854708 100644
 +	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
 +}
 +
++void Client::onSetFocus() {
++	if (!isReady()) {
++		return;
++	}
++	auto context = textService_->currentContext();
++	if (!context) {
++		return;
++	}
++	auto alive = alive_;
++	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive](Ime::EditSession* session, TfEditCookie) {
++		if (!*alive)
++			return;
++		json req = createRpcRequest("onSetFocus");
++		addSurroundingText(req, session);
++		json ret;
++		callRpcMethod(req, ret);
++		handleRpcResponse(ret, session);
++	});
++	HRESULT result;
++	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
++}
++
 +void Client::addSurroundingText(json& request, Ime::EditSession* session) {
 +	if (session == nullptr) {
 +		return;
@@ -263,7 +285,7 @@ index 7829c72..c854708 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +530,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +552,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -277,7 +299,7 @@ index 7829c72..c854708 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +539,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +561,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -295,7 +317,7 @@ index 7829c72..c854708 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +643,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +665,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -303,7 +325,7 @@ index 7829c72..c854708 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +676,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +698,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -311,7 +333,7 @@ index 7829c72..c854708 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +716,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +738,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -340,7 +362,7 @@ index 7829c72..c854708 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1006,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1028,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -350,10 +372,10 @@ index 7829c72..c854708 100644
  	return pipeName;
  }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
-index feb9813..e9b33b6 100644
+index feb9813..3b3d389 100644
 --- a/PIMETextService/PIMEClient.h
 +++ b/PIMETextService/PIMEClient.h
-@@ -92,6 +92,10 @@ public:
+@@ -92,6 +92,14 @@ public:
  	// called just before current composition is terminated for doing cleanup.
  	void onCompositionTerminated(bool forced);
  
@@ -361,10 +383,14 @@ index feb9813..e9b33b6 100644
 +	// asynchronous edit session, so a result that arrives between keys can be shown.
 +	void onTimer();
 +
++	// Claudish: the app has the keyboard again: send "onSetFocus" in an edit session, so the input
++	// method can say what waits in this text box before the next key.
++	void onSetFocus();
++
  private:
  	void startAsyncConnect();
  	static std::wstring getPipeName(const wchar_t* baseName);
-@@ -119,6 +123,12 @@ private:
+@@ -119,6 +127,12 @@ private:
  	void updateKeyboardStatus(nlohmann::json& msg);
  	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
  	void updateUI(nlohmann::json& data);
@@ -377,7 +403,7 @@ index feb9813..e9b33b6 100644
  	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
  
  private:
-@@ -128,6 +138,9 @@ private:
+@@ -128,6 +142,9 @@ private:
  	std::shared_ptr<AsyncConnector> connector_;
  	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
  	unsigned int nextSeqNum_;
@@ -439,13 +465,20 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..9c1cf51 100644
+index 28d8286..6fc1df4 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
-@@ -94,6 +94,14 @@ void TextService::onDeactivate() {
+@@ -94,6 +94,21 @@ void TextService::onDeactivate() {
  void TextService::onFocus() {
  }
  
++// virtual
++void TextService::onSetFocus() {
++	// Claudish: the app has the keyboard again: the input method may have something waiting there.
++	if (client_)
++		client_->onSetFocus();
++}
++
 +// virtual
 +void TextService::onKillFocus() {
 +	// Claudish: the app lost the keyboard: the panel, the suggestion and a toast belong to its text box.
@@ -457,7 +490,7 @@ index 28d8286..9c1cf51 100644
  // virtual
  bool TextService::filterKeyDown(Ime::KeyEvent& keyEvent) {
  	// if (keyEvent.isKeyToggled(VK_CAPITAL))
-@@ -268,6 +276,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -268,6 +283,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	candidateWindow_->setUseCursor(candUseCursor_);
  	candidateWindow_->setCandPerRow(candPerRow_);
@@ -467,7 +500,7 @@ index 28d8286..9c1cf51 100644
  
  	// the items in the candidate list should not exist the
  	// number of available keys used to select them.
-@@ -280,9 +291,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -280,9 +298,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	RECT textRect;
  	// get the position of composition area from TSF
@@ -481,7 +514,7 @@ index 28d8286..9c1cf51 100644
  	}
  
  	if (validCandidateListElementId_) {
-@@ -297,9 +309,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
+@@ -297,9 +316,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
      if (candidateWindow_) {
          RECT textRect;
          // get the position of composition area from TSF
@@ -493,7 +526,7 @@ index 28d8286..9c1cf51 100644
          }
      }
  }
-@@ -346,6 +357,35 @@ void TextService::hideCandidates() {
+@@ -346,6 +364,35 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -529,7 +562,7 @@ index 28d8286..9c1cf51 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,14 +409,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -369,14 +416,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -560,7 +593,7 @@ index 28d8286..9c1cf51 100644
      }
  }
  
-@@ -429,6 +481,7 @@ void TextService::closeClient() {
+@@ -429,6 +488,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -569,7 +602,7 @@ index 28d8286..9c1cf51 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 5c89d15..2f05e2a 100644
+index 5c89d15..5f1fe75 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -581,15 +614,16 @@ index 5c89d15..2f05e2a 100644
  #include <LibIME2/src/EditSession.h>
  #include <LibIME2/src/LangBarButton.h>
  #include "PIMEImeModule.h"
-@@ -46,6 +48,7 @@ public:
+@@ -46,6 +48,8 @@ public:
  	virtual void onDeactivate();
  
  	virtual void onFocus();
++	virtual void onSetFocus();
 +	virtual void onKillFocus();
  
  	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
  	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
-@@ -122,6 +125,16 @@ public:
+@@ -122,6 +126,16 @@ public:
  		updateFont_ = true;
  	}
  
@@ -606,7 +640,7 @@ index 5c89d15..2f05e2a 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +179,9 @@ private:
+@@ -166,6 +180,9 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;
@@ -617,7 +651,7 @@ index 5c89d15..2f05e2a 100644
  
  	HMENU popupMenu_;
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..c142e00 100644
+index 400c374..d89e685 100644
 --- a/python/textService.py
 +++ b/python/textService.py
 @@ -90,12 +90,20 @@ class TextService:
@@ -641,7 +675,26 @@ index 400c374..c142e00 100644
          elif method == "filterKeyUp":
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyUp(keyEvent)
-@@ -176,6 +184,15 @@ class TextService:
+@@ -121,6 +129,8 @@ class TextService:
+         elif method == "onCompositionTerminated":
+             forced = msg["forced"]
+             self.onCompositionTerminated(forced)
++        elif method == "onSetFocus":
++            self.onSetFocus()
+         elif method == "onActivate":
+             self.isActivated = True
+             self.keyboardOpen = msg["isKeyboardOpen"]
+@@ -147,6 +157,9 @@ class TextService:
+     def onDeactivate(self):
+         pass
+ 
++    def onSetFocus(self):
++        pass
++
+     def filterKeyDown(self, keyEvent):
+         return False
+ 
+@@ -176,6 +189,15 @@ class TextService:
          self.commitString = ""
          self.compositionString = ""
  
@@ -657,7 +710,7 @@ index 400c374..c142e00 100644
      def onKeyboardStatusChanged(self, opened):
          pass
  
-@@ -249,6 +266,20 @@ class TextService:
+@@ -249,6 +271,20 @@ class TextService:
          self.showCandidates = show
          self.currentReply["showCandidates"] = show
  
