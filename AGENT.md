@@ -40,8 +40,10 @@ and go on.
 
 `python scripts/check.py` is the merge gate: unit tests, compile, diff, the IBus and PIME smokes and
 the settings page, each under 5 s. A longer test (VM build and install, evaluation) runs once, on
-demand, in the background. Real typing is checked on the Mac and Windows VMs (yours to drive) and
-on Linux in a container. Never install services or input methods on the Spark itself.
+demand, in the background. The 5 s limit is for tests and merge/push gates; one-off work such as
+recording a demo or capturing a VM screen may take longer. Real typing is checked on the Mac and
+Windows VMs (yours to drive) and on Linux in a container. Never install services or input methods
+on the Spark itself.
 
 ## Git
 

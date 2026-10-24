@@ -26,6 +26,10 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 
 Tap Shift to switch. Shift+Enter keeps your words as typed. [Keys and modes](docs/using.md).
 
+In a terminal, a handoff is a command draft: Tab puts it at the prompt; Enter runs it in that folder.
+
+![Enter asks about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
+
 cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
 model, or a profile routed to one. Context: files, commands and MCP servers, per app.
