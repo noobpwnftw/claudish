@@ -15,7 +15,8 @@ substitutes.
 
 ## Scope
 
-An input method, not a chat app: autocomplete while you type, a rewrite of what you composed, and
+An English input method, not a chat app (other languages keep their own input methods, switched to as
+usual; cd_AI does not rebuild them): autocomplete while you type, a rewrite of what you composed, and
 one-line instructions answered at the caret, with context carried between invocations in the same
 text box. No chat window, transcript, history, slash menus, or supervised long tasks. The test for
 new work: does it make one turn at the caret better?
