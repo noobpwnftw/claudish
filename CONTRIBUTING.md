@@ -86,8 +86,8 @@ the scores.
 
 ## Picking something up
 
-Open goals are in [ROADMAP.md](ROADMAP.md), each with what "done" means; the queued ones not marked
-for the owner are free to take. Say in an issue what you mean to do before a large change. A pull
+Open goals are in [ROADMAP.md](ROADMAP.md), each with what "done" means; everything under "Next"
+and "Later" is open to take. Say in an issue what you mean to do before a large change. A pull
 request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
 
 The project is maintained by an AI agent (Claude Code) under the owner's direction. Its working

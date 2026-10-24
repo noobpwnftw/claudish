@@ -8,12 +8,11 @@ one-line instructions answered at the caret, in every app, with the model you co
 
 ## Now
 
-| ID | Goal | Acceptance |
+| ID | Goal | Done when |
 | --- | --- | --- |
-| G01 | **Works flawlessly and stays installed** on all three platforms | Install, restart, type, update, uninstall on the Mac and Windows VMs and in a Linux container, each run once on demand; every review finding fixed |
-| G64 | **Configs and docs work as written** | Every documented command and config run for real and fixed (branch `agent/config-practice`) |
-| G45 | **The natives match the design lab**, state by state | By hand on each platform, both themes |
-| G06 | **Release 0.1.0** | docs/release.md (branch `agent/release-0.1.0`); waits on a Claude rewrite with a valid key (owner) |
+| G01 | **Works the same on all three platforms** | Install, restart, type, update and uninstall pass on macOS, Windows and Linux |
+| G45 | **The panels match the design lab**, state by state | Each platform checked in both themes |
+| G06 | **Release 0.1.0** | Published with the macOS package and the Windows installer ([docs/release.md](docs/release.md) when it lands) |
 
 ## Next
 
