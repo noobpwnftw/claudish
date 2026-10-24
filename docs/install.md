@@ -4,8 +4,9 @@ How to install cd_AI on each OS, give it a model, and remove it. The short versi
 [README](../README.md#install).
 
 cd_AI ships no model. Out of the box it is set up for Claude: its settings, which open at the end
-of every install, take an [Anthropic API key](https://console.anthropic.com/settings/keys) or the
-address of another model API.
+of every install, take an [Anthropic API key](https://console.anthropic.com/settings/keys), or
+**Claude Code** for a Claude subscription (it runs Claude Code's `claude` command, logged in to that
+subscription; a few seconds per rewrite), or the address of another model API.
 
 ## The `claudish` command
 

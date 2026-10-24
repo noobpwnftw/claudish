@@ -126,6 +126,7 @@ STARTER = {
         "ollama: any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, a hosted API): set model_url,",
         "  and model when the server has several. A key: saved in the settings, or api_key_env.",
         "local: the llama.cpp server and Gemma 4 E4B that `claudish setup --profile local` installs.",
+        "claude-code: Claude Code's `claude -p` (a Claude subscription), picked in cd_AI's settings.",
         "agent: an agent CLI that reads the text on stdin (here Claude Code's `claude -p`).",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
         "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
@@ -136,6 +137,8 @@ STARTER = {
         "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
         "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
+        "claude-code": {"backend": "command", "timeout": 30, "templates": "templates.json",
+                        "command": ["claude", "-p", "--model", "haiku", "--output-format", "text"]},
         "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
     },
 }

@@ -85,7 +85,16 @@ holds the bindings; other profiles are loaded when they are first needed.
 ### An agent CLI as the backend
 
 With `"backend": "command"`, Claudish sends the mode's instructions, the profile's context, and your text on
-stdin; the command's output becomes the candidate, which you accept with Tab:
+stdin; the command's output becomes the candidate, which you accept with Tab. The settings page's
+**Claude Code** choice writes this profile, with the full path to `claude` (a login service may
+not have your shell's PATH), for a Claude subscription:
+
+```json
+{"profiles": {"claude-code": {"backend": "command", "timeout": 30,
+                              "command": ["/home/me/.local/bin/claude", "-p", "--model", "haiku", "--output-format", "text"]}}}
+```
+
+A longer-running agent, for instructions:
 
 ```json
 {"profiles": {"agent": {"backend": "command", "timeout": 120,

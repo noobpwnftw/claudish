@@ -155,5 +155,26 @@ class TypedCommandTests(unittest.TestCase):
             self.assertEqual(service.as_typed("run `claudish settings`"), "run `%s -m claudish settings`" % sys.executable)
 
 
+class ClaudeKeyChecks(unittest.TestCase):
+    """No Claude key: with Claude Code installed, the fix names the settings' Claude Code choice."""
+
+    def check(self, found):
+        settings = {"backend": "claude", "claude_model": "claude-opus-5-5"}
+        with patch.dict(os.environ, {}, clear=False), patch("claudish.keys.stored", return_value=None), \
+                patch.object(Path, "home", return_value=Path("/nonexistent-home")), \
+                patch("claudish.settings.claude_code", return_value=found):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
+            return doctor.check_backend({"settings": settings})
+
+    def test_the_fix_names_claude_code_when_it_is_installed(self):
+        try:
+            import anthropic  # noqa: F401
+        except ImportError:
+            self.skipTest("needs the Anthropic SDK")
+        self.assertIn("pick Claude Code", self.check("/usr/bin/claude")[2])
+        self.assertNotIn("Claude Code", self.check(None)[2])
+
+
 if __name__ == "__main__":
     unittest.main()

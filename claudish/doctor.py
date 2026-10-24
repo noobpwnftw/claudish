@@ -63,8 +63,11 @@ def check_backend(state):
         from .keys import stored
         if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") or stored()
                 or Path.home().joinpath(".config", "anthropic").is_dir()):
-            return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", \
-                "save one in cd_AI's settings (`claudish settings`) or with `claudish key`, or set ANTHROPIC_API_KEY, or run `ant auth login`"
+            from .settings import claude_code
+            fix = "save one in cd_AI's settings (`claudish settings`) or with `claudish key`, or set ANTHROPIC_API_KEY, or run `ant auth login`"
+            if claude_code():  # a Claude subscription works through it, without an API key
+                fix = "with a Claude subscription, pick Claude Code in cd_AI's settings (`claudish settings`); or " + fix
+            return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", fix
         return "ok", "Claude via the Anthropic SDK (%s)" % settings["claude_model"], None
     if backend == "command":
         program = settings["command"][0]

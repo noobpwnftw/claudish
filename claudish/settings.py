@@ -1,20 +1,39 @@
 """The settings window's model (G62): what it shows, and the few changes it makes to config.json.
 
-The window offers three things (docs/research/2026-10-24-install-poll.md): the Claude key, the
-tone, and a model server on this computer instead of Claude. They map onto the starter's
-profiles: "claude", and "ollama" for any OpenAI-compatible server (Ollama, LM Studio, llama.cpp).
+The window offers the model (Claude with an API key, Claude Code's `claude` command for a Claude
+subscription, or any OpenAI-compatible API) and the tone. The models map onto the starter's
+profiles: "claude", "claude-code", and "ollama" for any OpenAI-compatible server.
 A config whose default is another profile is shown as that profile and left to its file.
 The key is saved by claudish/keys.py.
 """
+import glob
 import json
 import os
+import shutil
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import config, keys
 from .modes import TEMPLATES
 
-CHOICES = {"claude": "claude", "server": "ollama"}  # the window's choice -> the starter profile it uses
-MANAGED = ("claude", "ollama", "local")  # the profiles whose tone the window sets
+CHOICES = {"claude": "claude", "claude-code": "claude-code", "server": "ollama"}  # choice -> starter profile
+MANAGED = ("claude", "claude-code", "ollama", "local")  # the profiles whose tone the window sets
+NO_CLAUDE_CODE = "claude was not found: install Claude Code, then log in"
+
+
+def claude_code():
+    """The `claude` command's full path, or None: on PATH, or where Claude Code installs it (a login
+    service may not have the shell's PATH, so the profile keeps the full path)."""
+    found = shutil.which("claude")
+    if found:
+        return str(Path(found).resolve())
+    home = Path.home()
+    places = [home / ".local/bin/claude", home / ".claude/local/claude", Path("/usr/local/bin/claude"),
+              Path("/opt/homebrew/bin/claude"), home / ".npm-global/bin/claude",
+              Path(os.environ.get("APPDATA", home / "AppData/Roaming")) / "npm/claude.cmd"]
+    places += sorted((Path(p) for p in glob.glob(str(home / ".vscode*/extensions/anthropic.claude-code-*/"
+                                                      "resources/native-binary/claude*"))), reverse=True)
+    return next((str(p) for p in places if p.is_file() and os.access(p, os.X_OK)), None)
 
 
 def read(path=None):
@@ -36,7 +55,7 @@ def state(path=None):
     profiles = data.get("profiles") or {}
     name = data.get("profile") or next(iter(profiles), None)
     entry = profiles.get(name) or {}
-    choice = {"claude": "claude", "ollama": "server", "local": "local"}.get(name, "other")
+    choice = {"claude": "claude", "claude-code": "claude-code", "ollama": "server", "local": "local"}.get(name, "other")
     server = profiles.get("ollama") or config.STARTER["profiles"]["ollama"]
     tone = entry.get("tone") or "corporate"
     return {
@@ -51,6 +70,7 @@ def state(path=None):
         # connection on this computer answers at once).
         "server_problem": check_server(server.get("model_url", ""), server.get("model")) if choice == "server" else None,
         "server_models": listed(server.get("model_url", "")) if choice == "server" else [],
+        "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
     }
 
 
@@ -165,6 +185,12 @@ def apply(changes, path=None):
             raise ValueError(problem)
     if "server" in changes and server_key:  # accepted by the server: saved for its address only
         keys.store(server_key, keys.server_name(profiles["ollama"]["model_url"]))
+    if changes.get("choice") == "claude-code":
+        command = claude_code()
+        if not command:  # like a server that is not there: no switch to a model that cannot answer
+            raise ValueError(NO_CLAUDE_CODE)
+        entry = profiles.setdefault("claude-code", dict(config.STARTER["profiles"]["claude-code"]))
+        entry["command"] = [command] + list(entry.get("command") or config.STARTER["profiles"]["claude-code"]["command"])[1:]
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
         profiles.setdefault(name, dict(config.STARTER["profiles"][name]))

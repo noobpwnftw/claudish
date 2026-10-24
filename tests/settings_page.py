@@ -40,6 +40,7 @@ async def check(args, home, port):
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")  # the rules backend, in words
         await expect(page.locator("input[name=choice][value=claude]")).to_be_checked()
         await expect(page.locator("#key-state")).to_have_text("Not set")
+        await expect(page.get_by_text("A Claude subscription, through the claude command.", exact=False)).to_be_visible()
         if args.screenshots:
             await page.screenshot(path=str(args.screenshots / "settings.png"), full_page=True)
 

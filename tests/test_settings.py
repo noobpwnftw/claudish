@@ -54,6 +54,22 @@ class SettingsTests(Home):
         settings.apply({"tone": "corporate"})
         self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
 
+    def test_claude_code_for_a_claude_subscription(self):
+        with patch.object(settings, "claude_code", return_value=None):
+            self.assertEqual(settings.state()["claude_code"], settings.NO_CLAUDE_CODE)
+            with self.assertRaisesRegex(ValueError, "claude was not found"):  # not switched to what cannot answer
+                settings.apply({"choice": "claude-code"})
+        self.assertFalse(self.path.exists())
+        with patch.object(settings, "claude_code", return_value="/opt/claude/bin/claude"):
+            state = settings.apply({"choice": "claude-code", "tone": "critic"})
+        self.assertEqual((state["choice"], state["claude_code"]), ("claude-code", None))
+        profile = self.written()["profiles"]["claude-code"]
+        # The full path: a login service may not have the shell's PATH.
+        self.assertEqual(profile["command"], ["/opt/claude/bin/claude", "-p", "--model", "haiku", "--output-format", "text"])
+        self.assertEqual(profile["tone"], "critic")
+        name, resolved, _, _ = config.resolve()
+        self.assertEqual((name, resolved["backend"]), ("claude-code", "command"))
+
     def test_a_model_server_on_this_computer(self):
         with patch.object(settings, "check_server", return_value="nothing answers at http://127.0.0.1:1234"):
             with self.assertRaisesRegex(ValueError, "nothing answers"):  # not switched to a server that is not there

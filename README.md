@@ -65,8 +65,8 @@ It installs cd_AI for you alone and ends in cd_AI's settings. Then log out and b
 built from source ([how](docs/install.md#windows-input-method)); the input method comes only from
 it. It ends in cd_AI's settings; then restart, and pick cd_AI with Win+Space.
 
-All three end in the same settings page: paste an Anthropic API key, or the address of another
-model API. A local model instead: `claudish setup --profile local`. Details, uninstalling, and a
+All three end in the same settings page: paste an Anthropic API key, pick **Claude Code** to use
+a Claude subscription through the `claude` command, or give the address of another model API. A local model instead: `claudish setup --profile local`. Details, uninstalling, and a
 source checkout for development: [docs/install.md](docs/install.md).
 
 ## Keys

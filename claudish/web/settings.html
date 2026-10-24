@@ -26,6 +26,10 @@
           <span><strong>Claude</strong><small>Anthropic's models, with an API key.</small></span>
         </label>
         <label class="row choice">
+          <input type="radio" name="choice" value="claude-code">
+          <span><strong>Claude Code</strong><small>A Claude subscription, through the claude command. A few seconds per rewrite.</small></span>
+        </label>
+        <label class="row choice">
           <input type="radio" name="choice" value="server">
           <span><strong>Another model API</strong><small>Any OpenAI-compatible API: OpenAI, OpenRouter, Groq, Ollama, LM Studio or llama.cpp.</small></span>
         </label>
@@ -41,9 +45,9 @@
           <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a key: sk-ant-…" aria-describedby="key-help">
           <button type="submit">Save</button>
         </div>
-        <p class="row note" id="key-help">No key yet? Anthropic bills API use separately from a Claude
-          subscription: sign in at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>,
-          add credit, and create a key. cd_AI checks it with Anthropic before saving it.</p>
+        <p class="row note" id="key-help">No key yet? Sign in at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>,
+          add credit, and create a key; cd_AI checks it with Anthropic before saving it. With a Claude
+          subscription, pick Claude Code above instead.</p>
       </form>
 
       <form class="group" id="server" hidden>
