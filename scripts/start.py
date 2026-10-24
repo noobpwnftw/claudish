@@ -84,8 +84,20 @@ def main():
     # SIGTERM (kill, service managers) must stop the model too, not orphan it.
     signal.signal(signal.SIGTERM, interrupt)
     # Bind the service first, so port conflicts do not leave an orphan model.
+    import errno
+    import secrets
     from claudish.client import write_token
-    server = make_server(rewriter, token=write_token())
+    token = secrets.token_urlsafe(32)
+    try:
+        server = make_server(rewriter, token=token, reload=lambda: local_rewriter(endpoint, args.profile),
+                             config_path=config.default_path())
+    except OSError as exc:
+        if exc.errno != errno.EADDRINUSE:
+            raise
+        print("Port 18765 is in use: cd_AI is already running, or another program has it. "
+              "Check with `claudish doctor`.", file=sys.stderr, flush=True)
+        return
+    write_token(token)  # only once the port is ours
     process = None
     try:
         process = subprocess.Popen(cmd)

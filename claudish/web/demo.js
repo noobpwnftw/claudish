@@ -638,7 +638,6 @@ async function checkConnection() {
     serviceTimeout = Number(data.timeout) || 3;
     hosted = Boolean(data.hosted);
     backend = data.backend;
-    $("inference-note").textContent = "Actual inference.";
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"
@@ -708,7 +707,7 @@ if (IN_BROWSER) {
     <div class="model-progress"><progress id="model-progress" max="100" value="0" aria-label="Model download"></progress>
     <span id="model-progress-label">0%</span></div></div>`;
   document.querySelector(".workspace").before(strip);
-  $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
+  $("model-copy").textContent = model;
   $("load-model").addEventListener("click", loadInBrowser);
   // Only once the model runs: it stops the model (whose files are open while it runs) and deletes them.
   $("remove-model").addEventListener("click", async () => {
@@ -718,15 +717,14 @@ if (IN_BROWSER) {
     await removeStored();
     $("remove-model").hidden = true;
     $("model-strip").classList.remove("ready");
-    $("model-copy").textContent = `${model} runs in this page, and nothing you type leaves it.`;
+    $("model-copy").textContent = model;
     $("connection").className = "connection";
-    $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
+    $("connection").replaceChildren(document.createElement("i"), document.createTextNode("In-browser model"));
     setStatus("Removed the model from this browser.");
   });
   $("connection").className = "connection";
-  $("connection").replaceChildren(document.createElement("i"), document.createTextNode("Runs in your browser"));
+  $("connection").replaceChildren(document.createElement("i"), document.createTextNode("In-browser model"));
   $("backend").textContent = "cd_AI · IN-BROWSER LLM";
-  $("inference-note").textContent = "The model runs in this page.";
 } else {
   checkConnection();
   setInterval(checkConnection, 15000);

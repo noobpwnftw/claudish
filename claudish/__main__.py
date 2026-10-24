@@ -214,11 +214,6 @@ def main():
                   "Check with `claudish doctor`." % args.port, file=sys.stderr, flush=True)
             return
         write_token(token)  # only once the port is ours: the running service's token stays valid
-        if rewriter.hosted:
-            target = ("the Anthropic API (%s)" % settings["claude_model"] if rewriter.claude
-                      else " ".join(settings["command"]) if settings["backend"] == "command"
-                      else settings["model_url"])
-            print("Typed text will be sent to %s." % target, flush=True)
         print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
             server.server_port, settings["backend"], ", profile " + profile if profile else ""), flush=True)
         if rewriter.read_terminal:
@@ -231,7 +226,7 @@ def main():
             pass
         finally:
             server.server_close()
-            rewriter.conversations.close()
+            server.rewriter.conversations.close()
     elif args.command == "rewrite":
         print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
     else:

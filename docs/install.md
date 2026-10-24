@@ -58,7 +58,7 @@ Verified end to end on Ubuntu 24.04 under systemd in a container.
 profiles to start from: `claude` (the default), `ollama` (any OpenAI-compatible server, local or
 hosted), `local` (below), and `agent` (an agent CLI such as `claude -p`). Run setup with
 `--profile NAME`, or see [configuration](configuration.md). With no model at all, compose says
-"no model is set up" and nothing you type is lost.
+"no model is set up".
 
 **Continue** (a Shift tap) types straight into the app. It suggests the rest of a sentence only
 with a local model, or with a model a profile routes to it ([configuration](configuration.md#modes)),

@@ -91,7 +91,6 @@ class Composition:
         # The service does not answer (the adapter copies Suggestions.offline here): composing says so
         # from the first key, as cloud input methods grey out their cloud part; nothing else changes.
         self.offline = False
-        self.hosted = ""  # the hosted model the shown result came from ("Claude"); "" when local
 
     def change(self, text):
         self.reply = ""

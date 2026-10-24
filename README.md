@@ -12,7 +12,7 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 > important to acknowledge that this particular direction may not align with our broader
 > strategic objectives—at least not at this stage of our journey.
 
-**[Try it in your browser →](https://claudish.io/demo/)** The model runs in the page; nothing you type leaves it.
+**[Try it in your browser →](https://claudish.io/demo/)**
 
 ## Two modes, one Shift
 
@@ -22,20 +22,11 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 | **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 | **continue** | `Thanks for the review on ` | the rest of the sentence, in grey; Tab takes it |
 
-Tap Shift to switch, as Shift switches English and pinyin. Shift+Enter keeps
-your words as typed. Continue is a Shift tap away when you want your keys to go
-straight in, with the rest of the sentence offered. Where you want none of it,
-switch that app to your usual keyboard (the system can remember it per app once you turn that on:
-[how](docs/using.md)).
+Tap Shift to switch. Shift+Enter keeps your words as typed. [Keys and modes](docs/using.md).
 
-cd_AI ships no model: point it at one. Claude is the default setup; any
-OpenAI-compatible server or an agent CLI
-works too, and `claudish setup --profile local` downloads Gemma 4 E4B, a local model
-that made slop as well as anything we tried (quick on a GPU or Apple silicon, 3–4 s on
-a CPU alone). Continue suggests only with a local model, or where you route one
-for it. The model can read
-context (files, commands, MCP servers) and, when you ask, look things up or run an
-agent whose questions arrive as choices.
+cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
+works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
+model, or a profile routed to one. Context: files, commands and MCP servers, per app.
 
 ## Voices and templates
 

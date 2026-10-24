@@ -157,8 +157,8 @@ def step_service(name, settings):
     except Exception:
         pass
     local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
-    extra = [] if name in (None, "local") else ["--profile", name]
-    what = "the local model and service" if local else "`claudish serve --profile %s`" % name
+    extra = []  # the service runs the config's profile, so the settings page can change it
+    what = "the local model and service" if local else "`claudish serve`"
     if settings.get("api_key_env"):
         what += "; it will need %s in the service manager's environment, not just your shell" % settings["api_key_env"]
     return "todo", "start %s at every login" % what, lambda: service.run("install", local=local, extra=extra)

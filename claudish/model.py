@@ -264,9 +264,6 @@ class Rewriter:
             other.url = getattr(self, "url", None)
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
             self.routed[name] = other
-            if other.hosted and not self.hosted:
-                # A local service sending some text to a hosted model: said out loud.
-                print("%s goes to profile %r, a hosted model." % (what[0].upper() + what[1:], name), flush=True)
         return self.routed[name]
 
     def sections(self, app=None):

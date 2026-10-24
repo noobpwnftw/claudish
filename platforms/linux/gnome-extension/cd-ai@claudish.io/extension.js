@@ -111,7 +111,7 @@ export default class CdAiExtension extends Extension {
     // The panel's anatomy: an optional header (a small label, then the content as is), the rows
     // (the highlighted one a neutral fill with the accent bar and its own Enter key; every row keeps
     // that key's column), and one footer (the tile or a warning mark, what is happening, each key
-    // with its verb, the free words, a hosted model's name at the end).
+    // with its verb, the free words).
     _fill(box, panel) {
         box.destroy_all_children();
         box.visible = Boolean(panel);

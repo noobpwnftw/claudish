@@ -35,7 +35,10 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         nonlocal rewriter
         fresh = reload()
         fresh.url = rewriter.url
+        # What is running goes on: sessions, each text box's conversation, the recent requests.
+        fresh.sessions, fresh.conversations, fresh.recent = rewriter.sessions, rewriter.conversations, rewriter.recent
         rewriter = fresh
+        server.rewriter = fresh
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -359,5 +362,6 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
     server = Server(("127.0.0.1", port), Handler)
     server.token = token
+    server.rewriter = rewriter
     rewriter.url = "http://127.0.0.1:%d" % server.server_port  # for the agents' textbox MCP server
     return server

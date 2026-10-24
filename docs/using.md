@@ -90,7 +90,7 @@ with the model running in the page through [wllama](https://github.com/ngxson/wl
 (llama.cpp compiled to WebAssembly). It needs no inference server, so any static
 host can serve it. Nothing is downloaded until the visitor clicks **Run the model
 in this browser**; the 491 MB model (pinned Qwen2.5 0.5B) is then cached by the
-browser, and nothing typed leaves the page. A small service worker (`coi-sw.js`)
+browser. A small service worker (`coi-sw.js`)
 supplies the cross-origin isolation headers static hosts cannot set, so the
 multi-threaded build runs: on the Spark's CPU in headless Chromium, a rewrite
 takes about 1 s (9 s single-threaded). Browsers with WebGPU are faster still.

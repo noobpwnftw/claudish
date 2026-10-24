@@ -55,7 +55,6 @@ tr:first-child td{border-top:0}
 .features{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px}
 .features li{font-size:15px;line-height:1.7;color:var(--muted)}
 .features b{color:var(--ink);font-weight:600}
-.features.everyone{margin-top:34px}
 .balanced p,.balanced li,.balanced .io span{text-wrap:balance}
 .plus{margin-right:6px;color:var(--muted)}
 .prompt{border:1px solid var(--workspace-border);border-radius:6px;overflow:hidden;background:var(--editor-bg);box-shadow:0 4px 0 var(--workspace-shadow);margin-top:22px}

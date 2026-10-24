@@ -27,7 +27,7 @@ No release has been made yet. What a first release would contain:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
 - **Setup:** `python -m claudish setup`, `claudish doctor`, `claudish service`.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/): a small model runs in the
-  page (weak slop, but nothing you type leaves it).
+  page (weak slop).
 
 Tested on Linux (X11 and GNOME Wayland in containers), Windows 11 ARM64 and macOS 26 in VMs; see
 the README's status. Measurements come from one machine (DGX Spark) and are not claims about

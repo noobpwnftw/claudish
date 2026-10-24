@@ -132,7 +132,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(states["Model"], "done")
         self.assertNotIn("llama.cpp", states)
         self.quiet("claude", yes=True)
-        self.service_run.assert_called_once_with("install", local=False, extra=["--profile", "claude"])
+        self.service_run.assert_called_once_with("install", local=False, extra=[])
 
     def test_a_service_running_by_hand_is_not_doubled(self):
         with patch("claudish.setup.doctor.fetch_json", return_value={"backend": "llama"}):
