@@ -142,5 +142,18 @@ class ModelServerChecks(unittest.TestCase):
         self.assertIn("did not accept the key", detail)
 
 
+class TypedCommandTests(unittest.TestCase):
+    """Hints name the command that runs here: `claudish` on PATH, else this Python with -m."""
+
+    def test_on_path_or_not(self):
+        import os
+        from claudish import service
+        script = os.path.join(os.path.dirname(sys.executable), "claudish")
+        with patch("shutil.which", return_value=script):
+            self.assertEqual(service.as_typed("run `claudish settings`"), "run `claudish settings`")
+        with patch("shutil.which", return_value=None):
+            self.assertEqual(service.as_typed("run `claudish settings`"), "run `%s -m claudish settings`" % sys.executable)
+
+
 if __name__ == "__main__":
     unittest.main()

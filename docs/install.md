@@ -60,8 +60,8 @@ with a local model, or with a model a profile routes to it ([configuration](conf
 
 **Start at login by hand:** `python3 -m claudish service install` runs `claudish serve` with
 the config's profile at every login: a systemd user unit on Linux, a logon task on Windows (no
-console window), a launch agent on macOS. Pass `-- --profile NAME` for another profile, `--local`
-for the local model below; `service status` and `service uninstall` inspect or remove it, and
+console window), a launch agent on macOS. Run again, it restarts the service with the current
+settings; `--local` is for the local model below; `service status` and `service uninstall` inspect or remove it, and
 `--dry-run` shows what it would do. `python3 -m claudish doctor` walks the whole chain (model,
 service, config, the input method's registration, context sources) and prints a fix for anything
 wrong.

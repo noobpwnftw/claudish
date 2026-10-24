@@ -28,6 +28,10 @@ python -m claudish serve --backend claude                     # claude-opus-5-5
 python -m claudish serve --backend claude --claude-model claude-haiku-5-5
 ```
 
+For a deterministic demo without a model, use `python -m claudish serve
+--backend rules`. That mode performs simple word substitutions and identifies
+itself as `rules` in API responses. It does not perform neural rewriting.
+
 The Claude backend runs one request at a time, at low effort, with server-side refusal
 fallbacks on the models that offer them. No model ships: the starter profile is Claude, and
 `--profile local` is the local one.
@@ -46,7 +50,7 @@ matches apps by a case-insensitive glob and sets, for them, which profile answer
 
 ```json
 {"profile": "claude", "profiles": {
-  "claude": {"backend": "claude", "tools": ["github"], "bindings": [
+  "claude": {"backend": "claude", "bindings": [
     {"app": "thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
     {"app": "slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
     {"app": "gnome-terminal-server", "profile": "agent"}]},
@@ -57,8 +61,8 @@ matches apps by a case-insensitive glob and sets, for them, which profile answer
 A binding holds what is true of an app every time: who answers there, a style
 guide, a glossary. What changes from one request to the next comes with the
 request: the text around the caret, a terminal's last lines, the window's
-picture (F8), and the tools the model calls for what you asked ("summarize PR
-1234 for the standup" reads that PR). Elsewhere, the service's own profile
+picture (F8), and the [tools](#tools-instructions-that-look-things-up) the model calls for
+what you asked ("summarize PR 1234 for the standup" reads that PR). Elsewhere, the service's own profile
 answers with its own context. Every response lists what was `consulted`.
 
 A mode can name the profile that answers it, too: continue runs at every pause
@@ -190,20 +194,18 @@ Apps that publish MCP on a local socket are read with `url` instead of
  "headers": {"Authorization": "Bearer $EDITOR_MCP_TOKEN"}, "tool": "get_selection"}
 ```
 
-For a deterministic demo without a model, use `python -m claudish serve
---backend rules`. That mode performs simple word substitutions and identifies
-itself as `rules` in API responses. It does not perform neural rewriting.
-
 ### Tools: instructions that look things up
 
 Context is read before the model starts. Tools go further: an instruction may
 *call* MCP tools while it works, then draft from what they returned, for example
-"tell the team how CI looks on main". Name servers from `mcp_servers` in a
-profile:
+"tell the team how CI looks on main". Define the servers under `mcp_servers` (or bring them
+with `claudish mcp import`) and name them in a profile's `tools`:
 
 ```json
-{"profiles": {"agent": {"backend": "llama", "timeout": 60,
-  "tools": ["github", {"server": "notes", "trust": ["pull_request_diff"]}]}}}
+{"mcp_servers": {"github": {"command": "github-mcp-server", "args": ["stdio"],
+                            "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"}}},
+ "profiles": {"claude": {"backend": "claude",
+                         "tools": [{"server": "github", "trust": ["get_pull_request_diff"], "deny": ["merge_pull_request"]}]}}}
 ```
 
 - Tools the server marks read-only (`readOnlyHint`), and the ones you vouch for
@@ -219,12 +221,10 @@ profile:
   its text box goes away or after 30 idle minutes.
 - Every call appears in "consulted", such as `notes.ci_status(branch="main")`.
 - The loop is bounded: at most 4 rounds of calls, and 60 s in all.
-- It needs an OpenAI-compatible server whose model calls tools (llama.cpp, whose
-  chat templates handle tool calls by default, vLLM, Ollama). On the Spark, Qwen2.5-14B called the right tool and
-  drafted from its result ("41 tests have passed… test_upload_retry timed out
-  after 30 seconds", 3.1 s), and called none for a haiku. Qwen2.5-1.5B never
-  called a tool and wrote around the gap. Claude runs the same loop with the SDK's
-  client-side tools, and an agent CLI (`session_command`) uses its own.
+- It needs a model that calls tools: Claude, or an OpenAI-compatible server whose model does
+  (llama.cpp, whose chat templates handle tool calls by default, vLLM, Ollama). Gemma 4 E4B, the
+  local model, called `ci_status` for "tell the team how CI looks on main" and drafted from its
+  result. An agent CLI (`session_command`) uses its own tools.
 
 ### Agent sessions: an agent at the caret
 
@@ -342,7 +342,7 @@ synergies. A profile can pick another tone:
 `proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain
 then. Any other few words work too ("warm and friendly", "plain and concise"); they
 replace the tone in each template, without examples. `claudish setup --tone critic` sets it for
-you. The tones are templates like the rest ([Templates](#templates)): change one, or add your own
+you. The tones are templates like the rest ([Templates](#templates)): change one, or add one
 under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
 over the tone. Instructions typed in a terminal always get a command line.
 

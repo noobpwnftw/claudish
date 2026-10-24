@@ -99,8 +99,9 @@ def main():
             except OSError:
                 time.sleep(0.5)
         else:
-            sys.exit("cd_AI's service is not running, so there are no settings to open. "
-                     "Start it with `claudish service install` (or `claudish serve`).")
+            from .service import as_typed
+            sys.exit(as_typed("cd_AI's service is not running, so there are no settings to open. "
+                              "Start it with `claudish service install` (or `claudish serve`)."))
         if args.print:
             print(url)
         else:
@@ -158,8 +159,9 @@ def main():
             path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
         print("and %s: the words cd_AI says to a model, editable (claudish templates shows them)."
               % path.with_name("templates.json"))
-        print("Pick the model in cd_AI's settings (`claudish settings`), or edit \"profile\" in the file;"
-              " a running service takes up an edit at its next request.")
+        from .service import as_typed
+        print(as_typed("Pick the model in cd_AI's settings (`claudish settings`), or edit \"profile\" in the file;"
+                       " a running service takes up an edit at its next request."))
         return
     if args.command == "templates":
         from . import modes as invocation
@@ -274,8 +276,9 @@ class reachable:
 
     def __exit__(self, kind, error, trace):
         if isinstance(error, OSError) and not isinstance(error, HTTPError):
-            sys.exit("cd_AI's service is not running at %s. Start it with `claudish service install` "
-                     "(or `claudish serve`)." % self.url)
+            from .service import as_typed
+            sys.exit(as_typed("cd_AI's service is not running at %s. Start it with `claudish service install` "
+                              "(or `claudish serve`)." % self.url))
         return False
 
 

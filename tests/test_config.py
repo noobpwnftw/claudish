@@ -28,6 +28,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual((settings["backend"], settings["timeout"]), ("rules", 3))
         self.assertIsNone(templates)
 
+    def test_a_model_server_named_with_no_backend_is_an_openai_compatible_one(self):
+        _, settings, _, _ = config.resolve(overrides={"model_url": "http://127.0.0.1:18766", "backend": None})
+        self.assertEqual(settings["backend"], "openai")
+        _, settings, _, _ = config.resolve(overrides={"model_url": "http://x", "backend": "rules"})
+        self.assertEqual(settings["backend"], "rules")  # a backend named wins
+
     def test_profile_selection_and_precedence(self):
         self.write({"modes": {"rewrite": {"system": "Be grand.", "examples": []}}}, "claudish/grand.json")
         self.write({"profile": "ollama", "profiles": {

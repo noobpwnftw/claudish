@@ -85,14 +85,9 @@ def check_backend(state):
         return "fail", "the model server at %s answered %d" % (url, exc.code), \
             "start your model server, or fix the profile's model_url"
     except Exception as exc:
-        fix = ("start it: `python scripts/start.py` (or `python scripts/run_model.py`)"
-               if backend == "llama" else "start your model server, or fix the profile's model_url")
-        if backend == "llama":
-            if not list((ROOT / "models").glob("*.gguf")):
-                fix = "download a model: `python scripts/download_model.py gemma`, then " + fix
-            servers = list((ROOT / ".tools").glob("llama-*/llama-server*")) + list((ROOT / ".tools").glob("build/bin/llama-server*"))
-            if not (servers or shutil.which("llama-server")):
-                fix = "get llama.cpp: `python scripts/download_llama.py`; " + fix
+        fix = ("`claudish setup --profile local` downloads llama.cpp and the model if they are missing, and "
+               "starts them at every login" if backend == "llama"
+               else "start your model server, or fix the profile's model_url")
         return "fail", "no model server at %s (%s)" % (url, type(exc).__name__), fix
 
 
@@ -101,7 +96,7 @@ def check_service(state):
         health = fetch_json(SERVICE + "/health")
     except Exception:
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
-            "start it: `python scripts/start.py` (local model) or `python -m claudish serve --profile NAME`"
+            "start it at every login: `claudish service install` (the config's profile; `--local` for the local model)"
     detail = "running: backend %s, profile %s" % (health.get("backend"), health.get("profile"))
     return "ok", detail, None
 
@@ -109,7 +104,7 @@ def check_service(state):
 def check_managed():
     from . import service
     status, detail = service.managed()
-    return status, detail, "claudish service install   (add -- --profile NAME for another profile, --local for the local model)" \
+    return status, detail, "`claudish service install` (it runs the config's profile; `--local` for the local model)" \
         if status == "warn" else None
 
 
@@ -237,7 +232,8 @@ def main(as_json=False):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")  # a diagnostic tool must never die on its own output
     symbols = marks()
-    results = run()
+    from .service import as_typed
+    results = [(n, s, d, as_typed(f) if f else f) for n, s, d, f in run()]
     if as_json:
         print(json.dumps([{"check": n, "status": s, "detail": d, "fix": f} for n, s, d, f in results], indent=1))
     else:

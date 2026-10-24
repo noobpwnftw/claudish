@@ -28,6 +28,29 @@ def command(local, extra):
     return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
 
 
+def typed():
+    """How a person runs claudish here: `claudish` when that is on PATH and is this install, the
+    bundle's own command on macOS, else this Python with -m claudish."""
+    import shutil
+    if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
+        return shlex_quote(os.environ["EXECUTABLEPATH"])
+    found = shutil.which("claudish")
+    here = os.path.join(os.path.dirname(sys.executable), "claudish")
+    if found and os.path.realpath(found) in (os.path.realpath(here), os.path.realpath(here + ".exe")):
+        return "claudish"
+    return "%s -m claudish" % shlex_quote(sys.executable)
+
+
+def shlex_quote(path):
+    return '"%s"' % path if " " in path else path
+
+
+def as_typed(text):
+    """A hint's `claudish ...` commands, as they run here."""
+    command = typed()
+    return text if command == "claudish" else text.replace("`claudish ", "`%s " % command)
+
+
 def systemd_unit(argv):
     return """[Unit]
 Description=Claudish input method service

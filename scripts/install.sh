@@ -27,6 +27,13 @@ cd "$home"
 [ -x .venv/bin/python ] || python3 -m venv .venv
 .venv/bin/python -m pip install --quiet --upgrade pip
 .venv/bin/python -m pip install --quiet -e ".[claude]"
+# `claudish` on PATH, as ~/.local/bin is on Ubuntu, Fedora and most desktops.
+mkdir -p "$HOME/.local/bin"
+ln -sf "$home/.venv/bin/claudish" "$HOME/.local/bin/claudish"
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) echo "The claudish command is in ~/.local/bin, which is not on PATH in this shell; a new login adds it on most desktops." ;;
+esac
 echo "cd_AI is in $home. Setting it up:"
 # setup asks questions: read them from the terminal even when this script came through a pipe.
 if [ -t 0 ]; then

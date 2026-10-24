@@ -256,8 +256,9 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
     if dry_run:
         print("\nDry run: nothing was changed.")
         return 0
+    from .service import as_typed
     for label, instruction in manual:
-        print("\n%s needs you: %s" % (label, instruction))
+        print("\n%s needs you: %s" % (label, as_typed(instruction)))
     if started and not wait_for_service():
         print("\nThe service has not answered within %d seconds; doctor may report it as down." % WAIT)
     print("\nChecking the whole chain (claudish doctor):\n")
@@ -277,7 +278,8 @@ def settings():
     except OSError:
         return  # no service to ask: doctor has said why
     if not sys.stdin.isatty():
-        print("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the tone.")
+        from .service import as_typed
+        print(as_typed("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the tone."))
         return
     import webbrowser
     print("\nOpening cd_AI's settings in your browser: the model, its key, and the tone.")

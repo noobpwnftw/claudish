@@ -78,6 +78,8 @@ def resolve(path=None, profile=None, overrides=None):
     elif profile:
         raise ValueError("--profile needs a config file (%s not found)" % default_path())
     settings.update({key: value for key, value in (overrides or {}).items() if value is not None})
+    if settings["backend"] == "none" and any((overrides or {}).get(key) for key in ("model_url", "model")):
+        settings["backend"] = "openai"  # a model server named with no backend: any OpenAI-compatible one
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
     if settings["backend"] == "command":
