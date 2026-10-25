@@ -1,7 +1,6 @@
 import json
 import sys
 import tempfile
-import threading
 import unittest
 from io import BytesIO
 from pathlib import Path
@@ -12,7 +11,7 @@ from urllib.request import Request, urlopen
 from claudish import config
 from claudish.context import Binding, Context
 from claudish.model import Rewriter
-from claudish.server import make_server
+from serving import serving
 
 
 def joined(context):
@@ -90,10 +89,7 @@ class ContextTests(unittest.TestCase):
         self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nok"))
 
     def test_service_validates_caret_text(self):
-        server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        try:
+        with serving(Rewriter("rules")) as server:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
             for body, status in [({"text": "very good", "before": "x" * 4000}, 200),
                                  ({"text": "very good", "before": "x" * 4001}, 400),
@@ -107,10 +103,6 @@ class ContextTests(unittest.TestCase):
                     with self.assertRaises(HTTPError) as error:
                         urlopen(request)
                     self.assertEqual(error.exception.code, status)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
 
 class BindingTests(unittest.TestCase):
@@ -143,10 +135,7 @@ class BindingTests(unittest.TestCase):
         path.write_text(json.dumps({"profiles": {"p": {"bindings": [
             {"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}]}}}), encoding="utf-8")
         _, settings, _, _ = config.resolve(path)
-        server = make_server(Rewriter("rules", bindings=settings["bindings"]), 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        try:
+        with serving(Rewriter("rules", bindings=settings["bindings"])) as server:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
             request = Request(url, data=json.dumps({"text": "very good", "app": "gtk3-demo"}).encode(),
                               headers={"Content-Type": "application/json", "X-Claudish-Token": server.token})
@@ -157,10 +146,6 @@ class BindingTests(unittest.TestCase):
             with self.assertRaises(HTTPError) as error:
                 urlopen(request)
             self.assertEqual(error.exception.code, 400)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
 
 class MCPContextTests(unittest.TestCase):
@@ -269,10 +254,7 @@ class RoutingTests(unittest.TestCase):
             self.assertIs(main.route("slack"), slack)  # built once
             self.assertEqual(loaded, ["plain"])
             self.assertIs(slack.sessions, main.sessions)  # one service: shared sessions and conversations
-            server = make_server(main, 0)
-            thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-            thread.start()
-            try:
+            with serving(main) as server:
                 url = "http://127.0.0.1:%d/suggest" % server.server_port
                 for app, token, expected in (("slack", True, "plain"), ("gedit", True, "main"),
                                              ("slack", False, "main")):
@@ -286,10 +268,6 @@ class RoutingTests(unittest.TestCase):
                                       side_effect=lambda self, *a, **k: {"text": self.profile}) as rewrite:
                         with urlopen(Request(url, json.dumps(body).encode(), headers)) as reply:
                             self.assertEqual(json.load(reply)["text"], expected, (app, token))
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join()
 
     def test_an_unknown_profile_in_a_binding_is_refused(self):
         import tempfile

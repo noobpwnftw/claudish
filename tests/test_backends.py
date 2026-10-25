@@ -14,6 +14,7 @@ from urllib.request import urlopen
 from claudish import modes
 from claudish.model import Rewriter
 from claudish.server import make_server
+from serving import serving
 
 
 def response(text="A considered rewrite—truly.", stop_reason="end_turn"):
@@ -100,18 +101,11 @@ class ClaudeBackendTests(unittest.TestCase):
 
     def test_health_reports_the_backend(self):
         for backend in ("claude", "rules"):
-            server = make_server(Rewriter(backend), 0)
-            thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-            thread.start()
-            try:
+            with serving(Rewriter(backend)) as server:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
                     self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "routes": {},
                                                        "profile": None, "modes": ["rewrite", "continue", "instruct"],
                                                        "timeout": 3, "keys": {"summon": "Shift+Enter"}, "hints": True})
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join()
 
 
 class EndpointBackendTests(unittest.TestCase):

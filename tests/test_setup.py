@@ -22,6 +22,7 @@ class SetupTests(unittest.TestCase):
         self.llama = SimpleNamespace(installed=lambda: None, host=lambda: ("Linux", "arm64"), BUILD="b1",
                                      ASSETS={("Linux", "arm64", "cpu"): ("llama.tar.gz", 18 << 20, "x")},
                                      install=MagicMock())
+        self.llama.find_server = lambda: self.llama.installed() and str(self.llama.installed())
         self.models = SimpleNamespace(target=lambda preset: self.model, PRESETS={"gemma": (0, 0, 0, 5154941280)},
                                       fetch=MagicMock())
         self.service_run = MagicMock(return_value=0)
@@ -34,7 +35,6 @@ class SetupTests(unittest.TestCase):
             patch("claudish.setup.platform.system", return_value="Linux"),
             patch("claudish.mcp_setup.platform.system", return_value="Linux"),
             patch.object(setup, "scripts", return_value=(self.llama, self.models)),
-            patch("claudish.setup.shutil.which", return_value=None),
             patch.object(setup, "ROOT", self.home),
             patch("claudish.setup.doctor.check_ime_linux",
                   return_value=[("Input method", "fail", "not registered", "install.py")]),

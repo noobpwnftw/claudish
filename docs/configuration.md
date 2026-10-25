@@ -156,9 +156,9 @@ its variable with `api_key_env`. Unknown keys and wrong types are rejected at st
 
 For apps that publish nothing Claudish can read, an instruction can carry a
 picture of the window you are typing in. In compose, press **F8** before
-Shift+Enter: the hint shows "instruct + window picture", and the service captures the
-focused window once, sends it with that one instruction, and lists it in
-"consulted". F8 applies to that one instruction.
+Shift+Enter: the panel footer shows "F8 without this window" (F8 again takes the picture
+off), and the service captures the focused window once, sends it with that one instruction, and
+lists it in "consulted". F8 applies to that one instruction.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
   ImageMagick (`sudo apt install x11-utils imagemagick`). Elsewhere, set the profile's
@@ -170,11 +170,6 @@ focused window once, sends it with that one instruction, and lists it in
   [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
   `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj
   mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
-
-Verified with a real capture in both places. On Windows 11 ARM64, a Notepad
-invoice was captured with PrintWindow and sent to Qwen2.5-VL-3B (Q4_K_M) on a
-DGX Spark's GPU; "what is the amount due here?" returned "The amount due is 1,250.00
-EUR." in 0.18 s.
 
 ### Context
 
@@ -304,10 +299,6 @@ pick, and its final answer is a candidate like any other. For Claude Code:
 - The agent runs with your Claude Code login, settings, and working directory
   (the service's), and its usage counts against that login. A session is limited to five
   minutes and four at a time.
-- Status: tested with a scripted agent that speaks Claude Code's stream-json protocol (the
-  message shapes come from the Agent SDK's control protocol), the PIME smoke and the macOS
-  doubles, and live against Claude Code (2.1.308). On Windows (Claudish's
-  own PIME) a question shows as it arrives.
 
 ### Helpers: handing a task over
 

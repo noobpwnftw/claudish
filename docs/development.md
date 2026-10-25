@@ -52,28 +52,11 @@ conditions. Neither is a current release certification. `models/`, `.tools/`, `d
 helpers and `AGENT_STATE.md` are working material outside Git. Keep that material available for
 the rigs; it is not part of the shipped source.
 
-## Current evidence and next checks
+## Next checks
 
-As of 2026-10-25 there is no published release. The merge gate runs the unit tests, both adapter
-smokes, the settings page in a browser, and a syntax check of the GNOME extension.
-
-- **macOS 26, Apple silicon (VM):** the candidate from `926e0bc` installs, starts its service at
-  login and passes `doctor`; its MCP tools load. The owner hand-tested the day's builds in TextEdit
-  and Terminal: rewrites, drafts, an answer inserted with one Tab, a reply typed over an answer, a
-  Claude Code handoff with a session and "is it done?", and an MCP tool's approval. Models: Gemma 4
-  E4B on another machine, and Claude Code. Both README recordings come from this VM.
-- **Windows 11 ARM64 (VM):** the candidate installs for a standard account through an
-  administrator's password, registers that account's logon task, and the service runs after a
-  restart (`doctor` all ok). The panel was checked drawing a long status and every footer. Not yet:
-  Windows x64, a logged-in subscription, a hand-typed session on this build.
-- **Linux:** the Docker rig's six typing scenarios (real IBus, GTK and Qt on X11) pass; GNOME Shell
-  on Wayland, headless in a container, draws every design-lab state (`.tools/rigs/linux-gnome`).
-  Not yet: a real desktop session, KDE, fcitx5.
-- **Settings and the site:** checked at 320, 560, 1024 and 1440 px in both themes.
-
-Still to check before calling a release done: browser-download installs (Safari, Edge), a funded
-Anthropic API key and its failure states on both packages, Codex from a package, Windows x64.
-Candidates and what was checked on each are kept in `dist/candidates/` with a manifest.
+The merge gate runs the unit tests, both adapter smokes, the settings page in a browser, and a
+syntax check of the GNOME extension. Still open: Windows x64, browser-download installs (Safari,
+Edge), and a funded Anthropic API key and its failure states on both packages.
 
 ## Build the tested CUDA backend
 

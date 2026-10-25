@@ -7,7 +7,6 @@ that need an administrator (Windows, macOS input methods) print the exact comman
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import time
@@ -92,10 +91,9 @@ def step_mcp():
 
 def step_llama(variant):
     download_llama, _ = scripts()
-    found = (shutil.which("llama-server") or download_llama.installed()
-             or next(iter((ROOT / ".tools/build/bin").glob("llama-server*")), None))
+    found = download_llama.find_server()
     if found:
-        return "done", str(found), None
+        return "done", found, None
     asset = download_llama.ASSETS.get(download_llama.host() + (variant,))
     if asset is None:
         return "manual", "no pinned %s build for %s %s" % ((variant,) + download_llama.host()), \

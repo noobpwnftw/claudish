@@ -316,8 +316,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(48)  # Tab asks
         self.assertEqual((self.controller.worker.modes[-1], self.controller.worker.immediate), ("rewrite", True))
         self.controller.worker.result = (state.revision, {"text": "A considered draft."})
-        self.controller.pollSuggestions_(None)  # it arrives: in place of your words, no list
-        # In place of your words; the panel keeps yours, as large, until you keep it.
+        self.controller.pollSuggestions_(None)
         # Your words stay the marked text; the rewrite waits in the panel for Tab (a click or a focus
         # change, which apps turn into a commit, can never insert the model's words).
         self.assertEqual((self.module.PANEL.rows, self.module.PANEL.spec["label"], self.module.PANEL.spec["body"]),
@@ -514,14 +513,11 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_the_input_menu_is_settings_and_kept(self):
         class Item:
-            def __init__(self, title=""): self.name, self.ticked = title, 0
+            def __init__(self, title=""): self.name = title
             @classmethod
             def alloc(cls): return cls()
             def initWithTitle_action_keyEquivalent_(self, title, action, key): self.name = title; return self
-            @classmethod
-            def separatorItem(cls): return cls()
             def setTarget_(self, target): pass
-            def setState_(self, state): self.ticked = state
             def title(self): return self.name
 
         class Menu:
@@ -535,7 +531,7 @@ class MacOSAdapterTests(unittest.TestCase):
         appkit.NSMenu, appkit.NSMenuItem = Menu, Item
         with patch.dict("sys.modules", {"AppKit": appkit}):
             menu = self.controller.menu()
-            self.assertEqual([item.name for item in menu.items], ["Settings…"])  # a Shift tap's toast says the mode
+            self.assertEqual([item.name for item in menu.items], ["Settings…"])  # Settings only: macOS shows the input mode itself
             self.assertIs(self.controller.menu(), menu)  # macOS asks after nearly every key: one menu
 
     def test_a_password_field_gets_its_keys_untouched(self):

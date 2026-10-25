@@ -1,7 +1,6 @@
 """Start the model and IME service together; Ctrl+C stops both."""
 import argparse
 import json
-import os
 import signal
 import subprocess
 import sys
