@@ -143,9 +143,12 @@ try:
     assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
     assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
     # Shift+Esc brings it back without asking again: its request is still running.
-    pending = engine.suggestions.pending
+    # (Counted at schedule: the worker's thread takes pending requests at any moment.)
+    scheduled, schedule = [], engine.suggestions.schedule
+    engine.suggestions.schedule = lambda *args, **kwargs: (scheduled.append(args), schedule(*args, **kwargs))
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, IBus.ModifierType.SHIFT_MASK)
-    assert engine.composition.text == "fix it" and engine.suggestions.pending is pending
+    assert engine.composition.text == "fix it" and scheduled == [], scheduled
+    engine.suggestions.schedule = schedule
     engine.do_reset()
     engine.composition.held = None
     # One conversation per text box: a new input context starts a fresh one.
