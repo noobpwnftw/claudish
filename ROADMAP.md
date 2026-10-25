@@ -34,6 +34,11 @@ A small purpose-trained model for continue (G21, after G53 found nothing under 1
 continue measurements and workarounds that depend on it (G48, G32, G49); a demo share card (G57);
 tone and templates directly on a binding (G59); selected text back into the buffer (G46).
 
+For further consideration (G68): knowing which field the caret is in, such as a browser's address
+bar. macOS gives an input method no field type, and browsers do not all mark their address bars as
+URL fields on Linux or Windows, so it would take per-app identification, which the invariants rule
+out. Today such a field is an ordinary text field to the model.
+
 The browser demo keeps Qwen2.5 0.5B, selected from the candidates that fit browser constraints.
 Revisit that choice only when a candidate improves the measured size, loading time, speed and
 quality tradeoff. Broader native-model scores alone are not a reason to replace it.
