@@ -30,5 +30,22 @@ class HelperDiscoveryTests(unittest.TestCase):
             self.assertEqual(handoff.helpers(["claude", "{prompt}"]), {})
 
 
+class ProgressTests(unittest.TestCase):
+    def test_a_terminal_handoff_is_found_in_whatever_folder_it_ran(self):
+        """On the Mac VM, "is it done?" said nothing could be read: a command run at a prompt has no
+        known folder, and the transcript was looked for under an empty one."""
+        import json
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}):
+            folder = os.path.join(home, ".claude", "projects", "-Users-me-invoices")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "s1.jsonl"), "w", encoding="utf-8") as out:
+                out.write(json.dumps({"type": "assistant", "timestamp": "2026-10-25T13:36:00Z", "message": {
+                    "content": [{"type": "text", "text": "Fixed: round(..., 2). The test passes."}]}}) + "\n")
+            said, last = handoff.claude_said({"helper": "claude", "session": "s1", "cwd": ""})
+        self.assertEqual((said, last), (["Fixed: round(..., 2). The test passes."], "2026-10-25T13:36:00Z"))
+
+
 if __name__ == "__main__":
     unittest.main()

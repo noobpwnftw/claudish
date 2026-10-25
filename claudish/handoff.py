@@ -137,9 +137,13 @@ def progress(handle, entries=4):
 
 
 def claude_said(handle):
-    """Claude Code: ~/.claude/projects/<the working directory, non-alphanumerics as "-">/<session>.jsonl."""
-    folder = re.sub(r"[^A-Za-z0-9]", "-", handle["cwd"])
-    path = os.path.join(os.path.expanduser("~"), ".claude", "projects", folder, handle["session"] + ".jsonl")
+    """Claude Code: ~/.claude/projects/<the working directory, non-alphanumerics as "-">/<session>.jsonl.
+    A command run at a terminal prompt ran in a folder cd_AI does not know: the session id is unique,
+    so it is looked for in every project."""
+    import glob
+    projects = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+    folder = re.sub(r"[^A-Za-z0-9]", "-", handle["cwd"]) if handle["cwd"] else "*"
+    path = next(iter(glob.glob(os.path.join(projects, folder, handle["session"] + ".jsonl"))), "")
     said, last = [], None
     for entry in jsonl(path):
         if entry.get("type") != "assistant":
