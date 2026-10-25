@@ -200,12 +200,15 @@ class CommandBackendTests(unittest.TestCase):
         return Rewriter("command", command=[sys.executable, "-c", script], **options)
 
     def test_prompt_on_stdin_and_output_as_candidate(self):
-        echo = "import sys; prompt = sys.stdin.read(); print('Drafted—' + prompt.split('Text:\\n')[-1].strip())"
+        echo = "import sys; prompt = sys.stdin.read(); print('Drafted—' + prompt.split('<text>')[-1].split('</text>')[0])"
         rewriter = self.agent(echo)
         result = rewriter.rewrite("say hi; rm -rf ~ $(whoami)", mode="instruct")
         self.assertEqual(result["text"], "Drafted—say hi; rm -rf ~ $(whoami)")  # data, never a shell or argv
         dump = self.agent("import sys; print(sys.stdin.read())").rewrite("thanks", mode="instruct")["text"]
         self.assertTrue(dump.startswith("The user typed an instruction"))  # the mode's template comes first
+        # Then its examples, tagged, as chat turns are elsewhere (one message: Claude Code, Codex).
+        self.assertIn("<example>\n<text>", dump)
+        self.assertTrue(dump.rstrip().endswith("<text>thanks</text>"))
 
     def test_failures_and_timeouts_keep_your_wording(self):
         with self.assertRaisesRegex(RuntimeError, "exit 3"):
