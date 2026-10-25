@@ -83,7 +83,7 @@ class SummonKeyTests(unittest.TestCase):
         self.assertTrue(state.panel()["nudge"])
         state.question = {"text": "Which day?", "choices": [{"label": "Friday"}]}
         panel = state.panel()
-        self.assertEqual((panel["take"], panel["foot"][-1]), ("Tab", ("Tab", "confirm")))  # Tab takes a choice
+        self.assertEqual(panel["foot"][-1], ("Tab", "confirm"))  # Tab takes a choice
         state.insert("Monday")  # a reply: Shift+Enter sends it; Enter is gated once the model is summoned
         self.assertEqual(state.panel()["foot"][0], ("Shift+Enter", "send reply"))
         self.assertIsNone(state.keep())
@@ -124,7 +124,32 @@ class ReceiveTests(unittest.TestCase):
                                                                      "choices": [{"label": "A"}]}, "session": "s"}), "question")
         state.answer_choice()
         self.assertEqual(state.receive(state.revision, {"text": "Thanks—truly.", "candidates": ["Thanks—truly."]}), "text")
+        self.assertIsNone(state.receive(state.revision, {"error": "late"}))  # it finished: nothing changes
+        state.change("say thanks again")
+        state.submit()
         self.assertEqual(state.receive(state.revision, {"error": "boom"}), "error")
+
+    def test_a_failed_instruction_drops_its_queued_questions(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("deploy")
+        state.submit()
+        for qid in ("a", "b"):
+            state.ask(state.revision, {"id": qid, "text": qid, "body": qid, "choices": [{"label": "ok"}]}, "s")
+        state.fail(state.revision, "timed out")
+        self.assertEqual(state.queued, [])  # a retry does not show the dead session's next question
+
+    def test_restore_keeps_the_fields_and_services_state_of_now(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("decline politely")
+        state.submit()
+        state.leave("mail")
+        state.field(terminal=True)
+        state.hints = False
+        state.restore()
+        self.assertTrue(state.sent)  # the exchange is back
+        self.assertEqual((state.terminal, state.hints), (True, False))  # where the caret is now, the config now
 
     def test_follow_copies_the_workers_view(self):
         state, worker = Composition(), type("W", (), {"summon": "Enter", "hints": False, "offline": True})()
@@ -409,7 +434,6 @@ class ModeFeelTests(unittest.TestCase):
         drafts = state.panel()
         self.assertEqual(([r["text"] for r in drafts["rows"]], drafts["on"]), (["Hi!", "Hello!", "Hey!"], 0))
         self.assertEqual(drafts["foot"], [("↑↓", "choose"), ("Tab", "insert"), ("Esc", "edit")])
-        self.assertEqual(drafts["take"], "Tab")  # the highlighted row says Tab takes it
         self.assertEqual(drafts["thread"], [])  # the instruction is still the composition: no "You asked"
         state.change("this is important")
         state.tab()
@@ -465,7 +489,7 @@ class ModeFeelTests(unittest.TestCase):
         state.offer(state.revision, "No, thank you.", ["I can't, sorry."])
         self.assertFalse(state.panel()["nudge"])
         self.assertEqual(state.enter(), "wait")
-        self.assertEqual((state.panel()["nudge"], state.panel()["take"]), (True, "Tab"))
+        self.assertTrue(state.panel()["nudge"])
         self.assertEqual(state.enter(), "wait")  # again: still lit, still nothing inserted
         self.assertTrue(state.panel()["nudge"])
         state.move(1)  # ↓: the panel changed, so the light ends

@@ -18,7 +18,7 @@
 .cd-foot { padding: 5px 10px 4px; spacing: 12px; font-size: 12.5px; color: #5e5e63; }
 .cd-hint { spacing: 5px; }
 .cd-cap { font-size: 12.5px; color: #2e2e32; border: 1px solid rgba(0,0,6,0.5); border-radius: 4px; padding: 0 5px; }
-/* Enter on a draft: the row's Tab, lit (the accent at 20% on the surface, kit.css .k-cap.lit). */
+/* A key that does nothing here: the highlighted row's Tab, lit (the accent at 20% on the surface, kit.css .k-cap.lit). */
 .cd-cap.cd-lit { background-color: #d7e6fa; border-color: #3584e4; }
 .cd-row .cd-cap { margin-left: 8px; }
 .cd-verb { color: #5e5e63; }

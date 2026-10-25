@@ -69,8 +69,8 @@
       line.append(words);
       if (index === spec.on) {
         const take = el("span", "k-take");
-        const key = spec.take || "Tab";  // Tab takes a draft or a choice
-        take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys[key] || key));  // lit: Enter was pressed on it
+        // Tab takes a draft or a choice; lit: a key that does nothing here pointed at it
+        take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys.Tab || "Tab"));
         line.append(take);
       }
       if (pick) line.addEventListener("mousedown", (event) => { event.preventDefault(); pick(index + 1); });
@@ -80,7 +80,7 @@
     return node;
   }
 
-  // The mode switch: a panel with only a footer, briefly at the caret.
+  // A toast (the mode switch, a drop, the pill, a helper's done line): a panel with only a footer, briefly at the caret.
   function toast(spec, keys = {}) {
     const node = el("div", "k-toast");
     for (const child of footer(spec, keys).childNodes) node.append(child.cloneNode(true));

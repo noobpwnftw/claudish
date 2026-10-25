@@ -416,13 +416,11 @@ class ClaudishTextService(TextService):
         self.setTimer(TIMER_MS)
 
     def onTimer(self):
-        before = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
-        self.poll_results()
-        after = (self.state.revision, self.state.candidate, self.state.question, self.state.status, self.state.failed)
-        if after != before or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
+        changed = self.poll_results()
+        if changed or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
             self.publish()  # an answer, a question, progress, or the pause for compose's keys
         # Still waiting: an instruction or rewrite that is working, or a suggestion not yet back.
-        waiting = self.state.working or (after == before and time.monotonic() < getattr(self, "waiting_until", 0))
+        waiting = self.state.working or (not changed and time.monotonic() < getattr(self, "waiting_until", 0))
         if waiting:
             self.setTimer(TIMER_MS)
 
@@ -454,12 +452,15 @@ class ClaudishTextService(TextService):
         return True
 
     def poll_results(self):
+        """The worker's result, if any, in the composition: its kind when it changed what shows."""
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         if self.worker:
             self.state.follow(self.worker)  # the config's keys, and whether the service answers
         result = self.worker.poll() if self.worker else None
-        if result and self.state.receive(*result) == "done" and self.state.hints:
+        kind = self.state.receive(*result) if result else None
+        if kind == "done" and self.state.hints:
             self.setToast(blank(status=result[1]["done"]), 3)  # a helper took the task: said briefly at the caret
+        return kind
 
     def onKeyDown(self, event):
         if event.keyCode == 0x7B and self.preview():

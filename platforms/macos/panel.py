@@ -30,10 +30,6 @@ ACCENT = (217 / 255, 119 / 255, 87 / 255)  # Claudish's: the AI tile only
 KEYS = {"Enter": "↩", "Esc": "esc", "Tab": "⇥", "Shift": "⇧", "Shift+Enter": "⇧↩", "Shift+Esc": "⇧esc"}  # macOS menus' names
 
 
-def spec_take(spec):
-    return (spec or {}).get("take") or "Tab"
-
-
 def rounded_mask(radius):
     """A stretchable rounded-rectangle mask: a visual-effect view clips its material only to a
     mask image (a layer's corner radius leaves square corners of material behind)."""
@@ -122,7 +118,7 @@ def tile(text, background, foreground, round_=False):
 def key_label(key, lit=False, size=SMALL):
     """A key's glyph, bare as in macOS menus: at its words' size (the system font draws ⇥ ↩ ↑↓
     to sit on the text's baseline, as in a menu's shortcuts), heavier and at full contrast
-    (round 5: the hint's grey was too faint); lit on a draft's row after Enter: a keycap, as on
+    (round 5: the hint's grey was too faint); lit when a key that does nothing here pointed at it: a keycap, as on
     every platform (the accent's outline, tinted inside; kit.css .k-cap.lit)."""
     glyph = label(KEYS.get(key, key), size, NSFontWeightSemibold)
     if not lit:
@@ -283,7 +279,7 @@ class Panel:
 
     def fit_status(self, items, room):
         """Shorten the status, word by word with an ellipsis, until the footer fits in `room`."""
-        status = getattr(self, "status_view", None)
+        status = self.status_view
         if status is None or not any(view is status for view, _ in items):
             return
         words = str(status.stringValue()).split()
@@ -344,15 +340,14 @@ class Panel:
         row = Row.alloc().initWithFrame_(NSMakeRect(PAD, y, width - 2 * PAD, h))
         if pick is not None:
             row.picked = lambda: pick(picked)
-        if on:  # a neutral fill, the system accent bar inside it, and the row's own ↩
+        if on:  # a neutral fill, the system accent bar inside it, and the row's Tab
             fill = box(NSColor.labelColor().colorWithAlphaComponent_(0.07), ROW_RADIUS)
             fill.setFrame_(NSMakeRect(0, 0, width - 2 * PAD, h))
             row.addSubview_(fill)
             bar = box(NSColor.controlAccentColor(), 1.5)
             bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
             row.addSubview_(bar)
-            key = spec_take(self.spec)  # Tab takes a draft or a choice
-            take = key_label(key, bool(self.spec.get("nudge")))
+            take = key_label("Tab", bool(self.spec.get("nudge")))  # Tab takes a draft or a choice
             if self.spec.get("nudge"):  # the lit keycap: centred in the row, at its right edge
                 size = take.frame().size
                 take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))
@@ -376,7 +371,7 @@ class Panel:
         for index, (view, gap) in enumerate(items):
             size = self.size(view)
             drawn = self.drawn(view)
-            if any(view is key for key in getattr(self, "keys", [])) and symbols(view):
+            if any(view is key for key in self.keys) and symbols(view):
                 bottom = middle - ink_middle(view) + view.font().descender()  # descender is negative
             elif isinstance(view, NSTextField):
                 bottom = baseline + view.font().descender()

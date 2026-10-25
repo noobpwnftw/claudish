@@ -50,11 +50,16 @@ def failure(error):
     return "the request failed"
 
 
+# What Shift+Esc does not take back from a held exchange: where the caret is now (a field, a
+# terminal) and the service's state (keys, hints, offline), besides the hold itself.
+KEPT_ON_RESTORE = ("held", "issued", "held_app", "held_at", "summon", "hints", "offline", "terminal", "quiet",
+                   "inside")
+
 def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None,
-                 "replying": False, "take": "Tab", "nudge": False, "column": False}, **shown)
+                 "replying": False, "nudge": False, "column": False}, **shown)
 
 
 class Composition:
@@ -77,7 +82,7 @@ class Composition:
         # drop says nothing there (Shift+Esc still restores where the key arrives).
         self.terminal = False
         self.inside = False  # text follows the caret on its line: continue waits for the end of a line
-        self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
+        self.question = None  # an agent session's open question: {"id", "text", "label", "body", "choices", "permission", "code", "read", "insert", "session"}
         self.reply = ""  # what you type while an instruction's exchange is open: a reply, or your next words
         self.answers = []  # your answers in this exchange, for the panel's thread ("You answered")
         self.editing = False  # the instruction came back to the caret (Esc edit): the next Esc drops it
@@ -175,10 +180,12 @@ class Composition:
         (docs/design/design.md; drawn as in claudish/web/design.html), or None when nothing shows:
         "thread" (what the composition does not say: "You asked", "You answered"); "label", "body",
         "code" (the header: who asks or what this is, then the content as is); "rows":
-        [{"text", "legend"}] with "on" the highlighted one (-1: none, an approval) and "take" its
-        key; "foot": [(key, verb)], then "tail" (free words); "tile": "ai" or "warn"; "status" with
-        "busy"; "failed" (why); "nudge" (Enter was pressed on a
-        draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
+        [{"text", "legend"}] with "on" the highlighted one (-1: none, an approval), Tab taking it;
+        "column" (the rows keep the key's column from the start); "foot": [(key, verb)], then "tail"
+        (free words); "replying" (you are typing a reply: the choices fade); "tile": "ai", "warn", or
+        "cd" (continue's toast); "status" with "busy"; "failed" (why); "nudge" (a key that does
+        nothing here lit the Tab of the highlighted draft or choice). Continue shows no panel: its
+        suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
         if not (self.hints or self.waits_on_you()):
@@ -217,9 +224,9 @@ class Composition:
             shown["status"], shown["busy"] = "working", True
         elif self.failed:  # Tab retries a rewrite, Shift+Enter an instruction: each key asks again
             retry = "Tab" if self.asked == "rewrite" else self.summon
-            shown.update(tile="warn", failed=self.error or "the request failed", foot=[(retry, "retry"), ("Esc", "edit")])
+            shown.update(tile="warn", failed=self.error, foot=[(retry, "retry"), ("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
-            readings = self.candidates or [self.candidate]
+            readings = self.candidates
             shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
                          nudge=self.nudge)
@@ -293,7 +300,7 @@ class Composition:
         return False
 
     def _showing(self):
-        return (self.text, self.reply, self.highlight, self.candidate, self.converted, id(self.question))
+        return (self.text, self.reply, self.highlight, self.candidate, id(self.question))
 
     def _pending(self):
         """A nudge given while the drafts were on their way: Tab lights when they come."""
@@ -301,7 +308,8 @@ class Composition:
 
     @property
     def nudge(self):
-        """Enter was pressed on the drafts, which only Tab takes: the highlighted row lights its Tab
+        """A key that does nothing here (the summon or keeper key) was pressed on a draft or a
+        question's highlighted choice, which only Tab takes: the highlighted row lights its Tab
         key (round 5: a key that does nothing must say why; the footer's two or three keys need no
         light, owner). It lasts while the panel shows what it showed then; any key that changes it
         ends it."""
@@ -323,8 +331,9 @@ class Composition:
         """What Tab does (it takes the model's text): "pass" (the app's), "request" (ask for a
         rewrite; it waits in the panel when it comes), "wait" (asked already), "convert" (a rewrite
         that came earlier: show it in the panel), "accept" (the rewrite shown, or the highlighted
-        draft), or "choose" (a question's highlighted choice, Allow or Deny included, or an answer to
-        read: insert it). Tab takes everything the model offers; Shift+Enter only sends words."""
+        draft, or an answer to read: inserted, and recorded with take_answering), or "choose" (a
+        question's highlighted choice, Allow or Deny included). Tab takes everything the model
+        offers; the summon key only sends words."""
         if not self.text:
             return "pass"
         if self.question and self.reading and not self.reply:
@@ -358,8 +367,9 @@ class Composition:
         """Esc, one step back: "pass" (the app's); "clear" (a reply you were typing to an agent
         goes; its question stays); "back" (still composing: your words again instead of the
         rewrite, or your instruction again with its drafts closed and a pending answer dropped);
-        "keep" (a selection taken from the app goes back as it was); or "drop" (what you typed goes,
-        nothing is inserted: Enter keeps it instead)."""
+        "keep" (a selection taken from the app goes back as it was); "dismiss" (an answer to read is
+        answered Dismiss, nothing inserted); or "drop" (what you typed goes, nothing is inserted: the
+        keeper key keeps it instead)."""
         if not self.text:
             return "pass"
         if self.reading and not self.reply:
@@ -390,7 +400,8 @@ class Composition:
         app's)."""
         if self.held is not None and not self.text and not self.live:
             held, self.held = self.held, None  # the exchange you left, back as it was
-            self.__dict__.update({k: v for k, v in held.__dict__.items() if k not in ("held", "issued")})
+            # The exchange comes back; this field and the service's state stay as they are now.
+            self.__dict__.update({k: v for k, v in held.__dict__.items() if k not in KEPT_ON_RESTORE})
             return self.reply or self.text
         if self.live or not self.dropped:
             return ""
@@ -439,7 +450,7 @@ class Composition:
         if self.sent or self.question or self.working or self.converted:  # a failed rewrite leaves only your words
             # Once the model is summoned the key is gated (owner): your instruction or a reply never
             # lands in the app by a reflexive press; the row Tab would take lights its Tab.
-            if not self.light_tab() and self.working and not self.question:
+            if not self.light_tab() and self.working and self.asked == "instruct" and not self.question:
                 self.nudged = self._pending()
             return None
         kept = self.shown  # what the composition shows (your words, or a reply)
@@ -470,19 +481,22 @@ class Composition:
         if "done" in data:
             return "done" if self.done(revision) else None
         if "error" in data:
-            self.fail(revision, data["error"])  # the panel says why: the summon key retries
-            return "error"
+            # The panel says why: Tab retries a rewrite, the summon key an instruction.
+            return "error" if self.fail(revision, data["error"]) else None
         return None
 
     def fail(self, revision, error=None):
+        """The request failed; True when that changed what shows."""
         held = self.route(revision)
         if held is not None:  # the exchange you left: it goes on, out of sight
             held.fail(revision, error)
-            return
-        if revision == self.revision and self.working:
-            self.working, self.failed = False, True
-            self.question, self.status = None, ""
-            self.error = failure(error)
+            return False
+        if revision != self.revision or not self.working:
+            return False
+        self.working, self.failed = False, True
+        self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
+        self.error = failure(error)
+        return True
 
     def done(self, revision):
         """The instruction was carried out elsewhere (a helper took the task): nothing is inserted,
@@ -536,12 +550,12 @@ class Composition:
         app's. Choices are not numbered: digits are text in English, as Space is."""
         if self.reply or not (self.question or (self.asked == "instruct" and self.candidate)):
             return False
-        count = len(self.question.get("choices") or []) if self.question else len(self.candidates) or 1
+        count = len(self.question.get("choices") or []) if self.question else len(self.candidates)
         if self.question and self.question.get("permission") and not self.selected:
             self.highlight, self.selected = 0, True
             return True
         self.highlight = max(0, min(count - 1, self.highlight + step))
-        if not self.question and self.candidates:
+        if not self.question:
             self.candidate = self.candidates[self.highlight]  # Tab takes the highlighted draft
         return True
 
@@ -638,14 +652,13 @@ class Composition:
         text to insert, or ""."""
         if self.live:
             self.mode = "compose"
-            self.look = False
             self.change("")
             return ""
         # A sent instruction's exchange is held, as on a focus change: back in compose, Shift+Esc
-        # brings it back.
-        kept = self.leave(getattr(self, "held_app", None)) if self.sent else self.shown
+        # brings it back (no pill: continue cannot open it).
+        kept = self.leave(None) if self.sent else self.shown
         self.mode = "continue"
-        self.look = False
+        self.look = False  # change() keeps it with words in the composition
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context
         return kept
 
@@ -751,7 +764,7 @@ class Composition:
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "a draft is ready" if held.candidate else
-                  (held.error or "the request failed") if held.failed else "working on what you asked")
+                  held.error if held.failed else "working on what you asked")
         return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
 
     def route(self, revision):

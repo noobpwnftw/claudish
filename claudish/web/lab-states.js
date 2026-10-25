@@ -27,7 +27,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -50,7 +49,6 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -77,7 +75,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -100,7 +97,6 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -144,7 +140,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -188,7 +183,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": true,
   "column": false
  },
@@ -224,7 +218,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": true
  },
@@ -265,7 +258,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": true,
-  "take": "Tab",
   "nudge": false,
   "column": true
  },
@@ -293,7 +285,6 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -329,7 +320,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": true
  },
@@ -365,7 +355,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": true
  },
@@ -392,7 +381,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -415,7 +403,6 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -442,7 +429,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": "the model is offline",
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -482,7 +468,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -505,7 +490,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -528,7 +512,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -551,7 +534,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  },
@@ -574,7 +556,6 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Tab",
   "nudge": false,
   "column": false
  }

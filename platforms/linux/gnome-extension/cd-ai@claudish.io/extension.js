@@ -153,8 +153,8 @@ export default class CdAiExtension extends Extension {
             text.x_expand = true;
             line.add_child(text);
             if (takes) {  // the trailing column: the key that takes the highlighted row
-                // Tab takes a draft or a choice; lit after Enter on the model's text (panel.nudge)
-                const take = label(on ? panel.take || 'Tab' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
+                // Tab takes a draft or a choice; lit when a key that does nothing here pointed at it (panel.nudge)
+                const take = label(on ? 'Tab' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
                 line.add_child(take);
             }
             box.add_child(line);

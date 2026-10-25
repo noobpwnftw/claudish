@@ -7,7 +7,7 @@
 .kit{
   --k-font:system-ui,-apple-system,'Segoe UI',sans-serif;--k-size:15px;--k-small:12.5px;--k-line:1.4;
   --k-surface:#fbfaf6;--k-text:#141413;--k-muted:#6b6a64;--k-ghost:#8c8a83;--k-sel-mix:7%;
-  --k-accent:#d97757;--k-select:#d97757;--k-error:#b3261e;--k-border:#d6d3c8;--k-shadow:0 8px 24px rgba(20,20,19,.12),0 1px 3px rgba(20,20,19,.08);
+  --k-select:#d97757;--k-error:#b3261e;--k-border:#d6d3c8;--k-shadow:0 8px 24px rgba(20,20,19,.12),0 1px 3px rgba(20,20,19,.08);
   --k-radius:10px;--k-row-radius:6px;--k-pad:4px;--k-row-x:9px;--k-row-y:5px;--k-gap:10px;--k-backdrop:none;
   --k-min:240px;--k-max:440px;--k-cap-border:1px solid #8f8c84;--k-cap-pad:1px 5px;--k-cap-size:var(--k-small);
 }
@@ -63,9 +63,8 @@
 .k-head+.k-foot,.k-row+.k-foot{margin-top:2px}
 .k-hint{white-space:nowrap;flex:none}
 .k-cap{display:inline-block;font-size:var(--k-cap-size);font-weight:var(--k-cap-weight,inherit);line-height:1.25;padding:var(--k-cap-pad);margin-right:5px;border:var(--k-cap-border);border-radius:4px;color:var(--k-text)}
-/* Enter on a draft: the row's Tab, lit until the next key (no animation; the footer is not lit). */
-.k-cap.lit{background:var(--k-lit-bg,color-mix(in srgb,var(--k-select) 20%,var(--k-surface)));border:var(--k-lit-border,1px solid var(--k-select));
-  color:var(--k-lit-color,var(--k-text));padding:var(--k-lit-pad,1px 5px);font-weight:var(--k-lit-weight,inherit)}
+/* A key that does nothing here: the highlighted row's Tab, lit until the next key (no animation; the footer is not lit). */
+.k-cap.lit{background:color-mix(in srgb,var(--k-select) 20%,var(--k-surface));border:1px solid var(--k-select);color:var(--k-text);padding:1px 5px}
 .k-status{color:var(--k-text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}  /* a long status gives way: the keys after it show */
 .k-status.failed{color:var(--k-error)}
 .k-warn{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--k-error);color:var(--k-surface);font-size:12px;font-weight:700;line-height:1}
@@ -74,14 +73,13 @@
 @keyframes k-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.k-spin{animation:none}}
 
-/* A mode switch: the mode's tile and name, briefly, at the caret, in the panel's shape. */
+/* A toast: the mode switch, a drop, the pill, a helper's done line, briefly at the caret, in the panel's shape. */
 .k-toast{position:absolute;z-index:3;display:inline-flex;align-items:center;gap:7px;padding:5px 10px 5px 6px;background:var(--k-surface);color:var(--k-text);
   border:1px solid var(--k-border);border-radius:var(--k-radius);box-shadow:var(--k-shadow);font-family:var(--k-font);font-size:var(--k-small);white-space:nowrap}
 .k-toast .k-hint{color:var(--k-muted)}  /* a toast is a footer: its verbs are muted, as in every panel */
 .k-tile{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;line-height:1}
-.k-tile.ai,.k-tile.cd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-img.k-tile.ai{display:block;background:none}
-.k-tile.ai{background:#d97757;color:#fff}
+.k-tile.cd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+img.k-tile.ai{display:block}
 .k-tile.cd{background:color-mix(in srgb,var(--k-text) 12%,var(--k-surface));color:var(--k-text)}
 
 /* High contrast: the system's colours; the highlight keeps its bar and its key. */

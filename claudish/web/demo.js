@@ -131,7 +131,6 @@ async function ask(revision) {
   try {
     let data;
     if (IN_BROWSER) {
-      if (!browserBackend) throw new Error("Run the model above first.");
       data = await browserBackend.suggest(text, mode);
     } else {
       const response = await fetch("/suggest", {method: "POST", headers: {"Content-Type": "application/json"},
@@ -168,7 +167,7 @@ async function ask(revision) {
 // What the panel shows: the same description as claudish/composition.py's panel(), so the demo
 // looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
 // Enter on a draft lights its row's Tab, the key that takes it, until a key changes the panel.
-const showing = () => JSON.stringify([state.text, state.reply, state.highlight, state.candidate, state.converted]);
+const showing = () => JSON.stringify([state.text, state.reply, state.highlight, state.candidate]);
 const pending = () => JSON.stringify(["pending", state.text, state.reply]);  // a nudge while the drafts come
 const nudge = () => state.nudged !== null && state.nudged === showing();
 
@@ -184,13 +183,13 @@ function panel() {
   if (state.failed) return {...shown, tile: "warn", failed: state.error || "the request failed",  // Tab retries a rewrite
                             foot: [[state.asked === "rewrite" ? "Tab" : "Shift+Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
-    const readings = state.candidates.length ? state.candidates : [state.candidate];
+    const readings = state.candidates;
     return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight,
-            foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]], take: "Tab",
+            foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]],
             nudge: nudge(), ...typing};
   }
   if (state.converted) return {...shown, label: "Rewrite", body: state.candidate,
-                               foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab"};
+                               foot: [["Tab", "insert"], ["Esc", "dismiss"]]};
   // Composing: the keys show from the first key (what each Enter does must be known).
   return {...shown, foot: [["Tab", "rewrite"], ["Shift+Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Enter", "keep"]]};
 }
@@ -260,7 +259,7 @@ function key(name, shift = false) {
   // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Tab takes.
   if ((name === "ArrowUp" || name === "ArrowDown") && state.asked === "instruct" && state.candidate
       && !state.reply) {  // ↑ and ↓ move the highlight, without wrapping (one draft: taken, nothing moves)
-    const count = state.candidates.length || 1;
+    const count = state.candidates.length;
     state.highlight = Math.max(0, Math.min(count - 1, state.highlight + (name === "ArrowUp" ? -1 : 1)));
     render();
     return true;
@@ -268,7 +267,7 @@ function key(name, shift = false) {
   if (name === "Enter") {
     if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
     if (!shift) {  // Enter only puts your own words in; the next Enter is the editor's (a newline)
-      if (sent()) {  // once the model is summoned Enter is gated: a reflexive press puts nothing in
+      if (sent() || state.working || state.converted) {  // once the model is asked Enter is gated, a rewrite included
         if (state.asked === "instruct" && state.candidate) state.nudged = showing();  // the row lights Tab
         else if (state.working) state.nudged = pending();
         render();
@@ -304,7 +303,7 @@ function key(name, shift = false) {
     // The first Tab asks for the rewrite, which shows in the panel as it arrives (your words stay);
     // the next inserts it (or an instruction's highlighted draft). A pending answer is not stale text: Tab waits.
     if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft
-      commit(state.converted ? state.candidate : state.candidates[state.highlight] || state.candidate); change(""); changed();
+      commit(state.converted ? state.candidate : state.candidates[state.highlight]); change(""); changed();
     } else if (state.asked === "rewrite" && state.candidate) { state.converted = true; render(); }
     else if (!state.working) {
       state.asked = "rewrite"; state.working = true; state.failed = false; render(); ask(state.revision);
