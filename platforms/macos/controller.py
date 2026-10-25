@@ -39,8 +39,8 @@ def secure_input():
 
 
 SURROUNDING = 8000
-# Each mode is an input mode of cd_AI's input source (Info.plist: "Claudish – Compose", "Claudish –
-# Continue", named as Apple's "Pinyin – Simplified"), its icon in the menu bar: "AI"
+# Each mode is an input mode of cd_AI's input source (Info.plist: "Claudish — Compose", "Claudish —
+# Continue", named as Apple's "Pinyin – Simplified", with an em dash), its icon in the menu bar: "AI"
 # for compose, "cd" for continue, as Mozc and AquaSKK show theirs.
 MODE_IDS = {"compose": "org.claudish.inputmethod.Claudish.English",
             "continue": "org.claudish.inputmethod.Claudish.Continue"}

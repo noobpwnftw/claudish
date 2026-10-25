@@ -51,7 +51,7 @@ the address of another model API, and pick a tone. Use **Try a rewrite** in Sett
 
 - **macOS** (Apple silicon): **cd_AI.pkg**. It is not signed by Apple, so macOS blocks it the first
   time: click **Done** (not Move to Trash), open **System Settings → Privacy & Security**, click
-  **Open Anyway**, and once more **Open Anyway**. Then log out and back in, and pick **Claudish – Compose**
+  **Open Anyway**, and once more **Open Anyway**. Then log out and back in, and pick **Claudish — Compose**
   in the input menu.
 - **Windows 11**: **cd_AI-setup.exe**. It is not signed, so
   SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. Then

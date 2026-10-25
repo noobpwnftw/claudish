@@ -6,8 +6,8 @@
 - Settings → Panel: "Only what is pending" (`"hints": false`) shows the panel while the model
   works, for drafts, rewrites and questions, and for errors: no keys while you compose, no toasts.
 - The input source is named Claudish, under English (as U.S. is): Claudish on Windows and Linux,
-  Claudish – Compose and Claudish – Continue on macOS.
-- macOS: compose and continue are input modes, Claudish – Compose and Claudish – Continue, each
+  Claudish — Compose and Claudish — Continue on macOS.
+- macOS: compose and continue are input modes, Claudish — Compose and Claudish — Continue, each
   with its icon in the menu bar ("AI", "cd"); macOS says the switch, so cd_AI shows no mode toast there.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
   switches modes), and it no longer shows dots.
