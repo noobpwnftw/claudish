@@ -711,7 +711,7 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
-    def test_tab_in_rewrite_rewrites_a_selection_in_place(self):
+    def test_tab_on_a_selection_is_the_apps(self):
         client = TextClient("Dear Ana, this is important. Thanks.")
         client.chosen = (10, 18)  # "this is important."
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
@@ -719,18 +719,8 @@ class MacOSAdapterTests(unittest.TestCase):
         try:
             fresh.state.mode = "compose"
             tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
-            self.assertTrue(fresh.handleEvent_client_(tab, client))
-            self.assertEqual((client.whole(), fresh.worker.sent), ("Dear Ana, this is important. Thanks.",
-                             ("this is important.", "Dear Ana, ", " Thanks.")))
-            fresh.worker.result = (fresh.state.revision, {"text": "This is of utmost significance."})
-            fresh.pollSuggestions_(None)
-            # The selection stays as it was (your words, marked); the rewrite waits in the panel for Tab.
-            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
-            self.assertEqual(self.module.PANEL.spec["body"], "This is of utmost significance.")
-            esc = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: 0, characters=lambda: "\x1b")
-            fresh.handleEvent_client_(esc, client)
-            fresh.handleEvent_client_(esc, client)  # your words, as they were
-            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
+            self.assertFalse(fresh.handleEvent_client_(tab, client))
+            self.assertEqual((client.whole(), fresh.state.text), ("Dear Ana, this is important. Thanks.", ""))
         finally:
             fresh.inputControllerWillClose()
 

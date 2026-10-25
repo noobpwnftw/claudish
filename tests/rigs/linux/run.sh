@@ -8,8 +8,8 @@ case "${1:-}" in
   build) exec docker build -t "$image" "$here" ;;
   check)
     case "${2:-}" in
-      compose|bypass|password|focus|offline|qt-selection) ;;
-      *) echo "choose compose, bypass, password, focus, offline, or qt-selection" >&2; exit 2 ;;
+      compose|bypass|password|focus|offline) ;;
+      *) echo "choose compose, bypass, password, focus, or offline" >&2; exit 2 ;;
     esac
     exec docker run --rm --network none --read-only --tmpfs /tmp \
       --tmpfs /home/tester:uid=1001,gid=1001 \

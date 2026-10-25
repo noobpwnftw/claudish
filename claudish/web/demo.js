@@ -44,7 +44,6 @@ const state = {
   candidate: "",
   candidates: [],
   converted: false,  // compose: the rewrite shows in the panel (your words stay the composition)
-  adopted: false,    // the composition is text taken from the box (a selection): Esc puts it back
   working: false,
   failed: false,
   error: "",     // why the last request failed, in plain words
@@ -64,7 +63,6 @@ function change(text) {
   state.candidate = "";
   state.candidates = [];
   state.converted = false;
-  state.adopted = false;
   state.asked = null;
   state.working = state.failed = false;
   state.error = state.reply = "";
@@ -291,13 +289,6 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Tab") {
-    if (!state.text && selected()) {
-      // A selection: it becomes the composition (CJK input methods call it reconversion), out of
-      // the text until you keep the rewrite or your words.
-      const [start, end] = selection();
-      const words = doc.text.slice(start, end);
-      if (words.length <= MAX) { removeSelection(); change(words); state.adopted = true; }
-    }
     if (!state.text) return false;
     if (state.reply) return true;  // a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
     // The first Tab asks for the rewrite, which shows in the panel as it arrives (your words stay);
@@ -325,7 +316,6 @@ function key(name, shift = false) {
       state.dropped = state.reply; state.droppedReply = true; state.reply = ""; render(); dropped(); return true;
     }
     if (state.converted) { state.converted = false; state.editing = true; render(); return true; }  // your words again
-    if (state.adopted) { commit(state.text); change(""); changed(); return true; }  // a selection goes back
     // Sent, or a rewrite pending or failed: back to your words, to edit (a late answer is ignored).
     if (sent() || state.working || state.failed) { change(state.text); state.editing = true; render(); return true; }
     state.dropped = state.text; state.droppedReply = false;

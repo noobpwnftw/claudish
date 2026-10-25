@@ -82,29 +82,16 @@ def setup(name):
     wait(lambda: "claudish" in run("ibus", "list-engine", check=False), "IBus registration")
     run("ibus", "engine", "claudish", check=False)  # layout=default can return 1 after switching
     wait(lambda: run("ibus", "engine", check=False) == "claudish", "active engine")
-    qt = name.startswith("qt-")
-    start(sys.executable, str(Path(__file__).with_name("app_qt.py" if qt else "app.py")),
+    start(sys.executable, str(Path(__file__).with_name("app.py")),
           str(STATE), str(COMMANDS))
     wait(state, "test app")
-    title = "Claudish Qt test app" if qt else "Claudish test app"
-    window = run("xdotool", "search", "--onlyvisible", "--name", title).splitlines()[-1]
+    window = run("xdotool", "search", "--onlyvisible", "--name", "Claudish test app").splitlines()[-1]
     run("xdotool", "windowfocus", window)
-    focus("qline" if qt else "entry")
+    focus("entry")
     return service
 
 
 def scenario(name, service):
-    if name == "qt-selection":
-        COMMANDS.write_text("qline seed-selection")
-        wait(lambda: state().get("qline") == "this is very important", "selected text fixture")
-        key("Tab")
-        wait(lambda: state().get("qline") == "this is very " and state().get("preedit"),
-             "selected text becomes composition")
-        key("Escape", "Escape")
-        wait(lambda: state().get("qline") == "this is very important" and not state().get("preedit"),
-             "Esc restores selected text")
-        return
-
     if name == "password":
         focus("password")
         type_text("pass-word")
@@ -141,8 +128,7 @@ def main():
     try:
         service = setup(sys.argv[1])
         scenario(sys.argv[1], service)
-        print("PASS %s: real IBus + %s (%.2f s remaining)" %
-              (sys.argv[1], "Qt" if sys.argv[1].startswith("qt-") else "GTK", DEADLINE - time.monotonic()))
+        print("PASS %s: real IBus + GTK (%.2f s remaining)" % (sys.argv[1], DEADLINE - time.monotonic()))
     except Exception:
         for log in WORK.glob("*.log"):
             print("%s:\n%s" % (log.name, log.read_text()[-2500:]), file=sys.stderr)
