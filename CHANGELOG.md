@@ -24,8 +24,10 @@ No release has been made yet. What a first release would contain:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
 - **Setup:** `claudish setup`, `claudish doctor`, `claudish service`. Settings selects models and
   subscriptions, follows startup and failures, and lets you try a rewrite before typing in an app.
-  Its controls become usable once the Settings session is ready. Overlapping saves preserve both
+  Its controls stay hidden until the Settings session is ready. Overlapping saves preserve both
   the model and tone changes.
+- **Native feedback:** failures keep the model's reason, including an exchange held across a
+  focus change. Mac panels use composition-relative caret positions after existing text.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
 
 Tested on Linux (X11 and GNOME Wayland in containers), Windows 11 ARM64 and macOS 26 in VMs; see

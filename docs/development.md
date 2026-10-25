@@ -55,11 +55,12 @@ the rigs; it is not part of the shipped source.
 ## Current evidence and next checks
 
 As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
-release. The merge gate runs 269 unit tests, both adapter smokes and the settings browser check.
+release. The merge gate runs 272 unit tests, both adapter smokes and the settings browser check.
 The browser check includes subscription startup/failure/retry, a first rewrite and stale example
 responses, including a delayed Settings session before controls become usable. CLI protocol tests
-use stand-ins; they do not establish account access. Concurrent HTTP saves also check that a
-slow model selection preserves a tone saved from another window. Separate browser runs through
+use stand-ins; they do not establish account access. The native worker also checks that an HTTP
+error retains the model's reason, and Mac caret tests distinguish inline offsets from document
+positions. Concurrent HTTP saves also check that a slow model selection preserves a tone saved from another window. Separate browser runs through
 the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
 2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
 at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
@@ -84,8 +85,22 @@ Installed Settings selected the rig's model API, discovered its only model with 
 and produced a real rewrite. After logout/login, the service started automatically and TextEdit
 accepted a real rewrite; the text and screenshots are retained with the candidates below. The
 package was installed while OS setup was still active, so automatic Settings opening timed out;
-Settings was opened after the desktop was ready. Automatic first opening on a prepared fresh
-account still needs checking. The source concurrency fix `051db05` postdates these packages.
+Settings was opened after the desktop was ready. These packages predate the source concurrency
+fix `051db05`.
+
+A later Mac candidate from `988a133` built over SSH after excluding unused Tk, whose bundling
+recipe aborted from a logged-out account. Safari downloaded the package with a matching SHA-256
+and browser quarantine metadata. With the fixture's config backed up, the owner completed native
+Installer and Settings appeared automatically. The owner found that first page unclickable;
+after reboot and signing into the fixture again, reopening Settings from the input menu worked
+through the API rewrite. The screenshot of the first page is not a usable-first-opening pass.
+The following fixes hide controls until Settings loads, retain model-error details in the native
+panel, and pass inline-relative positions to InputMethodKit's line-rectangle query. New Mac
+candidate `06c6004` contains those fixes and was update-installed on the fixture, preserving its
+model API profile. The owner reported the fix works and took over interactive rig testing.
+First-session usability and native anchor checks remain owner-driven; diagnostic captures alone
+are not acceptance passes. Candidates and their precise checks are retained in `dist/candidates/`
+with manifests.
 
 Candidate packages, source commit, SHA-256 hashes and screenshots are retained locally in
 `dist/candidates/04cac81/manifest.json` and its adjacent `evidence/` directory. They are not

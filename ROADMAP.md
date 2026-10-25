@@ -26,7 +26,8 @@ Native TextEdit and terminal-handoff recordings are in the README and site. The 
 separate the merge gate, VM typing and model measurements. Keep them current as changes land.
 
 For G06: release preparation is on `agent/release-0.1.0`; keep it aligned with main before
-building candidates. The existing packages predate the `051db05` Settings concurrency fix.
+building candidates. Mac candidate `06c6004` includes the Settings and caret fixes; the owner
+now drives its interactive checks. Coordinate the matching Windows candidate with Claude.
 The funded Anthropic-key check is still pending. No release is published.
 Build and verification can proceed autonomously; publishing remains the owner's action.
 
