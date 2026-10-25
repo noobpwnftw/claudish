@@ -8,22 +8,17 @@ one-line instructions answered at the caret, in every app, with the model you co
 
 ## Now
 
+0.1.0 is out (https://github.com/noobpwnftw/claudish/releases/tag/v0.1.0). From here the slop
+experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The ask workflow
+(instructions, tools, approvals, handoffs) is for experts; it gets fixes for the bugs they report.
+
 | ID | Goal | Done when |
 | --- | --- | --- |
-| G63 | **Install → model → first accepted rewrite** | A new user chooses a subscription or API, gets a real rewrite in Settings, then accepts `ok` with Tab in a native editor after login/restart; repeat on each installed package |
-| G06 | **Downloadable 0.1.0** | Release candidates built from reviewed source, installed and exercised from their downloads; the owner approves publishing the macOS package and Windows installer |
-| G01 | **Works the same on all three platforms** | Install, restart, type, update and uninstall pass on macOS, Windows and Linux |
+| G65 | **Slop quality per backend** | Every tone's rewrites measured with `benchmarks/` on the backends people use (Claude Code, Codex, an API key, Gemma 4), and the templates changed only where the numbers improve |
+| G66 | **Subscription rewrites feel instant** | Tab to rewrite on Claude Code and Codex measured end to end on an installed package, and brought down from 3–4 s |
+| G67 | **The demo's slop** | The browser model's rewrites and continue suggestions read as the product does, on the samples and on free typing |
+| G63 | **Install → model → first accepted rewrite** | A new user gets a real rewrite in Settings, then accepts `ok` with Tab in a native editor, on each published package |
 | G45 | **The panels match the design lab**, state by state | Each platform checked in both themes |
-
-Candidates from `926e0bc` (2026-10-25): the macOS package installed and hand-tested by the owner
-(rewrites, drafts, answers, a session handoff, MCP approvals; Gemma 4 and Claude Code), the Windows
-ARM64 installer installed by a standard account with its service at login. Linux: the Docker rig
-and GNOME Shell's drawing of every panel. Still open for G63: a logged-in subscription on Windows,
-Windows x64, a real Linux desktop. Evidence:
-[docs/development.md](docs/development.md#current-evidence-and-next-checks).
-
-For G06: `agent/release-0.1.0` is one commit on main with these candidates' hashes. Waiting on the
-owner: the funded Anthropic-key check, browser-download installs, then publishing.
 
 ## Next
 
