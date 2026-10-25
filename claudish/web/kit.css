@@ -61,12 +61,12 @@
 .k-foot{display:flex;flex-wrap:nowrap;align-items:center;gap:4px clamp(7px,2vw,12px);padding:var(--k-row-y) var(--k-row-x) calc(var(--k-row-y) - 1px);font-size:var(--k-small);color:var(--k-muted)}
 @media(max-width:360px){.k-foot{flex-wrap:wrap}}  /* a phone: the keys wrap rather than leave the panel */
 .k-head+.k-foot,.k-row+.k-foot{margin-top:2px}
-.k-hint{white-space:nowrap}
+.k-hint{white-space:nowrap;flex:none}
 .k-cap{display:inline-block;font-size:var(--k-cap-size);font-weight:var(--k-cap-weight,inherit);line-height:1.25;padding:var(--k-cap-pad);margin-right:5px;border:var(--k-cap-border);border-radius:4px;color:var(--k-text)}
 /* Enter on a draft: the row's Tab, lit until the next key (no animation; the footer is not lit). */
 .k-cap.lit{background:var(--k-lit-bg,color-mix(in srgb,var(--k-select) 20%,var(--k-surface)));border:var(--k-lit-border,1px solid var(--k-select));
   color:var(--k-lit-color,var(--k-text));padding:var(--k-lit-pad,1px 5px);font-weight:var(--k-lit-weight,inherit)}
-.k-status{color:var(--k-text)}
+.k-status{color:var(--k-text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}  /* a long status gives way: the keys after it show */
 .k-status.failed{color:var(--k-error)}
 .k-warn{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--k-error);color:var(--k-surface);font-size:12px;font-weight:700;line-height:1}
 /* Working: a small ring before the words (the platform's own spinner where it has one). */

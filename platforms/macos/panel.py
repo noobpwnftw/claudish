@@ -235,6 +235,8 @@ class Panel:
             widest = max(widest, size.width + (TAKE if takes else 0) + 2 * (PAD + ROW_X))
             blocks.append(("row", (text, on, index + 1), max(size.height, 18) + 2 * ROW_Y))
         foot = self.footer(spec, secondary, TOAST_GAP if bare else FOOT_GAP)
+        # A long status (an agent's progress) gives way, so the keys after it always show.
+        self.fit_status(foot, MAX_WIDTH - (TOAST_LEFT + TOAST_RIGHT if bare else 2 * (PAD + ROW_X)))
         if bare:  # a toast: the tile, the words and the key on one line, padded as .k-toast
             width = TOAST_LEFT + self.span(foot) + TOAST_RIGHT
             height = TILE + 2 * TOAST_Y
@@ -279,12 +281,23 @@ class Panel:
         """The footer's width: every item as drawn, and the gaps between them."""
         return sum(self.drawn(view) for view, _ in items) + sum(gap for _, gap in items[:-1])
 
+    def fit_status(self, items, room):
+        """Shorten the status, word by word with an ellipsis, until the footer fits in `room`."""
+        status = getattr(self, "status_view", None)
+        if status is None or not any(view is status for view, _ in items):
+            return
+        words = str(status.stringValue()).split()
+        while self.span(items) > room and len(words) > 1:
+            words.pop()
+            status.setStringValue_(" ".join(words) + "…")
+
     def footer(self, spec, secondary, gap):
         """[(view, gap after)]: the mark, what is happening, each key with its verb, and the tail;
         `gap` between items (.k-foot or .k-toast), CAP_GAP between
         a key and its verb."""
         items = []
         self.keys = []
+        self.status_view = None
         if spec["tile"] == "warn":  # a failure reads without colour: a mark, then why
             items.append((tile("!", NSColor.systemRedColor(), NSColor.whiteColor(), round_=True), gap))
         elif spec["tile"] == "cd":  # continue: a neutral tile, so only compose wears the accent
@@ -299,7 +312,8 @@ class Panel:
                 spinner.setIndeterminate_(True)
                 spinner.startAnimation_(None)
                 items.append((spinner, 6))
-            items.append((label(spec["status"], SMALL), gap))
+            self.status_view = label(spec["status"], SMALL)
+            items.append((self.status_view, gap))
         if spec["failed"]:
             items.append((label(spec["failed"], SMALL, color=NSColor.systemRedColor()), gap))
         for key, verb in spec["foot"]:
