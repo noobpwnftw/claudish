@@ -477,10 +477,11 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(kept))
         self.changed()
         self.show_mode()
-        if not self.composition.hints:
+        spec, lasting = self.composition.switched()
+        if not (self.composition.hints or lasting):
             pass
-        elif screen().shell:  # the mode switch, briefly at the caret
-            screen().publish(self.drawn, "", self.composition.toast())
+        elif screen().shell:  # the mode switch briefly at the caret, or the held exchange's pill
+            screen().publish(self.drawn, "", spec)
         elif not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
             self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
 

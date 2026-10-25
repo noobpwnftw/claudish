@@ -204,8 +204,9 @@ class ClaudishTextService(TextService):
         if self.worker:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
-        if self.state.hints:
-            self.setToast(self.state.toast(), 2)
+        spec, lasting = self.state.switched()
+        if spec:  # the mode switch briefly, or the held exchange's pill
+            self.setToast(spec, 3 if lasting else 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
 

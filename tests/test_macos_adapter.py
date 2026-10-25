@@ -394,6 +394,23 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.controller.state.mode, "compose")  # picked in the input menu
         self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])  # macOS chose it: not selected again
 
+    def test_a_shift_tap_on_a_question_holds_it_and_the_way_back_says_so(self):
+        """Owner: Shift on a pick panel left the instruction marked until a click, and back in
+        compose nothing said the drafts were waiting."""
+        self.type_text("draft 3 versions of hi")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        state.ask(state.revision, {"id": "q", "text": "Which?", "body": "Which?",
+                                   "choices": [{"label": "Hi"}, {"label": "Hello"}]}, "s")
+        self.shift_tap()  # continue: the exchange is held
+        self.assertEqual((state.mode, self.client.marked, self.client.commits), ("continue", "", []))
+        self.shift_tap()  # back in compose: the pill says what waits
+        self.assertEqual(state.mode, "compose")
+        self.assertTrue(self.module.TOAST.visible)
+        self.assertEqual(self.module.TOAST.spec["status"], "the model asks")
+        self.assertEqual(state.restore(), "draft 3 versions of hi")  # Shift+Esc brings it back
+        self.assertTrue(state.question)
+
     def test_a_shift_tap_switches_mode_and_keeps_what_you_typed(self):
         self.type_text("thank the team")
         state = self.controller.state

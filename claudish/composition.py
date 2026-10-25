@@ -654,8 +654,8 @@ class Composition:
             self.mode = "compose"
             self.change("")
             return ""
-        # A sent instruction's exchange is held, as on a focus change: back in compose, Shift+Esc
-        # brings it back (no pill: continue cannot open it).
+        # A sent instruction's exchange is held, as on a focus change: back in compose its pill says
+        # what waits (switched()), and Shift+Esc brings it back.
         kept = self.leave(None) if self.sent else self.shown
         self.mode = "continue"
         self.look = False  # change() keeps it with words in the composition
@@ -753,13 +753,21 @@ class Composition:
     def returned(self, app=None):
         """Focus came back: a passive pill if an exchange is held for this app ("3 drafts ready ·
         Shift+Esc open"); it takes no keys. None otherwise; a held exchange expires."""
+        return self.held_pill() if self.held is not None and app == self.held_app else None
+
+    def switched(self):
+        """What a mode switch shows: back in compose with an exchange held (a Shift tap left it),
+        its pill, until your next key; else the mode's toast. (spec or None, lasting)."""
+        pill = self.held_pill() if self.mode == "compose" else None
+        return (pill, True) if pill else (self.toast(), False)
+
+    def held_pill(self):
+        """The held exchange's pill, or None (in continue Shift+Esc cannot open it; your words come first)."""
         held = self.held
-        if held is None:
+        if held is None or self.live or self.text:
             return None
         if time.monotonic() - self.held_at > HELD_SECONDS:
             self.held = None
-            return None
-        if app != self.held_app or self.text:
             return None
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else

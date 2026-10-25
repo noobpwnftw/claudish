@@ -369,9 +369,12 @@ class ClaudishInputController(IMKInputController):
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         if kept:
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
+        else:  # an instruction held with its exchange: it leaves the text box (continue marks nothing)
+            unmark(client)
         self.changed(client)
-        if MODE_TOAST:
-            self.show_toast(self.state.toast(), client)
+        spec, lasting = self.state.switched()
+        if lasting or MODE_TOAST:  # the held exchange's pill; macOS says the mode itself
+            self.show_toast(spec, client, lasting=lasting)
         if tell:
             try:
                 client.selectInputMode_(MODE_IDS[self.state.mode])
