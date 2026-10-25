@@ -493,6 +493,34 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.chooseCompose_(None)
         self.assertEqual(self.controller.state.mode, "compose")
 
+    def test_the_input_menu_is_kept_and_its_tick_follows_the_mode(self):
+        class Item:
+            def __init__(self, title=""): self.name, self.ticked = title, 0
+            @classmethod
+            def alloc(cls): return cls()
+            def initWithTitle_action_keyEquivalent_(self, title, action, key): self.name = title; return self
+            @classmethod
+            def separatorItem(cls): return cls()
+            def setTarget_(self, target): pass
+            def setState_(self, state): self.ticked = state
+            def title(self): return self.name
+
+        class Menu:
+            @classmethod
+            def alloc(cls): return cls()
+            def initWithTitle_(self, title): self.items = []; return self
+            def addItem_(self, item): self.items.append(item)
+            def itemArray(self): return self.items
+
+        appkit = types.ModuleType("AppKit")
+        appkit.NSMenu, appkit.NSMenuItem = Menu, Item
+        with patch.dict("sys.modules", {"AppKit": appkit}):
+            menu = self.controller.menu()
+            self.assertEqual([(item.name, item.ticked) for item in menu.items][:2], [("Compose", 1), ("Continue", 0)])
+            self.controller.chooseContinue_(None)
+            self.assertIs(self.controller.menu(), menu)  # macOS asks after nearly every key: one menu
+            self.assertEqual([item.ticked for item in menu.items][:2], [0, 1])
+
     def test_a_password_field_gets_its_keys_untouched(self):
         with patch.object(self.module, "secure_input", return_value=True):
             for char in "hunter2":
