@@ -16,7 +16,7 @@ const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
 // [label, mode, text, the key that finishes it]
 const SAMPLES = [
   ["rewrite", "compose", "This is very important.", "Tab"],
-  ["continue", "continue", "Thanks for the quick review on ", ""],
+  ["continue", "continue", "Thanks for the quick review. ", ""],
   ["ask", "compose", "decline the meeting politely, propose Thursday", "Shift+Enter"],
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
