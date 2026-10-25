@@ -18,13 +18,16 @@ one-line instructions answered at the caret, in every app, with the model you co
 Settings now shows subscription startup and failures, offers a first rewrite, and preserves a
 subscription profile's settings when reselected. Controls wait for the Settings session before
 accepting clicks. Packages built from `04cac81` pass update/reboot, Settings rewrites and native
-Tab/Tab acceptance on macOS Apple silicon and Windows ARM64; fresh-account installs and a Windows
-subscription still need checking. Native TextEdit and terminal-handoff recordings
-are in the README and site. The [inventory and current evidence](docs/development.md#implementation)
+Tab/Tab acceptance on macOS Apple silicon and Windows ARM64. A new standard Mac account also
+passes model selection, a Settings rewrite and native acceptance after logout/login, with the
+owner allowing the input method and local-network access. Automatic Settings opening on a
+prepared fresh Mac account, the Windows fresh-account flow and a Windows subscription remain.
+Native TextEdit and terminal-handoff recordings are in the README and site. The [inventory and current evidence](docs/development.md#implementation)
 separate the merge gate, VM typing and model measurements. Keep them current as changes land.
 
-For G06: release preparation is on `agent/release-0.1.0`; integrate it with current main before
-building candidates. The funded Anthropic-key check is still pending. No release is published.
+For G06: release preparation is on `agent/release-0.1.0`; keep it aligned with main before
+building candidates. The existing packages predate the `051db05` Settings concurrency fix.
+The funded Anthropic-key check is still pending. No release is published.
 Build and verification can proceed autonomously; publishing remains the owner's action.
 
 ## Next

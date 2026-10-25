@@ -59,7 +59,8 @@ release. The merge gate runs 269 unit tests, both adapter smokes and the setting
 The browser check includes subscription startup/failure/retry, a first rewrite and stale example
 responses, including a delayed Settings session before controls become usable. CLI protocol tests
 use stand-ins; they do not establish account access. Concurrent HTTP saves also check that a
-slow model selection preserves a tone saved from another window. Separate browser runs through the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
+slow model selection preserves a tone saved from another window. Separate browser runs through
+the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
 2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
 at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
 
@@ -73,9 +74,18 @@ The macOS Apple-silicon package and Windows ARM64 installer were rebuilt from `0
 2026-10-25, update-installed and checked again after reboot. Installed Settings produced a real
 rewrite through Claude Code on macOS (3.22 s, one request) and the Gemma API in Windows Edge.
 TextEdit and Notepad both previewed `ok` on Tab and inserted the result on a second Tab. These
-were existing rig accounts, with working model access; they do not establish a fresh-account or
-browser-download install. Windows has no subscription CLI installed, so its subscription path
-remains unchecked. The macOS rig now selects Claude Code; its other profiles remain available.
+used existing rig accounts with working model access; they do not establish a browser-download
+install. Windows has no subscription CLI installed, so its subscription path remains unchecked.
+The original macOS rig account selects Claude Code; its other profiles remain available.
+
+A separate standard macOS account then installed the same package without a prior config or key.
+The owner completed OS first-login setup and allowed the input method and local-network access.
+Installed Settings selected the rig's model API, discovered its only model with Model left blank,
+and produced a real rewrite. After logout/login, the service started automatically and TextEdit
+accepted a real rewrite; the text and screenshots are retained with the candidates below. The
+package was installed while OS setup was still active, so automatic Settings opening timed out;
+Settings was opened after the desktop was ready. Automatic first opening on a prepared fresh
+account still needs checking. The source concurrency fix `051db05` postdates these packages.
 
 Candidate packages, source commit, SHA-256 hashes and screenshots are retained locally in
 `dist/candidates/04cac81/manifest.json` and its adjacent `evidence/` directory. They are not
@@ -84,8 +94,8 @@ confirmed that Settings opens and a rewrite reports the missing model/key.
 
 The next checks, in order, are in [ROADMAP.md](../ROADMAP.md). In particular:
 
-- Repeat installation and model selection on fresh accounts, then a Settings rewrite and native
-  acceptance after restart/login. Exercise a Windows subscription when a logged-in CLI is present.
+- Check automatic first opening of Settings on a prepared fresh Mac account, and repeat the
+  fresh-account flow on Windows. Exercise a Windows subscription when a logged-in CLI is present.
 - Integrate the release preparation with current main and check the download/install path.
   A funded Anthropic-key rewrite and its failure states remain unchecked on the installed Mac
   and Windows packages; publishing requires the owner.

@@ -103,10 +103,13 @@ writes `dist\windows\cd_AI-setup.exe`.
 **The installer**, `cd_AI.pkg`, for Apple silicon (Intel Macs are not supported yet). It installs
 for you alone (`~/Library/Input Methods`, no administrator password): the app, a starter config,
 the service at every login, and cd_AI added to your input sources and enabled. macOS asks once to
-allow it to enable cd_AI. On a first install, cd_AI's settings open at the end: paste your Claude
-key, pick a tone. Then **log out and back in**, as after installing or updating any macOS input
-method: until then macOS keeps its old list of input sources (and, after an update, the old cd_AI).
+allow it to enable cd_AI. On a first install, cd_AI's settings open at the end: choose your model
+and tone, then use Try a rewrite. Then **log out and back in**, as after installing or updating
+any macOS input method: until then macOS keeps its old list of input sources (and, after an update, the old cd_AI).
 **Settings…** in the input menu opens the settings again.
+
+For a model API on another computer, macOS asks for local-network access on the first connection.
+Choose **Allow**, then retry **Use this API** in Settings if its first check did not connect.
 
 The package is ad-hoc signed, not notarized. A copy downloaded with a browser is blocked the first
 time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**, and **Open
