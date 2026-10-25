@@ -45,7 +45,11 @@ function status(state) {
   const name = subscription(state);
   if (name) {
     const model = state.service.model || "warm";
-    if (model.startsWith("failed:")) return [`${name} could not start: ${model.slice(7).trim()}`, "bad"];
+    if (model.startsWith("failed:")) {  // most often not logged in: the CLI says so where you run it
+      const why = model.slice(7).trim().replace(`${name}: `, "").replace(/\.$/, "");
+      const run = state.command ? ` Run ${state.command} in a terminal and log in, then try a rewrite.` : "";
+      return [`${name} could not start: ${why}.${run}`, "bad"];
+    }
     if (model === "starting" || model === "restarting") return [`${model === "starting" ? "Starting" : "Restarting"} ${name}…`, ""];
     if (model === "stopped") return [`${name} is stopped. Pick it again below to start it.`, "bad"];
     return [`Ready: ${name} writes for you.`, "good"];
@@ -62,6 +66,7 @@ function showStatus(state) {
   const [line, kind] = status(state);
   $("status").textContent = line;
   $("status").className = kind;
+  if (kind === "bad" && subscription(state)) say("model-message", "");  // not "now writes with" beside it
   $("try").querySelector("button").disabled = !ready(state) &&
     !(subscription(state) && (state.service.model || "").startsWith("failed:"));
 }

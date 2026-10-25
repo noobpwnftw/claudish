@@ -92,6 +92,7 @@ def state(path=None):
         "server_models": listed(server.get("model_url", "")) if choice == "server" else [],
         "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
         "codex": None if codex() else NO_CODEX,
+        "command": (entry.get("command") or [None])[0] if choice in ("claude-code", "codex") else None,
     }
 
 

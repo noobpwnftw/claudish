@@ -105,7 +105,7 @@ async def check(args, home, port):
                 return
             response = await route.fetch()
             data = await response.json()
-            data.update(choice=lifecycle["backend"], service=dict(lifecycle))
+            data.update(choice=lifecycle["backend"], service=dict(lifecycle), command="/opt/codex/bin/codex")
             await route.fulfill(response=response, json=data)
 
         async def health(route):
@@ -126,9 +126,10 @@ async def check(args, home, port):
             await page.locator("#try-text").fill("hello")
             await page.locator("#try button").click()
             await expect(page.locator("#sample")).to_have_text("“hello” → “A rewrite of hello”")
-        lifecycle["model"] = "failed: login required"
+        lifecycle["model"] = "failed: Codex: login required"
         await page.reload()
-        await expect(page.locator("#status")).to_have_text("Codex could not start: login required")
+        await expect(page.locator("#status")).to_have_text(
+            "Codex could not start: login required. Run /opt/codex/bin/codex in a terminal and log in, then try a rewrite.")
         await expect(page.locator("#try button")).to_be_enabled()  # retry after logging in
         await page.locator("#try button").click()
         await expect(page.locator("#status")).to_have_text("Ready: Codex writes for you.")
