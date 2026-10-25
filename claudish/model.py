@@ -16,6 +16,19 @@ NO_MODEL = "no model is set up"  # said in the panel, where Tab or Shift+Enter a
 NO_CREDENTIALS = "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY"
 
 
+
+def one_message(prompt, examples, said):
+    """For a backend that takes one message (Claude Code, Codex, a command): the system prompt, the
+    examples as tagged text and output pairs (chat turns elsewhere), then the text, tagged too."""
+    pairs = [(examples[i]["content"], examples[i + 1]["content"]) for i in range(0, len(examples) - 1, 2)]
+    if not pairs:
+        return prompt + "\n\nText:\n" + said
+    shots = "".join("\n<example>\n<text>%s</text>\n<output>%s</output>\n</example>" % pair for pair in pairs)
+    return (prompt + "\n\nExamples, each a text and the output for it:" + shots
+            + "\n\nThe user's text, for your output as in the examples (only the output, no tags):\n<text>%s</text>"
+            % said)
+
+
 def rules(text):
     """Explicit model-free demo, not a substitute for neural rewriting."""
     text = text.replace("--", "—")
@@ -487,9 +500,9 @@ class Rewriter:
             if self.backend == "rules":
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
-                outputs = [self.run_command(prompt + "\n\nText:\n" + said)]
+                outputs = [self.run_command(one_message(prompt, examples, said))]
             elif self.warm:
-                outputs = [self.warm.ask(prompt + "\n\nText:\n" + said, self.timeout)]
+                outputs = [self.warm.ask(one_message(prompt, examples, said), self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
                 output, usage = self.claude.rewrite(said, prompt, examples, box.image)
                 if not output:

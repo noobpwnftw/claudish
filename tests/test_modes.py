@@ -12,6 +12,22 @@ from claudish.model import Rewriter
 from serving import serving
 
 
+class TidyTests(unittest.TestCase):
+    """What a model wraps around its answer is not the answer (OpenLess output_cleaning, #25)."""
+
+    def test_wrappings_go_and_the_answer_stays(self):
+        from claudish.modes import finish
+        answer = "Absolutely—let's align!"
+        for wrapped in ("<think>The user wants slop.</think>\n" + answer, "```\n" + answer + "\n```", "Here's a rewrite:\n\n" + answer, "Sure! Here is the text:\n" + answer,
+                        "“" + answer + "”", '"' + answer + '"'):
+            self.assertEqual(finish("rewrite", "ok", wrapped), answer, wrapped)
+        self.assertEqual(finish("rewrite", '"ok"', '"Absolutely!"'), '"Absolutely!"')  # quoted text: quotes stay
+        self.assertEqual(finish("rewrite", "ok", '"Yes," she said, "absolutely."'), '"Yes," she said, "absolutely."')
+        self.assertEqual(finish("instruct", "list it", "Here are the steps:\n1. Plan\n2. Ship"), "1. Plan\n2. Ship")
+        self.assertEqual(finish("instruct", "x", "Here is why: it works."), "Here is why: it works.")  # one line: kept
+        self.assertEqual(finish("rewrite", "ok", "<think>it ran out of tokens while thinking"), "")  # nothing to offer
+
+
 class ModeTests(unittest.TestCase):
     def test_continue_joins_onto_the_typed_text(self):
         self.assertEqual(modes.finish("continue", "Thanks for", "the review."), "Thanks for the review.")
@@ -124,7 +140,7 @@ class ModeTests(unittest.TestCase):
         self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
         custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
-        self.assertIn("in the same language, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
+        self.assertIn("next few words, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))

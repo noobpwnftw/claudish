@@ -220,8 +220,8 @@
       }
     },
     "tone": {
-      "rewrite": "Rewrite the user's text in {tone} English. Keep its meaning, names, numbers and language. Output only the rewritten text, no explanation.",
-      "continue": "Continue the user's unfinished text with the next few words, in the same language, {tone}. Output only the words that come next, not the text itself.",
+      "rewrite": "Rewrite the user's text in {tone} English. Keep its meaning, names and numbers. Output only the rewritten text, no explanation.",
+      "continue": "Continue the user's unfinished text with the next few words, {tone}. Output only the words that come next, not the text itself.",
       "instruct": "The user typed an instruction for text they want to write. Write that text, ready to send, in {tone} English. Use the reference context for names, terms, and facts, and add no facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text itself, with no preamble or notes."
     }
   },
