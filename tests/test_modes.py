@@ -140,7 +140,7 @@ class ModeTests(unittest.TestCase):
         self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
         custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
-        self.assertIn("in the same language, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
+        self.assertIn("next few words, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
