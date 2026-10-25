@@ -450,6 +450,30 @@ class Composition:
         self.asked, self.working, self.failed = "instruct", True, False
         self.nudged = None
 
+    def follow(self, worker):
+        """The worker's view of the service, copied each poll: the config's keys and hints, and
+        whether it answers. True when that changed (offline or back)."""
+        self.summon, self.hints = worker.summon, worker.hints
+        changed, self.offline = self.offline != worker.offline, worker.offline
+        return changed
+
+    def receive(self, revision, data):
+        """A result from the worker: a draft, a question, progress, done elsewhere, or an error.
+        Returns its kind ("text", "question", "progress", "done", "error") when it changed what
+        shows, else None; the adapter draws it its own way."""
+        if "text" in data:
+            return "text" if self.offer(revision, data["text"], data.get("candidates", ())) else None
+        if "question" in data:
+            return "question" if self.ask(revision, data["question"], data["session"]) else None
+        if "progress" in data or "partial" in data:
+            return "progress" if self.note(revision, data.get("progress") or data.get("partial")) else None
+        if "done" in data:
+            return "done" if self.done(revision) else None
+        if "error" in data:
+            self.fail(revision, data["error"])  # the panel says why: the summon key retries
+            return "error"
+        return None
+
     def fail(self, revision, error=None):
         held = self.route(revision)
         if held is not None:  # the exchange you left: it goes on, out of sight

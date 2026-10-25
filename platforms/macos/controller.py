@@ -197,42 +197,32 @@ class ClaudishInputController(IMKInputController):
     def poll(self):
         if not self.active or self.worker is None:
             return
-        self.state.summon = self.worker.summon  # the config's keys
-        self.state.hints = self.worker.hints
-        if self.state.offline != self.worker.offline:  # the service stopped or came back
-            self.state.offline = self.worker.offline
+        if self.state.follow(self.worker):  # the service stopped or came back
             trace({True: "offline", False: "online"}.get(self.state.offline, self.state.offline))
             if self.state.text and not self.state.live:
                 self.show_panel()
         result = self.worker.poll()
         if result:
             trace("result", sorted(result[1]), "current" if result[0] == self.state.revision else "stale")
-        if result:
-            revision, data = result
-            if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
-                if self.state.converted:  # the rewrite you asked for with Tab: in the panel, your words stay marked
-                    client = self.client()
-                    if client is not None:
-                        self.changed(client)
-                    return
-                if self.state.live:  # continue: the rest of the sentence, in grey after the caret
-                    client = self.client()
-                    if client is not None:
-                        self.show_ghost(client)
-                    return
-            elif "question" in data:
-                self.state.ask(revision, data["question"], data["session"])
-            elif "progress" in data or "partial" in data:
-                self.state.note(revision, data.get("progress") or data.get("partial"))
-            elif "done" in data and self.state.done(revision):
-                client = self.client()  # a helper took the task: nothing to insert
+        kind = self.state.receive(*result) if result else None
+        if kind == "text":
+            if self.state.converted:  # the rewrite you asked for with Tab: in the panel, your words stay marked
+                client = self.client()
                 if client is not None:
-                    if self.state.text:  # words you typed meanwhile: they stay, marked
-                        self.changed(client)
-                    else:
-                        unmark(client)
-            elif "error" in data:
-                self.state.fail(revision, data["error"])
+                    self.changed(client)
+                return
+            if self.state.live:  # continue: the rest of the sentence, in grey after the caret
+                client = self.client()
+                if client is not None:
+                    self.show_ghost(client)
+                return
+        elif kind == "done":
+            client = self.client()  # a helper took the task: nothing to insert
+            if client is not None:
+                if self.state.text:  # words you typed meanwhile: they stay, marked
+                    self.changed(client)
+                else:
+                    unmark(client)
         self.check_ghost()
         if self.state.panel() != self.drawn:  # an answer, a question, progress, or the pause for the keys
             self.show_panel()

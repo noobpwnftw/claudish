@@ -146,27 +146,14 @@ class ClaudishEngine(IBus.Engine):
         self.timer = GLib.timeout_add(40, self.poll)
 
     def poll(self):
-        self.composition.summon = self.suggestions.summon  # the config's keys
-        self.composition.hints = self.suggestions.hints
-        if self.composition.offline != self.suggestions.offline:  # the service stopped or came back
-            self.composition.offline = self.suggestions.offline
+        if self.composition.follow(self.suggestions):  # the service stopped or came back
             if self.composition.text and not self.composition.live:
                 self.render()
         result = self.suggestions.poll()
         if result:
             revision, data = result
             trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
-            if "text" in data and self.composition.offer(revision, data["text"], data.get("candidates", ())):
-                self.render()
-            elif "question" in data and self.composition.ask(revision, data["question"], data["session"]):
-                self.render()
-            elif ("progress" in data or "partial" in data) and \
-                    self.composition.note(revision, data.get("progress") or data.get("partial")):
-                self.render()
-            elif "done" in data and self.composition.done(revision):
-                self.render()  # a helper took the task: nothing to insert
-            elif "error" in data:
-                self.composition.fail(revision, data["error"])
+            if self.composition.receive(revision, data):  # a draft, a question, progress; done: nothing to insert
                 self.render()
         if not self.composition.live and self.composition.panel() != self.drawn:
             self.render()  # the pause before compose's keys, or anything else the description shows

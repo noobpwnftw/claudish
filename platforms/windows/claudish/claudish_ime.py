@@ -456,23 +456,10 @@ class ClaudishTextService(TextService):
     def poll_results(self):
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         if self.worker:
-            self.state.offline = self.worker.offline  # the service stopped or came back
-            self.state.summon = self.worker.summon  # the config's keys
-            self.state.hints = self.worker.hints
+            self.state.follow(self.worker)  # the config's keys, and whether the service answers
         result = self.worker.poll() if self.worker else None
-        if result:
-            revision, data = result
-            if "text" in data:
-                self.state.offer(revision, data["text"], data.get("candidates", ()))
-            elif "question" in data:
-                self.state.ask(revision, data["question"], data["session"])
-            elif "progress" in data or "partial" in data:
-                self.state.note(revision, data.get("progress") or data.get("partial"))
-            elif "done" in data:
-                if self.state.done(revision) and self.state.hints:
-                    self.setToast(blank(status=data["done"]), 3)  # a helper took the task: said briefly at the caret
-            elif "error" in data:
-                self.state.fail(revision, data["error"])  # the panel says why: Shift+Enter retries
+        if result and self.state.receive(*result) == "done" and self.state.hints:
+            self.setToast(blank(status=result[1]["done"]), 3)  # a helper took the task: said briefly at the caret
 
     def onKeyDown(self, event):
         if event.keyCode == 0x7B and self.preview():

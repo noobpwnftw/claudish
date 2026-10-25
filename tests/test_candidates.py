@@ -110,6 +110,29 @@ class SummonKeyTests(unittest.TestCase):
         self.assertEqual(state.keep(), "running late")  # nothing from the model waits: Enter keeps
 
 
+class ReceiveTests(unittest.TestCase):
+    """The worker's results, dispatched once for every adapter; each draws the kind its own way."""
+
+    def test_each_kind_and_stale_results(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("say thanks")
+        state.submit()
+        self.assertIsNone(state.receive(state.revision - 1, {"text": "old"}))  # stale: nothing changes
+        self.assertEqual(state.receive(state.revision, {"progress": "reading"}), "progress")
+        self.assertEqual(state.receive(state.revision, {"question": {"id": "q", "text": "Which?", "body": "Which?",
+                                                                     "choices": [{"label": "A"}]}, "session": "s"}), "question")
+        state.answer_choice()
+        self.assertEqual(state.receive(state.revision, {"text": "Thanks—truly.", "candidates": ["Thanks—truly."]}), "text")
+        self.assertEqual(state.receive(state.revision, {"error": "boom"}), "error")
+
+    def test_follow_copies_the_workers_view(self):
+        state, worker = Composition(), type("W", (), {"summon": "Enter", "hints": False, "offline": True})()
+        self.assertTrue(state.follow(worker))
+        self.assertEqual((state.summon, state.hints, state.offline), ("Enter", False, True))
+        self.assertFalse(state.follow(worker))  # nothing changed
+
+
 class HintsTests(unittest.TestCase):
     """"hints": false: no keys while you compose, no toasts; the panel while something is pending
     (working, or drafts, a rewrite, a question waiting on Tab) or went wrong."""
