@@ -207,12 +207,23 @@ class Suggestions:
             if exc.code == 400:  # this profile has no agent: a plain instruction (about 1 ms to find out)
                 return False
             raise
-        key, after = started["id"], 0
+        key, after, missed = started["id"], 0, 0
         while True:
             with self.condition:
                 if self.closed or self.pending is not None:  # edited, committed, or Esc: stop the agent
                     break
-            data = call(self.endpoint, "/sessions/%s?after=%d" % (key, after), timeout=5)
+            try:
+                data = call(self.endpoint, "/sessions/%s?after=%d" % (key, after), timeout=5)
+                missed = 0
+            except Exception:
+                # A busy service can miss a poll: ask again. When it keeps failing, the session is
+                # cancelled before the error goes up, so a retry does not run beside it.
+                missed += 1
+                if missed < 3:
+                    time.sleep(0.5)
+                    continue
+                self._cancel(key)
+                raise
             for event in data["events"]:
                 after = event["seq"] + 1
                 kind = event["type"]
@@ -228,11 +239,14 @@ class Suggestions:
                                             "session": key})
             if data["done"]:
                 return True
+        self._cancel(key)
+        return True
+
+    def _cancel(self, key):
         try:
             call(self.endpoint, "/sessions/%s/cancel" % key, {}, timeout=5)
         except Exception:
             pass
-        return True
 
     def _run(self):
         while True:

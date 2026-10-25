@@ -315,9 +315,9 @@ class ClaudishEngine(IBus.Engine):
                 self.commit_text(IBus.Text.new_from_string(words))
             return
         text = self.composition.commit(suggested)
-        self.changed()
         if text:
             self.commit_text(IBus.Text.new_from_string(text))
+        self.changed()  # after it: words that stay are the next composition
 
     def do_process_key_event(self, keyval, keycode, state):
         # A Shift tap switches mode (continue <-> compose), as Shift switches English and pinyin.

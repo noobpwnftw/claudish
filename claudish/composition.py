@@ -660,7 +660,9 @@ class Composition:
     def commit(self, suggested=False):
         """The text to insert: the candidate if asked for or already shown in place, else your words."""
         text = (self.candidate if suggested else "") or self.text  # the model's words only when asked for
-        self.change("")
+        # Your next words, back as the reply (an answer to read taken with Tab while they waited),
+        # stay at the caret as a composition of their own.
+        self.change(self.reply.strip() if suggested else "")
         return text
 
     def leave(self, app=None):

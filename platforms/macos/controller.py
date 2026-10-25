@@ -525,6 +525,8 @@ class ClaudishInputController(IMKInputController):
         if text and client is not None:
             # Inserting replaces the client's existing marked text.
             client.insertText_replacementRange_(text, (NSNotFound, 0))
+        if self.state.text and client is not None:  # words that stay are the next composition, marked
+            self.changed(client)
 
     def commitComposition_(self, sender):
         self.finish(self.client())

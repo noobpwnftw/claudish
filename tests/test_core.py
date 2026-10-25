@@ -278,5 +278,29 @@ class ServiceTests(unittest.TestCase):
 
 
 
+class SessionPollingTests(unittest.TestCase):
+    def test_a_session_whose_polls_keep_failing_is_cancelled(self):
+        """Codex: a failed poll left the session running on the service, with no cancel; a retry
+        could start another beside it. A missed poll is retried; then the session is cancelled."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation = "c"
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            if path.endswith("/cancel"):
+                return {"ok": True}
+            raise OSError("timed out")
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"):
+            with self.assertRaises(OSError):
+                worker.session(1, "fix it", "app")
+        self.assertEqual([c for c in calls if c.startswith("/sessions/k?")].__len__(), 3)
+        self.assertEqual(calls[-1], "/sessions/k/cancel")
+
+
 if __name__ == "__main__":
     unittest.main()

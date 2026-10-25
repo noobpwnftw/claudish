@@ -261,6 +261,20 @@ class ModeFeelTests(unittest.TestCase):
         self.assertTrue(state.done(state.revision))  # a helper took it: your words stay, unsent
         self.assertEqual((state.text, state.sent, state.reply), ("and Monday", False, ""))
 
+    def test_tab_on_an_answer_to_read_keeps_the_waiting_follow_up(self):
+        """Codex: the answer went in with Tab and the follow-up waiting beside it disappeared."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("what does this error mean")
+        state.submit()
+        for char in "then fix it":
+            state.insert(char)
+        state.ask(state.revision, {"id": "r", "read": True, "label": "The model says", "body": "A quote is open.",
+                                   "insert": "A quote is open.", "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
+        self.assertEqual(state.tab(), "accept")
+        self.assertEqual(state.commit(True), "A quote is open.")
+        self.assertEqual((state.text, state.sent), ("then fix it", False))  # the next composition, unsent
+
     def test_tab_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
         state.mode = "compose"
