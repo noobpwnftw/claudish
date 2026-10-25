@@ -15,7 +15,6 @@ experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The a
 | ID | Goal | Done when |
 | --- | --- | --- |
 | G65 | **Slop quality per backend** | Every tone's rewrites measured with `benchmarks/` on the backends people use (Claude Code, Codex, an API key, Gemma 4), and the templates changed only where the numbers improve |
-| G66 | **Subscription rewrites feel instant** | Tab to rewrite on Claude Code and Codex measured end to end on an installed package, and brought down from 3–4 s |
 | G67 | **The demo's slop** | The browser model's rewrites and continue suggestions read as the product does, on the samples and on free typing |
 | G63 | **Install → model → first accepted rewrite** | A new user gets a real rewrite in Settings, then accepts `ok` with Tab in a native editor, on each published package |
 | G45 | **The panels match the design lab**, state by state | Each platform checked in both themes |
