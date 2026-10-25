@@ -352,6 +352,17 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.restore(), "decline politely")  # Shift+Esc: the exchange, drafts and all
         self.assertEqual(state.candidates, ["A draft.", "Another."])
 
+    def test_returning_to_a_failed_exchange_keeps_its_reason(self):
+        state = Composition()
+        state.change("explain this")
+        state.submit()
+        sent = state.revision
+        self.assertEqual(state.leave("app"), "")
+        state.fail(sent, "no Claude credentials: save a key in Settings")
+        self.assertEqual(state.returned("app")["status"], "no Claude key yet · Settings…")
+        self.assertEqual(state.returned("app")["foot"], [("Shift+Esc", "open")])
+        self.assertEqual(state.text, "")
+
     def test_a_focus_change_commits_only_your_own_words(self):
         """Seven reviewers, unanimous: a focus change may commit your own words, never the model's,
         never words meant for the model, and it never sends or approves."""

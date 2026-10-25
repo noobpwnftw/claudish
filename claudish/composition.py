@@ -634,7 +634,7 @@ class Composition:
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "a draft is ready" if held.candidate else
-                  "the request failed" if held.failed else "working on what you asked")
+                  (held.error or "the request failed") if held.failed else "working on what you asked")
         return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
 
     def route(self, revision):
