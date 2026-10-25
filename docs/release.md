@@ -37,8 +37,9 @@ at login after a restart. Browser-download installs remain unchecked for these c
 4. Verify the Linux installer in a clean Docker rig against the proposed source, using
    `CLAUDISH_REF` to select it before the tag exists. At publication, its default reference and
    every installation snippet must match `v0.1.0`.
-5. Update the release notes with actual results and remaining platform limits, without the draft
-   notice, and the changelog heading as `0.1.0`. Ask the owner to approve the exact commit, the two
+5. Write the release notes as what the release does and supports, with no tested-on, verified or
+   preview claims (owner: a problem comes back as a report); no draft notice; the changelog heading
+   as the version. Ask the owner to approve the exact commit, the two
    package hashes and the notes.
 6. After publication: download the published files with Safari and Edge, check their hashes, and
    install the published `.pkg` on a fresh macOS account through to a first accepted rewrite.
