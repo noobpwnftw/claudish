@@ -114,9 +114,7 @@ def tile(text, background, foreground, round_=False):
     view.setFrame_(NSMakeRect(0, 0, TILE, TILE))
     glyph = label(text, 12 if round_ else 10, NSFontWeightBold, foreground, mono=not round_)
     size = glyph.fittingSize()
-    # Centred by its ink (AI's capitals), not its line box, which leaves room below for descenders.
-    bottom = TILE / 2 - ink_middle(glyph) + glyph.font().descender()  # descender is negative
-    glyph.setFrame_(NSMakeRect((TILE - size.width) / 2, round(bottom * 2) / 2, size.width, size.height))
+    glyph.setFrame_(NSMakeRect((TILE - size.width) / 2, (TILE - size.height) / 2, size.width, size.height))
     view.addSubview_(glyph)
     return view
 
