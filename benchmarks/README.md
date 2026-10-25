@@ -155,6 +155,16 @@ change—this needs addressing"), and "back in 20" became "meet back at 20".
 "Thanks!" still becomes "You're welcome!". Paired with the shipped prompt, it
 scores below 0.5B. It is not proposed as a preset.
 
+The text in a tag (2026-10-26; competitors wrap it so a question is rewritten, not answered):
+`"frame": "Text to rewrite: <text>{text}</text>"` on rewrite, Gemma 4 E4B on the Spark with
+reasoning, 80 cases, `--slop`. Not shipped: no better, and Gemma 4 answers none of the
+questions or short replies either way ("Thanks!" stays a thank-you).
+
+| Variant | Pass checks | Added em dash | Failures | Median |
+| --- | ---: | ---: | --- | ---: |
+| shipped | 74 / 80 | 71 | negation 5, new number 1 | 6.4 s |
+| text in a tag | 74 / 80 | 70 | negation 6 | 6.6 s |
+
 ## Meaning judge (G12)
 
 The mechanical checks miss meaning changes, so [`judge.py`](judge.py) asks a much
