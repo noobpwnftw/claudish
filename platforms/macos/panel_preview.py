@@ -4,12 +4,9 @@ comparing the native renderer with design.html#macos state by state. Not part of
 
   python3 panel_preview.py [seconds per state]       # on a Mac: watch, or screenshot each
 
-Each state is announced in /tmp/claudish-gallery-state (the gallery protocol); with an answer in
-/tmp/claudish-gallery-ack it moves on at once."""
+Each state's name is printed as it shows."""
 import os
 import sys
-import time
-from pathlib import Path
 
 from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSDate, NSRunLoop, NSScreen
 
@@ -18,8 +15,6 @@ root = os.path.join(here, "..", "..")
 sys.path[:0] = [here, root, os.path.join(root, "scripts")]
 import lab_states  # noqa: E402
 from panel import Panel  # noqa: E402
-
-STATE, ACK = Path("/tmp/claudish-gallery-state"), Path("/tmp/claudish-gallery-ack")
 
 
 def pump(seconds):
@@ -32,19 +27,14 @@ def main():
     app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
     screen = NSScreen.mainScreen().visibleFrame()
     caret = ((screen.origin.x + 200, screen.origin.y + screen.size.height - 220), (2, 18))
-    wait = float(sys.argv[1]) if len(sys.argv) > 1 else 20.0  # or until the gallery answers
+    wait = float(sys.argv[1]) if len(sys.argv) > 1 else 20.0
     panel, toast = Panel(), Panel(toast=True)
     for name, spec in lab_states.load(os.path.join(root, "claudish/web/lab-states.js")).items():
         shown = toast if name in lab_states.TOASTS else panel
         shown.show(caret, spec)
-        pump(0.3)
-        ACK.unlink(missing_ok=True)
-        STATE.write_text(name)
-        deadline = time.monotonic() + wait
-        while time.monotonic() < deadline and not ACK.exists():
-            pump(0.1)
+        print(name, flush=True)
+        pump(wait)
         shown.hide()
-    STATE.write_text("done")
 
 
 if __name__ == "__main__":

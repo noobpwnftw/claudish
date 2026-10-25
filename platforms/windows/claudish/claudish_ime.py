@@ -11,7 +11,6 @@ from .screen import is_terminal
 
 def keylog(*fields):
     """Opt-in diagnostics: CLAUDISH_KEYLOG=path appends key routing events."""
-    import os
     path = os.environ.get("CLAUDISH_KEYLOG")
     if path:
         try:
@@ -31,7 +30,6 @@ TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its
 
 def mode_icon(mode):
     """The taskbar's mode icon: continue's cream "cd" tile or compose's "AI", the same in both themes."""
-    import os
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "mode-%s.ico" % mode)
 
 
@@ -137,7 +135,6 @@ def focused_app():
     """The foreground window's program name (for bindings), such as "notepad.exe"; None elsewhere."""
     try:
         import ctypes
-        import os
         from ctypes import wintypes
         user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
         pid = wintypes.DWORD()
@@ -371,7 +368,7 @@ class ClaudishTextService(TextService):
         # A sent instruction is not text for the app: if the app ends the composition (a focus change),
         # Claudish's PIME clears it; words still being typed stay, as a CJK preedit does.
         self.setClearOnEnd(self.state.sent)
-        shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
+        shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
         self.setCompositionString(shown)
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
@@ -384,8 +381,7 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
-        self.state.terminal = is_terminal(focused_app())
-        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits") or self.state.terminal
+        self.state.field(self.field(), is_terminal(focused_app()))
         after = self.around()[1] if self.state.live else ""
         self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         if self.worker and self.state.automatic:
@@ -540,7 +536,7 @@ class ClaudishTextService(TextService):
         # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
         if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
-        if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.
+        if key == 0x77:  # F8 while composing: a picture of this window goes with the instruction.
             if self.state.toggle_look():
                 self.publish()
             return bool(self.state.text)
@@ -559,7 +555,7 @@ class ClaudishTextService(TextService):
                                          app=focused_app(), before=before[-1500:], after=after[:500],
                                          purpose=self.field())
                     self.await_result()
-            if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
+            if action != "accept":  # convert shows the rewrite in the panel; wait shows nothing new
                 self.publish()
                 return True
             answering = self.state.take_answering()  # an answer to read: recorded, not asked again

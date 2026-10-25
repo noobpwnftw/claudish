@@ -239,6 +239,12 @@ class Composition:
                                                                  ("Esc", "cancel reply" if question else "cancel")])
         return shown
 
+    def field(self, purpose=None, terminal=False):
+        """Where the caret is, as the adapter knows it: a field's purpose (url, email, number...) and
+        whether it is a terminal. Neither is prose: nothing is asked unasked."""
+        self.terminal = terminal
+        self.quiet = purpose in ("url", "email", "number", "phone", "digits") or terminal
+
     def waits_on_you(self):
         """Something is pending or went wrong: the model works on what you asked, what it offers
         waits for your Tab (a question or an answer to read, drafts, a rewrite), a request failed,
@@ -682,7 +688,7 @@ class Composition:
         return ""
 
     def commit(self, suggested=False):
-        """The text to insert: the candidate if asked for or already shown in place, else your words."""
+        """The text to insert: the candidate if asked for or shown in the panel, else your words."""
         text = (self.candidate if suggested else "") or self.text  # the model's words only when asked for
         # Your next words, back as the reply (an answer to read taken with Tab while they waited),
         # stay at the caret as a composition of their own.

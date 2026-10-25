@@ -1,11 +1,10 @@
-"""Text Input Sources (Carbon, via ctypes and PyObjC): register, enable and select an input method,
-so the installer adds cd_AI without the person going to Settings (G61), and the rig does the same.
+"""Text Input Sources (Carbon, via ctypes and PyObjC): register and enable an input method, so the
+installer adds cd_AI without the person going to Settings (G61).
 
 Each call should be a fresh process: Text Input Sources caches its list per process, so a process
 that started before the person clicked Allow keeps seeing the old answer.
 """
 import ctypes
-import time
 
 import objc
 from Foundation import NSDictionary, NSURL
@@ -15,9 +14,7 @@ P = ctypes.c_void_p
 for name, restype, argtypes in (("TISRegisterInputSource", ctypes.c_int32, [P]),
                                 ("TISCreateInputSourceList", P, [P, ctypes.c_bool]),
                                 ("TISEnableInputSource", ctypes.c_int32, [P]),
-                                ("TISSelectInputSource", ctypes.c_int32, [P]),
-                                ("TISGetInputSourceProperty", P, [P, P]),
-                                ("TISCopyCurrentKeyboardInputSource", P, [])):
+                                ("TISGetInputSourceProperty", P, [P, P])):
     getattr(carbon, name).restype, getattr(carbon, name).argtypes = restype, argtypes
 
 
@@ -31,10 +28,6 @@ def wrap(pointer):
 
 def prop(source, key):
     return wrap(carbon.TISGetInputSourceProperty(source, constant(key)))
-
-
-def current():
-    return str(prop(carbon.TISCopyCurrentKeyboardInputSource(), "kTISPropertyInputSourceID"))
 
 
 def sources(bundle_id):
@@ -61,14 +54,3 @@ def enable(bundle_id):
     over an enabled cd_AI asks nothing. Returns the statuses."""
     return [carbon.TISEnableInputSource(source) for source in sources(bundle_id)
             if not prop(source, "kTISPropertyInputSourceIsEnabled")]
-
-
-def select(bundle_id, tries=3):
-    """Make the first selectable one the current input source; True when it is."""
-    for _ in range(tries):
-        for source in sources(bundle_id):
-            if prop(source, "kTISPropertyInputSourceIsSelectCapable"):
-                if carbon.TISSelectInputSource(source) == 0 and current().startswith(bundle_id):
-                    return True
-        time.sleep(0.5)
-    return False

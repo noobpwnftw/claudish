@@ -202,13 +202,13 @@ class ClaudishEngine(IBus.Engine):
         text = state.shown  # your words (a rewrite waits in the panel), or a reply once sent
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           self.focus_mode())
-        # IBus's own popup (without the extension): the rows as a numbered list, the rest as one line.
+        # IBus's own popup (without the extension): the rows as a list (IBus numbers them), the rest as one line.
         if panel and panel["rows"]:
             table = IBus.LookupTable.new(9, 0, True, False)
             for row in panel["rows"]:
                 table.append_candidate(IBus.Text.new_from_string(
                     row["text"] + (" — " + row["legend"] if row.get("legend") else "")))
-            table.set_cursor_visible(panel["on"] >= 0)  # an approval highlights nothing: only a number answers it
+            table.set_cursor_visible(panel["on"] >= 0)  # an approval highlights nothing until ↓; then Tab takes it
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
@@ -479,8 +479,7 @@ class ClaudishEngine(IBus.Engine):
     def update_quiet(self):
         """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;
         Tab and Shift+Enter in compose still ask."""
-        self.composition.terminal = self.purpose == "terminal" or is_terminal(self.app)
-        self.composition.quiet = self.purpose in ("url", "email", "number", "phone", "digits") or self.composition.terminal
+        self.composition.field(self.purpose, self.purpose == "terminal" or is_terminal(self.app))
 
     def switch_mode(self):
         """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose

@@ -301,8 +301,8 @@ function key(name, shift = false) {
     }
     if (!state.text) return false;
     if (state.reply) return true;  // a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
-    // The first Tab asks for the rewrite, which takes your words' place as it arrives; the next
-    // keeps it (or an instruction's first draft). A pending answer is not stale text: Tab waits.
+    // The first Tab asks for the rewrite, which shows in the panel as it arrives (your words stay);
+    // the next inserts it (or an instruction's highlighted draft). A pending answer is not stale text: Tab waits.
     if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft
       commit(state.converted ? state.candidate : state.candidates[state.highlight] || state.candidate); change(""); changed();
     } else if (state.asked === "rewrite" && state.candidate) { state.converted = true; render(); }

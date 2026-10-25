@@ -127,7 +127,7 @@ class ClaudishInputController(IMKInputController):
 
     def menu(self):
         """The input menu's items for cd_AI (the menu bar's input source menu): Settings… (a Shift
-        tap switches modes, and its toast says which). macOS asks after nearly every key: one menu
+        tap switches modes, and macOS shows the new input mode). macOS asks after nearly every key: one menu
         per controller, as Squirrel keeps one."""
         try:
             menu = getattr(self, "kept_menu", None)
@@ -210,7 +210,7 @@ class ClaudishInputController(IMKInputController):
         if result:
             revision, data = result
             if "text" in data and self.state.offer(revision, data["text"], data.get("candidates", ())):
-                if self.state.converted:  # the rewrite you asked for with Tab, in place of your words
+                if self.state.converted:  # the rewrite you asked for with Tab: in the panel, your words stay marked
                     client = self.client()
                     if client is not None:
                         self.changed(client)
@@ -346,7 +346,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def show_toast(self, spec, client=None, lasting=False):
-        """A panel at the caret: briefly (the mode switch, what Esc just dropped), or until your next
+        """A panel at the caret: briefly (what Esc just dropped; the mode switch with MODE_TOAST), or until your next
         key (lasting: the pill for an exchange held while you were away)."""
         client = client if client is not None else self.client()
         if client is None or spec is None:  # nothing to say (hints off)
@@ -450,7 +450,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def changed(self, client):
-        self.state.quiet = self.state.terminal = is_terminal(self.app(client))  # a terminal's command line is not prose
+        self.state.field(terminal=is_terminal(self.app(client)))  # a terminal's command line is not prose
         after = self.around_caret(client)[1] if self.state.live else ""
         self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
@@ -464,7 +464,7 @@ class ClaudishInputController(IMKInputController):
             self.show_ghost(client)
             return
         OVERLAY.hide()
-        shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
+        shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(shown.encode("utf-16-le")) // 2
         if shown:
@@ -583,7 +583,7 @@ class ClaudishInputController(IMKInputController):
         key = event.keyCode()
         chars = event.characters() or ""
         # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
-        if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
+        if key == 100 and self.state.toggle_look():  # F8 while composing: a picture of this window goes with the instruction.
             self.changed(client)
             return True
         if self.state.live:
@@ -594,9 +594,9 @@ class ClaudishInputController(IMKInputController):
             if kept is not None:  # inserting ends the composition: no empty marked text before the key
                 client.insertText_replacementRange_(kept, (NSNotFound, 0))
             self.changed(client)
-            if kept is None:  # the model is asked: taken, nothing goes in
-                return True
-            return True  # Enter commits, as other input methods do: press it again for the app
+            # Enter commits (or, once the model is asked, does nothing), as other input methods do:
+            # press it again for the app.
+            return True
         if key in (36, 76):  # Return, keypad Enter
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
             if action == "reply":  # your own words, in answer to the agent's question
