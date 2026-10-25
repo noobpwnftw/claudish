@@ -274,18 +274,21 @@ class ClaudishInputController(IMKInputController):
             return (found.location, found.length) if hasattr(found, "location") else tuple(found)
         try:
             location = location_of(client.selectedRange())[0]
-            marked = location_of(client.markedRange()) if start else (NSNotFound, 0)
-            if marked[0] != NSNotFound and marked[1]:
+            marked = location_of(client.markedRange())
+            if start and marked[0] != NSNotFound and marked[1]:
                 location = marked[0]
         except Exception:
-            location = 0
+            location, marked = 0, (NSNotFound, 0)
+        # IMK's index is relative to the inline session, or zero for the current selection
+        # when there is none. NSTextInputClient's fallback below takes a document range.
+        index = max(0, location - marked[0]) if marked[0] != NSNotFound and marked[1] else 0
         try:
-            found = client.attributesForCharacterIndex_lineHeightRectangle_(location, None)
+            found = client.attributesForCharacterIndex_lineHeightRectangle_(index, None)
             rect = found[1] if isinstance(found, tuple) and len(found) == 2 else None
             if rect is not None:
                 (x, y), (w, h) = unpack(rect)
                 if h > 0 and (x, y) != (0, 0):  # the screen's corner: the app did not say
-                    trace("caret line", round(x), round(y), round(w), round(h), "at", location)
+                    trace("caret line", round(x), round(y), round(w), round(h), "inline", index, "document", location)
                     return (x, y), (w, h)
         except Exception:
             trace("caret line failed", traceback.format_exc().splitlines()[-1])

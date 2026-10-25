@@ -76,7 +76,9 @@ class TextClient(Client):
         raise AssertionError("crashes in IMK when PyObjC passes a NULL actualRange")
 
     def attributesForCharacterIndex_lineHeightRectangle_(self, index, rect):
-        return {}, ((10 * index, 400), (1, 18))  # a caret 10 points per character along the line
+        # IMK indexes the inline session; without one, zero asks for the selection.
+        base = self.mark_at if self.marked_text() else self.selectedRange()[0]
+        return {}, ((10 * (base + index), 400), (1, 18))
 
 
 class Grey:
@@ -507,6 +509,32 @@ class MacOSAdapterTests(unittest.TestCase):
         client.attributesForCharacterIndex_lineHeightRectangle_ = lambda index, rect: ({}, ((0, 0), (1, 18)))
         client.firstRectForCharacterRange_actualRange_ = lambda span, actual: ((0, 0), (0, 0))
         self.assertEqual(self.controller.caret(client), ((500, 282), (0, 18)))
+
+    def test_line_rect_uses_inline_offsets_after_existing_text(self):
+        client = TextClient("https://example.test/")
+        seen = []
+        original = client.attributesForCharacterIndex_lineHeightRectangle_
+        def line_rect(index, rect):
+            seen.append(index)
+            return original(index, rect)
+        client.attributesForCharacterIndex_lineHeightRectangle_ = line_rect
+        self.controller.caret(client)
+        self.assertEqual(seen.pop(), 0)  # no composition: ask for the current selection
+        client.setMarkedText_selectionRange_replacementRange_("ok", (2, 0), (self.module.NSNotFound, 0))
+        start = self.controller.caret(client, start=True)
+        self.assertEqual(seen.pop(), 0)
+        end = self.controller.caret(client)
+        self.assertEqual(seen.pop(), 2)
+        self.assertEqual(end[0][0] - start[0][0], 20)
+        # The fallback remains in document coordinates, not the inline offset.
+        absolute = []
+        client.attributesForCharacterIndex_lineHeightRectangle_ = lambda index, rect: ({}, ((0, 0), (0, 0)))
+        def first_rect(span, actual):
+            absolute.append(span)
+            return ((200, 400), (1, 18)), span
+        client.firstRectForCharacterRange_actualRange_ = first_rect
+        self.controller.caret(client, start=True)
+        self.assertEqual(absolute, [(len("https://example.test/"), 0)])
 
     def test_the_panel_starts_where_the_composition_starts(self):
         """Under the composition's start, as CJK candidate windows sit, whatever the caret: typed,
