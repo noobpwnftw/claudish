@@ -13,6 +13,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
 RECENT_SECONDS = 600
 NO_MODEL = "no model is set up"  # said in the panel, where Tab or Shift+Enter asked
+NO_CREDENTIALS = "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY"
 
 
 def rules(text):
@@ -92,7 +93,7 @@ class Claude:
         except TypeError as exc:
             if "authentication" not in str(exc):
                 raise
-            raise RuntimeError("no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY") from exc
+            raise RuntimeError(NO_CREDENTIALS) from exc
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude declined this; your wording is unchanged")
         reply = {"content": "".join(block.text for block in response.content if block.type == "text").strip()}
@@ -115,7 +116,7 @@ class Claude:
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
                 raise
-            raise RuntimeError("no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY") from exc
+            raise RuntimeError(NO_CREDENTIALS) from exc
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude declined this rewrite; your wording is unchanged")
         if response.stop_reason == "max_tokens":
@@ -189,7 +190,7 @@ class Rewriter:
                   % (settings["api_key_env"], settings["model_url"]), file=sys.stderr, flush=True)
         rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
                        settings["model"], api_key, settings["timeout"], templates, context, settings["modes"],
-                       settings["command"], settings["hosted"], settings["bindings"], settings.get("tone"))
+                       settings["command"], settings["bindings"], settings.get("tone"))
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
         rewriter.read_terminal = settings.get("read_terminal", True)
@@ -208,7 +209,7 @@ class Rewriter:
 
     def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
                  claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, templates=None,
-                 context=None, modes=None, command=None, hosted=None, bindings=(), tone=None):
+                 context=None, modes=None, command=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend
         self.endpoint = endpoint.rstrip("/")
@@ -232,6 +233,10 @@ class Rewriter:
         self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
         self.helper = None  # profile "helper": an agent (or named agents) an instruction may hand the task to (G39)
         self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
+        self.profile = None  # the profile's name in the config file
+        self.summon = "Shift+Enter"  # config "keys": the key that sends your words to the model
+        self.hints = True  # config "hints": the panel's key hints
+        self.url = None  # this service's address, for the agent's textbox MCP server
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
         # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
@@ -244,13 +249,11 @@ class Rewriter:
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.opener = None
-        self.hosted = backend == "claude" or (backend in ("llama", "openai") and not self.local)
         self.warm = None  # Claude Code or Codex, kept running beside the service (claudish/warm.py)
         if backend in ("command", "claude-code", "codex"):
             if not command:
                 raise ValueError('the %s backend needs a "command" list in the profile' % backend)
             self.command = command
-            self.hosted = True if hosted is None else hosted  # Most agent CLIs call a remote model.
         if backend in ("claude-code", "codex"):
             from . import config, warm
             self.warm = warm.make(backend, command, model, str(config.default_path().parent))
@@ -269,7 +272,7 @@ class Rewriter:
 
     def stop_model(self):
         """At service stop, or when the settings replace this profile: its model process ends."""
-        for rewriter in [self] + list(getattr(self, "routed", {}).values()):
+        for rewriter in [self] + list(self.routed.values()):
             if rewriter.warm:
                 rewriter.warm.stop()
 
@@ -284,15 +287,15 @@ class Rewriter:
         Routed profiles share this service's sessions, conversations, and recent requests."""
         chosen = self.bound(app)
         name = (chosen.modes.get(mode) or {}).get("profile") if mode else None
-        if name and name != getattr(chosen, "profile", None):
-            chosen = self.load(name, "%s requests" % mode)
+        if name and name != chosen.profile:
+            chosen = self.load(name)
         return chosen
 
     def bound(self, app):
         """The profile the app's binding names, else this one."""
         for binding in self.bindings:
             if binding.profile and binding.matches(app):
-                return self.load(binding.profile, "text typed in %s" % binding.pattern)
+                return self.load(binding.profile)
         return self
 
     def continues(self, app):
@@ -300,8 +303,8 @@ class Rewriter:
         model that would answer costs nothing per pause (autocompletes)."""
         return bool((self.bound(app).modes.get("continue") or {}).get("profile")) or self.route(app, "continue").autocompletes
 
-    def load(self, name, what):
-        if name == getattr(self, "profile", None) or self.loader is None:
+    def load(self, name):
+        if name == self.profile or self.loader is None:
             return self
         with ROUTING:  # two requests at once start one model process, not two
             return self._load(name)
@@ -310,7 +313,7 @@ class Rewriter:
         if name not in self.routed:
             other = self.loader(name)
             other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
-            other.url = getattr(self, "url", None)
+            other.url = self.url
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
             other.bindings = self.bindings  # the service's: a binding's context reaches the profile it routes to
             other.start_model()  # its model process, as the service's own starts with the service
@@ -350,9 +353,9 @@ class Rewriter:
             from .textbox import Textbox
             kept = self.conversations.get(conversation)
             kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
-            textbox = getattr(self, "url", None) and "textbox" in ((self.agent_mcp_config(kept) or {}).get("mcpServers") or {})
-            kept.agent = kept.agent or AgentProcess(self.session_command + self.agent_arguments(),
-                                                    self.agent_mcp_config(kept))
+            config = self.agent_mcp_config(kept)
+            textbox = self.url and "textbox" in ((config or {}).get("mcpServers") or {})
+            kept.agent = kept.agent or AgentProcess(self.session_command + self.agent_arguments(), config)
             # The same description of the text box a model gets, and the same observations.
             box = self.box("instruct", app, purpose, before, after, look, screen=screen)
             words = self.modes["instruct"]["box"]
@@ -377,7 +380,7 @@ class Rewriter:
                 if isinstance(server.get(field), dict):
                     server[field] = {key: os.path.expandvars(value) for key, value in server[field].items()}
             servers[name] = server
-        url = getattr(self, "url", None)
+        url = self.url
         if url and importlib.util.find_spec("mcp") is not None:
             package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             servers["textbox"] = {
@@ -450,8 +453,6 @@ class Rewriter:
         of read; context: False for the demo's requests (no token): no observations."""
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
-        if self.backend == "none":
-            raise RuntimeError(NO_MODEL)
         box = self.box(mode, app, purpose, before, after, look, screen, trusted=context)
         return self.answer(mode, text, box)
 
@@ -459,6 +460,8 @@ class Rewriter:
         """The one loop: describe the request, call the model with the tools this mode may use, run
         tool calls (asking through approve when policy says so), and fit the result to the box.
         serial: a request while typing, which fails fast instead of queueing behind another."""
+        if self.backend == "none":
+            raise RuntimeError(NO_MODEL)
         from .modes import parroted
         from .turn import system
         started = time.perf_counter()
@@ -472,7 +475,7 @@ class Rewriter:
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
         from .screen import redact
-        record = {"time": time.time(), "profile": getattr(self, "profile", None), "backend": self.backend,
+        record = {"time": time.time(), "profile": self.profile, "backend": self.backend,
                   "model": self.model or (self.claude.model if self.claude else None),
                   "mode": mode, "app": box.app, "kind": box.kind, "system": redact(prompt)[0], "turn": redact(said)[0],
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
@@ -532,7 +535,7 @@ class Rewriter:
             conversation.remember([{"role": "user", "content": text}] + new
                                   + [{"role": "assistant", "content": candidates[0]}])
         return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
-                "profile": getattr(self, "profile", None),
+                "profile": self.profile,
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}

@@ -73,12 +73,12 @@ class ConfigTests(unittest.TestCase):
                                  ({"timeout": True}, "timeout has the wrong type"),
                                  ({"backend": "gpt"}, "backend must be one of"),
                                  ({"backend": "command"}, "needs \"command\""),
-                                 ({"backend": "command", "command": "claude -p"}, "command has the wrong type"),
-                                 ({"hosted": "no"}, "hosted has the wrong type")]:
+                                 ({"backend": "command", "command": "claude -p"}, "command has the wrong type")]:
             path = self.write({"profiles": {"p": profile}}, "other.json")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
-        path = self.write({"profiles": {"p": {}}}, "other.json")
+        path = self.write({"profiles": {"p": {"hosted": "no"}}}, "other.json")
+        self.assertNotIn("hosted", config.resolve(path)[1])  # an old key, ignored
         with self.assertRaisesRegex(ValueError, "'missing' is not in"):
             config.resolve(path, "missing")
         with self.assertRaisesRegex(ValueError, "profiles"):

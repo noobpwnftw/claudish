@@ -97,7 +97,6 @@ class RewriterTests(unittest.TestCase):
                 self.assertEqual(ready(rewriter.warm), "warm")
                 self.assertTrue(Path(folder, "claudish").is_dir())
                 self.assertEqual(rewriter.model_state, "warm")
-                self.assertTrue(rewriter.hosted)
                 self.assertTrue(rewriter.rewrite("ok")["text"].startswith("seen 1"))
             finally:
                 rewriter.stop_model()

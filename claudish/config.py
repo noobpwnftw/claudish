@@ -22,13 +22,13 @@ from . import modes as invocation
 BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
 DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
             "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "templates": None,
-            "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
+            "context": None, "max_context_chars": 6000, "modes": None, "command": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
 # The key that sends your words to the model, the default first; the other one puts them in as typed.
 SUMMON_KEYS = ("Shift+Enter", "Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
+         "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
 
 def default_path():
@@ -77,6 +77,7 @@ def resolve(path=None, profile=None, overrides=None):
         if "prompt" in entry:
             raise ValueError('profile %r: "prompt" is now "templates", a file in the shape of '
                              "claudish/templates.json (docs/configuration.md#templates)" % name)
+        entry = {key: value for key, value in entry.items() if key != "hosted"}  # a key no longer read
         unknown = sorted(set(entry) - set(DEFAULTS))
         if unknown:
             raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
@@ -143,7 +144,7 @@ STARTER = {
         "codex: Codex (a ChatGPT subscription), kept running beside the service; picked in cd_AI's settings.",
         "agent: an agent CLI that reads the text on stdin (here Claude Code's `claude -p`).",
         "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
-        "templates, context, max_context_chars, modes, command, hosted, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
+        "templates, context, max_context_chars, modes, command, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
     ],
     "profile": "claude",
     "profiles": {

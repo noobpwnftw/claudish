@@ -125,16 +125,14 @@ class EndpointBackendTests(unittest.TestCase):
 
     def test_local_server_any_model_and_no_proxy(self):
         rewriter = Rewriter("openai", "http://localhost:11434/", model="qwen2.5:7b")
-        self.assertFalse(rewriter.hosted)
         handlers, request, payload = self.call(rewriter)
         self.assertEqual(request.full_url, "http://localhost:11434/v1/chat/completions")
         self.assertEqual(payload["model"], "qwen2.5:7b")
         self.assertIsNone(request.get_header("Authorization"))
         self.assertEqual(handlers[0].proxies, {})  # loopback bypasses HTTP_PROXY
 
-    def test_remote_endpoint_is_hosted_and_sends_key(self):
+    def test_remote_endpoint_sends_key(self):
         rewriter = Rewriter("openai", "https://models.example.com", model="any-model", api_key="k-123")
-        self.assertTrue(rewriter.hosted)
         handlers, request, _ = self.call(rewriter)
         self.assertEqual(request.get_header("Authorization"), "Bearer k-123")
         self.assertEqual(handlers, ())  # default opener: system proxy settings apply
@@ -210,12 +208,10 @@ class CommandBackendTests(unittest.TestCase):
     def test_prompt_on_stdin_and_output_as_candidate(self):
         echo = "import sys; prompt = sys.stdin.read(); print('Drafted—' + prompt.split('Text:\\n')[-1].strip())"
         rewriter = self.agent(echo)
-        self.assertTrue(rewriter.hosted)
         result = rewriter.rewrite("say hi; rm -rf ~ $(whoami)", mode="instruct")
         self.assertEqual(result["text"], "Drafted—say hi; rm -rf ~ $(whoami)")  # data, never a shell or argv
         dump = self.agent("import sys; print(sys.stdin.read())").rewrite("thanks", mode="instruct")["text"]
         self.assertTrue(dump.startswith("The user typed an instruction"))  # the mode's template comes first
-        self.assertFalse(self.agent("print('x')", hosted=False).hosted)
 
     def test_failures_and_timeouts_keep_your_wording(self):
         with self.assertRaisesRegex(RuntimeError, "exit 3"):

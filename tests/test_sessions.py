@@ -311,7 +311,7 @@ class RoutingTests(unittest.TestCase):
             return other
         main = Rewriter("rules")
         main.profile, main.loader, main.routed = "main", loader, {}
-        threads = [threading.Thread(target=main.load, args=("small", "test")) for _ in range(2)]
+        threads = [threading.Thread(target=main.load, args=("small",)) for _ in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:

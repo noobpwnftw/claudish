@@ -128,7 +128,10 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return self.reply(403, {"error": "cross-site requests are not accepted"})
             if self.headers.get_content_type() != "application/json":
                 return self.reply(415, {"error": "application/json required"})
-            size = int(self.headers.get("Content-Length", "0") or 0)
+            try:
+                size = int(self.headers.get("Content-Length", "0") or 0)
+            except ValueError:
+                size = 0
             if not 0 < size <= limit:
                 return self.reply(413, {"error": "invalid body size"})
             try:
@@ -275,12 +278,12 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
 
         def health(self):
             return {"service": "cd_AI", "backend": rewriter.backend,
-                    "profile": getattr(rewriter, "profile", None),
+                    "profile": rewriter.profile,
                     # Which app goes to which profile (the AI that answers there).
                     "routes": {b.pattern: b.profile for b in rewriter.bindings if b.profile},
                     "modes": list(rewriter.modes), "timeout": rewriter.timeout,
-                    "keys": {"summon": getattr(rewriter, "summon", "Shift+Enter")},
-                    "hints": getattr(rewriter, "hints", True),
+                    "keys": {"summon": rewriter.summon},
+                    "hints": rewriter.hints,
                     **({"model": rewriter.model_state} if rewriter.model_state else {})}
 
         def post_settings(self):
@@ -348,20 +351,10 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return self.post_ticket()
             if self.path != "/suggest":
                 return self.reply(404, {"error": "not found"})
-            origin = self.headers.get("Origin")
-            if origin is not None and origin != "http://" + self.headers["Host"]:
-                return self.reply(403, {"error": "cross-origin requests are not accepted"})
-            if self.headers.get("Sec-Fetch-Site") == "cross-site":
-                return self.reply(403, {"error": "cross-site requests are not accepted"})
-            if self.headers.get_content_type() != "application/json":
-                return self.reply(415, {"error": "application/json required"})
+            data = self.json_request()
+            if data is None:
+                return
             try:
-                size = int(self.headers.get("Content-Length", "0"))
-                if not 0 < size <= 32768:
-                    return self.reply(413, {"error": "invalid body size"})
-                data = json.loads(self.rfile.read(size))
-                if not isinstance(data, dict):
-                    raise ValueError("expected object")
                 text = data.get("text")
                 if not isinstance(text, str) or not text.strip() or len(text) > MAX_COMPOSITION:
                     raise ValueError("text must be 1–512 characters")

@@ -96,6 +96,8 @@ class ModelDriver:
         self.cancelled = False
         self.counter = 0
         self.handed = None  # what took the task over (a helper), when one did
+        self.drafted = None  # a draft a tool chose: an answer you inserted, or a helper's command line
+        self.settled = None  # what a settling tool did, for this conversation's next turn
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every
@@ -107,8 +109,7 @@ class ModelDriver:
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
-        self.handed = self.inserted = self.command = None
-        self.settled = None  # what a settling tool did, for this conversation's next turn
+        self.handed = self.drafted = self.settled = None
         try:
             result = rewriter.answer(
                 "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
@@ -117,7 +118,7 @@ class ModelDriver:
         except Exception as exc:  # with MCP servers open, a stop arrives wrapped in an exception group
             if self.cancelled:
                 return
-            if not (self.inserted or self.handed or self.command):
+            if not (self.drafted or self.handed):
                 raise
             # An answer you read and chose, or a handoff, ends the turn without asking the model again;
             # the conversation keeps what happened, so the next instruction in this box knows.
@@ -127,11 +128,8 @@ class ModelDriver:
                                             {"role": "assistant", "content": self.settled}])
         if self.cancelled:
             return
-        if self.inserted:  # an answer you read and chose to insert
-            session.emit("result", text=self.inserted, candidates=[self.inserted], consulted=result["consulted"])
-            return
-        if self.command:  # a helper's command line, at a terminal prompt: Tab puts it there, Enter runs it
-            session.emit("result", text=self.command, candidates=[self.command], consulted=result["consulted"])
+        if self.drafted:  # an answer you chose to insert, or a helper's command line at a terminal prompt
+            session.emit("result", text=self.drafted, candidates=[self.drafted], consulted=result["consulted"])
             return
         if self.handed:
             # The task went to a helper (or an answer was read): nothing is inserted, and the
@@ -174,24 +172,24 @@ class ModelDriver:
                 task = str(arguments.get("task") or "").strip()[:500]
                 note = handoff.write_note(task, box.observations)
                 session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
+                # A handle, so a later "is it done?" in this text box can look (G44).
+                record = {"helper": title, "task": task, "session": session, "note": note,
+                          "tmux": "", "cwd": "", "started": time.time()}
                 if box.kind == "terminal":
                     # At a terminal prompt the helper's command is the draft: Tab puts it at the
                     # prompt and your Enter runs it there, in that folder; no window, no question.
                     command = handoff.line(helper, note, session)
                     if command:
-                        self.command = command
-                        self.conversation.handoffs.append({"helper": title, "task": task, "session": session,
-                                                           "note": note, "tmux": "", "cwd": "", "started": time.time()})
+                        self.drafted = command
+                        self.conversation.handoffs.append(record)
                         self.settled = "I offered %s's command at the prompt for this task: %s" % (title, task)
                         raise Finished(self.settled)
-                launcher = getattr(self.rewriter, "launcher", None)
+                launcher = self.rewriter.launcher
                 window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
                 if not handoff.launch(helper, note, launcher, session, window):
                     return "No terminal window could be opened for %s: answer the instruction yourself." % title
-                # A handle, so a later "is it done?" in this text box can look (G44).
-                self.conversation.handoffs.append({"helper": title, "task": task, "session": session, "note": note,
-                                                   "tmux": window if launcher and launcher[0] == "tmux" else "",
-                                                   "cwd": os.path.expanduser("~"), "started": time.time()})
+                record.update(tmux=window if launcher and launcher[0] == "tmux" else "", cwd=os.path.expanduser("~"))
+                self.conversation.handoffs.append(record)
                 self.handed = "%s opened in a new window" % title
                 self.settled = "I handed this task to %s in a new window: %s" % (title, task)
                 raise Finished(self.settled)
@@ -244,7 +242,7 @@ class ModelDriver:
         if words:  # "or type to ask more": your words go to the model, and the turn goes on
             return "The user read it and asked: " + words
         if choice == 0:
-            self.inserted = fitted
+            self.drafted = fitted
             self.settled = "I showed the user this answer, and they inserted it: " + text
         else:
             self.handed = "read and dismissed"
