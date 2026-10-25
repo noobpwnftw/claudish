@@ -196,6 +196,35 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
         self.assertEqual(result["text"], "git stash")
 
+    def test_versions_to_pick_from_are_the_drafts_in_one_round(self):
+        """Owner: "draft 3 versions of hi" is a pick; asking would take another round before Tab
+        inserts. user__versions ends the turn with the versions as the drafts (↑↓, Tab inserts)."""
+        versions = ["Hi—so thrilled to connect!", "Hello, and welcome to our synergy journey!", "Hey there—let's align!"]
+        model = Scripted(answer(calls=[("user__versions", {"versions": versions + [versions[0]]})]))
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", model):
+            conversation = rewriter.conversations.get("box")
+            session, thread = run(ModelDriver(rewriter, conversation), "draft 3 versions of hi")
+            thread.join(5)
+        result = session.events[-1]
+        self.assertEqual((result["type"], result["text"], result["candidates"]), ("result", versions[0], versions))
+        self.assertEqual(len(model.sent), 1)  # no second request
+        self.assertIn("versions to pick from", conversation.messages[-1]["content"])  # the next turn can refine them
+
+    def test_versions_sent_as_one_string_and_tool_markup_left_as_text(self):
+        """Gemma passed one "draft" string, a version a line, and its unparsed retry came back as
+        "<|tool_call>call:..." text, offered as the draft."""
+        model = Scripted(answer(calls=[("user__versions", {"draft": "Hi—thrilled!\nHello—aligned!\nHey—synergy!"})]))
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "draft 3 versions of hi")
+            thread.join(5)
+        self.assertEqual(session.events[-1]["candidates"], ["Hi—thrilled!", "Hello—aligned!", "Hey—synergy!"])
+        from claudish.modes import parroted
+        self.assertTrue(parroted("instruct", "hi", '<|tool_call>call:user__draft{draft:<|"|>Hi<|"|>}<tool_call|>'))
+
     def test_a_choice_can_be_a_whole_draft(self):
         """Owner: "draft 3 versions of hi and ask which" showed choices cut mid-word at 80 characters."""
         draft = "Greetings! I am absolutely thrilled to be engaging with you today. Let us leverage this synergy."

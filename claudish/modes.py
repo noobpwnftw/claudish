@@ -115,10 +115,17 @@ def finish(mode, text, output):
     return text + joiner + output
 
 
+# A tool call the server did not parse, left in the reply as text (Gemma's "<|tool_call>call:...",
+# Qwen's "<tool_call>"): never a draft.
+TOOL_MARKUP = ("<|tool_call>", "<tool_call>", "<|tool_call|>")
+
+
 def parroted(mode, text, candidate, examples=()):
     """An answer that is not about what you typed: one of the template's own example answers
     (a small model given nonsense, "tttt", repeats its example), or, in continue, words already
-    in the text before the caret. Offering those is noise from any model."""
+    in the text before the caret; or a tool call left as text. Offering those is noise from any model."""
+    if any(markup in candidate for markup in TOOL_MARKUP):
+        return True
     answers = {m["content"].strip().lower() for m in examples if m.get("role") == "assistant"}
     if mode != "continue":
         asked = {m["content"].strip().lower() for m in examples if m.get("role") == "user"}

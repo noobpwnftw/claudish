@@ -13,6 +13,8 @@
   once nothing is marked).
 - Just after login, before the service first answers, the panel says "cd_AI is initializing"
   rather than offline.
+- Several versions ("draft 3 versions of hi") come as the drafts to pick from (↑↓, Tab inserts), in one
+  round; a choice the model offers can be a whole draft (up to 400 characters).
 - macOS: the service answers sooner after login: it runs as an interactive job, and it starts
   without loading the input method's AppKit.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap

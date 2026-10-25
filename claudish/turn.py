@@ -56,6 +56,8 @@ class Box:
             parts.append("The text box is %s%s." % (kind or "a text field", " in %s" % self.app if self.app else ""))
         if self.kind in words["facts"]:
             parts.append(words["facts"][self.kind])
+        if mode == "instruct":  # how the answer reaches the user, whatever the box shares
+            parts.append(words["shown"])
         before = "" if mode == "continue" else self.before
         if before or self.after:
             more = ""
