@@ -353,6 +353,26 @@ class ShowTests(unittest.TestCase):
 
 
 class FollowUpTests(unittest.TestCase):
+    def test_a_reply_typed_on_an_answer_goes_to_the_model(self):
+        """On the Mac VM, "well then fix it" typed while the answer showed was taken as a dismissal and
+        dropped; the panel's "or type to ask more" means the model hears it, and the turn goes on."""
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        conversation = rewriter.conversations.get("term")
+        model = Scripted(answer(calls=[("user__show", {"answer": "The total is rounded to a whole number."})]),
+                         answer("sed -i '' 's/tax_rate)/tax_rate, 2)/' invoice.py"))
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, conversation, purpose="terminal",
+                                              screen="$ python3 -m unittest\nAssertionError: 49 != 48.85\n$"),
+                                  "what does this error mean")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            session.answer(next(e for e in session.events if e["type"] == "question")["id"], text="well then fix it")
+            thread.join(5)
+        self.assertIn("The user read it and asked: well then fix it", json.dumps(model.sent[-1]["messages"]))
+        self.assertEqual(session.events[-1]["text"], "sed -i '' 's/tax_rate)/tax_rate, 2)/' invoice.py")
+
     def test_a_shown_answer_stays_in_the_conversation_for_the_next_instruction(self):
         """"What does this error mean?", read and dismissed, then "well then fix it for me" in the
         same box: the second turn sees the first, so "it" is known."""

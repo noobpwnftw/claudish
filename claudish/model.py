@@ -491,7 +491,9 @@ class Rewriter:
                                                              tools, approve, progress, local, serial)
                 consulted += called
         except Exception as exc:
-            record["outcome"] = "failed: %s" % exc
+            from .tools import Finished
+            # A tool that settled the turn (an answer chosen, a handoff) is how it ended, not a failure.
+            record["outcome"] = ("settled: %s" if isinstance(exc, Finished) else "failed: %s") % exc
             raise
         finally:
             if serial:

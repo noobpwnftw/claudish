@@ -241,7 +241,9 @@ class ModelDriver:
                                       [{"label": "Insert it", "legend": "at the caret"},
                                        {"label": "Dismiss", "legend": "nothing is inserted"}],
                                       label=MODEL_SAYS.rstrip(": "), body=text, read=True, insert=fitted)
-        if words is None and choice == 0:
+        if words:  # "or type to ask more": your words go to the model, and the turn goes on
+            return "The user read it and asked: " + words
+        if choice == 0:
             self.inserted = fitted
             self.settled = "I showed the user this answer, and they inserted it: " + text
         else:
