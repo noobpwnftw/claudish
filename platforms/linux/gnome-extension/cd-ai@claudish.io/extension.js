@@ -178,8 +178,10 @@ export default class CdAiExtension extends Extension {
             foot.add_child(label(panel.failed, 'cd-failed'));
         for (const [key, verb] of panel.foot) {
             const hint = new St.BoxLayout({style_class: 'cd-hint'});
-            hint.add_child(label(key, 'cd-cap'));
-            hint.add_child(label(verb, 'cd-verb'));
+            for (const part of [label(key, 'cd-cap'), label(verb, 'cd-verb')]) {
+                part.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;  // a long status gives way, never a key
+                hint.add_child(part);
+            }
             foot.add_child(hint);
         }
         if (panel.tail)
