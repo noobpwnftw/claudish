@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Enter commits your words and stops there, as other input methods do; the next Enter is the app's.
+- macOS: no beep in Terminal when Enter keeps your words; the input menu no longer shows dots.
+
 ## 0.1.1
 
 - A conversation belongs to its text box on Linux, as on macOS and Windows.

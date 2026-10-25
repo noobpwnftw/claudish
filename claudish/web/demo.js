@@ -267,14 +267,14 @@ function key(name, shift = false) {
   }
   if (name === "Enter") {
     if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
-    if (!shift) {  // Enter only puts your own words in, then is the editor's (a newline)
+    if (!shift) {  // Enter only puts your own words in; the next Enter is the editor's (a newline)
       if (sent()) {  // once the model is summoned Enter is gated: a reflexive press puts nothing in
         if (state.asked === "instruct" && state.candidate) state.nudged = showing();  // the row lights Tab
         else if (state.working) state.nudged = JSON.stringify(["pending", state.text, state.reply]);
         render();
         return true;
       }
-      commit(shown() + "\n"); change(""); changed(); return true;
+      commit(shown()); change(""); changed(); return true;
     }
     if (sent() && state.reply.trim()) {  // your next words: a follow-up instruction
       change(state.reply.trim());

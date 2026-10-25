@@ -592,7 +592,7 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             if kept is None:  # the model is asked: taken, nothing goes in
                 return True
-            return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
+            return True  # Enter commits, as other input methods do: press it again for the app
         if key in (36, 76):  # Return, keypad Enter
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
             if action == "reply":  # your own words, in answer to the agent's question

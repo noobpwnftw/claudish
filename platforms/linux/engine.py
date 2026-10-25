@@ -362,7 +362,7 @@ class ClaudishEngine(IBus.Engine):
                 return False
             self.changed()
             self.commit_text(IBus.Text.new_from_string(kept))
-            return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
+            return True  # Enter commits, as other input methods do: press it again for the app
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
             if action == "reply":  # your own words, in answer to the agent's question

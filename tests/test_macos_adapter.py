@@ -277,13 +277,13 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.client.commits)
         self.key(51)
         self.assertEqual(self.client.marked, "Hi-")
-        self.assertFalse(self.key(36, "\r"))  # Enter keeps your words as they are, and the app gets its Enter
+        self.assertTrue(self.key(36, "\r"))  # Enter keeps your words as they are; the app gets the next one
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
-    def test_enter_keeps_and_reaches_the_app_and_shift_enter_asks(self):
+    def test_enter_keeps_and_shift_enter_asks(self):
         self.type_text("on my way")
-        self.assertFalse(self.key(36, "\r"))  # the app gets its Enter: a chat box sends
+        self.assertTrue(self.key(36, "\r"))  # Enter commits; the app gets the next one
         self.assertEqual(self.client.commits, ["on my way"])
         self.type_text("say thanks")
         self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter asks the model
@@ -300,7 +300,7 @@ class MacOSAdapterTests(unittest.TestCase):
         client.insertText_replacementRange_ = lambda text, *rest: (calls.append(("insert", text)), insert(text, *rest))
         self.type_text("ls")
         del calls[:]
-        self.assertFalse(self.key(36, "\r"))
+        self.assertTrue(self.key(36, "\r"))
         self.assertEqual(calls, [("insert", "ls")])
 
     def test_rewrite_converts_in_place_without_a_list(self):

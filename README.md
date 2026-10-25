@@ -76,7 +76,7 @@ source: [docs/install.md](docs/install.md).
 | Shift (tap) | switch: continue ↔ compose |
 | Tab | take what the model offers: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft or choice (Allow and Deny too), an answer to read (with nothing offered, Tab is the app's) |
 | Shift+Enter | compose: send it as an instruction (it stays underlined while the model works), a follow-up, or a reply |
-| Enter | compose: keep your words as they are, and the app gets its Enter (a chat box sends); once the model is asked, it does nothing (with nothing composed, it is the app's) |
+| Enter | compose: keep your words as they are (the next Enter is the app's); once the model is asked, it does nothing (with nothing composed, it is the app's) |
 | ↑ ↓ | choose a draft or an answer, Tab takes it (Allow and Deny too); choices are not numbered: digits are text, and Space does nothing while drafts show |
 | F8 | with an instruction: also send a picture of this window |
 | Esc | one step back: what you typed, then edit (your instruction back at the caret), then drop |

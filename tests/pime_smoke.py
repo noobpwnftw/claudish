@@ -170,8 +170,8 @@ def main():
             for _ in range(2):  # TSF's test, then the key: Enter is taken both times
                 assert key(0x0D, method="filterKeyDown")["return"] is True
             before = list(replayed)
-            # Enter keeps it as it is, then is pressed again for the app (a chat box sends).
-            assert key(0x0D)["commitString"] == "as is" and replayed == before + [(0x0D, [])], replayed
+            # Enter keeps it as it is; the app gets the next Enter.
+            assert key(0x0D)["commitString"] == "as is" and replayed == before, replayed
             assert service.state.mode == "compose" and service.state.text == ""
             before = list(replayed)
             # With nothing composed, Shift+Enter and Enter are the app's (a newline), never replayed.

@@ -389,8 +389,8 @@ over the tone. Instructions typed in a terminal always get a command line.
 {"profile": "claude", "keys": {"summon": "Enter"}, "profiles": {"claude": {"backend": "claude"}}}
 ```
 
-`"Shift+Enter"` (the default) asks with Shift+Enter, and Enter puts your words in as typed and
-goes on to the app, so a chat box sends in one press. `"Enter"` swaps them. The ask key sends
+`"Shift+Enter"` (the default) asks with Shift+Enter, and Enter puts your words in as typed (the
+next Enter is the app's). `"Enter"` swaps them. The ask key sends
 everything that goes to the model (an instruction, a follow-up, a reply); once the model is asked,
 the other key does nothing, and Tab takes what it offers (a draft, a choice, Allow or Deny). The
 panel's footer names the keys. A change applies within a few seconds, without a restart.

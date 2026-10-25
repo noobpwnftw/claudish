@@ -116,10 +116,10 @@ try:
     assert engine.do_process_key_event(IBus.KEY_Down, 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
     assert commits[-1] == "Hi there." and not engine.composition.text
-    # Enter keeps your words as they are, goes on to the app (a chat box sends), and stays in compose.
+    # Enter keeps your words as they are (the app gets the next Enter), and stays in compose.
     for char in "as is":
         engine.do_process_key_event(ord(char), 0, 0)
-    assert not engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     assert commits[-1] == "as is" and engine.composition.mode == "compose" and not engine.composition.text
     assert not engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)  # nothing composed: the app's
     # Esc with just your words drops them (Enter keeps them).

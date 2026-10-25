@@ -510,9 +510,7 @@ class ClaudishTextService(TextService):
                 return True
             self.setCommitString(kept)
             self.changed()
-            if not shift:  # a plain Enter goes on to the app (a chat box sends), as a shortcut does
-                replay(key, held(event))
-            return True
+            return True  # Enter commits, as other input methods do: press it again for the app
         if key == 0x0D:
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
             if action == "pass":  # nothing composed: the app's key, as it is (never replayed)
