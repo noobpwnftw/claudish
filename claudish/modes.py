@@ -4,6 +4,7 @@ The words for each mode are data, in claudish/templates.json; a profile's "templ
 same shape and replaces only what it names (docs/configuration.md#templates)."""
 import copy
 import json
+import re
 from pathlib import Path
 
 TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
@@ -95,10 +96,34 @@ def defaults(override=None, tone=None):
     return specs
 
 
+# Wrapping a model can put around its answer: reasoning, a fence, quotes, a line introducing it.
+THINKING = re.compile(r"^\s*<think\b[^>]*>.*?(</think>|$)\s*", re.S | re.I)
+FENCE = re.compile(r"^\s*```[\w-]*\n(.*?)\n```\s*$", re.S)
+INTRO = re.compile(r"^(here(?: is|'s| are)|sure[,!.]|certainly[,!.])[^\n]*:\s*\n+", re.I)
+QUOTES = ('""', "“”", "''", "‘’")
+
+
+def tidy(text, output):
+    """The answer without what a model wraps it in: a <think> block, a fence around all of it, a
+    first line introducing it ("Here's a rewrite:"), one pair of quotes around all of it (unless
+    your text was quoted)."""
+    output = THINKING.sub("", output, count=1)
+    fenced = FENCE.match(output)
+    if fenced:
+        output = fenced.group(1)
+    output = INTRO.sub("", output.strip(), count=1).strip()
+    for pair in QUOTES:
+        if (len(output) > 2 and output[0] == pair[0] and output[-1] == pair[1] and pair[0] not in output[1:-1]
+                and not text.strip().startswith(pair[0])):
+            output = output[1:-1].strip()
+            break
+    return output
+
+
 def finish(mode, text, output):
     """The candidate to offer for the model's output."""
     if mode != "continue":
-        return output
+        return tidy(text, output)
     # Small models sometimes echo the text, or its last words, before continuing it.
     if output.startswith(text):
         output = output[len(text):]
