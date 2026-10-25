@@ -16,6 +16,9 @@
 - Several versions ("draft 3 versions of hi") come as the drafts to pick from (↑↓, Tab inserts), in one
   round; a choice the model offers can be a whole draft (up to 400 characters).
 - Tab no longer rewrites a selection (it rewrote the whole selection even when made mid-sentence).
+- Claude Code, Codex and command backends get the tone's examples too, inside their one message.
+- Rewrites and drafts lose what a model wraps them in: a <think> block, a fence around all of it,
+  a "Here's a rewrite:" line, wrapping quotes.
 - macOS: the service answers sooner after login: it runs as an interactive job, and it starts
   without loading the input method's AppKit.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
