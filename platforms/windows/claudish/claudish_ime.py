@@ -563,9 +563,8 @@ class ClaudishTextService(TextService):
             self.publish()
             return True
         elif key == 0x1B and event.isKeyDown(0x10) and self.state.restore():  # Shift+Esc: the dropped one, back
-            if self.state.working and self.worker:  # held while it worked: ask again
-                self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
-                                     app=focused_app(), purpose=self.field())
+            # A held exchange's request is still running: its results come for the same revision.
+            if self.state.working:
                 self.await_result(60)
             self.publish()
             return True

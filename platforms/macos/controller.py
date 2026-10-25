@@ -625,9 +625,7 @@ class ClaudishInputController(IMKInputController):
             self.show_panel(client)
             return True
         if key == 53 and flags & NSEventModifierFlagShift and self.state.restore():  # Shift+Esc: the dropped one, back
-            if self.state.working and self.worker is not None:  # held while it worked: ask again
-                self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
-                                     app=self.app(client))
+            # A held exchange's request is still running: its results come for the same revision.
             self.changed(client)
             return True
         if key == 53:  # Escape: one step back

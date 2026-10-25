@@ -545,6 +545,17 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.caret(client, start=True)
         self.assertEqual(absolute, [(len("https://example.test/"), 0)])
 
+    def test_shift_esc_brings_a_held_exchange_back_without_asking_again(self):
+        """Codex: restoring a running instruction scheduled it a second time (two sessions, the
+        second without the text around the caret). Its request is still running."""
+        self.type_text("say hi")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter: sent
+        asked = list(self.controller.worker.modes)
+        self.key(0, "a", 1 << 20)  # Cmd+A: a shortcut holds the exchange
+        self.assertIsNotNone(self.controller.state.held)
+        self.assertTrue(self.key(53, "\x1b", 1 << 17))  # Shift+Esc: back
+        self.assertEqual((self.controller.state.text, self.controller.worker.modes), ("say hi", asked))
+
     def test_the_panel_starts_where_the_composition_starts(self):
         """Under the composition's start, as CJK candidate windows sit, whatever the caret: typed,
         dropped (its toast), or brought back whole by Shift+Esc (docs/design/design.md, Placement)."""

@@ -410,9 +410,7 @@ class ClaudishEngine(IBus.Engine):
             self.render()  # ↑ and ↓ move the highlight
             return True
         if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK and self.composition.restore():
-            if self.composition.working:  # held while it worked: ask again
-                self.suggestions.schedule(self.composition.revision, self.composition.text, "instruct",
-                                          immediate=True, app=self.app, purpose=self.purpose)
+            # A held exchange's request is still running: its results come for the same revision.
             self.render()  # Shift+Esc: what Esc dropped, or the exchange you left, back
             return True
         if keyval == IBus.KEY_Escape:
@@ -537,6 +535,11 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
+        # One conversation per text box (its input context), as on Windows: earlier instructions,
+        # context and approvals stay with the box they were made in.
+        if getattr(self, "context", None) not in (None, object_path):
+            self.suggestions.new_conversation()
+        self.context = object_path
         self.update_quiet()
         self.refresh_surrounding()
         self.show_mode(register=True)

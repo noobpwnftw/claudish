@@ -142,7 +142,19 @@ try:
     assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK) and engine.composition.sent
     assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
     assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
+    # Shift+Esc brings it back without asking again: its request is still running.
+    pending = engine.suggestions.pending
+    assert engine.do_process_key_event(IBus.KEY_Escape, 0, IBus.ModifierType.SHIFT_MASK)
+    assert engine.composition.text == "fix it" and engine.suggestions.pending is pending
+    engine.do_reset()
     engine.composition.held = None
+    # One conversation per text box: a new input context starts a fresh one.
+    engine.do_focus_in_id("/org/freedesktop/IBus/InputContext_7", "gtk3-im:gedit")
+    first = engine.suggestions.conversation
+    engine.do_focus_in_id("/org/freedesktop/IBus/InputContext_7", "gtk3-im:gedit")
+    assert engine.suggestions.conversation == first  # the same box again
+    engine.do_focus_in_id("/org/freedesktop/IBus/InputContext_8", "gtk3-im:firefox")
+    assert engine.suggestions.conversation != first
     # The indicator's menu picks a mode, as a Shift tap does.
     engine.do_property_activate("mode.continue", IBus.PropState.CHECKED)
     assert engine.composition.mode == "continue"
