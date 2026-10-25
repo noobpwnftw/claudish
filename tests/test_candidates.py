@@ -214,6 +214,24 @@ class ModeFeelTests(unittest.TestCase):
         # after sending can never insert a draft nobody read (owner, 2026-10-24).
         self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))
 
+    def test_a_key_that_does_nothing_on_a_choice_lights_its_tab(self):
+        """Owner: Enter on the approval lit nothing, where on drafts it lights Tab."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("hand it over")
+        state.submit()
+        state.ask(state.revision, {"id": "p", "text": "Send this task to claude?", "permission": True,
+                                   "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
+        self.assertIsNone(state.keep())
+        self.assertFalse(state.panel()["nudge"])  # nothing highlighted: nothing to light
+        state.move(1)  # ↓: Deny
+        self.assertIsNone(state.keep())
+        self.assertTrue(state.panel()["nudge"])  # Enter lights the highlighted row's Tab
+        state.move(1)  # ↓: Allow, a change: the light goes
+        self.assertFalse(state.panel()["nudge"])
+        self.assertEqual(state.enter(), "wait")  # Shift+Enter with nothing typed lights it too
+        self.assertTrue(state.panel()["nudge"])
+
     def test_tab_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
         state.mode = "compose"

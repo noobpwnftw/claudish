@@ -205,7 +205,7 @@ class Composition:
                          on=self.highlight if self.asks or self.selected else -1,
                          rows=[{"text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
                          foot=[("↑↓", "choose")] + ([("Tab", "confirm")] if not approval or self.selected else []),
-                         tail="or type why not" if not self.asks else "or type a reply")
+                         tail="or type why not" if not self.asks else "or type a reply", nudge=self.nudge)
         elif self.working and not self.reply:
             status = " ".join((self.status or "").split())
             shown.update(status=(status[:77] + "…" if len(status) > 80 else status)
@@ -260,6 +260,18 @@ class Composition:
                              shown["failed"]) if w]
         words += ["%s %s" % key for key in shown["foot"]] + [w for w in (shown["tail"],) if w]
         return " · ".join(words)
+
+    def light_tab(self):
+        """A key that does nothing here: the highlighted row Tab would take lights its Tab (a draft,
+        or a question's highlighted choice); True when one did. An approval with nothing highlighted
+        lights nothing: no choice is offered to a reflexive key (owner: as drafts do, 2026-10-25)."""
+        if self.reply.strip():
+            return False
+        if (self.question and (self.asks or self.selected) and not self.reading) or \
+                (not self.question and self.asked == "instruct" and self.candidate):
+            self.nudged = self._showing()
+            return True
+        return False
 
     def _showing(self):
         return (self.text, self.reply, self.highlight, self.candidate, self.converted, id(self.question))
@@ -377,14 +389,15 @@ class Composition:
         if self.question:
             if self.reply.strip():
                 return "reply"
-            return "wait"  # a choice, or an answer to read, is Tab's
+            self.light_tab()
+            return "wait"  # a choice, or an answer to read, is Tab's: the highlighted row lights Tab
         if self.sent and self.reply.strip():
             # Your next words, typed while it worked or with its drafts showing: a follow-up
             # instruction in the same conversation.
             self.change(self.reply.strip())
             return "submit"
         if self.asked == "instruct" and self.candidate:
-            self.nudged = self._showing()
+            self.light_tab()
             return "wait"  # a draft goes in with Tab: its row lights Tab
         if self.converted:
             return "wait"  # the rewrite goes in with Tab, as its footer says
@@ -402,10 +415,8 @@ class Composition:
             return ""
         if self.sent or self.question or self.working or self.converted:  # a failed rewrite leaves only your words
             # Once the model is summoned the key is gated (owner): your instruction or a reply never
-            # lands in the app by a reflexive press; on drafts it lights Tab, the key that takes one.
-            if self.asked == "instruct" and self.candidate:
-                self.nudged = self._showing()
-            elif self.working:
+            # lands in the app by a reflexive press; the row Tab would take lights its Tab.
+            if not self.light_tab() and self.working and not self.question:
                 self.nudged = ("pending", self.text, self.reply)
             return None
         kept = self.shown  # what the composition shows (your words, or a reply)
