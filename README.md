@@ -2,7 +2,7 @@
 
 English goes in. Em dashes come out.
 
-!["ok", Tab: the rewrite in cd_AI's panel; Tab again puts it in (macOS, TextEdit)](docs/cd_AI.gif)
+!["ok", Tab: the rewrite in cd_AI's panel, Tab again puts it in; then Shift+Enter for drafts, ↓ and Tab (the demo, with Gemma 4 E4B)](docs/cd_AI.gif)
 
 An input method that puts a language model at the caret of every app, on Linux,
 Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
@@ -28,7 +28,7 @@ Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/usin
 
 In a terminal, a handoff is a command draft: Tab puts it at the prompt; Enter runs it in that folder.
 
-![Shift+Enter asks about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
+![A question about a typo, then a handoff of the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
 
 cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
