@@ -15,6 +15,9 @@ setup(
     app=[{"script": "main.py", "dest_base": "Claudish"}],
     options={"py2app": {"plist": info,
                         "includes": ["controller", "panel", "sources", "InputMethodKit", "AppKit", "Foundation"],
+                        # Cocoa supplies the UI. Tk's recipe opens a GUI during bundling and can
+                        # abort when building over SSH from a logged-out account.
+                        "excludes": ["tkinter"],
                         # the Claude backend and MCP (tools and context), for the service the bundle also runs
                         # certifi as files, not zipped: the HTTP client opens its cacert.pem by path
                         "packages": ["claudish", "anthropic", "mcp", "certifi"],
