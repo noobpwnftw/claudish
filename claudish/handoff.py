@@ -215,7 +215,7 @@ def ago(started):
 
 
 def line(template, note, session=""):
-    """The helper's command as one double-quoted line, or None when it cannot be written safely."""
+    """The helper's command as one double-quoted line, or None when a shell would read it otherwise."""
     words = []
     # A Windows service has your own PATH: a program it cannot find, your prompt cannot either (Claude
     # Code's installer leaves claude.exe off it), so the draft names it in full. Elsewhere your

@@ -14,9 +14,9 @@ Typing in detail, the browser demos, and terminals.
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Shift+Enter ask · Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With a question: answer with the highlighted choice (Allow and Deny too). With an answer to read: insert it (Esc dismisses it). |
 | Shift+Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. With nothing composed, Shift+Enter is the app's (a newline in most chat boxes) |
-| ↑ ↓ | Move the highlight through the drafts or a question's choices, no wrap; Tab takes the highlighted one. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Tab does nothing until a choice is highlighted |
+| ↑ ↓ | Move the highlight through the drafts or a question's choices, no wrap; Tab takes the highlighted one. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on Deny, and Tab takes a choice once one is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Shift+Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Shift+Enter sends them as a follow-up in the same conversation). The choices fade while you type |
-| Enter (compose) | Keep what you composed as it is, and the app gets its Enter (a chat box sends), as most input methods keep the typed letters with Enter. Once the model is asked, Enter does nothing, so a reflexive press puts nothing in (on drafts it lights Tab). `"keys"` in the config swaps Enter and Shift+Enter |
+| Enter (compose) | Keep what you composed as it is, and the app gets its Enter (a chat box sends), as most input methods keep the typed letters with Enter. Once the model is asked, Enter lights the Tab of the highlighted row. `"keys"` in the config swaps Enter and Shift+Enter |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
 | Switching windows | Words you are typing go in as typed; a sent instruction is not: it leaves the text box with its exchange, held for that text box. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
@@ -76,7 +76,7 @@ claudish serve --model-url http://127.0.0.1:18766
 It runs at [claudish.io/demo](https://claudish.io/demo/), under the [project home page](https://claudish.io). It is the same browser demo
 with the model running in the page through [wllama](https://github.com/ngxson/wllama)
 (llama.cpp compiled to WebAssembly). It needs no inference server, so any static
-host can serve it. Nothing is downloaded until the visitor clicks **Run the model
+host can serve it. The model downloads when the visitor clicks **Run the model
 in this browser**; the 491 MB model (pinned Qwen2.5 0.5B) is then cached by the
 browser.
 

@@ -244,7 +244,7 @@ with `claudish mcp import`) and name them in a profile's `tools`:
 - Tools the server marks read-only (`readOnlyHint`), and the ones you vouch for
   with `"trust"`, run without asking. Any other tool asks first, in the panel: Deny,
   Allow, Allow for this conversation, with nothing highlighted (the first ↓ lands on
-  Deny, so Allow is a deliberate ↓↓ Tab); a tool marked destructive
+  Deny, and Allow is ↓↓ Tab); a tool marked destructive
   (`destructiveHint`) asks every time. Typing words instead denies the call with your
   words as the reason. `"deny": [TOOL, ...]` keeps a tool
   from ever being offered.
@@ -277,7 +277,7 @@ pick, and its final answer is a candidate like any other. For Claude Code:
 ```
 
 - *"is my branch clean?"* → `Deny` / `Allow — Bash: git status`: ↓ to a choice and Tab
-  answers (Allow is a deliberate ↓↓ Tab; Deny lets the agent carry on without it), or type a reply and
+  answers (Allow is ↓↓ Tab; Deny lets the agent carry on without it), or type a reply and
   press Shift+Enter: it denies the call with your words as the reason ("use git diff
   instead"), so the agent can adjust. Claude Code's own settings may allow a call
   without asking.

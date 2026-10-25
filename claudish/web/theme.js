@@ -1,6 +1,6 @@
 "use strict";
 // Runs before the stylesheet so the initial paint matches the system theme. One button flips
-// light and dark for this visit; nothing is stored.
+// light and dark for this visit.
 (() => {
   const system = window.matchMedia("(prefers-color-scheme: dark)");
   let preference = null;  // null: follow the system
