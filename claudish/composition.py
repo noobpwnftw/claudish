@@ -370,8 +370,10 @@ class Composition:
             self.reply = ""  # what you typed goes; the exchange stays open
             return "clear"
         if self.converted:
-            self.converted = False
-            self.editing = True  # your words again; the next Esc drops them, and the footer says so
+            # Your words again, the rewrite forgotten: Tab asks for another take. The next Esc drops
+            # them, and the footer says so.
+            self.converted, self.candidate, self.candidates = False, "", []
+            self.editing = True
             return "back"
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)

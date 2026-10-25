@@ -220,9 +220,10 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.shown, "very good")
         self.assertEqual((state.panel()["label"], state.panel()["body"]), ("Rewrite", "Exceptionally good."))
         self.assertEqual((state.escape(), state.shown, state.panel()["label"]), ("back", "very good", None))
-        self.assertEqual(state.tab(), "convert")  # the rewrite again, without asking again
+        self.assertEqual(state.tab(), "request")  # owner: Esc, then Tab, is another take
+        state.offer(state.revision, "Exceptionally, remarkably good.")
         self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))  # Tab keeps it; Enter does not
-        self.assertEqual(state.commit(True), "Exceptionally good.")
+        self.assertEqual(state.commit(True), "Exceptionally, remarkably good.")
         state.change("very good")
         state.tab()
         state.offer(state.revision, "Exceptionally good.")

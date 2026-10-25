@@ -19,6 +19,7 @@
 - Claude Code, Codex and command backends get the tone's examples too, inside their one message.
 - Rewrites and drafts lose what a model wraps them in: a <think> block, a fence around all of it,
   a "Here's a rewrite:" line, wrapping quotes.
+- Esc, then Tab, on a rewrite asks for another take (it showed the same rewrite again).
 - macOS: the service answers sooner after login: it runs as an interactive job, and it starts
   without loading the input method's AppKit.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap

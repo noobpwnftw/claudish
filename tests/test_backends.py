@@ -125,6 +125,18 @@ class EndpointBackendTests(unittest.TestCase):
         self.assertIsNone(request.get_header("Authorization"))
         self.assertEqual(handlers[0].proxies, {})  # loopback bypasses HTTP_PROXY
 
+    def test_the_same_text_again_is_another_take(self):
+        """Esc, then Tab, asks again: on a server whose first answer is deterministic, the repeat is
+        sampled, so it can differ."""
+        rewriter = Rewriter("openai", "http://127.0.0.1:9")
+        sent = []
+        rewriter.chat = lambda payload, headers, image=None, timeout=None: (
+            sent.append(payload) or ({"message": {"content": "Take %d." % len(sent)}, "finish_reason": "stop"}, {}))
+        rewriter.rewrite("ok")
+        rewriter.rewrite("ok")
+        self.assertEqual(sent[0]["temperature"], 0)
+        self.assertEqual((sent[1]["temperature"], sent[1]["seed"]), (0.9, 101))
+
     def test_remote_endpoint_sends_key(self):
         rewriter = Rewriter("openai", "https://models.example.com", model="any-model", api_key="k-123")
         handlers, request, _ = self.call(rewriter)

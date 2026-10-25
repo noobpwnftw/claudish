@@ -252,6 +252,7 @@ class Rewriter:
         self.url = None  # this service's address, for the agent's textbox MCP server
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
+        self.takes = {}  # (mode, text) -> how many times it was asked: a repeat is another take
         # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
         self.modes = invocation.defaults(templates, tone)
         for name, route in (modes or {}).items():  # which profile answers a mode
@@ -513,7 +514,8 @@ class Rewriter:
                 # conversation (one reading: alternatives would multiply the cost).
                 outputs, usage, new, called = self.ask_model(mode, prompt, examples, history, said, box,
                                                              1 if self.claude else count,
-                                                             tools, approve, progress, local, serial)
+                                                             tools, approve, progress, local, serial,
+                                                             take=self.take(mode, said))
                 consulted += called
         except Exception as exc:
             from .tools import Finished
@@ -553,10 +555,22 @@ class Rewriter:
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}
 
-    def ask_model(self, mode, prompt, examples, history, said, box, count, tools, approve, progress, local, serial):
+    def take(self, mode, said):
+        """How many times this text was asked in this mode before: Esc then Tab on a rewrite asks
+        again, for another take (the last few texts are remembered)."""
+        key = (mode, said)
+        taken = self.takes.pop(key, 0)
+        self.takes[key] = taken + 1
+        for old in list(self.takes)[:-32]:
+            del self.takes[old]
+        return taken
+
+    def ask_model(self, mode, prompt, examples, history, said, box, count, tools, approve, progress, local, serial,
+                  take=0):
         """An OpenAI-compatible server: the first answer deterministic (what the evaluation
         measures), with the tool loop when this mode has tools, then extra readings sampled over the
-        same results. (outputs, usage, the turn's tool messages, what the tools consulted)."""
+        same results; asked again (take), the first is sampled too, for a different one. (outputs,
+        usage, the turn's tool messages, what the tools consulted)."""
         from .conversation import TURN_TIMEOUT
         messages = ([{"role": "system", "content": prompt}] + examples + history
                     + [{"role": "user", "content": user_content(said, box.image, "openai")}])
@@ -601,7 +615,8 @@ class Rewriter:
             first, called, with_tools = (self.toolbox or Toolbox([], {})).run(
                 ask, messages, approve=approve, progress=progress, local=local)
         else:
-            first = (ask(messages, None).get("content") or "").strip()
+            again = {"temperature": 0.9, "seed": 100 + take} if take else {}
+            first = (ask(messages, None, **again).get("content") or "").strip()
         if not first:
             raise RuntimeError("model returned no text")
         outputs = [first]

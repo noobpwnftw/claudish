@@ -315,7 +315,9 @@ function key(name, shift = false) {
     if (sent() && state.reply) {  // what you typed goes, and says so; Shift+Esc brings it back
       state.dropped = state.reply; state.droppedReply = true; state.reply = ""; render(); dropped(); return true;
     }
-    if (state.converted) { state.converted = false; state.editing = true; render(); return true; }  // your words again
+    if (state.converted) {  // your words again, the rewrite forgotten: Tab asks for another take
+      state.converted = false; state.candidate = ""; state.candidates = []; state.editing = true; render(); return true;
+    }
     // Sent, or a rewrite pending or failed: back to your words, to edit (a late answer is ignored).
     if (sent() || state.working || state.failed) { change(state.text); state.editing = true; render(); return true; }
     state.dropped = state.text; state.droppedReply = false;

@@ -145,8 +145,11 @@ def main():
             assert reply["panel"]["body"] == "A nuanced draft.", reply
             reply = key(0x1B)  # Esc: your words again
             assert "commitString" not in reply and reply["compositionString"] == "draft", reply
-            key(9)  # the rewrite again, without asking again
-            assert key(9)["commitString"] == "A nuanced draft."  # Tab again keeps it
+            key(9)  # Tab: another take
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A more nuanced draft."})
+            service.handleRequest({"method": "onTimer", "seqNum": 1})
+            worker_class.return_value.poll.return_value = None
+            assert key(9)["commitString"] == "A more nuanced draft."  # Tab again keeps it
             for char in "say hi":
                 key(ord(char.upper()), ord(char))
             reply = shift_tap()

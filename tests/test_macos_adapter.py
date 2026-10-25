@@ -325,9 +325,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((self.client.marked, self.client.commits), ("draft!", []))
         self.key(53)  # Esc: your words again
         self.assertEqual(self.client.marked, "draft!")
-        self.key(48)
-        self.key(48)  # Tab again keeps it
-        self.assertEqual(self.client.commits, ["A considered draft."])
+        self.key(48)  # Tab: another take
+        self.assertEqual(self.controller.worker.modes[-2:], ["rewrite", "rewrite"])
+        self.controller.worker.result = (state.revision, {"text": "A thoughtfully considered draft."})
+        self.controller.pollSuggestions_(None)
+        self.key(48)  # Tab keeps it
+        self.assertEqual(self.client.commits, ["A thoughtfully considered draft."])
 
     def test_esc_in_instruct_goes_back_a_step_then_drops(self):
         self.key(98)
