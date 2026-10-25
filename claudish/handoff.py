@@ -47,7 +47,16 @@ def available(template):
         return False
     if name(template) == "claude" and unsupervised_claude():
         return False
-    return shutil.which(template[0]) is not None
+    return found(template[0]) is not None
+
+
+def found(program):
+    """A helper's program: on the service's PATH, or where Claude Code's and Codex's installers put
+    them (a login service may not have the shell's PATH: ~/.local/bin, the VS Code extension)."""
+    if shutil.which(program):
+        return shutil.which(program)
+    from . import settings
+    return {"claude": settings.claude_code, "codex": settings.codex}.get(program, lambda: None)()
 
 
 def unsupervised_claude():
@@ -95,10 +104,15 @@ def write_note(task, observed):
     return path
 
 
-def arguments(template, note, session=""):
+def arguments(template, note, session="", resolve=False):
+    """The helper's arguments; resolve: its program as found (a window this service opens does not
+    have the shell's PATH either). A terminal's draft keeps the name you configured."""
     prompt = "Read the handoff note at %s and work on the task in it." % note
-    return [a.replace("{note}", note).replace("{prompt}", prompt).replace("{session}", session or "")
+    argv = [a.replace("{note}", note).replace("{prompt}", prompt).replace("{session}", session or "")
             for a in template]
+    if resolve and argv and not shutil.which(argv[0]):
+        argv[0] = found(argv[0]) or argv[0]
+    return argv
 
 
 def progress(handle, entries=4):
@@ -213,7 +227,7 @@ def launch(template, note, launcher=None, session="", name=""):
     "{command}"]): {command} becomes the helper's arguments."""
     import platform
     import subprocess
-    argv, home, system = arguments(template, note, session), os.path.expanduser("~"), platform.system()
+    argv, home, system = arguments(template, note, session, resolve=True), os.path.expanduser("~"), platform.system()
     if launcher:
         commands = [[part for item in launcher
                      for part in (argv if item == "{command}" else [item.replace("{name}", name)])]]
