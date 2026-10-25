@@ -93,10 +93,7 @@ def import_servers(path=None, dry_run=False, replace=False):
         imported.append(name)
         print("%s %-20s from %s" % ("would import" if dry_run else "import", name, label))
     if not dry_run and imported:
-        if not path.exists():
-            config.write_starter_templates(path)  # the starter's profiles read it
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        config.save(data, path)
         print("Wrote %s." % path)
     if needed:
         print("Set these in the environment Claudish runs in: %s" % ", ".join(sorted(needed)))

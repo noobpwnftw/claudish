@@ -1,9 +1,9 @@
 """The settings window's model (G62): what it shows, and the few changes it makes to config.json.
 
 The window offers the model (Claude with an API key, Claude Code's `claude` command for a Claude
-subscription, Codex's `codex` command for a ChatGPT subscription, or any OpenAI-compatible API) and
-the tone. The models map onto the starter's profiles: "claude", "claude-code", "codex", and
-"ollama" for any OpenAI-compatible server.
+subscription, Codex's `codex` command for a ChatGPT subscription, or any OpenAI-compatible API), the
+tone, the key that asks the model, and whether the panel shows hints. The models map onto the
+starter's profiles: "claude", "claude-code", "codex", and "ollama" for any OpenAI-compatible server.
 A config whose default is another profile is shown as that profile and left to its file.
 The key is saved by claudish/keys.py.
 """
@@ -74,8 +74,7 @@ def state(path=None):
     profiles = data.get("profiles") or {}
     name = data.get("profile") or next(iter(profiles), None)
     entry = profiles.get(name) or {}
-    choice = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "ollama": "server",
-              "local": "local"}.get(name, "other")
+    choice = dict({profile: c for c, profile in CHOICES.items()}, local="local").get(name, "other")
     server = profiles.get("ollama") or config.STARTER["profiles"]["ollama"]
     tone = entry.get("tone") or "corporate"
     return {
@@ -226,13 +225,7 @@ def apply(changes, path=None):
         tone = changes["tone"]
         if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
             raise ValueError("a tone is a name or a few words")
-        tone = tone.strip()
-        for name in MANAGED:
-            if name in profiles:
-                if tone in ("", "corporate"):
-                    profiles[name].pop("tone", None)
-                else:
-                    profiles[name]["tone"] = tone
+        config.set_tone(profiles, tone, MANAGED)
     if "summon" in changes:  # which key asks the model; the other keeps your words
         if changes["summon"] not in config.SUMMON_KEYS:
             raise ValueError("the key that asks is Shift+Enter or Enter")
@@ -250,10 +243,5 @@ def apply(changes, path=None):
         profiles.setdefault("claude", dict(config.STARTER["profiles"]["claude"]))
         data["profile"] = "claude"
     if set(changes) - {"key"} or not path.is_file():
-        if not path.is_file():
-            config.write_starter_templates(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-        os.replace(temporary, path)
+        config.save(data, path)
     return state(path)

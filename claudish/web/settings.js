@@ -31,7 +31,7 @@ function say(id, text, bad) {
 function subscription(state) {
   const names = {"claude-code": "Claude Code", codex: "Codex"};
   const backend = (state.service || {}).backend;
-  return names[backend] || (backend === "command" ? names[state.choice] : null);
+  return names[backend] || null;
 }
 
 function ready(state) {

@@ -16,12 +16,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from claudish import modes  # noqa: E402
+from download_model import PRESETS  # noqa: E402
 
-# Pinned like scripts/download_model.py's "small" preset; chosen among browser-sized candidates.
+# scripts/download_model.py's "small" preset; chosen among browser-sized candidates.
 # It is not the native app's default (no model ships with the app).
-MODEL_URL = ("https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/"
-             "9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf")
-MODEL_BYTES = 491400032
+_repo, _revision, _filename, MODEL_BYTES, _ = PRESETS["small"]
+MODEL_URL = "https://huggingface.co/%s/resolve/%s/%s" % (_repo, _revision, _filename)
 CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; "
        "worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https:; style-src 'self'; "
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
