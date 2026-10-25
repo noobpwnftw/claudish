@@ -8,7 +8,7 @@ one-line instructions answered at the caret, in every app, with the model you co
 
 ## Now
 
-0.1.1 is out (https://github.com/noobpwnftw/claudish/releases/latest). From here the slop
+0.2.0 is out (https://github.com/noobpwnftw/claudish/releases/latest). From here the slop
 experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The ask workflow
 (instructions, tools, approvals, handoffs) is for experts; it gets fixes for the bugs they report.
 

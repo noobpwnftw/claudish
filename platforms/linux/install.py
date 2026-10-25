@@ -30,7 +30,7 @@ COMPONENT = '''<?xml version="1.0" encoding="utf-8"?>
   <name>org.freedesktop.IBus.Claudish</name>
   <description>Claudish language model IME</description>
   <exec>/usr/bin/python3 &quot;%s&quot; --ibus</exec>
-  <version>0.1.1</version>
+  <version>0.2.0</version>
   <license>MIT</license>
   <author>Claudish contributors</author>
   <engines><engine>

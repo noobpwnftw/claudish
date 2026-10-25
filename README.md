@@ -59,7 +59,7 @@ the address of another model API, and pick a tone. Use **Try a rewrite** in Sett
 - **Linux** (IBus; fcitx5 is not supported yet), as your user:
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.1/scripts/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.2.0/scripts/install.sh | sh
   ```
 
   Then log out and back in, and add **English → Claudish** in **Settings → Keyboard → Input

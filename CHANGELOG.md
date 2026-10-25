@@ -1,29 +1,29 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Enter commits your words and stops there, as other input methods do; the next Enter is the app's.
-- Settings → Panel: "Only what is pending" (`"hints": false`) shows the panel while the model
-  works, for drafts, rewrites and questions, and for errors: no keys while you compose, no toasts.
-- The input source is named Claudish, under English (as U.S. is): Claudish on Windows and Linux,
-  Claudish — Compose and Claudish — Continue on macOS.
-- macOS: compose and continue are input modes, Claudish — Compose and Claudish — Continue, each
-  with its icon in the menu bar ("AI", "cd"); macOS says the switch, so cd_AI shows no mode toast there.
-- In a terminal, Esc's drop shows no toast (Terminal.app does not give the input method Shift+Esc
-  once nothing is marked).
-- Just after login, before the service first answers, the panel says "cd_AI is initializing"
-  rather than offline.
-- Several versions ("draft 3 versions of hi") come as the drafts to pick from (↑↓, Tab inserts), in one
-  round; a choice the model offers can be a whole draft (up to 400 characters).
-- Tab no longer rewrites a selection (it rewrote the whole selection even when made mid-sentence).
-- Claude Code, Codex and command backends get the tone's examples too, inside their one message.
+- Esc, then Tab, on a rewrite asks for another take.
+- Several versions ("draft 3 versions of hi") come as drafts to pick from (↑↓, Tab inserts), in one
+  round; a choice the model offers can be a whole draft.
+- Claude Code, Codex and command backends get the tone's examples too.
 - Rewrites and drafts lose what a model wraps them in: a <think> block, a fence around all of it,
   a "Here's a rewrite:" line, wrapping quotes.
-- Esc, then Tab, on a rewrite asks for another take (it showed the same rewrite again).
-- macOS: the service answers sooner after login: it runs as an interactive job, and it starts
-  without loading the input method's AppKit.
-- macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
-  switches modes), and it no longer shows dots.
+- A Shift tap on an open exchange holds it: it leaves the caret at once, its agent goes on, and back
+  in compose its pill says what waits.
+- An answer the instruction can no longer take (it timed out or was stopped) ends it with that
+  error instead of leaving it working.
+- Settings → Panel: "Only what is pending" (`"hints": false`) shows the panel while the model
+  works, for drafts, rewrites and questions, and for errors: no keys while you compose, no toasts.
+- The input source is named Claudish, under English: Claudish on Windows and Linux, Claudish —
+  Compose and Claudish — Continue on macOS.
+- macOS: compose and continue are input modes with their own menu-bar icons ("AI", "cd"); macOS says
+  the switch. The input menu is Settings….
+- macOS: no beep in Terminal when Enter keeps your words; the input menu no longer shows dots.
+- macOS: the service answers sooner after login; until it first answers the panel says "cd_AI is
+  initializing".
+- In a terminal, Esc's drop shows no toast.
+- Tab no longer rewrites a selection.
 
 ## 0.1.1
 
