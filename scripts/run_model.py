@@ -1,10 +1,9 @@
 """Launch a persistent llama-server. Works with Windows and Linux binaries."""
 import argparse
-import shutil
 import subprocess
 from pathlib import Path
 
-from download_llama import installed
+from download_llama import find_server
 from download_model import PRESETS
 
 root = Path(__file__).resolve().parents[1]
@@ -18,13 +17,7 @@ def arguments(parser):
 
 
 def command(args):
-    server = args.server or shutil.which("llama-server") or shutil.which("llama-server.exe")
-    if not server:
-        candidate = root / ".tools/build/bin/llama-server"
-        if candidate.is_file():
-            server = str(candidate)
-    if not server:
-        server = installed() and str(installed())
+    server = args.server or find_server()
     if not server:
         raise ValueError("run python scripts/download_llama.py, or supply --server /path/to/llama-server")
     model = root / "models" / PRESETS[args.preset][2]

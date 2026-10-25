@@ -54,6 +54,17 @@ class UnpackTests(unittest.TestCase):
         download_llama.unpack(archive, self.root / "out")
         self.assertEqual((self.root / "out/llama-b1/libggml.so.0").read_bytes(), b"lib")
 
+    def test_finds_a_source_build_by_its_platform_name(self):
+        built = self.root / ".tools/build/bin" / download_llama.executable_name("Windows")
+        built.parent.mkdir(parents=True)
+        built.write_bytes(b"")
+        with patch.object(download_llama, "ROOT", self.root), patch.object(download_llama, "installed", return_value=None), \
+                patch("download_llama.shutil.which", return_value=None):
+            with patch.object(download_llama, "host", return_value=("Windows", "x64")):
+                self.assertEqual(download_llama.find_server(), str(built))
+            with patch.object(download_llama, "host", return_value=("Linux", "x64")):
+                self.assertIsNone(download_llama.find_server())
+
 
 class InstallTests(unittest.TestCase):
     def setUp(self):

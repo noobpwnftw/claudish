@@ -64,6 +64,15 @@ def installed():
     return None
 
 
+def find_server():
+    """The llama-server to run: on PATH, installed by this script, or built from source; or None."""
+    found = shutil.which("llama-server") or installed()
+    if found:
+        return str(found)
+    built = ROOT / ".tools/build/bin" / executable_name()
+    return str(built) if built.is_file() else None
+
+
 def unpack(archive, target):
     """Unpack into target, refusing members that would land outside it."""
     target = Path(target).resolve()
