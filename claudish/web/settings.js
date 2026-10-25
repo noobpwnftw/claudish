@@ -110,6 +110,7 @@ function render(state) {
   $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.key_where}` : "";
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   tones(state);
+  for (const radio of document.getElementsByName("summon")) radio.checked = radio.value === state.summon;
 }
 
 function tones(state) {
@@ -260,3 +261,7 @@ start().catch((error) => {
   $("status").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".";
   $("status").className = "bad";
 });
+
+for (const radio of document.getElementsByName("summon")) {
+  radio.addEventListener("change", () => change({summon: radio.value}, "keys-message", `${radio.value} asks the model.`));
+}

@@ -44,34 +44,34 @@ cd_AI ships no model: compose uses the profile's model (Claude by default). With
 
 | Key | In compose |
 | --- | --- |
-| Tab | takes the model's text: asks for a rewrite (it waits in the panel; Tab again puts it in), inserts the highlighted draft, or an answer to read |
-| Enter | talks to the model: sends your words as an instruction, a reply, or the answer to a question (on a draft it lights the row's Tab) |
-| Shift+Enter | keeps your words as typed |
+| Tab | takes what the model offers: asks for a rewrite (it waits in the panel; Tab again puts it in), inserts the highlighted draft or an answer to read, confirms the highlighted choice (Allow and Deny too) |
+| Shift+Enter | talks to the model: sends your words as an instruction, a follow-up, or a reply |
+| Enter | keeps your words as typed, and the app gets its Enter; once the model is asked it does nothing (on a draft it lights the row's Tab) |
 | ↑ ↓ | move the highlight (no wrap); choices are not numbered: digits are text, and Space does nothing while drafts show |
 | Esc | one step back: cancel the reply you typed, then edit the instruction, then drop it |
 | Shift+Esc | brings back what Esc dropped, or the exchange a focus change held |
 | F8 | attaches a picture of the window to the instruction |
 
 Only a letter or a digit starts a composition; a space or punctuation with nothing composed goes
-straight in. The compose keys show in the panel's footer from the first key (what Enter does must
+straight in. The compose keys show in the panel's footer from the first key (what each Enter does must
 be known before it is pressed).
 
 ## An exchange
 
-1. **Enter sends** your words. They stay underlined at the caret while the exchange is open (as a
+1. **Shift+Enter sends** your words. They stay underlined at the caret while the exchange is open (as a
    CJK preedit: choices never show without a composition; macOS apps give an input method Return,
    Tab and the arrows only while there is marked text). The panel says what is happening
    ("working", with a spinner; Esc stop).
 2. **The model answers** with drafts (rows; the first highlighted; Tab inserts the highlighted
    one), an answer to read (a paragraph; Tab insert, Esc dismiss, or type to ask more), or a
-   question (its choices as rows; Enter answers with the highlighted one, or type a reply).
+   question (its choices as rows; Tab answers with the highlighted one, or type a reply).
 3. **A reply** you type takes the instruction's place in the composition; the panel then says
    "You asked: …" and the choices fade. After an answer, the panel says "You answered: …". The
    panel says only what the composition does not.
 4. **An approval** (a tool that writes, a handoff to a helper) shows what will run in full; its
    safe choice (Deny, No) is listed first and nothing is highlighted: the first ↓ lands on Deny,
-   so Allow is always a deliberate ↓↓ Enter. Typed words refuse it with a reason ("or type why
-   not", then "Enter deny with reason").
+   so Allow is always a deliberate ↓↓ Tab. Typed words refuse it with a reason ("or type why
+   not", then "Shift+Enter deny with reason").
 5. **A focus change** commits words you are typing; a sent instruction is cleared, and its exchange is held for that text box
    and a passive pill shows on return ("3 drafts ready · Shift+Esc open"); it expires after ten
    minutes.
@@ -89,11 +89,11 @@ warning mark on failure; what is happening; each key with its verb; free words s
 reply").
 
 - **The highlighted row:** a neutral fill, a bar in the platform's accent, and the key that takes
-  it (Tab for a draft, Enter for a choice) in a trailing column every row keeps. Enter on a draft
+  it (Tab, for a draft or a choice) in a trailing column every row keeps. Enter on a draft
   lights that key (the accent at 20% behind it, an accent outline) until a key changes the panel;
   the footer is never lit.
 - **Failure:** the warning mark and the reason in plain words ("the model is offline"), regular
-  weight; Tab retries a rewrite, Enter an instruction; Esc edit.
+  weight; Tab retries a rewrite, Shift+Enter an instruction; Esc edit.
 - **Color:** Claudish orange means only AI (the tile); the highlight and the lit key use the
   platform's accent. Muted text 4.5:1 or more, the suggestion and keycap borders 3:1 or more; a
   forced-colors rendering keeps the bar and the key.
@@ -125,5 +125,5 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 ## Open
 
 How much context continue gets; per-app input behavior (first, continue's Tab in macOS
-Terminal); which of Enter and Shift+Enter asks by default (both layouts exist: `"keys"` in
-docs/configuration.md); screen-reader announcements.
+Terminal); screen-reader announcements. Shift+Enter asks and Enter keeps by default (owner,
+2026-10-25, after a poll: Enter is the key people send and confirm with); `"keys"` swaps them.

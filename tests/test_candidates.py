@@ -52,7 +52,7 @@ class CompositionTests(unittest.TestCase):
 
 class SummonKeyTests(unittest.TestCase):
     """By default Enter puts your words in and Shift+Enter sends them to the model; "keys":
-    {"summon": "Enter"} swaps them. Once an exchange is open, Enter answers it in either layout."""
+    {"summon": "Enter"} swaps them. Once the model is asked, the keeper key does nothing."""
 
     def composing(self, summon):
         state = Composition()
@@ -186,7 +186,7 @@ class ModeFeelTests(unittest.TestCase):
         state.insert("o")  # letters are your next words, at the caret; the drafts stay, without numbers
         self.assertTrue(state.panel()["rows"] and state.panel()["replying"])
         self.assertEqual((state.shown, state.text), ("mo", "decline politely"))
-        self.assertEqual(state.enter(), "submit")  # Enter asks it as a follow-up
+        self.assertEqual(state.enter(), "submit")  # the summon key asks it as a follow-up
         self.assertEqual((state.text, state.reply, state.candidates), ("mo", "", []))
         state.submit()
         state.offer(state.revision, "No, thank you.")
@@ -225,7 +225,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertIsNone(state.panel())  # continue: no panel; the suggestion speaks for itself
         state.mode = "compose"
         state.change("say hi")
-        # What Enter does shows from the first key (CJK reviewers: Enter sends your words away).
+        # What each Enter does shows from the first key (CJK reviewers: Enter must not surprise).
         self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Shift+Enter", "ask"), ("Enter", "keep")])
         self.assertEqual(state.hint(), "Tab rewrite · Shift+Enter ask · Enter keep")
         state.submit()

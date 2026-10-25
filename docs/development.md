@@ -183,7 +183,7 @@ sh tests/rigs/linux/run.sh check offline
 sh tests/rigs/linux/run.sh check qt-selection
 ```
 
-The checks cover Tab accepting a rewrite, Shift+Enter keeping the original words, password
+The checks cover Tab accepting a rewrite, Enter keeping the original words, password
 typing, a focus change during composition, keeping words when the service stops, and restoring
 a Qt selection with Esc. The rig does not check a desktop panel, Wayland, or model quality.
 

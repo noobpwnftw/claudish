@@ -94,7 +94,7 @@ try:
     del engine.before_caret
     shift_tap()
     assert engine.composition.mode == "compose" and engine.composition.text == ""  # the words are in the app
-    # Compose holds the text; Shift+Enter sends it as an instruction; Enter then talks to the exchange.
+    # Compose holds the text; Shift+Enter sends it as an instruction; Enter then puts nothing in.
     for char in "story":
         engine.do_process_key_event(ord(char), 0, 0)
     assert not engine.composition.working

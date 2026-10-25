@@ -7,16 +7,16 @@ Typing in detail, the browser demos, and terminals.
 | Key/action | Result |
 | --- | --- |
 | Type | Continue: straight into the app. Compose: your words gather as the composition (underlined) |
-| Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Enter |
+| Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Shift+Enter |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second, after a pause: Shift with another key (a capital, Shift+Enter), held (Shift+click), or pressed right after another key (rolled typing) is not one. Leaving compose keeps your words as typed. A brief pill at the caret says the mode and where Shift goes next; GNOME's top bar, Windows' taskbar, and the macOS menu bar show it all along |
 | Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in gray. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
-| Compose keys | The panel at the caret says them from the first key: Tab rewrite · Enter ask · Shift+Enter keep |
-| Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With an answer to read: insert it (Esc dismisses it). |
-| Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Enter on a draft lights its Tab. With nothing composed, Enter is the app's (a newline) |
-| ↑ ↓ | Move the highlight through the drafts (Tab inserts it) or a question's choices (Enter answers with it), no wrap. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Enter does nothing until a choice is highlighted |
-| Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Enter sends them as a follow-up in the same conversation). The choices fade while you type |
-| Shift+Enter (compose) | Keep what you composed as it is, and stay in compose. Most CJK input methods keep the typed letters with Enter; in cd_AI, Enter asks the model and Shift+Enter keeps |
+| Compose keys | The panel at the caret says them from the first key: Tab rewrite · Shift+Enter ask · Enter keep |
+| Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words. With drafts: insert the highlighted one. With a question: answer with the highlighted choice (Allow and Deny too). With an answer to read: insert it (Esc dismisses it). |
+| Shift+Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. With nothing composed, Shift+Enter is the app's (a newline in most chat boxes) |
+| ↑ ↓ | Move the highlight through the drafts or a question's choices, no wrap; Tab takes the highlighted one. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on its safe choice (Deny), and Tab does nothing until a choice is highlighted |
+| Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Shift+Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Shift+Enter sends them as a follow-up in the same conversation). The choices fade while you type |
+| Enter (compose) | Keep what you composed as it is, and the app gets its Enter (a chat box sends), as most input methods keep the typed letters with Enter. Once the model is asked, Enter does nothing, so a reflexive press puts nothing in (on drafts it lights Tab). `"keys"` in the config swaps Enter and Shift+Enter |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped (a selection taken from the app goes back instead). While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
 | Switching windows | Words you are typing go in as typed; a sent instruction is not: it leaves the text box with its exchange, held for that text box. Back in it, a pill says what is waiting ("3 drafts ready · Shift+Esc open"); it takes no keys, and expires after ten minutes |
@@ -45,8 +45,8 @@ With cd_AI's service running (`claudish service status`), open **http://127.0.0.
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and the panel, drawn with the same kit as the design lab
 (`/design.html`) and the desktop adapters. It opens in compose (Tab
-offers a rewrite, Enter sends it as an instruction and offers drafts to choose
-with ↑↓ and take with Tab, Shift+Enter keeps your words); a Shift tap or the badge switches to continue (keys go straight in;
+offers a rewrite, Shift+Enter sends it as an instruction and offers drafts to choose
+with ↑↓ and take with Tab, Enter keeps your words; on a phone, tap the key strip); a Shift tap or the badge switches to continue (keys go straight in;
 pause after a word and the rest waits in gray; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default.
@@ -90,13 +90,13 @@ and the time it took (`--full` prints the prompts whole).
 ## In a terminal
 
 A terminal prompt is a text box too. After a command fails, in compose (where cd_AI starts) type
-what you want ("fix", or "undo the last commit but keep the changes") and press Enter: the instruction goes with the last lines of what the
+what you want ("fix", or "undo the last commit but keep the changes") and press Shift+Enter: the instruction goes with the last lines of what the
 terminal shows, and the answer is a command line, placed at the prompt like
 typed text. Running it is your Enter.
 
 cd_AI reads the screen through the accessibility APIs screen readers use (AT-SPI
 on Linux, UI Automation on Windows, the AX API on macOS), when you press
-Tab or Enter in compose (continue stays quiet in terminals). On macOS the service's Python needs
+Tab or Shift+Enter in compose (continue stays quiet in terminals). On macOS the service's Python needs
 the Accessibility permission; on Linux the desktop's accessibility bus must run
 (GNOME and KDE run it). The lines go to the profile's model. A profile's `"read_terminal": false` turns reading off.
 Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
@@ -131,13 +131,13 @@ Claude Code in VS Code.
   chat box. On macOS, VS Code and other Chromium apps share only about 100
   characters around the caret with an input method, which is plenty for a
   message.
-- **Compose, then Enter** turns a one-line task into the message: "tell it to add a test for
+- **Compose, then Shift+Enter** turns a one-line task into the message: "tell it to add a test for
   the retry" becomes a full request, drafted at the caret for you to send.
 - **The code you are looking at** comes from F8 (a picture of the window, for a
   vision model) or from MCP servers you configure for Claudish; Claudish does not
   read Claude Code's own configuration or connection.
 - **Permissions**: if a tool you configured needs one (fetching a site, say), it
-  asks in the panel: what would run, in full; nothing is highlighted, ↓ then Enter
+  asks in the panel: what would run, in full; nothing is highlighted, ↓ then Tab
   chooses (Deny comes first).
 
 It is not a replacement for the extension: the conversation with the agent stays
@@ -152,7 +152,7 @@ described the same way for every mode:
   profile's bindings;
 - **the field's kind** when the app reports it (IBus: terminal, email, URL,
   number, and so on). URL, email, number, and phone fields get no unasked
-  suggestions; Tab and Enter still work there;
+  suggestions; Tab and Shift+Enter still work there;
 - **the text around the caret**: for continue, the text before it (the
   suggestion's start) and after it; for rewrite, where your phrase goes; for
   instruct, a window of the text box, with the rest available as retrieval.

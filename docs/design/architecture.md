@@ -16,10 +16,10 @@ question to the user presented as is."
      the selection, the box's length; the rest of the box is a tool (`textbox.read`,
      `textbox.search`), read live at the moment of the call;
    - observations: the profile's context providers and the app's bindings (files, commands, MCP
-     resources); a terminal's screen, read through the accessibility APIs on Tab or Enter in
+     resources); a terminal's screen, read through the accessibility APIs on Tab or Shift+Enter in
      compose (the last lines); a picture of the window on F8. Every result lists what was
      consulted.
-2. **What you did:** the mode and the key (a pause in continue, Tab or Enter in compose, an answer
+2. **What you did:** the mode and the key (a pause in continue, Tab or Shift+Enter in compose, an answer
    to a question), and the text box's conversation so far.
 3. **What is available:** the tools the configuration allows there: the profile's MCP servers
    under their trust and deny policy, and Claudish's own (the text box, a helper such as Claude
@@ -31,7 +31,7 @@ question to the user presented as is."
 | --- | --- | --- |
 | **complete** | after the caret, gray; Tab takes it | a pause in continue |
 | **replace** | the rewrite in the panel; Tab puts it in | Tab in compose |
-| **insert** | drafts in the panel; ↑ ↓ choose, Tab inserts | Enter in compose |
+| **insert** | drafts in the panel; ↑ ↓ choose, Tab inserts | Shift+Enter in compose |
 | **ask** | a question with choices, or an answer to read, shown as is; the answer goes back to the model | an instruction, when it needs you |
 
 Side effects happen only through tools, and a tool that writes or acts goes through **ask** first

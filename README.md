@@ -21,14 +21,14 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 | | You type | cd_AI |
 | --- | --- | --- |
 | **compose** (where it starts), then Tab | `this is important` | a rewrite in cd_AI's panel, waiting; Tab again puts it in |
-| **compose**, then Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
+| **compose**, then Shift+Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
 | **continue** | `Thanks for the review on ` | the rest of the sentence, in gray; Tab takes it |
 
-Tap Shift to switch. Shift+Enter keeps your words as typed. [Keys and modes](docs/using.md).
+Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/using.md).
 
 In a terminal, a handoff is a command draft: Tab puts it at the prompt; Enter runs it in that folder.
 
-![Enter asks about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
+![Asking about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
 
 cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
@@ -79,10 +79,10 @@ source checkout for development: [docs/install.md](docs/install.md).
 | Key | Does |
 | --- | --- |
 | Shift (tap) | switch: continue ↔ compose |
-| Tab | take the model's text: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft, an answer to read (with nothing offered, Tab is the app's) |
-| Enter | compose: send it as an instruction (it stays underlined while the model works), a reply, or the answer to the model's question (with nothing composed, a newline) |
-| Shift+Enter | compose: keep your words as they are (where most CJK input methods use Enter for that) |
-| ↑ ↓ | choose a draft (Tab inserts it) or an answer (Enter sends it); choices are not numbered: digits are text, and Space does nothing while drafts show |
+| Tab | take what the model offers: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft or choice (Allow and Deny too), an answer to read (with nothing offered, Tab is the app's) |
+| Shift+Enter | compose: send it as an instruction (it stays underlined while the model works), a follow-up, or a reply |
+| Enter | compose: keep your words as they are, and the app gets its Enter (a chat box sends); once the model is asked, it does nothing (with nothing composed, it is the app's) |
+| ↑ ↓ | choose a draft or an answer, Tab takes it (Allow and Deny too); choices are not numbered: digits are text, and Space does nothing while drafts show |
 | F8 | with an instruction: also send a picture of this window |
 | Esc | one step back: what you typed, then edit (your instruction back at the caret), then drop |
 | Shift+Esc | bring back what Esc dropped, or the exchange you left when you switched windows |

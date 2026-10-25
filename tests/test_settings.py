@@ -54,6 +54,16 @@ class SettingsTests(Home):
         settings.apply({"tone": "corporate"})
         self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
 
+    def test_the_key_that_asks_is_saved_beside_the_profile(self):
+        self.assertEqual(settings.apply({"tone": "corporate"})["summon"], "Shift+Enter")
+        self.assertEqual(settings.apply({"summon": "Enter"})["summon"], "Enter")
+        self.assertEqual(self.written()["keys"], {"summon": "Enter"})
+        self.assertEqual(config.resolve(self.path)[1]["summon"], "Enter")
+        settings.apply({"summon": "Shift+Enter"})
+        self.assertNotIn("keys", self.written())  # the default: nothing written
+        with self.assertRaises(ValueError):
+            settings.apply({"summon": "Ctrl+Enter"})
+
     def test_claude_code_for_a_claude_subscription(self):
         with patch.object(settings, "claude_code", return_value=None):
             self.assertEqual(settings.state()["claude_code"], settings.NO_CLAUDE_CODE)

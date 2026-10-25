@@ -59,7 +59,7 @@
         <details class="recording">
           <summary>A terminal task, handed to Claude Code</summary>
           <img src="cd_AI-terminal.gif" alt="A typo question, a handoff command accepted at the prompt, then Claude Code fixing the invoice test" width="1100" height="597" loading="lazy">
-          <p class="body small">Enter asks about the typo. For the task, Tab inserts the helper's command; Enter runs it in the project folder.</p>
+          <p class="body small">Shift+Enter asks about the typo. For the task, Tab inserts the helper's command; Enter runs it in the project folder.</p>
         </details>
       </section>
 
@@ -68,7 +68,7 @@
         <h2 id="layers">Compose, or <span class="nobr">continue<span class="dash">—</span></span>Shift switches.</h2>
         <div class="cards">
           <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Type a few words and press Tab: the rewrite appears in the panel. Tab again inserts it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">can't make it tonight, sorry</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">Regrettably, I must convey that I won't be able to make it tonight—my current bandwidth is fully allocated to high-priority deliverables, but I look forward to connecting when our schedules realign!</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Ask</h3><p>Type what you want and press Enter: drafts wait in the panel, ↑↓ picks one, and Tab takes it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">draft 1</span><span class="io-result">I genuinely appreciate you carving out time to connect with me; however, at this juncture, I am unable to make the proposed meeting time work.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div><div class="io"><span class="io-label">draft 2</span><span class="io-result">I sincerely appreciate you extending this invitation to connect—it sounds like a truly valuable discussion! Regrettably, due to prior commitments that require my full focus, I won't be able to make the scheduled time.</span></div></div></article>
+          <article class="card"><div class="card-body"><h3>Ask</h3><p>Type what you want and press Shift+Enter: drafts wait in the panel, ↑↓ picks one, and Tab takes it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">decline the meeting politely</span></div><div class="io"><span class="io-label">draft 1</span><span class="io-result">I genuinely appreciate you carving out time to connect with me; however, at this juncture, I am unable to make the proposed meeting time work.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div><div class="io"><span class="io-label">draft 2</span><span class="io-result">I sincerely appreciate you extending this invitation to connect—it sounds like a truly valuable discussion! Regrettably, due to prior commitments that require my full focus, I won't be able to make the scheduled time.</span></div></div></article>
           <article class="card"><div class="card-body"><h3>Continue</h3><p>A Shift tap, and your keys go straight in.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
@@ -95,9 +95,9 @@
         <table class="keys">
           <tr><td><kbd>Shift</kbd></td><td>tap to switch: continue or compose</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>take the model's text: the suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>in compose, send it as an instruction, a reply, or an answer</td></tr>
-          <tr><td><kbd>Shift</kbd><span class="plus">+</span><kbd>Enter</kbd></td><td>in compose, keep it as it is</td></tr>
-          <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>choose a draft (Tab inserts it) or an answer (Enter sends it)</td></tr>
+          <tr><td><kbd>Shift</kbd><span class="plus">+</span><kbd>Enter</kbd></td><td>in compose, send it as an instruction, a follow-up, or a reply</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>in compose, keep it as it is (a chat box sends)</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>choose a draft or an answer; Tab takes it</td></tr>
           <tr><td><kbd>F8</kbd></td><td>with an instruction, also send this window</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>one step back: what you typed, then edit, then drop</td></tr>
           <tr><td><kbd>Shift</kbd><span class="plus">+</span><kbd>Esc</kbd></td><td>bring back what Esc dropped, or the exchange you left</td></tr>
@@ -129,7 +129,7 @@
 4. Run `python -m claudish setup --yes`. It writes a config, registers the input method (on Linux; on Windows the input method comes from cd_AI-setup.exe, see docs/install.md), and starts cd_AI at login.
 5. Run `python -m claudish settings` if the installer has not opened it. Help me pick my existing model: Claude Code for a Claude subscription, Codex for a ChatGPT subscription, Claude with an API key, or another model API. If a subscription command is missing or not logged in, help install it and log in. Use Try a rewrite in Settings to check that my chosen model answers. Let me enter any key in Settings myself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
-7. Finish by telling me how to start: on Linux, log out and back in and add "cd_AI — Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick cd_AI with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Enter sends my words as an instruction, Shift+Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
+7. Finish by telling me how to start: on Linux, log out and back in and add "cd_AI — Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick cd_AI with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Shift+Enter sends my words as an instruction, Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
         </div>
         <h3 class="by-hand">Or by hand</h3>
         <pre class="commands">git clone https://github.com/noobpwnftw/claudish

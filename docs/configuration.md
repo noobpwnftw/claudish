@@ -156,7 +156,7 @@ its variable with `api_key_env`. Unknown keys and wrong types are rejected at st
 
 For apps that publish nothing Claudish can read, an instruction can carry a
 picture of the window you are typing in. In compose, press **F8** before
-Enter: the hint shows "instruct + window picture", and the service captures the
+Shift+Enter: the hint shows "instruct + window picture", and the service captures the
 focused window once, sends it with that one instruction, and lists it in
 "consulted". F8 applies to that one instruction.
 
@@ -244,7 +244,7 @@ with `claudish mcp import`) and name them in a profile's `tools`:
 - Tools the server marks read-only (`readOnlyHint`), and the ones you vouch for
   with `"trust"`, run without asking. Any other tool asks first, in the panel: Deny,
   Allow, Allow for this conversation, with nothing highlighted (the first ↓ lands on
-  Deny, so Allow is a deliberate ↓↓ Enter); a tool marked destructive
+  Deny, so Allow is a deliberate ↓↓ Tab); a tool marked destructive
   (`destructiveHint`) asks every time. Typing words instead denies the call with your
   words as the reason. `"deny": [TOOL, ...]` keeps a tool
   from ever being offered.
@@ -261,7 +261,7 @@ with `claudish mcp import`) and name them in a profile's `tools`:
 
 ### Agent sessions: an agent at the caret
 
-With `"session_command"` in a profile, a sent instruction (Enter in compose)
+With `"session_command"` in a profile, a sent instruction (Shift+Enter in compose)
 runs an agent instead of a single model call. Claudish is the agent's host: its
 progress and partial draft show in the input method's status line, its
 permission questions show in the panel (what would run, in full; Deny first, nothing
@@ -276,9 +276,9 @@ pick, and its final answer is a candidate like any other. For Claude Code:
     "--permission-prompts", "host"]}}}
 ```
 
-- *"is my branch clean?"* → `Deny` / `Allow — Bash: git status`: ↓ to a choice and Enter
-  answers (Allow is a deliberate ↓↓ Enter; Deny lets the agent carry on without it), or type a reply and
-  press Enter: it denies the call with your words as the reason ("use git diff
+- *"is my branch clean?"* → `Deny` / `Allow — Bash: git status`: ↓ to a choice and Tab
+  answers (Allow is a deliberate ↓↓ Tab; Deny lets the agent carry on without it), or type a reply and
+  press Shift+Enter: it denies the call with your words as the reason ("use git diff
   instead"), so the agent can adjust. Claude Code's own settings may allow a call
   without asking.
 - **Esc** at any point stops the agent's turn and gives you back the instruction to
@@ -386,13 +386,14 @@ over the tone. Instructions typed in a terminal always get a command line.
 `"keys"`, beside `"profile"`, sets which key sends your words to the model:
 
 ```json
-{"profile": "claude", "keys": {"summon": "Shift+Enter"}, "profiles": {"claude": {"backend": "claude"}}}
+{"profile": "claude", "keys": {"summon": "Enter"}, "profiles": {"claude": {"backend": "claude"}}}
 ```
 
-`"Enter"` (the default) asks with Enter, and Shift+Enter puts your words in as typed.
-With `"Shift+Enter"`, Enter puts them in and goes on to the app, so a chat box sends in one press,
-and Shift+Enter asks. Once drafts or a question show, Enter answers them either way. The panel's
-footer names the keys. A change applies within a few seconds, without a restart.
+`"Shift+Enter"` (the default) asks with Shift+Enter, and Enter puts your words in as typed and
+goes on to the app, so a chat box sends in one press. `"Enter"` swaps them. The ask key sends
+everything that goes to the model (an instruction, a follow-up, a reply); once the model is asked,
+the other key does nothing, and Tab takes what it offers (a draft, a choice, Allow or Deny). The
+panel's footer names the keys. A change applies within a few seconds, without a restart.
 
 ## Modes
 
@@ -404,7 +405,7 @@ Every request names a mode:
 | `continue` | the start of a sentence | your text plus the next few words |
 | `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
 
-At the caret, compose's Tab asks for `rewrite`, its Enter (or Shift+Enter, [Keys](#keys)) sends `instruct`, and continue mode
+At the caret, compose's Tab asks for `rewrite`, its Shift+Enter (or Enter, [Keys](#keys)) sends `instruct`, and continue mode
 (a Shift tap) asks for `continue`. Adapters send `"mode"` in `/suggest`, and
 `/health` lists the modes. A profile's templates can change any mode, or add one
 of its own; its `"modes"` says only which profile answers a mode (above).
