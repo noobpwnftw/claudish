@@ -194,6 +194,8 @@ export default class CdAiExtension extends Extension {
         // The monitor with the caret, not the one the panel was last on.
         const monitor = Main.layoutManager.monitors.find((m) => x >= m.x && x < m.x + m.width && y >= m.y && y < m.y + m.height)
             || Main.layoutManager.primaryMonitor;
+        // Its work area: the screen less the top bar and any dock.
+        const area = Main.layoutManager.getWorkAreaForMonitor(Main.layoutManager.monitors.indexOf(monitor));
         for (const box of [this._panel, this._toast]) {
             if (!box.visible) {
                 box._opened = null;
@@ -217,9 +219,10 @@ export default class CdAiExtension extends Extension {
             if (box._opened && box._opened.line === y && left >= box._opened.left)
                 left = box._opened.left;
             box._opened = {left, line: y};
-            left = Math.max(monitor.x + 4, Math.min(left, monitor.x + monitor.width - natural - 4));
-            if (top + tall > monitor.y + monitor.height)
-                top = Math.round(y - tall - GAP);  // no room below: above the line
+            left = Math.max(area.x + 4, Math.min(left, area.x + area.width - natural - 4));
+            // Above the line when it does not fit below and there is more room above (as Windows does).
+            if (top + tall > area.y + area.height && y - area.y > area.y + area.height - (y + height))
+                top = Math.round(y - tall - GAP);
             box.set_position(left, top);
         }
         if (this._ghost.visible) {

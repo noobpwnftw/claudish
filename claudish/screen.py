@@ -70,6 +70,12 @@ def is_terminal(app):
     return bool(app) and app.lower() in TERMINALS
 
 
+def opens_above(tall, below, above):
+    """Whether a panel `tall` high opens above its line, with `below` and `above` the room on each
+    side: when it does not fit below and there is more room above, as Windows' own panels do."""
+    return tall > below and above > below
+
+
 def tail(text):
     """The last lines of a screen: trailing blanks and the padding consoles add are dropped."""
     lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]

@@ -15,7 +15,7 @@ from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSDate
 
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.join(here, "..", "..")
-sys.path[:0] = [here, os.path.join(root, "scripts")]
+sys.path[:0] = [here, root, os.path.join(root, "scripts")]
 import lab_states  # noqa: E402
 from panel import Panel  # noqa: E402
 

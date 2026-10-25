@@ -12,6 +12,8 @@ from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsM
                     NSFontWeightMedium, NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
                     NSMutableParagraphStyle, NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
+from claudish.screen import opens_above
+
 # Every metric is the lab's macOS skin (claudish/web/design.css .host.macos) and kit.css's box model;
 # change them there first. INSET: an NSTextField label's own padding on each side, subtracted so a
 # gap between two labels is the lab's gap.
@@ -258,7 +260,7 @@ class Panel:
         self.opened = (x, cy)
         frame = NSMakeRect(x, cy - height - 6, width, height)
         screen = caret_screen(cx, cy)
-        if frame.origin.y < screen.origin.y:  # no room below: above the line
+        if opens_above(height + 6, cy - screen.origin.y, screen.origin.y + screen.size.height - (cy + ch)):
             frame.origin.y = cy + ch + 6
         frame.origin.x = max(screen.origin.x + 4, min(frame.origin.x, screen.origin.x + screen.size.width - width - 4))
         self.window.setFrame_display_(frame, True)

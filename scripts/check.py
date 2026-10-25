@@ -128,6 +128,11 @@ def main():
     run("compileall", [sys.executable, "-m", "compileall", "-q", "claudish", "platforms", "scripts", "tests",
                        "benchmarks"])
     run("git diff --check", ["git", "diff", "--check", "HEAD"])
+    extension = ROOT / "platforms/linux/gnome-extension/cd-ai@claudish.io/extension.js"
+    if shutil.which("node"):  # GNOME Shell loads it as a module
+        run("GNOME extension", ["sh", "-c", 'node --input-type=module --check < "$0"', str(extension)])
+    else:
+        skip("GNOME extension", "needs node")
     system_python = Path("/usr/bin/python3")
     if not shutil.which("dbus-run-session") or not system_python.is_file():
         skip("IBus smoke", "needs dbus-run-session and /usr/bin/python3")
