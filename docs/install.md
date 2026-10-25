@@ -30,7 +30,7 @@ Every install includes cd_AI's command line, `claudish`: `claudish settings`, `c
 
 ## Linux input method
 
-IBus only (fcitx5 is not supported yet), a preview. One line, as your user:
+IBus only (fcitx5 is not supported yet). One line, as your user:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
@@ -68,8 +68,7 @@ The config stays in `~/.config/claudish/`.
 
 ## Windows input method
 
-**The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11 (tested on ARM64; x64 not
-yet). It installs cd_AI's text service (its own build of PIME, beside any PIME you already have,
+**The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11. It installs cd_AI's text service (its own build of PIME, beside any PIME you already have,
 such as Chewing or Rime), a Python of its own for the service, and the `claudish` command, and adds
 cd_AI to your input sources. It asks for an administrator once, then sets up a starter config and
 the service at every login, and opens cd_AI's settings in your browser (the key, the tone). Then

@@ -99,8 +99,7 @@ on Linux, UI Automation on Windows, the AX API on macOS), when you press
 Tab or Shift+Enter in compose (continue stays quiet in terminals). On macOS the service's Python needs
 the Accessibility permission; on Linux the desktop's accessibility bus must run
 (GNOME and KDE run it). The lines go to the profile's model. A profile's `"read_terminal": false` turns reading off.
-Verified with GNOME Terminal, Windows Terminal, the classic Windows console, and
-Terminal.app.
+It reads GNOME Terminal, Windows Terminal, the classic Windows console and Terminal.app.
 
 **Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
 Esc only while there is marked text. An instruction stays marked while its drafts show,

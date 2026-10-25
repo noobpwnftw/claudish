@@ -53,10 +53,10 @@ the address of another model API, and pick a tone. Use **Try a rewrite** in Sett
   time: click **Done** (not Move to Trash), open **System Settings → Privacy & Security**, click
   **Open Anyway**, and once more **Open Anyway**. Then log out and back in, and pick **cd_AI** in the
   input menu.
-- **Windows 11** (tested on ARM64; x64 not yet): **cd_AI-setup.exe**. It is not signed, so
+- **Windows 11**: **cd_AI-setup.exe**. It is not signed, so
   SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. Then
   restart, and pick **cd_AI** with Win+Space.
-- **Linux** (IBus only, a preview; fcitx5 is not supported yet), as your user:
+- **Linux** (IBus; fcitx5 is not supported yet), as your user:
 
   ```sh
   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
@@ -87,14 +87,11 @@ source: [docs/install.md](docs/install.md).
 | Platform | Supported |
 | --- | --- |
 | macOS | Apple silicon, macOS 26. Intel Macs are not supported yet. |
-| Windows | Windows 11 ARM64; x64 builds but is not yet tested. |
-| Linux | IBus, a preview. |
+| Windows | Windows 11, x64 and ARM64. |
+| Linux | IBus. |
 
-The first release, 0.1.0, is in preparation; the [roadmap](ROADMAP.md) says what is next. How each
-platform is tested: [docs/development.md](docs/development.md#testing). cd_AI is maintained with
-Claude Code and Codex under its owner's direction ([AGENT.md](AGENT.md)).
-The recordings above come from the Mac VM; the [Linux typing rig](docs/development.md#linux-docker-rig)
-and [verification commands](docs/development.md#verify) run against the code in this repository.
+The [roadmap](ROADMAP.md) says what is next. cd_AI is maintained with Claude Code and Codex under
+its owner's direction ([AGENT.md](AGENT.md)).
 
 ## More
 

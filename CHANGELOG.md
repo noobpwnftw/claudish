@@ -32,6 +32,3 @@
 - **Native feedback:** failures keep the model's reason, including an exchange held across a
   focus change. Mac panels use composition-relative caret positions after existing text.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
-
-Tested on Linux (X11 in containers; GNOME Shell on Wayland in a container), Windows 11 ARM64 and macOS 26 in VMs; see
-the README's status. Measurements are from one machine (DGX Spark).

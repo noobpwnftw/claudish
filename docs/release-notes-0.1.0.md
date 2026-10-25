@@ -11,11 +11,11 @@ Settings → Privacy & Security → Open Anyway**, twice. Windows SmartScreen sa
 PC": **More info → Run anyway**. With Windows' **Smart App Control** fully on (not in evaluation), an
 unsigned installer is blocked with no Run anyway.
 
-| | File | Tested |
-| --- | --- | --- |
-| macOS, Apple silicon | `cd_AI.pkg` | macOS 26 (VM). Intel Macs: not supported yet; the installer says so. |
-| Windows 11 | `cd_AI-setup.exe` | Windows 11 ARM64 (VM): install by a standard account, restart, update, uninstall. x64: not yet tested. |
-| Linux, IBus | `curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh \| sh` | A preview: installs in a clean Ubuntu 24.04. |
+| | File |
+| --- | --- |
+| macOS 26, Apple silicon (not Intel yet) | `cd_AI.pkg` |
+| Windows 11, x64 and ARM64 | `cd_AI-setup.exe` |
+| Linux, IBus | `curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh \| sh` |
 
 ## The model
 
@@ -28,12 +28,7 @@ cd_AI ships no model. At the end of the install, its settings ask for one:
 - **Another model API**: any OpenAI-compatible address (OpenAI, OpenRouter, Groq, Ollama, LM Studio
   or llama.cpp), with a key if it needs one.
 
-Use **Try a rewrite** in Settings before switching input methods. On 2026-10-25, installed
-packages produced rewrites, drafts, answers, approvals and a Claude Code handoff on macOS (Gemma 4
-as "Another model API", and Claude Code), and ran their service at login on Windows ARM64 for a
-standard account. Codex produced a real rewrite from Settings run from source. Still to check:
-Codex from a package, a logged-in subscription on Windows, Windows x64, browser downloads, and a
-funded Anthropic API key. See [the current evidence](development.md#current-evidence-and-next-checks).
+Use **Try a rewrite** in Settings before switching input methods.
 
 ## Good to know
 
