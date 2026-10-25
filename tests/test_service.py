@@ -80,5 +80,16 @@ class SafetyTests(unittest.TestCase):
             self.assertTrue(all(c[0] == tool for c in commands), system)
 
 
+    def test_windows_logon_task_is_this_accounts_own(self):
+        """A machine-wide "claudish" task was taken by whoever installed first; another account's
+        install could not replace it, so its service never started at login (Windows VM)."""
+        with patch("claudish.service.platform.system", return_value="Windows"), \
+                patch.dict("os.environ", {"USERNAME": "Mei Lin"}):
+            steps = service.plan("install", extra=["--backend", "rules"])
+        names = [payload[payload.index("/tn") + 1] for _, kind, payload in steps if kind in ("run", "stop")]
+        self.assertEqual(names, ["claudish", "claudish-Mei_Lin", "claudish-Mei_Lin"])  # the old shared one goes first
+        self.assertEqual(steps[0][1], "stop")  # another account's: it may not be ours to delete
+
+
 if __name__ == "__main__":
     unittest.main()

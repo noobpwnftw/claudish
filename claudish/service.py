@@ -14,6 +14,13 @@ from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "claudish"
+
+
+def task_name():
+    """Windows' logon task, one per account: a machine-wide name was taken by whoever installed first,
+    and another account's install could not replace it, so its service never started at login."""
+    import re
+    return "%s-%s" % (NAME, re.sub(r"[^A-Za-z0-9_.-]", "_", os.environ.get("USERNAME", "") or "user"))
 LABEL = "com.claudish.service"
 
 
@@ -139,13 +146,15 @@ def plan(action, local=False, extra=()):
     if system == "Windows":
         if action == "install":
             task = paths()["Windows"]
-            return [("write the logon task", "write", (task, windows_task(argv), "utf-16")),
-                    ("create the logon task", "run", ["schtasks", "/create", "/tn", NAME, "/xml", str(task), "/f"]),
-                    ("start it now", "run", ["schtasks", "/run", "/tn", NAME])]
+            return [("drop the shared logon task an older cd_AI made (if this account's)", "stop",
+                     ["schtasks", "/delete", "/tn", NAME, "/f"]),
+                    ("write the logon task", "write", (task, windows_task(argv), "utf-16")),
+                    ("create the logon task", "run", ["schtasks", "/create", "/tn", task_name(), "/xml", str(task), "/f"]),
+                    ("start it now", "run", ["schtasks", "/run", "/tn", task_name()])]
         if action == "uninstall":
-            return [("stop it", "run", ["schtasks", "/end", "/tn", NAME]),
-                    ("delete the logon task", "run", ["schtasks", "/delete", "/tn", NAME, "/f"])]
-        return [("status", "run", ["schtasks", "/query", "/tn", NAME])]
+            return [("stop it", "run", ["schtasks", "/end", "/tn", task_name()]),
+                    ("delete the logon task", "run", ["schtasks", "/delete", "/tn", task_name(), "/f"])]
+        return [("status", "run", ["schtasks", "/query", "/tn", task_name()])]
     if system == "Darwin":
         agent, domain = paths()["Darwin"], "gui/%d" % os.getuid()
         if action == "install":
@@ -200,7 +209,7 @@ def managed():
                                    timeout=5).stdout.strip()
             return ("ok" if state == "active" else "warn"), "systemd user unit (%s)" % (state or "unknown")
         if system == "Windows":
-            found = subprocess.run(["schtasks", "/query", "/tn", NAME], capture_output=True, text=True,
+            found = subprocess.run(["schtasks", "/query", "/tn", task_name()], capture_output=True, text=True,
                                    timeout=5).returncode == 0
             return ("ok", "logon task") if found else ("warn", "not managed: it will not start at login")
         if system == "Darwin":
