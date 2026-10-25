@@ -106,6 +106,7 @@ class Suggestions:
         self.conversation = "%032x" % random.getrandbits(128)
         self.offline = False  # the service did not answer its last check
         self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
+        self.hints = True  # the config's "hints"
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -120,7 +121,9 @@ class Suggestions:
                 with OPENER.open(self.endpoint + "/health", timeout=2) as answer:
                     self.offline, missed = False, 0
                     try:  # the config's keys, taken up as the service takes up a hand edit
-                        self.summon = json.loads(answer.read().decode("utf-8"))["keys"]["summon"]
+                        health = json.loads(answer.read().decode("utf-8"))
+                        self.summon = health["keys"]["summon"]
+                        self.hints = health.get("hints", True) is not False
                     except (ValueError, KeyError, TypeError):
                         pass
             except Exception as exc:

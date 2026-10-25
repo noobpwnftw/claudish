@@ -197,6 +197,7 @@ class Rewriter:
         rewriter.launcher = settings.get("launcher")
         rewriter.session_command = settings.get("session_command")
         rewriter.summon = settings.get("summon", "Shift+Enter")
+        rewriter.hints = settings.get("hints", True)
         if settings.get("tools"):
             if settings["backend"] not in ("llama", "openai", "claude"):
                 raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "

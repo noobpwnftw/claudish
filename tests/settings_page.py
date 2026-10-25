@@ -70,6 +70,11 @@ async def check(args, home, port):
         await expect(page.locator("#tone-message")).to_have_text("Tone saved.")
         assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "plain and friendly"
 
+        await expect(page.locator("input[name=hints][value=on]")).to_be_checked()
+        await page.get_by_text("Only what waits on Tab", exact=True).click()
+        await expect(page.locator("#hints-message")).to_have_text("The panel shows only what waits on Tab.")
+        assert json.loads(config.read_text())["hints"] is False
+
         await page.get_by_text("Another model API").click()  # the form first: nothing switched yet
         await expect(page.locator("#server")).to_be_visible()
         assert json.loads(config.read_text())["profile"] == "claude"

@@ -111,6 +111,7 @@ function render(state) {
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   tones(state);
   for (const radio of document.getElementsByName("summon")) radio.checked = radio.value === state.summon;
+  for (const radio of document.getElementsByName("hints")) radio.checked = radio.value === (state.hints === false ? "off" : "on");
 }
 
 function tones(state) {
@@ -191,7 +192,7 @@ async function sample(manual = false) {
 }
 
 async function change(body, message, done) {
-  const keys = Object.keys(body).join() === "summon";  // a key changes no rewrite: no new example
+  const keys = ["summon", "hints"].includes(Object.keys(body).join());  // keys and hints change no rewrite: no new example
   if (!keys) {
     sampleVersion++;
     $("sample").hidden = true;
@@ -265,6 +266,10 @@ start().catch((error) => {
   $("status").className = "bad";
 });
 
+for (const radio of document.getElementsByName("hints")) {
+  radio.addEventListener("change", () => change({hints: radio.value === "on"}, "hints-message",
+                                                radio.value === "on" ? "Hints show." : "The panel shows only what waits on Tab."));
+}
 for (const radio of document.getElementsByName("summon")) {
   radio.addEventListener("change", () => change({summon: radio.value}, "keys-message", `${radio.value} asks the model.`));
 }

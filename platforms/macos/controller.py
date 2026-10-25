@@ -191,6 +191,7 @@ class ClaudishInputController(IMKInputController):
         if not self.active or self.worker is None:
             return
         self.state.summon = self.worker.summon  # the config's keys
+        self.state.hints = self.worker.hints
         if self.state.offline != self.worker.offline:  # the service stopped or came back
             self.state.offline = self.worker.offline
             if self.state.text and not self.state.live:
@@ -340,7 +341,7 @@ class ClaudishInputController(IMKInputController):
         """A panel at the caret: briefly (the mode switch, what Esc just dropped), or until your next
         key (lasting: the pill for an exchange held while you were away)."""
         client = client if client is not None else self.client()
-        if client is None:
+        if client is None or spec is None:  # nothing to say (hints off)
             return
         TOAST.show(self.caret(client, start=True), spec)
         if getattr(self, "toast_timer", None) is not None:

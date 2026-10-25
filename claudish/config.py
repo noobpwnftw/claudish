@@ -42,7 +42,7 @@ def resolve(path=None, profile=None, overrides=None):
     templates: the profile's templates file, read (modes.load), or None for the shipped ones;
     settings["modes"] becomes name -> {"profile"}: which profile answers a mode."""
     settings, name, base, servers, known = dict(DEFAULTS), None, Path.cwd(), {}, set()
-    summon = SUMMON_KEYS[0]
+    summon, hints = SUMMON_KEYS[0], True
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
         try:
@@ -60,6 +60,9 @@ def resolve(path=None, profile=None, overrides=None):
         if not (isinstance(keys, dict) and set(keys) <= {"summon"} and keys.get("summon", SUMMON_KEYS[0]) in SUMMON_KEYS):
             raise ValueError('"keys" takes "summon": "Enter" or "Shift+Enter" (the other key puts your words in)')
         summon = keys.get("summon", summon)
+        hints = data.get("hints", True)
+        if not isinstance(hints, bool):
+            raise ValueError('"hints" is true or false (false: the panel only for what waits on your Tab)')
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
@@ -125,7 +128,7 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError("profile %r: binding for %r names profile %r, which is not in the config"
                              % (name, binding.pattern, binding.profile))
     settings["mcp_servers"] = servers
-    settings["summon"] = summon
+    settings["summon"], settings["hints"] = summon, hints
     return name, settings, templates, context
 
 

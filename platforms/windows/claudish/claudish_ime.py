@@ -207,7 +207,8 @@ class ClaudishTextService(TextService):
         if self.worker:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
-        self.setToast(self.state.toast(), 2)
+        if self.state.hints:
+            self.setToast(self.state.toast(), 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
 
@@ -460,6 +461,7 @@ class ClaudishTextService(TextService):
         if self.worker:
             self.state.offline = self.worker.offline  # the service stopped or came back
             self.state.summon = self.worker.summon  # the config's keys
+            self.state.hints = self.worker.hints
         result = self.worker.poll() if self.worker else None
         if result:
             revision, data = result
@@ -470,7 +472,7 @@ class ClaudishTextService(TextService):
             elif "progress" in data or "partial" in data:
                 self.state.note(revision, data.get("progress") or data.get("partial"))
             elif "done" in data:
-                if self.state.done(revision):
+                if self.state.done(revision) and self.state.hints:
                     self.setToast(blank(status=data["done"]), 3)  # a helper took the task: said briefly at the caret
             elif "error" in data:
                 self.state.fail(revision, data["error"])  # the panel says why: Shift+Enter retries
@@ -580,7 +582,7 @@ class ClaudishTextService(TextService):
                     self.worker.answer(*chosen)
                 self.publish()
                 return True
-            if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
+            if action in ("clear", "drop") and self.state.hints:  # words discarded: said, with the key that brings them back
                 self.setToast(self.state.dropped_toast(), 2)
             if action == "clear":  # the reply goes; the question stays
                 self.publish()

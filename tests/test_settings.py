@@ -64,6 +64,16 @@ class SettingsTests(Home):
         with self.assertRaises(ValueError):
             settings.apply({"summon": "Ctrl+Enter"})
 
+    def test_hints_are_saved_only_when_off(self):
+        self.assertIs(settings.apply({"tone": "corporate"})["hints"], True)
+        self.assertIs(settings.apply({"hints": False})["hints"], False)
+        self.assertIs(self.written()["hints"], False)
+        self.assertIs(config.resolve(self.path)[1]["hints"], False)
+        settings.apply({"hints": True})
+        self.assertNotIn("hints", self.written())
+        with self.assertRaises(ValueError):
+            settings.apply({"hints": "off"})
+
     def test_claude_code_for_a_claude_subscription(self):
         with patch.object(settings, "claude_code", return_value=None):
             self.assertEqual(settings.state()["claude_code"], settings.NO_CLAUDE_CODE)

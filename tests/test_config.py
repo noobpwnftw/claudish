@@ -57,6 +57,15 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '"keys" takes "summon"'):
                 config.resolve()
 
+    def test_hints(self):
+        self.assertIs(config.resolve()[1]["hints"], True)
+        profiles = {"profiles": {"r": {"backend": "rules"}}}
+        self.write(dict(profiles, hints=False))
+        self.assertIs(config.resolve()[1]["hints"], False)
+        self.write(dict(profiles, hints="off"))
+        with self.assertRaisesRegex(ValueError, '"hints" is true or false'):
+            config.resolve()
+
     def test_invalid_configs_fail_with_clear_messages(self):
         for profile, message in [({"api_key": "sk-secret"}, "api_key_env"),
                                  ({"modle": "typo"}, "unknown keys modle"),

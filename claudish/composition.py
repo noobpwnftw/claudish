@@ -112,6 +112,9 @@ class Composition:
         # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
         # by the adapter like offline); the other one puts them in as typed.
         self.summon = "Shift+Enter"
+        # "hints": false in the config (copied here as summon is): no keys while you compose, no
+        # mode or dropped toasts, no working status; the panel only for what waits on your Tab.
+        self.hints = True
 
     @property
     def keeper(self):
@@ -190,6 +193,8 @@ class Composition:
         draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
+        if not (self.hints or self.waits_on_you()):
+            return None
         shown = blank(take="Tab")  # the key that takes the highlighted row: a draft or a choice
         question = self.question
         if self.sent:
@@ -247,15 +252,26 @@ class Composition:
                                                                  ("Esc", "cancel reply" if question else "cancel")])
         return shown
 
+    def waits_on_you(self):
+        """Something the model offers waits for your Tab: a question or an answer to read, drafts,
+        a rewrite."""
+        return bool(self.question or self.converted or (self.asked == "instruct" and self.candidate
+                                                        and not self.working and not self.failed))
+
     def toast(self):
         """The mode switch, briefly at the caret: the mode's tile, its name, and the key back (a
-        panel with only a footer)."""
+        panel with only a footer). None with hints off."""
+        if not self.hints:
+            return None
         compose = self.mode == "compose"
         return blank(tile="ai" if compose else "cd", status="compose" if compose else "continue",
                      foot=[("Shift", "continue" if compose else "compose")])
 
     def dropped_toast(self):
-        """After Esc discarded words: say so, briefly, with the key that brings them back."""
+        """After Esc discarded words: say so, briefly, with the key that brings them back (None with
+        hints off)."""
+        if not self.hints:
+            return None
         return blank(status="dropped", foot=[("Shift+Esc", "restore")])
 
     def hint(self):
@@ -709,6 +725,8 @@ class Composition:
             self.held = None
             return None
         if app != self.held_app or self.text:
+            return None
+        if not self.hints and not (held.question or held.candidate):  # with hints off: only what waits on you
             return None
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else

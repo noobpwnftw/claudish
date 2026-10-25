@@ -156,6 +156,7 @@ class Worker:
         self.closed = False
         self.offline = False
         self.summon = "Shift+Enter"
+        self.hints = True
         self.modes = []
 
     def answer(self, session, question, choice=None, text=None):

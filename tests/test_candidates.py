@@ -110,6 +110,49 @@ class SummonKeyTests(unittest.TestCase):
         self.assertEqual(state.keep(), "running late")  # nothing from the model waits: Enter keeps
 
 
+class HintsTests(unittest.TestCase):
+    """"hints": false: no keys while you compose, no toasts, no working status; the panel only for
+    what waits on your Tab (drafts, a rewrite, a question)."""
+
+    def quiet(self):
+        state = Composition()
+        state.mode, state.hints = "compose", False
+        state.change("running late")
+        return state
+
+    def test_composing_and_working_show_nothing(self):
+        state = self.quiet()
+        self.assertIsNone(state.panel())
+        self.assertIsNone(state.toast())
+        self.assertIsNone(state.dropped_toast())
+        state.submit()
+        self.assertIsNone(state.panel())  # working: nothing to take yet
+        state.fail(state.revision, "no model")
+        self.assertIsNone(state.panel())
+
+    def test_drafts_a_rewrite_and_questions_still_show(self):
+        state = self.quiet()
+        state.submit()
+        state.offer(state.revision, "Running late.", ["Running late—apologies."])
+        self.assertEqual(len(state.panel()["rows"]), 2)
+        state = self.quiet()
+        self.assertEqual(state.tab(), "request")
+        self.assertIsNone(state.panel())
+        state.offer(state.revision, "I am running late.")
+        self.assertEqual(state.panel()["body"], "I am running late.")
+        state = self.quiet()
+        state.submit()
+        state.ask(state.revision, {"id": "q", "text": "Which meeting?", "choices": [{"label": "Standup"}]}, "s")
+        self.assertEqual(state.panel()["rows"][0]["text"], "Standup")
+
+    def test_by_default_hints_show(self):
+        state = Composition()
+        state.change("running late")
+        self.assertTrue(state.hints)
+        self.assertTrue(state.panel()["foot"])
+        self.assertTrue(state.toast())
+
+
 class ModeFeelTests(unittest.TestCase):
     """Each mode looks different at the caret: a rewrite waits in the panel, an instruction lists drafts."""
 

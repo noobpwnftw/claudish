@@ -395,6 +395,12 @@ everything that goes to the model (an instruction, a follow-up, a reply); once t
 the other key does nothing, and Tab takes what it offers (a draft, a choice, Allow or Deny). The
 panel's footer names the keys. A change applies within a few seconds, without a restart.
 
+### Hints
+
+`"hints": false`, beside `"profile"`, keeps the panel for what waits on your Tab: drafts, a
+rewrite, a question or an approval. The keys while you compose, the mode and dropped toasts, and
+the working and failed lines do not show. Settings → Panel sets it too.
+
 ## Modes
 
 Every request names a mode:

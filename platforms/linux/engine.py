@@ -147,6 +147,7 @@ class ClaudishEngine(IBus.Engine):
 
     def poll(self):
         self.composition.summon = self.suggestions.summon  # the config's keys
+        self.composition.hints = self.suggestions.hints
         if self.composition.offline != self.suggestions.offline:  # the service stopped or came back
             self.composition.offline = self.suggestions.offline
             if self.composition.text and not self.composition.live:
@@ -421,7 +422,7 @@ class ClaudishEngine(IBus.Engine):
                     self.suggestions.answer(*chosen)
                 self.render()
                 return True
-            if action in ("clear", "drop") and screen().shell:  # said, with the key that brings it back
+            if action in ("clear", "drop") and screen().shell and self.composition.hints:  # said, with the key that brings it back
                 screen().publish(None, "", self.composition.dropped_toast())
             if action == "keep":
                 self.finish()
@@ -489,7 +490,9 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(kept))
         self.changed()
         self.show_mode()
-        if screen().shell:  # the mode switch, briefly at the caret
+        if not self.composition.hints:
+            pass
+        elif screen().shell:  # the mode switch, briefly at the caret
             screen().publish(self.drawn, "", self.composition.toast())
         elif not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
             self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)

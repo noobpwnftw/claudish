@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Enter commits your words and stops there, as other input methods do; the next Enter is the app's.
+- Settings → Panel: "Only what waits on Tab" (`"hints": false`) shows the panel for drafts,
+  rewrites and questions only: no keys while you compose, no toasts.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
   switches modes), and it no longer shows dots.
 

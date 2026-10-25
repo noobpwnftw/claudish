@@ -85,6 +85,7 @@ def state(path=None):
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
+        "hints": data.get("hints", True) is not False,
         "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
         "config": str(path or config.default_path()),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
@@ -164,7 +165,7 @@ def check_server(url, model=None, key=None):
 def apply(changes, path=None):
     """Make the window's changes; ValueError (with words for the window) when one is not valid.
     The key is checked before it is saved, and a key Anthropic refuses is not saved."""
-    if not isinstance(changes, dict) or not set(changes) <= {"choice", "key", "server", "tone", "summon"}:
+    if not isinstance(changes, dict) or not set(changes) <= {"choice", "key", "server", "tone", "summon", "hints"}:
         raise ValueError("unknown setting")
     path = path or config.default_path()
     data = read(path)
@@ -238,6 +239,12 @@ def apply(changes, path=None):
         data.pop("keys", None)
         if changes["summon"] != config.SUMMON_KEYS[0]:
             data["keys"] = {"summon": changes["summon"]}
+    if "hints" in changes:  # key hints and toasts; off: the panel only for what waits on your Tab
+        if not isinstance(changes["hints"], bool):
+            raise ValueError("hints are on or off")
+        data.pop("hints", None)
+        if not changes["hints"]:
+            data["hints"] = False
     if "key" in changes and "choice" not in changes and not path.is_file():
         # The page already shows Claude chosen: with no config yet, the key makes it so.
         profiles.setdefault("claude", dict(config.STARTER["profiles"]["claude"]))

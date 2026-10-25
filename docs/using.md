@@ -24,6 +24,9 @@ Typing in detail, the browser demos, and terminals.
 | Tab with a selection (compose) | With nothing composed, the selected text becomes your words, and Tab asks for its rewrite as above; Esc twice puts it back. macOS, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
 | Backspace | Edit the composition; with a rewrite showing, the first Backspace closes it |
 
+Settings → Panel → "Only what waits on Tab" (`"hints": false`) hides the keys while you compose,
+the toasts and the working line; drafts, rewrites and questions still show.
+
 Where you want no suggestions at all, switch that app to your usual keyboard;
 the system remembers it per app or window once you turn that on: Windows,
 Settings → Time & language → Typing → Advanced keyboard settings → "Let me use a

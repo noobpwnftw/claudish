@@ -45,6 +45,7 @@ def main():
             worker_class.return_value.poll.return_value = None
             worker_class.return_value.offline = False
             worker_class.return_value.summon = "Shift+Enter"
+            worker_class.return_value.hints = True
             service = ClaudishTextService(None)
             replayed = []  # keys pressed again for the app after a commit
             replaying = patch("pime_claudish.claudish_ime.replay", lambda vk, modifiers=(): replayed.append((vk, modifiers)))
