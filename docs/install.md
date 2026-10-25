@@ -104,7 +104,8 @@ the service at every login, and cd_AI added to your input sources and enabled. m
 allow it to enable cd_AI. On a first install, cd_AI's settings open at the end: choose your model
 and tone, then use Try a rewrite. Then **log out and back in**, as after installing or updating
 any macOS input method: until then macOS keeps its old list of input sources (and, after an update, the old cd_AI).
-**Settings…** in the input menu opens the settings again.
+In the input menu it is **Claudish – Compose** and **Claudish – Continue**: a Shift tap switches
+between them, the menu bar showing AI or cd. **Settings…** in the input menu opens the settings again.
 
 For a model API on another computer, macOS asks for local-network access on the first connection.
 Choose **Allow**, then retry **Use this API** in Settings if its first check did not connect.
@@ -132,7 +133,8 @@ Option, such as — and €, stay in the composition.
 
 **Uninstall:**
 
-1. In **System Settings → Keyboard → Text Input → Edit**, select cd_AI and click **−**.
+1. In **System Settings → Keyboard → Text Input → Edit**, select Claudish – Compose and Claudish –
+   Continue and click **−**.
 2. Paste into Terminal, which stops cd_AI's service and removes the app:
    `~/Library/Input\ Methods/Claudish.app/Contents/MacOS/Claudish service uninstall && rm -rf ~/Library/Input\ Methods/Claudish.app`
 3. Log out and back in.
