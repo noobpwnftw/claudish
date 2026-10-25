@@ -12,7 +12,7 @@ subscription, kept running beside the service), or **Codex** for a ChatGPT subsc
 Pick the model you already use, then use **Try a rewrite** in Settings before switching input
 methods. Subscription choices show when their command is starting or needs a login. After
 logging in through that command, try the rewrite again. Once it answers, finish the OS steps below:
-type `ok`, press Tab to preview the rewrite, then Tab again to insert it. Enter keeps `ok`.
+type `ok`, press Tab to preview the rewrite, then Tab again to insert it. Enter keeps `ok` (and the app gets the Enter).
 
 ## The `claudish` command
 

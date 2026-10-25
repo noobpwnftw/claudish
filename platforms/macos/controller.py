@@ -248,7 +248,7 @@ class ClaudishInputController(IMKInputController):
         if not self.active:
             return
         action = self.state.click(number - 1)
-        if action == "choose":  # a question's choice: answered, as Shift+Enter would
+        if action == "choose":  # a question's choice: answered, as Tab would
             chosen = self.state.answer_choice()
             if chosen and self.worker is not None:
                 self.worker.answer(*chosen)
@@ -566,7 +566,7 @@ class ClaudishInputController(IMKInputController):
         self.pollSuggestions_(None)
         key = event.keyCode()
         chars = event.characters() or ""
-        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Shift+Enter).
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
         if key == 100 and self.state.toggle_look():  # F8 in instruct: send a picture of this window too.
             self.changed(client)
             return True
@@ -576,18 +576,12 @@ class ClaudishInputController(IMKInputController):
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
             self.changed(client)
-            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+            if kept is None:  # the model is asked: taken, nothing goes in
                 return True
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
             return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if key in (36, 76):  # Return, keypad Enter
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
-            if action == "choose":  # answer with the highlighted choice
-                chosen = self.state.answer_choice()
-                if chosen and self.worker is not None:
-                    self.worker.answer(*chosen)
-                self.changed(client)
-                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
                 if self.worker is not None:

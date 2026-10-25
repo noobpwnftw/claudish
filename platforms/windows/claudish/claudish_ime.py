@@ -499,7 +499,7 @@ class ClaudishTextService(TextService):
         shift = event.isKeyDown(0x10)
         if key == 0x0D and not self.state.talks(shift) and self.state.text and not self.state.live:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
-            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+            if kept is None:  # the model is asked: taken, nothing goes in
                 self.publish()
                 return True
             self.setCommitString(kept)
@@ -511,12 +511,6 @@ class ClaudishTextService(TextService):
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
             if action == "pass":  # nothing composed: the app's key, as it is (never replayed)
                 return False
-            if action == "choose":  # answer with the highlighted choice
-                chosen = self.state.answer_choice()
-                if chosen and self.worker:
-                    self.worker.answer(*chosen)
-                self.publish()
-                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
                 if self.worker:
@@ -536,7 +530,7 @@ class ClaudishTextService(TextService):
             if action == "wait":  # still working, or the model's text: the panel lights Tab, which takes it
                 self.publish()
                 return True
-        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Shift+Enter).
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
         if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
         if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.

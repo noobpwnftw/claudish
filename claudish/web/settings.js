@@ -191,13 +191,16 @@ async function sample(manual = false) {
 }
 
 async function change(body, message, done) {
-  sampleVersion++;
-  $("sample").hidden = true;
+  const keys = Object.keys(body).join() === "summon";  // a key changes no rewrite: no new example
+  if (!keys) {
+    sampleVersion++;
+    $("sample").hidden = true;
+  }
   say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the API…" : "");
   try {
     render(await call("/settings", body));
     say(message, done);
-    sample();
+    if (!keys) sample();
     return true;
   } catch (error) {
     say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);

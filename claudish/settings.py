@@ -84,7 +84,7 @@ def state(path=None):
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
-        "summon": (data.get("keys") or {}).get("summon", config.SUMMON_KEYS[0]),  # the key that asks the model
+        "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
         "config": str(path or config.default_path()),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused

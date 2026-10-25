@@ -84,7 +84,7 @@ const ghost = () => live() && !selected() && state.candidate.length > state.text
 function automatic() {
   // Only continue asks on a pause, at a word boundary (not at the start of an empty line), and only
   // at the end of a line: in the middle of text a suggestion would cover what follows. Rewrite asks
-  // on Tab and instruct on Enter: nothing is sent while you type.
+  // on Tab and instruct on Shift+Enter: nothing is sent while you type.
   const inside = Boolean(doc.text[doc.caret]) && doc.text[doc.caret] !== "\n";
   return live() && !inside && Boolean(state.text) && !/[\p{L}\p{N}\n]$/u.test(state.text);
 }

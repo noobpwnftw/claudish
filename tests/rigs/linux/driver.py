@@ -133,7 +133,7 @@ def scenario(name, service):
             time.sleep(0.25)
             assert state()["entry"] == "", state()
             assert state()["preedit"] == "keep me", state()
-        key("shift+Return")
+        key("Return")  # Enter keeps your words (Shift+Enter would ask)
         wait(lambda: state().get("entry") == "keep me", "original words committed")
 
 

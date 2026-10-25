@@ -26,7 +26,7 @@ fi
 cd "$home"
 [ -x .venv/bin/python ] || python3 -m venv .venv
 .venv/bin/python -m pip install --quiet --upgrade pip
-.venv/bin/python -m pip install --quiet -e ".[claude]"
+.venv/bin/python -m pip install --quiet -e ".[claude,mcp]"
 # `claudish` on PATH, as ~/.local/bin is on Ubuntu, Fedora and most desktops.
 mkdir -p "$HOME/.local/bin"
 ln -sf "$home/.venv/bin/claudish" "$HOME/.local/bin/claudish"

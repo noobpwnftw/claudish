@@ -28,7 +28,7 @@ Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/usin
 
 In a terminal, a handoff is a command draft: Tab puts it at the prompt; Enter runs it in that folder.
 
-![Asking about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
+![Shift+Enter asks about a typo, then hands the failing invoice tests to Claude Code (macOS, Terminal)](docs/cd_AI-terminal.gif)
 
 cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
 works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local

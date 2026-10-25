@@ -89,6 +89,18 @@ class SummonKeyTests(unittest.TestCase):
         self.assertIsNone(state.keep())
         self.assertEqual(state.enter(), "reply")
 
+    def test_a_rewrite_on_its_way_or_shown_gates_enter_too(self):
+        state = self.composing("Shift+Enter")
+        self.assertEqual(state.tab(), "request")  # the spinner: a reflexive Enter must not send
+        self.assertIsNone(state.keep())
+        state.offer(state.revision, "Running slightly behind.")
+        self.assertIsNone(state.keep())  # the rewrite waits for Tab; Esc first to keep your words
+        self.assertEqual((state.escape(), state.keep()), ("back", "running late"))
+        state = self.composing("Shift+Enter")
+        state.tab()
+        state.fail(state.revision, "offline")
+        self.assertEqual(state.keep(), "running late")  # nothing from the model waits: Enter keeps
+
 
 class ModeFeelTests(unittest.TestCase):
     """Each mode looks different at the caret: a rewrite waits in the panel, an instruction lists drafts."""
@@ -144,14 +156,14 @@ class ModeFeelTests(unittest.TestCase):
         state.adopt("their words")
         self.assertEqual(state.escape(), "keep")  # even before any rewrite
 
-    def test_shift_enter_keeps_it_as_it_is_and_stays_in_compose(self):
+    def test_the_keeper_keeps_it_as_it_is_and_stays_in_compose(self):
         state = Composition()
         state.mode = "compose"
-        self.assertEqual(state.keep(), "")  # nothing composed: Shift+Enter is the app's
+        self.assertEqual(state.keep(), "")  # nothing composed: Enter is the app's
         state.change("as typed")
         self.assertEqual((state.keep(), state.mode, state.text), ("as typed", "compose", ""))
 
-    def test_enter_sends_an_instruction_and_tab_a_rewrite(self):
+    def test_the_summon_key_sends_an_instruction_and_tab_a_rewrite(self):
         state = Composition()
         state.mode = "compose"
         state.change("decline politely")

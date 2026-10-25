@@ -351,11 +351,11 @@ class ClaudishEngine(IBus.Engine):
             return True
         if self.composition.live:
             return self.live_key(keyval)
-        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Shift+Enter).
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
         shift = bool(state & IBus.ModifierType.SHIFT_MASK)
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
             kept = self.composition.keep()  # the keeper key: as it is, and keep composing
-            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+            if kept is None:  # the model is asked: taken, nothing goes in
                 self.render()
                 return True
             if not kept:
@@ -365,12 +365,6 @@ class ClaudishEngine(IBus.Engine):
             return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
-            if action == "choose":  # answer with the highlighted choice
-                chosen = self.composition.answer_choice()
-                if chosen:
-                    self.suggestions.answer(*chosen)
-                self.render()
-                return True
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.composition.answer_text()
                 self.suggestions.answer(session, question, text=words)

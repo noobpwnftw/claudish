@@ -111,8 +111,9 @@ class Composition:
 
     def talks(self, shift):
         """Whether Enter (Shift+Enter with shift) talks to the model rather than keeping your words:
-        the summon key does everything that goes to the model (an instruction, a follow-up, a reply,
-        a choice), the other key only ever puts your own words in (owner, 2026-10-25)."""
+        the summon key sends every word that goes to the model (an instruction, a follow-up, a
+        reply); Tab takes what it offers; the other key only ever puts your own words in, and does
+        nothing once the model is asked (owner, 2026-10-25)."""
         return not shift if self.summon == "Enter" else shift
 
     def change(self, text):
@@ -360,8 +361,7 @@ class Composition:
     def enter(self):
         """What the summon key does (Shift+Enter; it talks to the model): "pass" (the
         app's), "submit" (send it as an instruction), "reply" (send what you typed to the model's
-        question), "choose" (answer with the highlighted choice), or "wait" (nothing to send: on a
-        draft, the row lights Tab, the key that takes it)."""
+        question), or "wait" (nothing to send: a choice is Tab's; on a draft, the row lights Tab)."""
         if not self.text:
             return "pass"
         if self.question:
@@ -386,11 +386,11 @@ class Composition:
 
     def keep(self):
         """The keeper key (Enter, or Shift+Enter when Enter summons): insert what you see, as it
-        is, and keep composing; "" with nothing composed (then the key is the app's); None while an
-        exchange shows and nothing is typed (the key is taken, nothing goes in)."""
+        is, and keep composing; "" with nothing composed (then the key is the app's); None once the
+        model is asked, a rewrite included (the key is taken, nothing goes in)."""
         if not self.text or self.live:
             return ""
-        if self.sent or self.question:
+        if self.sent or self.question or self.working or self.converted:  # a failed rewrite leaves only your words
             # Once the model is summoned the key is gated (owner): your instruction or a reply never
             # lands in the app by a reflexive press; on drafts it lights Tab, the key that takes one.
             if self.asked == "instruct" and self.candidate:

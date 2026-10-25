@@ -1034,7 +1034,7 @@ index 0000000..ae062af
 +    std::wstring status;  // what is happening
 +    bool busy = false;    // with a spinner
 +    std::wstring failed;  // why a request failed
-+    std::wstring take = L"Enter";  // the highlighted row's key: Tab takes a draft, Enter confirms a choice
++    std::wstring take = L"Tab";  // the highlighted row's key: Tab takes a draft or a choice
 +    bool nudge = false;   // Enter on a draft: the highlighted row's key (take) is lit
 +
 +    bool empty() const {

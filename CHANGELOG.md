@@ -30,5 +30,5 @@ No release has been made yet. What a first release would contain:
   focus change. Mac panels use composition-relative caret positions after existing text.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
 
-Tested on Linux (X11 and GNOME Wayland in containers), Windows 11 ARM64 and macOS 26 in VMs; see
+Tested on Linux (X11 in containers; GNOME Wayland once, before 2026-10-24), Windows 11 ARM64 and macOS 26 in VMs; see
 the README's status. Measurements are from one machine (DGX Spark).

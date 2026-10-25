@@ -55,7 +55,7 @@ the rigs; it is not part of the shipped source.
 ## Current evidence and next checks
 
 As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
-release. The merge gate runs 272 unit tests, both adapter smokes and the settings browser check.
+release. The merge gate runs the unit tests, both adapter smokes and the settings browser check.
 The browser check includes subscription startup/failure/retry, a first rewrite and stale example
 responses, including a delayed Settings session before controls become usable. CLI protocol tests
 use stand-ins; they do not establish account access. The native worker also checks that an HTTP
@@ -109,8 +109,8 @@ confirmed that Settings opens and a rewrite reports the missing model/key.
 
 The next checks, in order, are in [ROADMAP.md](../ROADMAP.md). In particular:
 
-- Check automatic first opening of Settings on a prepared fresh Mac account, and repeat the
-  fresh-account flow on Windows. Exercise a Windows subscription when a logged-in CLI is present.
+- Check automatic first opening of Settings on a prepared fresh Mac account (the Windows
+  fresh-account flow passed on 2026-10-25). Exercise a Windows subscription with a logged-in CLI.
 - Integrate the release preparation with current main and check the download/install path.
   A funded Anthropic-key rewrite and its failure states remain unchecked on the installed Mac
   and Windows packages; publishing requires the owner.
