@@ -15,17 +15,15 @@ one-line instructions answered at the caret, in every app, with the model you co
 | G01 | **Works the same on all three platforms** | Install, restart, type, update and uninstall pass on macOS, Windows and Linux |
 | G45 | **The panels match the design lab**, state by state | Each platform checked in both themes |
 
-Verified by installed packages (2026-10-25): macOS Apple silicon (Claude Code, a new account
-through logout and login) and Windows ARM64 (Gemma 4 as another model API, a new standard account
-with one UAC prompt, Settings opening by itself, update, uninstall). Linux typing runs in the
-Docker rig. Still open for G63: a logged-in subscription on Windows, Windows x64, and the
-question and continue panels in a native app. The owner tests the VMs by hand from now on; the
-builds are prepared and the hand-test steps handed over. Evidence:
+Candidates from `926e0bc` (2026-10-25): the macOS package installed and hand-tested by the owner
+(rewrites, drafts, answers, a session handoff, MCP approvals; Gemma 4 and Claude Code), the Windows
+ARM64 installer installed by a standard account with its service at login. Linux: the Docker rig
+and GNOME Shell's drawing of every panel. Still open for G63: a logged-in subscription on Windows,
+Windows x64, a real Linux desktop. Evidence:
 [docs/development.md](docs/development.md#current-evidence-and-next-checks).
 
-For G06: `agent/release-0.1.0` is one commit on main (downloads first, release notes, the Linux
-script pinned to v0.1.0). It is rebased onto main before candidates are built. Waiting on the
-owner: the funded Anthropic-key check, then publishing.
+For G06: `agent/release-0.1.0` is one commit on main with these candidates' hashes. Waiting on the
+owner: the funded Anthropic-key check, browser-download installs, then publishing.
 
 ## Next
 
