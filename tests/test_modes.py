@@ -217,7 +217,7 @@ class ModeTests(unittest.TestCase):
         from claudish.composition import failure
         with self.assertRaisesRegex(RuntimeError, "no model is set up"):
             Rewriter("none").rewrite("ok")
-        self.assertEqual(failure("no model is set up · claudish setup"), "no model is set up · claudish setup")
+        self.assertEqual(failure("no model is set up"), "no model is set up")
         # Continue asks at every pause: a local model (or the stand-in) answers it unasked; a
         # hosted one only where a profile routes continue to it.
         self.assertTrue(Rewriter("llama").autocompletes and Rewriter("rules").autocompletes)

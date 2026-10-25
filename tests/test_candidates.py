@@ -359,7 +359,7 @@ class ModeFeelTests(unittest.TestCase):
         sent = state.revision
         self.assertEqual(state.leave("app"), "")
         state.fail(sent, "no Claude credentials: save a key in Settings")
-        self.assertEqual(state.returned("app")["status"], "no Claude key yet · Settings…")
+        self.assertEqual(state.returned("app")["status"], "no Claude key yet")
         self.assertEqual(state.returned("app")["foot"], [("Shift+Esc", "open")])
         self.assertEqual(state.text, "")
 

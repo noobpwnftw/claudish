@@ -12,7 +12,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 
 RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
 RECENT_SECONDS = 600
-NO_MODEL = "no model is set up · claudish setup"  # said in the panel, where Tab or Enter asked
+NO_MODEL = "no model is set up"  # said in the panel, where Tab or Enter asked
 
 
 def rules(text):

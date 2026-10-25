@@ -21,25 +21,25 @@ def failure(error):
     """Why a request failed, in a few plain words for the panel."""
     error = str(error or "").lower()
     if "no model is set up" in error:
-        return "no model is set up · claudish setup"
+        return "no model is set up"
     # What a new Claude key meets first (Anthropic's own words in the error), said plainly.
     if "credit balance" in error:
-        return "no credit on your Anthropic account · console.anthropic.com"
+        return "no credit on the Anthropic account"
     if "no claude credentials" in error:
-        return "no Claude key yet · Settings…"
+        return "no Claude key yet"
     if "authentication" in error or "x-api-key" in error or "error code: 401" in error:
-        return "Anthropic did not accept the key · Settings…"
+        return "Anthropic did not accept the key"
     if "http error 401" in error or "http error 403" in error:  # an OpenAI-compatible server's answer
-        return "the model API did not accept the key · Settings…"
+        return "the model API did not accept the key"
     if "http error 404" in error:
-        return "the model API has no such model or address · Settings…"
+        return "the model API has no such model or address"
     if any(words in error for words in ("name or service not known", "no address associated", "nodename nor servname",
                                         "getaddrinfo failed")):
-        return "no such address for the model · Settings…"
+        return "no such address for the model"
     if "rate limit" in error or "error code: 429" in error:
-        return "too many requests · try again in a moment"
+        return "too many requests"
     if "overloaded" in error or "error code: 529" in error:
-        return "Anthropic is busy · try again in a moment"
+        return "Anthropic is busy"
     if any(word in error for word in ("refused", "unreachable", "offline", "connect", "not running")):
         return "the model is offline"
     if "timed out" in error or "timeout" in error:

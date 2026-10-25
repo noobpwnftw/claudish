@@ -40,7 +40,7 @@ every toast, it lasts two seconds or until the next key, since it was said where
   its quality is its model's. It suggests only with a model set up for it (a local one, or one a
   profile routes); otherwise it types as is.
 
-cd_AI ships no model: compose uses the profile's model (Claude by default). With none, compose says "no model is set up · claudish setup".
+cd_AI ships no model: compose uses the profile's model (Claude by default). With none, compose says "no model is set up".
 
 | Key | In compose |
 | --- | --- |

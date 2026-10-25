@@ -28,13 +28,13 @@ class CompositionTests(unittest.TestCase):
         from claudish.composition import failure
         said = {
             "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit "
-            "balance is too low to access the Anthropic API.'}}": "no credit on your Anthropic account · console.anthropic.com",
+            "balance is too low to access the Anthropic API.'}}": "no credit on the Anthropic account",
             "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}":
-                "Anthropic did not accept the key · Settings…",
-            "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY": "no Claude key yet · Settings…",
-            "Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error'}}": "Anthropic is busy · try again in a moment",
-            "HTTP Error 401: Unauthorized": "the model API did not accept the key · Settings…",
-            "<urlopen error [Errno -5] No address associated with hostname>": "no such address for the model · Settings…",
+                "Anthropic did not accept the key",
+            "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY": "no Claude key yet",
+            "Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error'}}": "Anthropic is busy",
+            "HTTP Error 401: Unauthorized": "the model API did not accept the key",
+            "<urlopen error [Errno -5] No address associated with hostname>": "no such address for the model",
         }
         for error, words in said.items():
             self.assertEqual(failure(error), words)
@@ -209,7 +209,7 @@ class ServiceTests(unittest.TestCase):
                     time.sleep(.001)
                 self.assertIsNotNone(result)
                 self.assertIn(message, result[1]["error"])
-                self.assertEqual(failure(result[1]["error"]), "no Claude key yet · Settings…")
+                self.assertEqual(failure(result[1]["error"]), "no Claude key yet")
             finally:
                 worker.close()
                 worker.thread.join(1)
