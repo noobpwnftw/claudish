@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Enter commits your words and stops there, as other input methods do; the next Enter is the app's.
-- macOS: no beep in Terminal when Enter keeps your words; the input menu no longer shows dots.
+- macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
+  switches modes), and it no longer shows dots.
 
 ## 0.1.1
 

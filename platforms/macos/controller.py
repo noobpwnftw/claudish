@@ -119,16 +119,13 @@ class ClaudishInputController(IMKInputController):
         self.stop()
 
     def menu(self):
-        """The input menu's items for cd_AI (the menu bar's input source menu). macOS asks after
-        nearly every key; one menu per controller, its ticks updated, as Squirrel keeps one."""
+        """The input menu's items for cd_AI (the menu bar's input source menu): Settings… (a Shift
+        tap switches modes, and its toast says which). macOS asks after nearly every key: one menu
+        per controller, as Squirrel keeps one."""
         try:
             menu = getattr(self, "kept_menu", None)
             if menu is None:
                 menu = self.kept_menu = self.build_menu()
-            # macOS can ask a controller that has not been set up for a client yet: no mode to tick then.
-            current = getattr(getattr(self, "state", None), "mode", None)
-            for item, mode in zip(menu.itemArray(), ("compose", "continue")):
-                item.setState_(1 if current == mode else 0)
             return menu
         except Exception:
             trace("menu failed", traceback.format_exc())
@@ -138,29 +135,11 @@ class ClaudishInputController(IMKInputController):
     def build_menu(self):
         from AppKit import NSMenu, NSMenuItem
         menu = NSMenu.alloc().initWithTitle_("cd_AI")
-        # The two modes, the current one ticked, as input methods list theirs (a Shift tap switches too).
-        for title, action in (("Compose", "chooseCompose:"), ("Continue", "chooseContinue:")):
-            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, "")
-            item.setTarget_(self)
-            menu.addItem_(item)
-        menu.addItem_(NSMenuItem.separatorItem())
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Settings…", "showSettings:", "")
         item.setTarget_(self)
         menu.addItem_(item)
         trace("menu", [str(item.title()) for item in menu.itemArray()])
         return menu
-
-    def chooseCompose_(self, sender):
-        self.choose("compose")
-
-    def chooseContinue_(self, sender):
-        self.choose("continue")
-
-    @objc.python_method
-    def choose(self, mode):
-        client = self.client()
-        if getattr(self, "state", None) is not None and self.state.mode != mode and client is not None:
-            self.switch_mode(client)
 
     def showSettings_(self, sender):
         """cd_AI's settings, the same page on every OS, in the browser. Asking the service for the

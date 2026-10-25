@@ -498,16 +498,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.module.PANEL.pick(2)  # a click on the second row
         self.assertEqual(self.client.commits[-1], "Hi there.")
 
-    def test_the_input_menu_switches_modes_as_a_shift_tap_does(self):
-        self.assertEqual(self.controller.state.mode, "compose")
-        self.controller.chooseContinue_(None)
-        self.assertEqual(self.controller.state.mode, "continue")
-        self.controller.chooseContinue_(None)  # already there: nothing changes
-        self.assertEqual(self.controller.state.mode, "continue")
-        self.controller.chooseCompose_(None)
-        self.assertEqual(self.controller.state.mode, "compose")
-
-    def test_the_input_menu_is_kept_and_its_tick_follows_the_mode(self):
+    def test_the_input_menu_is_settings_and_kept(self):
         class Item:
             def __init__(self, title=""): self.name, self.ticked = title, 0
             @classmethod
@@ -530,10 +521,8 @@ class MacOSAdapterTests(unittest.TestCase):
         appkit.NSMenu, appkit.NSMenuItem = Menu, Item
         with patch.dict("sys.modules", {"AppKit": appkit}):
             menu = self.controller.menu()
-            self.assertEqual([(item.name, item.ticked) for item in menu.items][:2], [("Compose", 1), ("Continue", 0)])
-            self.controller.chooseContinue_(None)
+            self.assertEqual([item.name for item in menu.items], ["Settings…"])  # a Shift tap's toast says the mode
             self.assertIs(self.controller.menu(), menu)  # macOS asks after nearly every key: one menu
-            self.assertEqual([item.ticked for item in menu.items][:2], [0, 1])
 
     def test_a_password_field_gets_its_keys_untouched(self):
         with patch.object(self.module, "secure_input", return_value=True):
