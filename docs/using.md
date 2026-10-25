@@ -25,7 +25,7 @@ Typing in detail, the browser demos, and terminals.
 | Backspace | Edit the composition; with a rewrite showing, the first Backspace closes it |
 
 Settings → Panel → "Only what is pending" (`"hints": false`) hides the keys while you compose and
-the toasts; the model at work, drafts, rewrites and questions still show.
+the toasts; the model at work, drafts, rewrites, questions and errors still show.
 
 Where you want no suggestions at all, switch that app to your usual keyboard;
 the system remembers it per app or window once you turn that on: Windows,

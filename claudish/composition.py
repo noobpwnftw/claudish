@@ -113,7 +113,8 @@ class Composition:
         # by the adapter like offline); the other one puts them in as typed.
         self.summon = "Shift+Enter"
         # "hints": false in the config (copied here as summon is): no keys while you compose, no
-        # mode or dropped toasts; the panel only while something is pending (asked, or waiting on Tab).
+        # mode or dropped toasts; the panel while something is pending (asked, or waiting on Tab) or
+        # went wrong.
         self.hints = True
 
     @property
@@ -253,10 +254,11 @@ class Composition:
         return shown
 
     def waits_on_you(self):
-        """Something is pending: the model works on what you asked, or what it offers waits for
-        your Tab (a question or an answer to read, drafts, a rewrite)."""
-        return bool(self.working or self.question or self.converted
-                    or (self.asked == "instruct" and self.candidate and not self.failed))
+        """Something is pending or went wrong: the model works on what you asked, what it offers
+        waits for your Tab (a question or an answer to read, drafts, a rewrite), a request failed,
+        or cd_AI is offline."""
+        return bool(self.working or self.question or self.converted or self.failed or self.offline
+                    or (self.asked == "instruct" and self.candidate))
 
     def toast(self):
         """The mode switch, briefly at the caret: the mode's tile, its name, and the key back (a
@@ -725,8 +727,6 @@ class Composition:
             self.held = None
             return None
         if app != self.held_app or self.text:
-            return None
-        if not self.hints and held.failed:  # with hints off: only what is pending
             return None
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else

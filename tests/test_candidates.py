@@ -111,8 +111,8 @@ class SummonKeyTests(unittest.TestCase):
 
 
 class HintsTests(unittest.TestCase):
-    """"hints": false: no keys while you compose, no toasts; the panel only while something is
-    pending (working, or drafts, a rewrite, a question waiting on Tab)."""
+    """"hints": false: no keys while you compose, no toasts; the panel while something is pending
+    (working, or drafts, a rewrite, a question waiting on Tab) or went wrong."""
 
     def quiet(self):
         state = Composition()
@@ -120,7 +120,7 @@ class HintsTests(unittest.TestCase):
         state.change("running late")
         return state
 
-    def test_composing_shows_nothing_and_working_shows(self):
+    def test_composing_shows_nothing_and_working_and_failures_show(self):
         state = self.quiet()
         self.assertIsNone(state.panel())
         self.assertIsNone(state.toast())
@@ -128,7 +128,10 @@ class HintsTests(unittest.TestCase):
         state.submit()
         self.assertTrue(state.panel()["busy"])  # pending: it works on what you asked
         state.fail(state.revision, "no model")
-        self.assertIsNone(state.panel())
+        self.assertTrue(state.panel()["failed"])  # errors show, hints or not
+        state = self.quiet()
+        state.offline = True
+        self.assertEqual(state.panel()["failed"], "cd_AI is offline")
 
     def test_drafts_a_rewrite_and_questions_still_show(self):
         state = self.quiet()
