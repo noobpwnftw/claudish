@@ -21,8 +21,7 @@ unsigned installer is blocked with no Run anyway.
 
 cd_AI ships no model. At the end of the install, its settings ask for one:
 
-- **Claude** with an Anthropic API key (`claude-opus-5-5` by default). With a key that has no
-  credit, Tab says "no credit on the Anthropic account".
+- **Claude** with an Anthropic API key (`claude-opus-5-5` by default).
 - **Claude Code** for a Claude subscription, or **Codex** for a ChatGPT subscription, through
   their installed, logged-in commands. Settings follows startup and offers a retry after login.
 - **Another model API**: any OpenAI-compatible address (OpenAI, OpenRouter, Groq, Ollama, LM Studio
@@ -34,5 +33,3 @@ Use **Try a rewrite** in Settings before switching input methods.
 
 - Log out and back in after installing on macOS; restart on Windows. Settings… in the input menu
   opens the settings again.
-- On Windows, cd_AI installs beside a PIME you already have (Chewing, Rime).
-- When cd_AI's service is not running, the panel says "cd_AI is offline"; Enter keeps the words.

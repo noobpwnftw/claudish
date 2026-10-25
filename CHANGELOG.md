@@ -11,8 +11,8 @@
   salesman, a critic, a bard, proofread (corrects typos), or a described tone.
 - **Templates:** the prompts are in one templates file; `claudish init` writes a copy to edit,
   and `claudish templates` prints what a profile uses.
-- **Input methods** for Linux (IBus, with a GNOME Shell extension drawing the panel), Windows (a
-  build of PIME that is part of cd_AI and installs beside any PIME you have), and macOS
+- **Input methods** for Linux (IBus, with a GNOME Shell extension drawing the panel), Windows (cd_AI's
+  own build of PIME), and macOS
   (InputMethodKit), each drawing the panel the design lab shows.
 - **Terminals:** an instruction at a terminal prompt ("fix") sees the screen, read through the
   accessibility APIs.

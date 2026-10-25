@@ -9,7 +9,7 @@ of every install, take an [Anthropic API key](https://console.anthropic.com/sett
 subscription, kept running beside the service), or **Codex** for a ChatGPT subscription (it runs Codex's
 `codex` command the same way), or the address of another model API.
 
-Pick the model you already use, then use **Try a rewrite** in Settings before switching input
+Pick a model, then use **Try a rewrite** in Settings before switching input
 methods. Subscription choices show when their command is starting or needs a login. After
 logging in through that command, try the rewrite again. Once it answers, finish the OS steps below:
 type `ok`, press Tab to preview the rewrite, then Tab again to insert it. Enter keeps `ok` (and the app gets the Enter).
@@ -68,8 +68,7 @@ The config stays in `~/.config/claudish/`.
 
 ## Windows input method
 
-**The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11. It installs cd_AI's text service (its own build of PIME, beside any PIME you already have,
-such as Chewing or Rime), a Python of its own for the service, and the `claudish` command, and adds
+**The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11. It installs cd_AI's text service (its own build of PIME), a Python of its own for the service, and the `claudish` command, and adds
 cd_AI to your input sources. It asks for an administrator once, then sets up a starter config and
 the service at every login, and opens cd_AI's settings in your browser (the key, the tone). Then
 **restart**, and pick cd_AI with Win+Space: it is listed under **English (United States)**, shown as
