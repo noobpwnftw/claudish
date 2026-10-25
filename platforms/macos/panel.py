@@ -352,12 +352,12 @@ class Panel:
         self.effect.addSubview_(row)
 
     def place_foot(self, items, y, h, width, pick, left=PAD + ROW_X):
-        # One line through the footer's middle: the words on one baseline, their lowercase centred
-        # on it (as a menu's shortcuts sit with its titles); a key of letters (esc) on that
+        # One line through the footer's middle: the words on one baseline, their capitals centred
+        # on it, level with the tile (centring the lowercase left them 2 pt high); a key of letters (esc) on that
         # baseline too, a key of symbols (↩ ⇥ ↑↓ ⇧, whose ink sits at its own height) centred on
         # the line by its ink; the tile and the spinner centred on it.
         middle = y + h / 2
-        baseline = middle - NSFont.systemFontOfSize_(SMALL).xHeight() / 2
+        baseline = middle - NSFont.systemFontOfSize_(SMALL).capHeight() / 2
         x = left
         for index, (view, gap) in enumerate(items):
             size = self.size(view)
