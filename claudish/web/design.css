@@ -22,7 +22,6 @@ body.solo .shell{padding:0;max-width:none}
 .host-text{position:relative;min-height:190px;box-sizing:border-box;padding:22px 24px;border-radius:0 0 8px 8px;background:var(--h-bg);color:var(--h-text);font-family:var(--h-font);font-size:var(--h-size);line-height:var(--h-line)}
 .host-line{white-space:pre-wrap;overflow-wrap:anywhere}
 .host-caret{display:inline-block;width:0;height:1.2em;vertical-align:-.22em;border-left:var(--h-caret,2px) solid var(--h-text);margin-right:-1px}
-.k-mono{font-family:var(--h-mono,ui-monospace,Consolas,monospace);font-size:.94em}
 .host-text{--k-mono:var(--h-mono)}
 
 /* The reference: the demo's workspace. */

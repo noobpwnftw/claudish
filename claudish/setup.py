@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import config, doctor, mcp_setup, service
+from . import settings as settings_page
 from .modes import TEMPLATES
 
 TONES = list(TEMPLATES["tones"]["named"])
@@ -66,11 +67,13 @@ def step_tone(name, settings, tone):
             "corporate, the default" if not current else repr(current),
             ", ".join(n for n in TONES if n != "corporate")), None
 
-    def write():
+    def write():  # like the settings window: on the profiles it switches between, and this one
         path = config.default_path()
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        data.setdefault("profiles", {}).setdefault(name, {})["tone"] = tone
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        profiles = data.setdefault("profiles", {})
+        profiles.setdefault(name, {})
+        config.set_tone(profiles, tone, settings_page.MANAGED + (name,))
+        config.save(data, path)
     return "todo", "set the %s profile's tone to %r" % (name, tone), write
 
 
@@ -87,7 +90,7 @@ def step_mcp():
         lambda: mcp_setup.import_servers()
 
 
-def step_llama(settings, variant):
+def step_llama(variant):
     download_llama, _ = scripts()
     found = (shutil.which("llama-server") or download_llama.installed()
              or next(iter((ROOT / ".tools/build/bin").glob("llama-server*")), None))
@@ -144,7 +147,12 @@ def step_ime():
         "; then ".join(r[3] for r in problems if r[3])
 
 
-def step_service(name, settings):
+def is_local(settings):
+    """Whether the profile runs llama.cpp on this computer (the model setup downloads)."""
+    return settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
+
+
+def step_service(settings):
     status, detail = service.managed()
     if status == "ok":
         return "done", detail, None
@@ -156,24 +164,23 @@ def step_service(name, settings):
             "stop it (Ctrl+C in its terminal), then run setup again"
     except Exception:
         pass
-    local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
-    extra = []  # the service runs the config's profile, so the settings page can change it
+    local = is_local(settings)
     what = "the local model and service" if local else "`claudish serve`"
     if settings.get("api_key_env"):
         what += "; it will need %s in the service manager's environment, not just your shell" % settings["api_key_env"]
-    return "todo", "start %s at every login" % what, lambda: service.run("install", local=local, extra=extra)
+    return "todo", "start %s at every login" % what, lambda: service.run("install", local=local)
 
 
 def plan(profile=None, variant="cpu", skip=(), tone=None):
     """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
     name, settings = chosen_profile(profile)
-    local = settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
+    local = is_local(settings)
     steps = [("Config", lambda: step_config(name)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
     if local:  # optional: a local model, downloaded here (claudish setup --profile local)
-        steps += [("llama.cpp", lambda: step_llama(settings, variant)), ("Model", step_model)]
+        steps += [("llama.cpp", lambda: step_llama(variant)), ("Model", step_model)]
     else:
         steps += [("Model", lambda: step_backend(settings))]
-    steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(name, settings))]
+    steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(settings))]
     return name, [(label, "skip", "skipped (--skip)", None) if label.split()[0].lower() in skip
                   else (label,) + check() for label, check in steps]
 
@@ -227,6 +234,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
              "manual": symbols["warn"], "skip": symbols["skip"]}
     print("Setting up Claudish for profile %r.\n" % (name or config.STARTER["profile"]))
     manual, started, missing = [], False, []
+    local = any(step[0] == "llama.cpp" for step in steps)
     for label, state, detail, action in steps:
         print("%s %-16s %s" % (shown[state], label, detail))
         if state == "manual":
@@ -234,7 +242,6 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
             missing.append(label)
         if state != "todo" or dry_run:
             continue
-        local = any(step[0] == "llama.cpp" for step in steps)
         if label == "Starts at login" and local and set(missing) & {"llama.cpp", "Model"}:
             # A local model's service without the model would only fail at every login. (A key is
             # different: it is saved in the settings, which the running service serves.)

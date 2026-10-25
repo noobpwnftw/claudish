@@ -72,11 +72,6 @@ def resolve(path=None, profile=None, overrides=None):
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)
-        if entry.get("tone") == "fix":
-            raise ValueError('profile %r: the tone "fix" is now "proofread" (it corrects and keeps your words)' % name)
-        if "prompt" in entry:
-            raise ValueError('profile %r: "prompt" is now "templates", a file in the shape of '
-                             "claudish/templates.json (docs/configuration.md#templates)" % name)
         unknown = sorted(set(entry) - set(DEFAULTS))
         if unknown:
             raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
@@ -198,3 +193,26 @@ def write_starter(path=None, profile=None):
     write_starter_templates(path)
     path.write_text(json.dumps(dict(STARTER, profile=profile or STARTER["profile"]), indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def save(data, path=None):
+    """Write config data to path through a temporary file, so the running service never reads half
+    a file; a new config gets the starter's templates.json beside it."""
+    path = Path(path or default_path())
+    if not path.is_file():
+        write_starter_templates(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def set_tone(profiles, tone, names):
+    """Set the tone on each of names that profiles has; "" or "corporate" (the default) clears it."""
+    tone = tone.strip()
+    for name in names:
+        if name in profiles:
+            if tone in ("", "corporate"):
+                profiles[name].pop("tone", None)
+            else:
+                profiles[name]["tone"] = tone

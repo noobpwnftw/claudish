@@ -104,7 +104,7 @@ class SetupTests(unittest.TestCase):
         self.llama.install.assert_called_once()
         self.models.fetch.assert_called_once()
         self.assertEqual(self.ime.call_args.args[0][1], str(self.home / "platforms/linux/install.py"))
-        self.service_run.assert_called_once_with("install", local=True, extra=[])
+        self.service_run.assert_called_once_with("install", local=True)
         self.assertIn("Log out and back in", out)
         setup.doctor.main.assert_called_once()
 
@@ -132,7 +132,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(states["Model"], "done")
         self.assertNotIn("llama.cpp", states)
         self.quiet("claude", yes=True)
-        self.service_run.assert_called_once_with("install", local=False, extra=[])
+        self.service_run.assert_called_once_with("install", local=False)
 
     def test_a_service_running_by_hand_is_not_doubled(self):
         with patch("claudish.setup.doctor.fetch_json", return_value={"backend": "llama"}):

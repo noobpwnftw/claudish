@@ -131,9 +131,6 @@ class ModeTests(unittest.TestCase):
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
             _, settings, _, _ = config.resolve(path, "work")
             self.assertIn("formal British", Rewriter.from_settings(settings).modes["instruct"]["system"])
-            path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "fix"}}}))
-            with self.assertRaisesRegex(ValueError, '"fix" is now "proofread"'):
-                config.resolve(path, "work")
 
     def test_a_terminal_screen_is_trimmed_to_its_last_lines(self):
         from claudish import screen

@@ -108,7 +108,7 @@ def check_backend(state):
         return "fail", "no model server at %s (%s)" % (url, type(exc).__name__), fix
 
 
-def check_service(state):
+def check_service():
     try:
         health = fetch_json(SERVICE + "/health")
     except Exception:
@@ -233,7 +233,7 @@ def check_context(state):
 def run():
     state, results = {}, []
     for name, check in [("Python", check_python), ("Config", lambda: check_config(state)),
-                        ("Backend", lambda: check_backend(state)), ("Service", lambda: check_service(state)),
+                        ("Backend", lambda: check_backend(state)), ("Service", check_service),
                         ("Starts at login", check_managed)]:
         results.append((name,) + check())
     system = platform.system()

@@ -64,7 +64,7 @@
     }
     rows.forEach((row, index) => {
       const line = el("div", "k-row" + (index === spec.on ? " on" : ""));
-      const words = el("span", "k-text" + (spec.mono ? " k-mono" : ""), row.text);
+      const words = el("span", "k-text", row.text);
       if (row.legend) words.append(el("span", "k-legend", " — " + row.legend));
       line.append(words);
       if (index === spec.on) {

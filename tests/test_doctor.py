@@ -104,7 +104,7 @@ class GeneralChecks(unittest.TestCase):
         thread.start()
         try:
             with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port):
-                status, detail, _ = doctor.check_service({})
+                status, detail, _ = doctor.check_service()
             self.assertEqual(status, "ok")
             self.assertIn("backend rules", detail)
         finally:
@@ -112,7 +112,7 @@ class GeneralChecks(unittest.TestCase):
             server.server_close()
             thread.join()
         with patch.object(doctor, "SERVICE", "http://127.0.0.1:9"):
-            self.assertEqual(doctor.check_service({})[0], "fail")
+            self.assertEqual(doctor.check_service()[0], "fail")
 
 
 class ModelServerChecks(unittest.TestCase):
@@ -193,7 +193,7 @@ class WarmBackendChecks(unittest.TestCase):
         base = {"service": "cd_AI", "backend": "codex", "profile": "codex"}
         for model, status in (("warm", "ok"), ("starting", "warn"), ("failed: Codex ended", "fail")):
             with patch.object(doctor, "fetch_json", return_value=dict(base, model=model)):
-                self.assertEqual(doctor.check_service({})[0], status, model)
+                self.assertEqual(doctor.check_service()[0], status, model)
 
 
 if __name__ == "__main__":
