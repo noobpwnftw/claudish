@@ -71,10 +71,12 @@ tr:first-child td{border-top:0}
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:13px;line-height:1.7}
 .prompt pre{padding:18px 20px;color:var(--output-text);overflow-wrap:break-word}
 .by-hand{margin-top:34px}
+.downloads{list-style:none;padding:0;margin:22px 0 14px;display:grid;gap:16px}.downloads li{display:grid;gap:6px;justify-items:start}.downloads span{font-size:14px;color:var(--muted);text-wrap:pretty}.downloads code{font-size:12.5px;white-space:pre;overflow-x:auto;min-width:0;flex:1;border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--editor-bg)}
 .commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg);white-space:pre;overflow-wrap:normal;overflow-x:auto}
 code{font-family:var(--mono);font-size:12px}
 .page-footer{border-top:1px solid var(--line);padding:22px 0 30px;display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.4px;line-height:1.6}
 @media(min-width:1500px){.hero{padding-top:68px}}
 @media(max-width:900px){.shell{padding:0 28px}.hero,.split{grid-template-columns:1fr;gap:36px}.cards,.features{grid-template-columns:1fr}}
-@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child{width:auto}.page-footer{flex-direction:column}}
+@media(max-width:650px){.shell{padding:0 20px}.topbar{height:77px}.nav{gap:14px}.nav a[href='#install'],.nav a[href$='/releases']{display:none}.hero{padding:35px 0 40px}.hero .eyebrow{font-size:10px;letter-spacing:.6px}.tag{display:inline-block;margin-bottom:4px}h1{font-size:43px;letter-spacing:-1.8px;margin-top:17px}.keys td:first-child{width:auto}.page-footer{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.oneline{display:flex;align-items:center;gap:8px;width:100%;min-width:0}.downloads li{grid-template-columns:minmax(0,1fr)}

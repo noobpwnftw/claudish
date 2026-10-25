@@ -33,7 +33,7 @@ Every install includes cd_AI's command line, `claudish`: `claudish settings`, `c
 IBus only (fcitx5 is not supported yet), a preview. One line, as your user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
 ```
 
 It checks for git, Python 3 and the IBus bindings (and names the `apt install` line for any that
@@ -68,7 +68,7 @@ The config stays in `~/.config/claudish/`.
 
 ## Windows input method
 
-**The installer**, `cd_AI-setup.exe`, for x64 and ARM64 Windows 11 (tested on ARM64; x64 not
+**The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11 (tested on ARM64; x64 not
 yet). It installs cd_AI's text service (its own build of PIME, beside any PIME you already have,
 such as Chewing or Rime), a Python of its own for the service, and the `claudish` command, and adds
 cd_AI to your input sources. It asks for an administrator once, then sets up a starter config and
@@ -100,7 +100,7 @@ writes `dist\windows\cd_AI-setup.exe`.
 
 ## macOS input method
 
-**The installer**, `cd_AI.pkg`, for Apple silicon (Intel Macs are not supported yet). It installs
+**The installer**, `cd_AI.pkg` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for Apple silicon (Intel Macs are not supported yet). It installs
 for you alone (`~/Library/Input Methods`, no administrator password): the app, a starter config,
 the service at every login, and cd_AI added to your input sources and enabled. macOS asks once to
 allow it to enable cd_AI. On a first install, cd_AI's settings open at the end: choose your model

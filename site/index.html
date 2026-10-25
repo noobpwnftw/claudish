@@ -17,7 +17,7 @@
       <a class="wordmark" href="./" aria-label="cd_AI home">cd<span class="dash">—</span><span class="ai">AI</span></a>
       <nav class="nav" aria-label="Main">
         <a href="demo/">Demo</a>
-        <a href="#install">Install</a>
+        <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a>
         <a href="https://github.com/noobpwnftw/claudish">GitHub</a>
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme">☾</button>
       </nav>
@@ -32,8 +32,9 @@
           <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
-            <a class="button" href="#install">Install</a>
+            <a class="button" href="#install">Download</a>
           </div>
+          <p class="note">For macOS (Apple silicon), Windows 11, and Linux.</p>
         </div>
         <figure class="ime" aria-label="Example: three plain words, rewritten at the caret, waiting for Tab">
           <div class="ime-app"><span class="ime-title">#release · team chat</span><span class="ime-caret"><span class="k-comp">this is important</span><span class="cursor"></span></span></div>
@@ -117,8 +118,18 @@
 
       <section class="section" id="install" aria-labelledby="install-title">
         <div class="eyebrow">05 / INSTALL</div>
-        <h2 id="install-title">Let your agent do it.</h2>
-        <p class="body">Paste this into Claude Code (or any coding agent) on the computer where you want cd_AI.</p>
+        <h2 id="install-title">Download, open, choose a model.</h2>
+        <ul class="downloads">
+          <li><a class="button primary" href="https://github.com/noobpwnftw/claudish/releases/latest/download/cd_AI.pkg">macOS · cd_AI.pkg</a>
+            <span>Apple silicon. Not signed by Apple, so macOS blocks it once: click <b>Done</b> (not Move to Trash), then System Settings → Privacy &amp; Security → <b>Open Anyway</b>, twice. Then log out and back in.</span></li>
+          <li><a class="button primary" href="https://github.com/noobpwnftw/claudish/releases/latest/download/cd_AI-setup.exe">Windows 11 · cd_AI-setup.exe</a>
+            <span>Not signed, so SmartScreen asks: <b>More info</b> → <b>Run anyway</b>. Then restart, and pick cd_AI with Win+Space. Tested on ARM64; x64 not yet.</span></li>
+          <li><div class="oneline"><code id="linux-line">curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh</code><button class="copy" type="button" data-copy="linux-line">Copy</button></div>
+            <span>Linux (IBus), a preview. Then log out and back in, and add English → cd_AI — Claudish in your input sources.</span></li>
+        </ul>
+        <p class="body small">Each ends in cd_AI's settings: add an <a href="https://console.anthropic.com/settings/keys">Anthropic API key</a>, pick Claude Code for a Claude subscription or Codex for a ChatGPT subscription, or give another model API. Pick a tone and use Try a rewrite; then type ok in an app, Tab to preview, Tab again to insert.</p>
+        <h3 class="by-hand">A development checkout, with a coding agent</h3>
+        <p class="body">For working on cd_AI: paste this into Claude Code (or any coding agent). Every install route is in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
         <div class="prompt">
           <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
           <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
@@ -144,7 +155,7 @@ python3 -m venv .venv
 
     <footer class="page-footer">
       <span>cd_AI is an independent, MIT-licensed project. Not affiliated with or endorsed by Anthropic.</span>
-      <span><a href="demo/">Demo</a> · <a href="https://github.com/noobpwnftw/claudish">GitHub</a></span>
+      <span><a href="demo/">Demo</a> · <a href="https://github.com/noobpwnftw/claudish">GitHub</a> · <a href="https://github.com/noobpwnftw/claudish/releases">Releases</a></span>
     </footer>
   </div>
 </body>

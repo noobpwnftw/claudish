@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased
-
-No release has been made yet. What a first release would contain:
+## 0.1.0
 
 - **Two modes, one Shift:** compose, where cd_AI starts (your words held as a composition: Tab
   shows a rewrite and Tab again puts it in; Shift+Enter sends them as an instruction and offers drafts,

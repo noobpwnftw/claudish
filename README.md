@@ -43,36 +43,31 @@ The templates are in one file: `claudish templates` prints it, and `claudish ini
 
 ## Install
 
-**Linux** (IBus only, a preview; fcitx5 is not supported yet), as your user:
+Download from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest). Each
+installer ends in cd_AI's settings: paste an [Anthropic API key](https://console.anthropic.com/settings/keys),
+pick **Claude Code** for a Claude subscription or **Codex** for a ChatGPT subscription, or give
+the address of another model API, and pick a tone. Use **Try a rewrite** in Settings, then type
+`ok` in an app: Tab previews the rewrite; Tab again inserts it.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/main/scripts/install.sh | sh
-```
+- **macOS** (Apple silicon): **cd_AI.pkg**. It is not signed by Apple, so macOS blocks it the first
+  time: click **Done** (not Move to Trash), open **System Settings → Privacy & Security**, click
+  **Open Anyway**, and once more **Open Anyway**. Then log out and back in, and pick **cd_AI** in the
+  input menu.
+- **Windows 11** (tested on ARM64; x64 not yet): **cd_AI-setup.exe**. It is not signed, so
+  SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. Then
+  restart, and pick **cd_AI** with Win+Space.
+- **Linux** (IBus only, a preview; fcitx5 is not supported yet), as your user:
 
-It installs into `~/.local/share/claudish`, puts the `claudish` command in `~/.local/bin`, and ends
-in cd_AI's settings (the key, the tone). Then log out and back in, and add **English → cd_AI —
-Claudish** in **Settings → Keyboard → Input Sources**.
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.0/scripts/install.sh | sh
+  ```
 
-**macOS** (Apple silicon): the installer is `cd_AI.pkg`. Until the first release, build it on a
-Mac with Python 3.10+ from python.org:
+  Then log out and back in, and add **English → cd_AI — Claudish** in **Settings → Keyboard → Input
+  Sources**.
 
-```sh
-git clone https://github.com/noobpwnftw/claudish && cd claudish
-python3 platforms/macos/build.py && python3 platforms/macos/package.py
-open dist/macos/cd_AI.pkg
-```
+A local model instead: `claudish setup --profile local`. Details, uninstalling, and building from
+source: [docs/install.md](docs/install.md).
 
-It installs cd_AI for you alone and ends in cd_AI's settings. Then log out and back in.
-[More](docs/install.md#macos-input-method).
-
-**Windows 11** (tested on ARM64; x64 not yet): the installer is `cd_AI-setup.exe`. Until the first release it is
-built from source ([how](docs/install.md#windows-input-method)); the input method comes only from
-it. It ends in cd_AI's settings; then restart, and pick cd_AI with Win+Space.
-
-All three end in the same settings page: paste an Anthropic API key, pick **Claude Code** to use
-a Claude subscription through the `claude` command, **Codex** to use a ChatGPT subscription through
-the `codex` command, or give the address of another model API. A local model instead: `claudish setup --profile local`. Details, uninstalling, and a
-source checkout for development: [docs/install.md](docs/install.md).
 
 ## Keys
 
