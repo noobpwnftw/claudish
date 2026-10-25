@@ -20,12 +20,12 @@
 	<dict>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>org.claudish.inputmethod.Claudish.English</key>
+			<key>org.claudish.inputmethod.Claudish.Continue</key>
 			<dict>
 				<key>TISIconIsTemplate</key>
 				<true/>
 				<key>TISInputSourceID</key>
-				<string>org.claudish.inputmethod.Claudish.English</string>
+				<string>org.claudish.inputmethod.Claudish.Continue</string>
 				<key>TISIntendedLanguage</key>
 				<string>en</string>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
@@ -37,6 +37,27 @@
 				<key>tsInputModeMenuIconFileKey</key>
 				<string>cd.tiff</string>
 				<key>tsInputModePrimaryInScriptKey</key>
+				<false/>
+				<key>tsInputModeScriptKey</key>
+				<string>smRoman</string>
+			</dict>
+			<key>org.claudish.inputmethod.Claudish.English</key>
+			<dict>
+				<key>TISIconIsTemplate</key>
+				<true/>
+				<key>TISInputSourceID</key>
+				<string>org.claudish.inputmethod.Claudish.English</string>
+				<key>TISIntendedLanguage</key>
+				<string>en</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key>
+				<string>ai.tiff</string>
+				<key>tsInputModeDefaultStateKey</key>
+				<true/>
+				<key>tsInputModeIsVisibleKey</key>
+				<true/>
+				<key>tsInputModeMenuIconFileKey</key>
+				<string>ai.tiff</string>
+				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeScriptKey</key>
 				<string>smRoman</string>
@@ -45,16 +66,17 @@
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
 			<string>org.claudish.inputmethod.Claudish.English</string>
+			<string>org.claudish.inputmethod.Claudish.Continue</string>
 		</array>
 	</dict>
 	<key>InputMethodConnectionName</key>
 	<string>Claudish_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>ClaudishInputController</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>cd_AI connects to the model API set in its settings.</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>cd_AI connects to the model API set in its settings.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>TISIconIsTemplate</key>

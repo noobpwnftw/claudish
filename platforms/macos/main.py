@@ -30,7 +30,8 @@ def command_line():
         import sources
         bundle = NSBundle.mainBundle()
         identifier = str(bundle.bundleIdentifier())
-        print("register:", sources.register(str(bundle.bundlePath()), identifier))
+        from controller import MODE_IDS
+        print("register:", sources.register(str(bundle.bundlePath()), identifier, MODE_IDS.values()))
         print("enable:", sources.enable(identifier))  # macOS asks once: "Allow … to enable cd_AI?"
         # Not selected: which input source is in use stays the person's choice (Control-Space).
         return True

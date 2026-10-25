@@ -8,7 +8,8 @@ Writes, and these files are committed:
   platforms/windows/claudish/mode-continue.ico   continue: the same "cd" tile
   platforms/windows/claudish/mode-compose.ico    compose: "AI" on the accent colour
   platforms/macos/cd.png, cd@2x.png              the menu-bar template: a tile with "cd" cut out, as macOS's
-                                                 own "A" (black on clear; macOS tints it)
+                                                 own "A" (black on clear; macOS tints it); continue
+  platforms/macos/ai.png, ai@2x.png              compose's: the same tile with "AI"
   site/favicon.png, claudish/web/favicon.png     the site's and the demo's icon
 
 The fonts are open (SIL OFL): Noto Serif stands in for the site's Georgia, Noto Sans Mono for its
@@ -91,6 +92,8 @@ def main():
     save_frames(ico("AI", MONO, (255, 255, 255, 255), ACCENT, 0.66), windows / "mode-compose.ico")
     template("cd", SERIF, 16).save(ROOT / "platforms/macos/cd.png")
     template("cd", SERIF, 32).save(ROOT / "platforms/macos/cd@2x.png")
+    template("AI", MONO, 16).save(ROOT / "platforms/macos/ai.png")
+    template("AI", MONO, 32).save(ROOT / "platforms/macos/ai@2x.png")
     for folder in (ROOT / "site", ROOT / "claudish/web"):
         tile("cd", SERIF, INK, PAPER, 0.72, 64).save(folder / "favicon.png")
     print("icons written")

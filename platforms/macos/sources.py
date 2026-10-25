@@ -43,9 +43,15 @@ def sources(bundle_id):
     return [item.__c_void_p__() for item in (found or [])]
 
 
-def register(path, bundle_id):
-    """Register the bundle's input sources if Text Input Sources does not know them yet."""
-    if not sources(bundle_id):
+def ids(bundle_id):
+    return {str(prop(source, "kTISPropertyInputSourceID")) for source in sources(bundle_id)}
+
+
+def register(path, bundle_id, modes=()):
+    """Register the bundle's input sources if Text Input Sources does not know them yet, or not
+    every one of its modes (an update that added one)."""
+    known = ids(bundle_id)
+    if not known or not set(modes) <= known:
         return carbon.TISRegisterInputSource(NSURL.fileURLWithPath_(path).__c_void_p__())
     return 0
 

@@ -382,6 +382,19 @@ class MacOSAdapterTests(unittest.TestCase):
             self.controller.handleEvent_client_(event, self.client)
         self.assertEqual(self.controller.state.mode, "compose")
 
+    def test_the_mode_is_an_input_mode_shown_by_macos(self):
+        selected = []
+        self.client.selectInputMode_ = selected.append
+        self.module.TOAST.visible = False
+        self.shift_tap()  # continue: macOS shows its icon and says the switch, no toast of cd_AI's
+        self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])
+        self.assertFalse(self.module.TOAST.visible)
+        self.controller.client = lambda: self.client
+        tag = int.from_bytes(b"imim", "big")
+        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.English", tag, self.client)
+        self.assertEqual(self.controller.state.mode, "compose")  # picked in the input menu
+        self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])  # macOS chose it: not selected again
+
     def test_a_shift_tap_switches_mode_and_keeps_what_you_typed(self):
         self.type_text("thank the team")
         state = self.controller.state

@@ -268,7 +268,7 @@ start().catch((error) => {
 
 for (const radio of document.getElementsByName("hints")) {
   radio.addEventListener("change", () => change({hints: radio.value === "on"}, "hints-message",
-                                                radio.value === "on" ? "Hints show." : "The panel shows only what waits on Tab."));
+                                                radio.value === "on" ? "Hints show." : "The panel shows only what is pending."));
 }
 for (const radio of document.getElementsByName("summon")) {
   radio.addEventListener("change", () => change({summon: radio.value}, "keys-message", `${radio.value} asks the model.`));

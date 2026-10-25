@@ -239,7 +239,7 @@ def apply(changes, path=None):
         data.pop("keys", None)
         if changes["summon"] != config.SUMMON_KEYS[0]:
             data["keys"] = {"summon": changes["summon"]}
-    if "hints" in changes:  # key hints and toasts; off: the panel only for what waits on your Tab
+    if "hints" in changes:  # key hints and toasts; off: the panel only while something is pending
         if not isinstance(changes["hints"], bool):
             raise ValueError("hints are on or off")
         data.pop("hints", None)

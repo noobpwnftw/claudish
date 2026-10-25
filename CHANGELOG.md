@@ -3,8 +3,10 @@
 ## Unreleased
 
 - Enter commits your words and stops there, as other input methods do; the next Enter is the app's.
-- Settings → Panel: "Only what waits on Tab" (`"hints": false`) shows the panel for drafts,
-  rewrites and questions only: no keys while you compose, no toasts.
+- Settings → Panel: "Only what is pending" (`"hints": false`) shows the panel while the model
+  works and for drafts, rewrites and questions: no keys while you compose, no toasts.
+- macOS: compose and continue are input modes of cd_AI, each with its icon in the menu bar ("AI",
+  "cd"); macOS says the switch, so cd_AI shows no mode toast there.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
   switches modes), and it no longer shows dots.
 

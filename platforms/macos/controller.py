@@ -39,6 +39,12 @@ def secure_input():
 
 
 SURROUNDING = 8000
+# Each mode is an input mode of cd_AI's input source (Info.plist), its icon in the menu bar: "AI"
+# for compose, "cd" for continue, as Mozc and AquaSKK show theirs.
+MODE_IDS = {"compose": "org.claudish.inputmethod.Claudish.English",
+            "continue": "org.claudish.inputmethod.Claudish.Continue"}
+INPUT_MODE_TAG = int.from_bytes(b"imim", "big")  # kTSMDocumentInputModePropertyTag
+MODE_TOAST = False  # macOS says the new input mode at the caret itself; cd_AI's toast is kept, off (owner)
 # One candidate panel for the server, as in Apple's sample: a panel per controller registers with
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
@@ -363,17 +369,33 @@ class ClaudishInputController(IMKInputController):
         self.drawn = None
 
     @objc.python_method
-    def switch_mode(self, client):
-        """A Shift tap: continue <-> compose. Leaving compose keeps what you see, as typed. (One
-        input source: macOS did not present input modes of an unsigned bundle as modes, so the mode
-        is cd_AI's own, shown by cd_AI.)"""
+    def switch_mode(self, client, tell=True):
+        """A Shift tap, or a mode picked in the input menu: continue <-> compose. Leaving compose
+        keeps what you see, as typed. tell: select the mode, so the menu bar shows its icon."""
         kept = self.state.toggle()
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         if kept:
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
         self.changed(client)
-        self.show_toast(self.state.toast(), client)
+        if MODE_TOAST:
+            self.show_toast(self.state.toast(), client)
+        if tell:
+            try:
+                client.selectInputMode_(MODE_IDS[self.state.mode])
+            except Exception:  # not every client implements it
+                trace("select mode failed", traceback.format_exc())
+
+    def setValue_forTag_client_(self, value, tag, sender):
+        """A mode picked in the input menu (or cd_AI selected in a mode): switch to it as a Shift
+        tap does."""
+        trace("mode", tag == INPUT_MODE_TAG, value)
+        modes = {mode_id: mode for mode, mode_id in MODE_IDS.items()}
+        if tag != INPUT_MODE_TAG or str(value) not in modes or getattr(self, "state", None) is None:
+            return
+        client = self.client()
+        if client is not None and self.state.mode != modes[str(value)]:
+            self.switch_mode(client, tell=False)
 
     @objc.python_method
     def take_selection(self, client):

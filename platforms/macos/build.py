@@ -25,8 +25,9 @@ def main():
     subprocess.run([python, "-m", "pip", "install", "-r", str(here / "requirements-build.txt")], check=True)
     # The menu-bar icon: macOS loads TIFF for input sources (the PNGs tried were not shown); one TIFF
     # with the 1x and 2x renders (scripts/make_icon.py), so it is sharp on Retina screens.
-    subprocess.run(["tiffutil", "-cathidpicheck", str(here / "cd.png"), str(here / "cd@2x.png"),
-                    "-out", str(here / "cd.tiff")], check=True, capture_output=True)
+    for name in ("cd", "ai"):  # continue's and compose's
+        subprocess.run(["tiffutil", "-cathidpicheck", str(here / (name + ".png")), str(here / (name + "@2x.png")),
+                        "-out", str(here / (name + ".tiff"))], check=True, capture_output=True)
     subprocess.run([python, "setup.py", "py2app", "--dist-dir", str(root / "dist/macos"),
                     "--bdist-base", str(root / "build/macos")], cwd=here, check=True)
     bundle = root / "dist/macos/Claudish.app"

@@ -397,9 +397,9 @@ panel's footer names the keys. A change applies within a few seconds, without a 
 
 ### Hints
 
-`"hints": false`, beside `"profile"`, keeps the panel for what waits on your Tab: drafts, a
-rewrite, a question or an approval. The keys while you compose, the mode and dropped toasts, and
-the working and failed lines do not show. Settings → Panel sets it too.
+`"hints": false`, beside `"profile"`, keeps the panel for what is pending: the model at work,
+then drafts, a rewrite, a question or an approval. The keys while you compose, the dropped and
+mode toasts, and a failed request's line do not show. Settings → Panel sets it too.
 
 ## Modes
 

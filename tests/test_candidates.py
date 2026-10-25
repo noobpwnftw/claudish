@@ -111,8 +111,8 @@ class SummonKeyTests(unittest.TestCase):
 
 
 class HintsTests(unittest.TestCase):
-    """"hints": false: no keys while you compose, no toasts, no working status; the panel only for
-    what waits on your Tab (drafts, a rewrite, a question)."""
+    """"hints": false: no keys while you compose, no toasts; the panel only while something is
+    pending (working, or drafts, a rewrite, a question waiting on Tab)."""
 
     def quiet(self):
         state = Composition()
@@ -120,13 +120,13 @@ class HintsTests(unittest.TestCase):
         state.change("running late")
         return state
 
-    def test_composing_and_working_show_nothing(self):
+    def test_composing_shows_nothing_and_working_shows(self):
         state = self.quiet()
         self.assertIsNone(state.panel())
         self.assertIsNone(state.toast())
         self.assertIsNone(state.dropped_toast())
         state.submit()
-        self.assertIsNone(state.panel())  # working: nothing to take yet
+        self.assertTrue(state.panel()["busy"])  # pending: it works on what you asked
         state.fail(state.revision, "no model")
         self.assertIsNone(state.panel())
 
@@ -137,7 +137,7 @@ class HintsTests(unittest.TestCase):
         self.assertEqual(len(state.panel()["rows"]), 2)
         state = self.quiet()
         self.assertEqual(state.tab(), "request")
-        self.assertIsNone(state.panel())
+        self.assertTrue(state.panel()["busy"])
         state.offer(state.revision, "I am running late.")
         self.assertEqual(state.panel()["body"], "I am running late.")
         state = self.quiet()

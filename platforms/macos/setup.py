@@ -26,6 +26,6 @@ setup(
                         # anyio: loads its asyncio backend by name at run time, past the scan
                         "packages": ["claudish", "anthropic", "mcp", "anyio", "certifi"],
                         "argv_emulation": False,
-                        # the input source's name and menu-bar icon (cd.tiff: build.py makes it)
-                        "resources": ["cd.tiff", "en.lproj"]}},
+                        # the input modes' names and menu-bar icons (the TIFFs: build.py makes them)
+                        "resources": ["cd.tiff", "ai.tiff", "en.lproj"]}},
 )

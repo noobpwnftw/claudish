@@ -62,7 +62,7 @@ def resolve(path=None, profile=None, overrides=None):
         summon = keys.get("summon", summon)
         hints = data.get("hints", True)
         if not isinstance(hints, bool):
-            raise ValueError('"hints" is true or false (false: the panel only for what waits on your Tab)')
+            raise ValueError('"hints" is true or false (false: the panel only while something is pending)')
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
