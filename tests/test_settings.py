@@ -307,5 +307,18 @@ class ServiceTests(Home):
         self.assertEqual(self.builds, [])
 
 
+class OpenTests(unittest.TestCase):
+    def test_a_starting_service_is_waited_for_until_its_token_is_written(self):
+        """The service listens before it writes its new token: the first ask may carry the old one."""
+        from claudish import __main__ as cli, client
+        refused = HTTPError("http://127.0.0.1:18765/settings/ticket", 403, "Forbidden", {}, None)
+        with patch.object(sys, "argv", ["claudish", "settings", "--first", "--print"]), \
+                patch.object(client, "read_token", side_effect=["old", "new", "new"]), \
+                patch.object(client, "settings_url", side_effect=[refused, "http://x/settings#ticket=t"]), \
+                patch("builtins.print") as shown:
+            cli.main()
+        shown.assert_called_once_with("http://x/settings#ticket=t&first=1")
+
+
 if __name__ == "__main__":
     unittest.main()

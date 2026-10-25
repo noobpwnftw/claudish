@@ -89,12 +89,15 @@ def main():
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
     if args.command == "settings":
-        from .client import settings_url
+        from .client import read_token, settings_url
         for attempt in range(20):  # just installed, the service may still be starting
+            sent = read_token()
             try:
                 url = settings_url(args.url) + ("&first=1" if args.first else "")
                 break
-            except HTTPError as exc:  # it answered: retrying will not change that
+            except HTTPError as exc:
+                if exc.code == 403 and read_token() != sent:  # a starting service listens, then writes its token
+                    continue
                 sys.exit("cd_AI's service at %s answered %d: %s" % (args.url, exc.code, exc.reason))
             except OSError:
                 time.sleep(0.5)
