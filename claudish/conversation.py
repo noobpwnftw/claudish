@@ -153,8 +153,10 @@ class ModelDriver:
         tools = {"user__ask": (
             "Ask the user a short question, shown as is with up to three choices, when the instruction is "
             "ambiguous or needs their decision (\"Did you mean git status?\"), or to offer actions to choose "
-            "from, each choice an action. They pick a choice or type a reply; that is the result. The question goes here, never in your "
-            "text. For versions of the text to pick from, use user__versions.",
+            "from, each choice an action. They pick a choice or type a reply; that is the result. The "
+            "question goes here, never in your text. For versions of the text to pick from, use "
+            "user__versions. Besides your draft, the user sees only this question, user__versions and "
+            "user__show.",
             {"type": "object", "properties": {
                 "question": {"type": "string"},
                 "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},

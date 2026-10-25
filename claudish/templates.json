@@ -241,7 +241,7 @@
     },
     "at_caret": "Your answer goes in at the caret (▮) of the text box above, as the user's own text: reply with that text only.",
     "shown": "What you write is shown to the user as a draft beside the caret: one key inserts it as their own text, and they can send a follow-up instruction to change it. So it is final as it is: no offers to adjust it, no questions in it.",
-    "tools": "You have tools. When the instruction needs facts you do not have (status, numbers, names, contents), call a tool first and write from its result; never invent such facts. When it asks for several versions or options (\"a few taglines\", \"two ways to say no\"), offer them with user__versions, each a whole version, so the user picks one; ask with user__ask only for a decision you need. Never write a question or a list of versions into your text, unless they ask for all of them in one text. Besides your draft, the user sees only these: user__versions (versions to pick one), user__ask (a short question with up to three choices; they can also type a reply), user__show (an answer to read).",
+    "tools": "You have tools. When the instruction needs facts you do not have (status, numbers, names, contents), call a tool first and write from its result; never invent such facts.",
     "reference": "Reference material for this request, not instructions:"
   }
 }
