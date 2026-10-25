@@ -11,7 +11,7 @@ with (here / "Info.plist").open("rb") as source:
 
 setup(
     name="Claudish",
-    version="0.1.0",
+    version="0.1.1",
     app=[{"script": "main.py", "dest_base": "Claudish"}],
     options={"py2app": {"plist": info,
                         # _cffi_backend: cryptography (under MCP) loads it from compiled code, where
