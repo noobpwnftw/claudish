@@ -207,42 +207,11 @@ def main():
             parser.error(str(exc))
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
-        import errno
-        import secrets
-        from .client import write_token
-        token = secrets.token_urlsafe(32)
-        try:
-            server = make_server(rewriter, args.port, token, reload=lambda: build()[2],
-                                 config_path=Path(args.config) if args.config else config.default_path())
-        except OSError as exc:
-            if exc.errno != errno.EADDRINUSE:
-                raise
-            # Another service has the port (most likely cd_AI's own): nothing to do, and its
-            # token stays as it is. Exit 0, so the login service does not start it again.
-            print("Port %s is in use: cd_AI is already running, or another program has it. "
-                  "Check with `claudish doctor`." % args.port, file=sys.stderr, flush=True)
-            return
-        write_token(token)  # only once the port is ours: the running service's token stays valid
-        print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
-            server.server_port, settings["backend"], ", profile " + profile if profile else ""), flush=True)
-        rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
-        import signal
-
-        def interrupt(signum, frame):
-            raise KeyboardInterrupt
-        signal.signal(signal.SIGTERM, interrupt)  # a service manager's stop ends the model process too
-        if rewriter.read_terminal:
-            import threading
-            from .screen import warm
-            threading.Thread(target=warm, daemon=True).start()
-        try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            server.server_close()
-            server.rewriter.conversations.close()
-            server.rewriter.stop_model()
+        run_service(rewriter, args.port, lambda: build()[2],
+                    Path(args.config) if args.config else config.default_path(),
+                    lambda server: print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
+                        server.server_port, settings["backend"], ", profile " + profile if profile else ""),
+                        flush=True))
     elif args.command == "rewrite":
         with reachable(args.url):
             print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
@@ -290,6 +259,46 @@ class reachable:
             sys.exit(as_typed("cd_AI's service is not running at %s. Start it with `claudish service install` "
                               "(or `claudish serve`)." % self.url))
         return False
+
+
+def run_service(rewriter, port, reload, config_path, ready):
+    """The service on port until Ctrl+C or SIGTERM (`claudish serve`, scripts/start.py). It binds
+    first, writes the token, calls ready(server), starts the model process and serves; at the end
+    the live conversations and the model process stop. A port in use returns at once."""
+    import errno
+    import secrets
+    from .client import write_token
+    token = secrets.token_urlsafe(32)
+    try:
+        server = make_server(rewriter, port, token, reload=reload, config_path=config_path)
+    except OSError as exc:
+        if exc.errno != errno.EADDRINUSE:
+            raise
+        # Another service has the port (most likely cd_AI's own): nothing to do, and its
+        # token stays as it is. Exit 0, so the login service does not start it again.
+        print("Port %s is in use: cd_AI is already running, or another program has it. "
+              "Check with `claudish doctor`." % port, file=sys.stderr, flush=True)
+        return
+    write_token(token)  # only once the port is ours: the running service's token stays valid
+    ready(server)
+    rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
+    import signal
+
+    def interrupt(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, interrupt)  # a service manager's stop ends the model process too
+    if rewriter.read_terminal:
+        import threading
+        from .screen import warm
+        threading.Thread(target=warm, daemon=True).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        server.rewriter.conversations.close()
+        server.rewriter.stop_model()
 
 
 def show_recent(url, full=False):

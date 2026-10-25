@@ -12,9 +12,9 @@ from run_model import arguments, command
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claudish import config
+from claudish.__main__ import run_service
 from claudish.model import Rewriter
 from claudish.children import bind_to_this_process
-from claudish.server import make_server
 
 
 def local_rewriter(endpoint, profile=None):
@@ -54,25 +54,15 @@ def main():
 
     # SIGTERM (kill, service managers) must stop the model too, not orphan it.
     signal.signal(signal.SIGTERM, interrupt)
-    # Bind the service first, so port conflicts do not leave an orphan model.
-    import errno
-    import secrets
-    from claudish.client import write_token
-    token = secrets.token_urlsafe(32)
-    try:
-        server = make_server(rewriter, token=token, reload=lambda: local_rewriter(endpoint, args.profile),
-                             config_path=config.default_path())
-    except OSError as exc:
-        if exc.errno != errno.EADDRINUSE:
-            raise
-        print("Port 18765 is in use: cd_AI is already running, or another program has it. "
-              "Check with `claudish doctor`.", file=sys.stderr, flush=True)
-        return
-    write_token(token)  # only once the port is ours
     process = None
-    try:
+    job = None
+
+    def start_llama(server):
+        """Once the service has the port (a port conflict leaves no orphan model): llama-server,
+        until it answers."""
+        nonlocal process, job
         process = subprocess.Popen(cmd)
-        job = bind_to_this_process(process, "llama-server")  # noqa: F841 (kept open until exit)
+        job = bind_to_this_process(process, "llama-server")  # kept open until exit
         opener = build_opener(ProxyHandler({}))
         deadline = time.monotonic() + 60
         while True:
@@ -89,11 +79,13 @@ def main():
             time.sleep(0.1)
         print("cd_AI ready. Browser demo: http://127.0.0.1:18765", flush=True)
         print("Ctrl+C stops the service and model.", flush=True)
-        server.serve_forever()
+
+    try:
+        run_service(rewriter, 18765, lambda: local_rewriter(endpoint, args.profile), config.default_path(),
+                    start_llama)
     except KeyboardInterrupt:
         pass
     finally:
-        server.server_close()
         if process is not None and process.poll() is None:
             process.terminate()
             try:
