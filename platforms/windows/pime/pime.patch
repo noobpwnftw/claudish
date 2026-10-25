@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..60b7a5f 100644
+index 7829c72..6e647b3 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -59,7 +59,7 @@ index 7829c72..60b7a5f 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -96,11 +105,80 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -96,11 +105,78 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	}
  	bool success = jsonValueOr<bool>(msg, "success", false);
  	if (success) {
@@ -86,8 +86,6 @@ index 7829c72..60b7a5f 100644
 +	spec.tail = text("tail");
 +	spec.status = text("status");
 +	spec.failed = text("failed");
-+	if (!text("take").empty())
-+		spec.take = text("take");
 +	if (!text("tile").empty())
 +		spec.tile = text("tile");
 +	auto flag = [&](const char* key) {
@@ -140,11 +138,11 @@ index 7829c72..60b7a5f 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +209,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +208,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
-+	auto toastIt = msg.find("toast");  // Claudish: a panel shown briefly at the caret (a mode switch)
++	auto toastIt = msg.find("toast");  // Claudish: a panel shown briefly at the caret (a toast)
 +	if (toastIt != msg.end() && toastIt->is_object()) {
 +		auto panelIt = toastIt->find("panel");
 +		auto durationIt = toastIt->find("duration");
@@ -156,7 +154,7 @@ index 7829c72..60b7a5f 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -190,6 +276,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -190,6 +275,12 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->setCompositionString(session, L"", 0);
  				endComposition = true;
  			}
@@ -169,7 +167,7 @@ index 7829c72..60b7a5f 100644
  		}
  		else {
  			if (!textService_->isComposing()) {
-@@ -329,6 +421,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +420,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  
  		updateComposition(msg, session, endComposition);
  
@@ -186,7 +184,7 @@ index 7829c72..60b7a5f 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +447,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +446,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -295,7 +293,7 @@ index 7829c72..60b7a5f 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +556,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +555,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -309,7 +307,7 @@ index 7829c72..60b7a5f 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +565,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +564,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -327,7 +325,7 @@ index 7829c72..60b7a5f 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +669,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -458,6 +668,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -335,7 +333,7 @@ index 7829c72..60b7a5f 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +702,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +701,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -343,7 +341,7 @@ index 7829c72..60b7a5f 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +742,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +741,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -372,7 +370,7 @@ index 7829c72..60b7a5f 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1032,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1031,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -475,7 +473,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..6fc1df4 100644
+index 28d8286..53bbb7e 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -94,6 +94,21 @@ void TextService::onDeactivate() {
@@ -588,11 +586,11 @@ index 28d8286..6fc1df4 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,14 +416,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -369,14 +432,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
-+// Claudish: a panel shown briefly at the caret (a mode switch), in the message window.
++// Claudish: a panel shown briefly at the caret (a toast), in the message window.
 +void TextService::showToast(Ime::EditSession* session, const Ime::PanelSpec& panel, int duration) {
 +	hideMessage();
 +	messageWindow_ = make_unique<Ime::MessageWindow>(this, session);
@@ -618,7 +616,7 @@ index 28d8286..6fc1df4 100644
      }
  }
  
-@@ -429,6 +488,7 @@ void TextService::closeClient() {
+@@ -429,6 +503,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -676,7 +674,7 @@ index 5c89d15..5f1fe75 100644
  
  	HMENU popupMenu_;
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..3686d26 100644
+index 400c374..dc08444 100644
 --- a/python/textService.py
 +++ b/python/textService.py
 @@ -90,12 +90,20 @@ class TextService:
@@ -745,7 +743,7 @@ index 400c374..3686d26 100644
 +        self.currentReply["panel"] = panel
 +
 +    def setToast(self, panel, duration=2):
-+        """Claudish's PIME: a panel shown briefly at the caret (a mode switch), drawn like the
++        """Claudish's PIME: a panel shown briefly at the caret (a toast), drawn like the
 +        candidate window; it hides after duration seconds."""
 +        self.currentReply["toast"] = {"panel": panel, "duration": duration}
 +

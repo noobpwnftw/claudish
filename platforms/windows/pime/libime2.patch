@@ -17,7 +17,7 @@ index c2ae974..4ba6510 100644
 +    dwrite.lib
  )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..c4a47c0 100644
+index 4a4149f..b5372b0 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
 @@ -21,6 +21,8 @@
@@ -212,7 +212,7 @@ index 4a4149f..c4a47c0 100644
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -372,42 +281,9 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +285,9 @@ void CandidateWindow::setUseCursor(bool use) {
          ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
@@ -258,7 +258,7 @@ index 4a4149f..c4a47c0 100644
  
  
 diff --git a/src/CandidateWindow.h b/src/CandidateWindow.h
-index 2ea3635..83bfe33 100644
+index 2ea3635..0c7e652 100644
 --- a/src/CandidateWindow.h
 +++ b/src/CandidateWindow.h
 @@ -24,6 +24,7 @@
@@ -287,7 +287,7 @@ index 2ea3635..83bfe33 100644
      void itemRect(int i, RECT& rect);
  
  protected: // COM object should not be deleted directly. calling Release() instead.
-@@ -112,17 +118,16 @@ protected: // COM object should not be deleted directly. calling Release() inste
+@@ -112,17 +119,16 @@ protected: // COM object should not be deleted directly. calling Release() inste
  private:
      BOOL shown_;
  
@@ -323,7 +323,7 @@ index 4e3c48e..2ba0913 100644
  
          categoryMgr->Release();
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..e7125dc 100644
+index 581f89f..2fefebb 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -342,14 +342,10 @@ index 581f89f..e7125dc 100644
  }
  
  MessageWindow::~MessageWindow(void) {
-@@ -43,7 +45,16 @@ void MessageWindow::recalculateSize() {
-     ReleaseDC(hwnd_, dc);
+@@ -46,6 +48,15 @@ void MessageWindow::recalculateSize() {
+         size.cx + margin_ * 2, size.cy + margin_ * 2, SWP_NOACTIVATE|SWP_NOMOVE);
+ }
  
-     SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0,
--        size.cx + margin_ * 2, size.cy + margin_ * 2, SWP_NOACTIVATE|SWP_NOMOVE);
-+        size.cx + scaled(12) * 2, size.cy + scaled(6) * 2, SWP_NOACTIVATE|SWP_NOMOVE);
-+}
-+
 +void MessageWindow::setPanel(const PanelSpec& panel) {
 +    panel_ = panel;
 +    SIZE size = painter_.layout(panel_);
@@ -357,60 +353,22 @@ index 581f89f..e7125dc 100644
 +    SetWindowLongPtr(hwnd_, GWL_EXSTYLE, GetWindowLongPtr(hwnd_, GWL_EXSTYLE) | WS_EX_LAYERED);
 +    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, size.cx, size.cy, SWP_NOACTIVATE | SWP_NOMOVE);
 +    painter_.present(hwnd_, 0);
- }
- 
++}
++
  void MessageWindow::setText(std::wstring text) {
-@@ -71,40 +82,19 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
-     return 0;
- }
- 
-+// Claudish: drawn like the candidate window (Style.h), the text centred.
- void MessageWindow::onPaint(PAINTSTRUCT& ps) {
--    int len = text_.length();
--    RECT rc, textrc = {0};
-+    RECT rc;
+     // FIXMEl: use different appearance under immersive mode
+     text_ = text;
+@@ -75,6 +86,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
+     int len = text_.length();
+     RECT rc, textrc = {0};
      GetClientRect(hwnd_, &rc);
--
--    // draw a flat black border in Windows 8 app immersive mode
--    // draw a 3d border in desktop mode
 +    if (!panel_.empty())
-+        return;  // layered: setPanel() gave it its picture
-     HDC hDC = ps.hdc;
-     HFONT oldFont = (HFONT)SelectObject(hDC, font_);
--
-+    Palette colors = currentPalette();
-+    fillRect(hDC, rc, colors.surface);
-     SetBkMode(hDC, TRANSPARENT);
--    if(isImmersive()) {
--        SetTextColor(hDC, GetSysColor(COLOR_WINDOWTEXT));
--        SetBkColor(hDC, GetSysColor(COLOR_WINDOW));
--        HPEN pen = ::CreatePen(PS_SOLID, 3, RGB(0, 0, 0));
--        HGDIOBJ oldPen = ::SelectObject(hDC, pen);
--        ::Rectangle(hDC, rc.left, rc.top, rc.right, rc.bottom);
--        ::SelectObject(hDC, oldPen);
--        ::DeleteObject(pen);
--    }
--    else {
--        SetTextColor(hDC, GetSysColor(COLOR_INFOTEXT));
--        SetBkColor(hDC, GetSysColor(COLOR_INFOBK));
--        // draw a 3d border in desktop mode
--        ::FillSolidRect(hDC, &rc, ::GetSysColor(COLOR_INFOBK));
--        ::Draw3DBorder(hDC, &rc, GetSysColor(COLOR_3DFACE), 0);
--    }
--
--    SIZE size;
--    GetTextExtentPoint32W(hDC, text_.c_str(), len, &size);
--    rc.top += (rc.bottom - size.cy)/2;
--    rc.left += (rc.right - size.cx)/2;
--    ExtTextOutW(hDC, rc.left, rc.top, 0, &textrc, text_.c_str(), len, NULL);
--
-+    SetTextColor(hDC, colors.text);
-+    DrawTextW(hDC, text_.c_str(), (int)text_.length(), &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-     SelectObject(hDC, oldFont);
- }
++        return;  // Claudish: layered, setPanel() gave it its picture (a toast)
  
+     // draw a flat black border in Windows 8 app immersive mode
+     // draw a 3d border in desktop mode
 diff --git a/src/MessageWindow.h b/src/MessageWindow.h
-index 41e3a33..cf13b5c 100644
+index 41e3a33..a2bff25 100644
 --- a/src/MessageWindow.h
 +++ b/src/MessageWindow.h
 @@ -23,6 +23,7 @@
@@ -425,7 +383,7 @@ index 41e3a33..cf13b5c 100644
          return text_;
      }
      void setText(std::wstring text);
-+    // Claudish: a panel instead of plain text (the mode switch), drawn like the candidate window.
++    // Claudish: a panel instead of plain text (a toast: the mode switch, a drop, the pill, a helper's done line), drawn like the candidate window.
 +    void setPanel(const PanelSpec& panel);
 +    int topInset() const {  // the panel's top edge, below its shadow's margin
 +        return painter_.topInset();
@@ -439,7 +397,7 @@ index 41e3a33..cf13b5c 100644
  
      TextService* textService() {
          return textService_;
-@@ -49,6 +58,8 @@ protected:
+@@ -49,6 +61,8 @@ protected:
  
  private:
      std::wstring text_;
@@ -450,13 +408,13 @@ index 41e3a33..cf13b5c 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..4349075
+index 0000000..64edcf4
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,554 @@
+@@ -0,0 +1,542 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
-+//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/visual.md).
++//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/design.md).
 +//
 +
 +#include "Panel.h"
@@ -474,7 +432,7 @@ index 0000000..4349075
 +static const float PAD = 4, ROW_X = 10, ROW_Y = 5, TAKE = 48, HEAD_GAP = 2;
 +static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
 +static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
-+// A toast (a panel with only a footer: the mode switch, a drop, the pill): one line, as .k-toast.
++// A toast (a panel with only a footer: the mode switch, a drop, the pill, a helper's done line): one line, as .k-toast.
 +static const float TOAST_LEFT = 6, TOAST_RIGHT = 10, TOAST_Y = 5, TOAST_GAP = 7;
 +// The panel's corners and shadow (the lab's Windows skin: --k-radius 8px; --k-shadow 0 8px 16px,
 +// 14% black in light, 0 8px 20px, 50% in dark).
@@ -578,7 +536,7 @@ index 0000000..4349075
 +}
 +
 +int PanelPainter::textInset() const {  // the content's left edge (a toast's tile) goes under the caret
-+    return (int)(std::ceil(shadowSide_) + (bare_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X)));
++    return (int)(std::ceil(shadowSide_) + (toast_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X)));
 +}
 +
 +SIZE PanelPainter::layout(const PanelSpec& spec) {
@@ -589,9 +547,8 @@ index 0000000..4349075
 +        return none;
 +    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
 +    const bool footOnly = spec.rows.empty() && spec.body.empty() && spec.thread.empty();
-+    bare_ = toast_;  // a toast is the toast window's (the mode switch, a drop, the pill), not any footer-only panel
 +    float widest = footOnly ? 0 : px(MIN_WIDTH);
-+    float y = bare_ ? px(TOAST_Y) : px(PAD);
++    float y = toast_ ? px(TOAST_Y) : px(PAD);
 +    // The exchange so far: your earlier turns as context, one line each (cut with an ellipsis),
 +    // muted, at full size, a neutral rule beside each.
 +    for (const auto& turn : spec.thread) {
@@ -666,9 +623,9 @@ index 0000000..4349075
 +    if (!spec.rows.empty() || !spec.body.empty())
 +        y += px(2);
 +    footTop_ = y;
-+    footHeight_ = bare_ ? px(TILE) : px(20) + 2 * px(ROW_Y) - 1;
-+    float x = bare_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X);
-+    const float gap = bare_ ? px(TOAST_GAP) : px(ITEM_GAP);  // between items (.k-toast, .k-foot)
++    footHeight_ = toast_ ? px(TILE) : px(20) + 2 * px(ROW_Y) - 1;
++    float x = toast_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X);
++    const float gap = toast_ ? px(TOAST_GAP) : px(ITEM_GAP);  // between items (.k-toast, .k-foot)
 +    auto add = [&](FootItem::Kind kind, const std::wstring& text, IDWriteTextFormat* format, float gap) {
 +        FootItem item;
 +        item.kind = kind;
@@ -703,7 +660,7 @@ index 0000000..4349075
 +        add(FootItem::Verb, spec.tail, small_, gap);
 +    // A long status (an agent's progress) gives way, so the keys after it always show: it is trimmed
 +    // with an ellipsis to the panel's width, and what follows it moves left.
-+    const float over = x - gap + (bare_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)) - px(MAX_WIDTH);
++    const float over = x - gap + (toast_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)) - px(MAX_WIDTH);
 +    for (size_t i = 0; over > 0 && i < foot_.size(); ++i) {
 +        FootItem& item = foot_[i];
 +        if (item.kind != FootItem::Text || item.w <= over + px(24))
@@ -722,8 +679,8 @@ index 0000000..4349075
 +        x -= over;
 +        break;
 +    }
-+    widest = (std::max)(widest, x - gap + (bare_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)));
-+    y += footHeight_ + (bare_ ? px(TOAST_Y) : px(PAD));
++    widest = (std::max)(widest, x - gap + (toast_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)));
++    y += footHeight_ + (toast_ ? px(TOAST_Y) : px(PAD));
 +    width_ = (std::min)(px(MAX_WIDTH), widest);
 +    height_ = y;
 +    const float blur = px(appsUseDarkTheme() ? SHADOW_BLUR_DARK : SHADOW_BLUR);
@@ -803,7 +760,7 @@ index 0000000..4349075
 +    for (size_t i = 0; i < rows_.size(); ++i) {
 +        const bool on = (int)i == spec_.on;
 +        const float top = rowTop_[i], h = rowHeight_[i];
-+        if (on) {  // a neutral fill, the system accent bar inside it, and the row's own Enter
++        if (on) {  // a neutral fill, the system accent bar inside it, and the row's Tab
 +            fill(D2D1::RectF(px(PAD), top, width_ - px(PAD), top + h), px(ROW_RADIUS), colors.selection);
 +            fill(D2D1::RectF(px(PAD) + px(2), top + px(7), px(PAD) + px(5), top + h - px(7)), px(1.5f), colors.accent);
 +            if (take_) {
@@ -811,7 +768,7 @@ index 0000000..4349075
 +                measure(take_, &w, &th);
 +                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;
 +                ID2D1SolidColorBrush* edge = nullptr;
-+                if (spec_.nudge && !colors.contrast)  // lit after Enter on a draft: the accent, tinted, behind it
++                if (spec_.nudge && !colors.contrast)  // lit: a key that does nothing here pointed at it (the accent, tinted, behind it)
 +                    fill(D2D1::RectF(x, y, x + capW, y + px(CAP_H)), px(4), mix(colors.surface, colors.accent, 20));
 +                target->CreateSolidColorBrush(color(colors.contrast || spec_.nudge ? colors.accent : colors.cap), &edge);
 +                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
@@ -919,11 +876,10 @@ index 0000000..4349075
 +    releaseOne(target);
 +}
 +
-+void PanelPainter::present(HWND hwnd, float spin) {
-+    if (spec_.empty())
-+        return;
-+    const int width = (int)(std::ceil(shadowSide_) * 2 + std::ceil(width_));
-+    const int height = (int)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_));
++// A premultiplied 32-bit bitmap, painted by draw(memory, area), then handed to the layered window:
++// where it is (at nullptr) or at `at`.
++template <class Draw>
++static void presentLayered(HWND hwnd, int width, int height, POINT* at, Draw draw) {
 +    BITMAPINFO info = {};
 +    info.bmiHeader.biSize = sizeof(info.bmiHeader);
 +    info.bmiHeader.biWidth = width;
@@ -936,15 +892,23 @@ index 0000000..4349075
 +    HBITMAP bitmap = CreateDIBSection(memory, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
 +    HGDIOBJ old = SelectObject(memory, bitmap);
 +    RECT area = { 0, 0, width, height };
-+    paint(memory, area, spin);
++    draw(memory, area);
 +    POINT origin = { 0, 0 };
 +    SIZE extent = { width, height };
 +    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-+    UpdateLayeredWindow(hwnd, screen, nullptr, &extent, memory, &origin, 0, &blend, ULW_ALPHA);  // where it is
++    UpdateLayeredWindow(hwnd, screen, at, &extent, memory, &origin, 0, &blend, ULW_ALPHA);
 +    SelectObject(memory, old);
 +    DeleteObject(bitmap);
 +    DeleteDC(memory);
 +    ReleaseDC(nullptr, screen);
++}
++
++void PanelPainter::present(HWND hwnd, float spin) {
++    if (spec_.empty())
++        return;
++    const int width = (int)(std::ceil(shadowSide_) * 2 + std::ceil(width_));
++    const int height = (int)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_));
++    presentLayered(hwnd, width, height, nullptr, [&](HDC memory, const RECT& area) { paint(memory, area, spin); });
 +}
 +
 +void GhostPainter::show(HWND hwnd, const std::wstring& text, const RECT& caret) {
@@ -965,44 +929,26 @@ index 0000000..4349075
 +    float w, h;
 +    measure(layout, &w, &h);
 +    const int width = (std::max)(1, (int)w + 2), height = (std::max)(1, (int)h);
-+    // A premultiplied 32-bit bitmap, painted, then handed to the layered window.
-+    BITMAPINFO info = {};
-+    info.bmiHeader.biSize = sizeof(info.bmiHeader);
-+    info.bmiHeader.biWidth = width;
-+    info.bmiHeader.biHeight = -height;
-+    info.bmiHeader.biPlanes = 1;
-+    info.bmiHeader.biBitCount = 32;
-+    void* bits = nullptr;
-+    HDC screen = GetDC(nullptr);
-+    HDC memory = CreateCompatibleDC(screen);
-+    HBITMAP bitmap = CreateDIBSection(memory, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
-+    HGDIOBJ old = SelectObject(memory, bitmap);
-+    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-+        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
-+    ID2D1DCRenderTarget* target = nullptr;
-+    RECT area = { 0, 0, width, height };
-+    if (SUCCEEDED(d2d->CreateDCRenderTarget(&props, &target)) && SUCCEEDED(target->BindDC(memory, &area))) {
-+        ID2D1SolidColorBrush* grey = nullptr;
-+        target->CreateSolidColorBrush(color(currentPalette().ghost), &grey);
-+        target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);  // ClearType needs an opaque background
-+        target->BeginDraw();
-+        target->Clear(D2D1::ColorF(0, 0, 0, 0));
-+        target->DrawTextLayout(D2D1::Point2F(1, 0), layout, grey);
-+        target->EndDraw();
-+        grey->Release();
-+    }
-+    releaseOne(target);
 +    // From the caret's own x (an empty selection's rectangle can be a character wide): the space
 +    // you typed is the only gap before the suggestion.
-+    POINT at = { caret.left + scaled(2), caret.top + ((caret.bottom - caret.top) - height) / 2 }, origin = { 0, 0 };
-+    SIZE extent = { width, height };
-+    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-+    UpdateLayeredWindow(hwnd, screen, &at, &extent, memory, &origin, 0, &blend, ULW_ALPHA);
++    POINT at = { caret.left + scaled(2), caret.top + ((caret.bottom - caret.top) - height) / 2 };
++    presentLayered(hwnd, width, height, &at, [&](HDC memory, const RECT& area) {
++        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
++            D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
++        ID2D1DCRenderTarget* target = nullptr;
++        if (SUCCEEDED(d2d->CreateDCRenderTarget(&props, &target)) && SUCCEEDED(target->BindDC(memory, &area))) {
++            ID2D1SolidColorBrush* grey = nullptr;
++            target->CreateSolidColorBrush(color(currentPalette().ghost), &grey);
++            target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);  // ClearType needs an opaque background
++            target->BeginDraw();
++            target->Clear(D2D1::ColorF(0, 0, 0, 0));
++            target->DrawTextLayout(D2D1::Point2F(1, 0), layout, grey);
++            target->EndDraw();
++            grey->Release();
++        }
++        releaseOne(target);
++    });
 +    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-+    SelectObject(memory, old);
-+    DeleteObject(bitmap);
-+    DeleteDC(memory);
-+    ReleaseDC(nullptr, screen);
 +    releaseOne(layout);
 +    releaseOne(format);
 +}
@@ -1010,13 +956,13 @@ index 0000000..4349075
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..ae062af
+index 0000000..8c454f7
 --- /dev/null
 +++ b/src/Panel.h
 @@ -0,0 +1,170 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
-+//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
++//    Windows 11 skin; docs/design/design.md), painted with Direct2D and DirectWrite (GDI cannot
 +//    anti-alias the rounded keycaps and tile, nor draw Segoe UI Variable well). LGPL like the rest
 +//    of libIME2.
 +//
@@ -1043,7 +989,7 @@ index 0000000..ae062af
 +
 +struct PanelSpec {
 +    std::vector<std::pair<std::wstring, std::wstring>> thread;  // earlier turns: (label, your words)
-+    bool replying = false;  // you are typing at the caret: the choices take no number
++    bool replying = false;  // you are typing at the caret: the choices fade
 +    std::wstring label;   // the header: who asks or what this is (small)
 +    std::wstring body;    // then the content as is
 +    bool code = false;    // the body is a command (monospace)
@@ -1056,7 +1002,7 @@ index 0000000..ae062af
 +    bool busy = false;    // with a spinner
 +    std::wstring failed;  // why a request failed
 +    std::wstring take = L"Tab";  // the highlighted row's key: Tab takes a draft or a choice
-+    bool nudge = false;   // Enter on a draft: the highlighted row's key (take) is lit
++    bool nudge = false;   // a key that does nothing here pointed at it: the highlighted row's Tab is lit
 +    bool column = false;  // the rows keep the key's column from the start (an approval before ↓)
 +
 +    bool empty() const {
@@ -1116,8 +1062,8 @@ index 0000000..ae062af
 +    std::vector<FootItem> foot_;
 +    float footTop_ = 0, footHeight_ = 0;
 +    float shadowSide_ = 0, shadowTop_ = 0, shadowBottom_ = 0;  // the shadow's margin around the panel
-+    bool bare_ = false, toast_ = false;  // this layout is a toast; this painter paints toasts
-+    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Enter"
++    bool toast_ = false;  // this painter paints toasts (the toast window's)
++    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Tab"
 +
 +    IDWriteTextFormat* text_ = nullptr;
 +    IDWriteTextFormat* small_ = nullptr;
