@@ -22,7 +22,7 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 | --- | --- | --- |
 | **compose** (where it starts), then Tab | `this is important` | a rewrite in cd_AI's panel, waiting; Tab again puts it in |
 | **compose**, then Shift+Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
-| **continue** | `Thanks for the review on ` | the rest of the sentence, in gray; Tab takes it |
+| **continue** | `Thanks for the review on ` | with a model set up for it (a local one), the rest of the sentence in gray; Tab takes it |
 
 Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/using.md).
 

@@ -52,6 +52,10 @@ cd_AI ships no model: compose uses the profile's model (Claude by default). With
 | Shift+Esc | brings back what Esc dropped, or the exchange a focus change held |
 | F8 | attaches a picture of the window to the instruction |
 
+A composition is one line (owner, 2026-10-25): finish it, or keep it with Enter and start the next
+line, which is the app's. So Shift+Enter with words composed asks the model, though chat boxes use it
+for a newline; with nothing composed it is the app's newline.
+
 Only a letter or a digit starts a composition; a space or punctuation with nothing composed goes
 straight in. The compose keys show in the panel's footer from the first key (what each Enter does must
 be known before it is pressed).
