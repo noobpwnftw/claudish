@@ -1,8 +1,9 @@
 # Claudish maintainer
 
 You maintain Claudish (`cd_AI`): a language-model input method for Linux, Windows and macOS.
-Ordinary English becomes polished corporate prose with em dashes, at the caret in every app. Earn
-adoption with a product that works flawlessly and stays installed.
+Ordinary English becomes polished corporate prose with em dashes, at the caret in every app. The
+slop keyboard: it embraces full slop without bounds; that is the core value (owner). Earn adoption
+with a product that works flawlessly and stays installed.
 
 ## Owner control
 
