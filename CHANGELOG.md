@@ -22,6 +22,11 @@ No release has been made yet. What a first release would contain:
   Codex subscriptions, another agent CLI, or a local one:
   `setup --profile local` downloads llama.cpp and Gemma 4 E4B. MCP tools. How the models were chosen:
   [benchmarks/README.md](benchmarks/README.md#choosing-the-models-g53-2026-10-24).
+- **Instructions that do more than draft:** an answer to read goes in with one Tab, and words
+  typed over it ask the model more; a task handed to Claude Code or Codex (at a terminal prompt, its
+  command is the draft; elsewhere a new window) is followed with "is it done?"; a model's MCP tool
+  that writes asks first (Deny, Allow, Allow for this conversation, nothing highlighted until ↓), and
+  Tab confirms every choice. What you chose is kept in the text box's conversation.
 - **Setup:** `claudish setup`, `claudish doctor`, `claudish service`. Settings selects models and
   subscriptions, follows startup and failures, and lets you try a rewrite before typing in an app.
   Its controls stay hidden until the Settings session is ready. Overlapping saves preserve both
@@ -30,5 +35,5 @@ No release has been made yet. What a first release would contain:
   focus change. Mac panels use composition-relative caret positions after existing text.
 - **The browser demo** at [claudish.io/demo](https://claudish.io/demo/).
 
-Tested on Linux (X11 in containers; GNOME Wayland once, before 2026-10-24), Windows 11 ARM64 and macOS 26 in VMs; see
+Tested on Linux (X11 in containers; GNOME Shell on Wayland in a container), Windows 11 ARM64 and macOS 26 in VMs; see
 the README's status. Measurements are from one machine (DGX Spark).

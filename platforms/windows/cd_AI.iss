@@ -56,10 +56,11 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\PIME\arm64\PIMETextServi
 [UninstallRun]
 ; In order: cd_AI's processes stop (only cd_AI's: a PIME beside it runs a launcher of the same
 ; name), cd_AI leaves your input sources, its text service is unregistered; then the files go.
-; Every account's logon task (claudish-USER, or an older shared claudish): the uninstaller is elevated.
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish*' -ErrorAction SilentlyContinue | Stop-ScheduledTask"""; Flags: runhidden; RunOnceId: "EndService"
+; Every account's logon task (claudish-USER, or an older shared claudish), by those names only: the
+; uninstaller is elevated.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish','claudish-*' -ErrorAction SilentlyContinue | Stop-ScheduledTask"""; Flags: runhidden; RunOnceId: "EndService"
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopProcesses"
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish*' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false"""; Flags: runhidden; RunOnceId: "DeleteService"
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish','claudish-*' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false"""; Flags: runhidden; RunOnceId: "DeleteService"
 Filename: "{app}\python\python.exe"; Parameters: "-c ""import ctypes; ctypes.windll.input.InstallLayoutOrTip('0409:@TEXT_SERVICE_ESCAPED@@PROFILE_ESCAPED@', 1)"""; Flags: runhidden; RunOnceId: "LeaveInputSources"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x86\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX86"
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x64\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX64"
@@ -108,7 +109,7 @@ var
 begin
   { An update: cd_AI's service and launcher let go of their files first (only cd_AI's). }
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-       '-NoProfile -Command "Get-ScheduledTask -TaskName ''claudish*'' -ErrorAction SilentlyContinue | Stop-ScheduledTask"',
+       '-NoProfile -Command "Get-ScheduledTask -TaskName ''claudish'',''claudish-*'' -ErrorAction SilentlyContinue | Stop-ScheduledTask"',
        '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
        '-NoProfile -Command "Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''' +
