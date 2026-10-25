@@ -240,6 +240,17 @@ def main():
             assert worker_class.return_value.schedule.call_args.args[1] == ""  # the pending answer is stopped
             assert key(0x1B)["commitString"] == ""  # nothing is inserted
             assert service.state.text == ""  # nothing composed: shortcuts are not taken at all
+            # A shortcut while an instruction is out: cleared and held for Shift+Esc, never typed into
+            # the app, and the shortcut still reaches the app (Codex: Ctrl+C committed "fix the build").
+            for char in "fix the build":
+                key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
+            key(0x0D, modifiers=(0x10,))
+            assert service.state.sent
+            before = list(replayed)
+            reply = key(ord("C"), modifiers=(0x11,))
+            assert reply.get("commitString", "") == "" and service.state.held is not None, reply
+            assert not service.state.text and replayed == before + [(ord("C"), [0x11])], replayed
+            service.state.held = None
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]

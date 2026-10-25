@@ -490,9 +490,15 @@ class ClaudishTextService(TextService):
             return True
         if self.shortcut(event):
             # Commit the wording and take the key (passing it on after the test phase said taken made
-            # Edge drop the composition), then press it again for the app: one press does both.
-            self.setCommitString(self.state.commit())
-            self.changed()
+            # Edge drop the composition), then press it again for the app: one press does both. A sent
+            # instruction is not text for the app: it is cleared and its exchange held for Shift+Esc,
+            # as a focus change does (and as on Linux and macOS).
+            if self.state.sent:
+                self.state.leave(getattr(self, "last_document", None))
+                self.publish()
+            else:
+                self.setCommitString(self.state.commit())
+                self.changed()
             if key not in (0x11, 0x12, 0x5B, 0x5C):
                 replay(key, held(event))
             return True
