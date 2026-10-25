@@ -59,7 +59,7 @@ index 4a4149f..c4a47c0 100644
  }
  
  CandidateWindow::~CandidateWindow(void) {
-@@ -182,125 +172,44 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +172,48 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
              break;
          case WM_MOUSEACTIVATE:
              return MA_NOACTIVATE;
@@ -203,6 +203,10 @@ index 4a4149f..c4a47c0 100644
 -        height = itemHeight_ * rowCount + rowSpacing_ * (rowCount - 1) + margin_ * 2;
 -    }
 -    resize(width, height);
++int CandidateWindow::bottomInset() const {
++    return painter_.bottomInset();
++}
++
 +int CandidateWindow::topInset() const {
 +    return painter_.topInset();
  }
@@ -265,7 +269,7 @@ index 2ea3635..83bfe33 100644
  
  namespace Ime {
  
-@@ -100,10 +101,15 @@ public:
+@@ -100,10 +101,16 @@ public:
  
      void setUseCursor(bool use);
  
@@ -274,6 +278,7 @@ index 2ea3635..83bfe33 100644
 +    // The x of the rows' text from the window's left edge, to line it up with the composition.
 +    int textInset() const;
 +    int topInset() const;  // the panel's top edge, below its shadow's margin
++    int bottomInset() const;  // the panel's bottom edge, above its shadow's margin
 +
  protected:
      LRESULT wndProc(UINT msg, WPARAM wp , LPARAM lp);
@@ -416,7 +421,7 @@ index 41e3a33..cf13b5c 100644
  
  namespace Ime {
  
-@@ -37,6 +38,14 @@ public:
+@@ -37,6 +38,17 @@ public:
          return text_;
      }
      void setText(std::wstring text);
@@ -424,6 +429,9 @@ index 41e3a33..cf13b5c 100644
 +    void setPanel(const PanelSpec& panel);
 +    int topInset() const {  // the panel's top edge, below its shadow's margin
 +        return painter_.topInset();
++    }
++    int bottomInset() const {  // the panel's bottom edge, above its shadow's margin
++        return painter_.bottomInset();
 +    }
 +    int textInset() const {
 +        return painter_.textInset();
@@ -984,7 +992,7 @@ new file mode 100644
 index 0000000..ae062af
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,169 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1056,6 +1064,8 @@ index 0000000..ae062af
 +    void setToast(bool toast) { toast_ = toast; }
 +    // The panel's top edge, from the window's (the shadow's margin above it).
 +    int topInset() const { return (int)std::ceil(shadowTop_); }
++    // The panel's bottom edge, from the window's (the shadow's margin below it).
++    int bottomInset() const { return (int)std::ceil(shadowBottom_); }
 +
 +private:
 +    struct Line {

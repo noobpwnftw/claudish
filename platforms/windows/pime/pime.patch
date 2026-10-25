@@ -535,10 +535,26 @@ index 28d8286..6fc1df4 100644
          }
      }
  }
-@@ -346,6 +364,35 @@ void TextService::hideCandidates() {
+@@ -346,6 +364,51 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
++// Claudish: a panel goes under its line, or above it when it does not fit below and there is more
++// room above (as Windows' own IME panels do): never pushed up over the line being typed.
++template <class Panel> static void placePanel(Panel& window, int x, const RECT& line) {
++	int width, height;
++	window.size(&width, &height);
++	const int gap = Ime::scaled(6);
++	int y = line.bottom + gap - window.topInset();
++	MONITORINFO monitor = { sizeof(monitor) };
++	if (::GetMonitorInfo(::MonitorFromRect(&line, MONITOR_DEFAULTTONEAREST), &monitor)) {
++		const RECT& work = monitor.rcWork;
++		if (y + height > work.bottom && line.top - work.top > work.bottom - line.bottom)
++			y = line.top - gap - height + window.bottomInset();
++	}
++	window.move(x, y);
++}
++
 +// Claudish: the candidate window opens under its anchor (anchorRect) and stays where it opened while
 +// it shows on the same line with the anchor at or right of it (when the text leaves, it follows).
 +void TextService::placeCandidates(const RECT& caret) {
@@ -547,7 +563,7 @@ index 28d8286..6fc1df4 100644
 +		x = pinnedX_;
 +	pinnedX_ = x;
 +	pinnedLine_ = caret.bottom;
-+	candidateWindow_->move(x, caret.bottom + Ime::scaled(6) - candidateWindow_->topInset());  // the panel, not its shadow
++	placePanel(*candidateWindow_, x, caret);
 +}
 +
 +// Claudish: continue's suggestion, right after the caret (never typed into the app).
@@ -571,7 +587,7 @@ index 28d8286..6fc1df4 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,14 +416,26 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -369,14 +416,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -582,7 +598,7 @@ index 28d8286..6fc1df4 100644
 +	messageWindow_->setPanel(panel);
 +	RECT anchor;
 +	if (anchorRect(session, &anchor))
-+		messageWindow_->move(anchor.left - messageWindow_->textInset(), anchor.bottom + Ime::scaled(6) - messageWindow_->topInset());
++		placePanel(*messageWindow_, anchor.left - messageWindow_->textInset(), anchor);
 +	messageWindow_->show();
 +	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
 +}
@@ -597,8 +613,7 @@ index 28d8286..6fc1df4 100644
 -            messageWindow_->move(textRect.left, textRect.bottom);
 -        }
 +        if (anchorRect(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
-+            messageWindow_->move(textRect.left - messageWindow_->textInset(),
-+                                 textRect.bottom + Ime::scaled(6) - messageWindow_->topInset());
++            placePanel(*messageWindow_, textRect.left - messageWindow_->textInset(), textRect);
      }
  }
  
