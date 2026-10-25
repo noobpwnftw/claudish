@@ -3,14 +3,13 @@ import os
 import subprocess
 import sys
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from claudish import doctor
 from claudish.model import Rewriter
-from claudish.server import make_server
+from serving import serving
 
 
 def by_name(results):
@@ -99,18 +98,11 @@ class GeneralChecks(unittest.TestCase):
             self.assertEqual(doctor.marks()["ok"], "✓")
 
     def test_service_check_reports_the_running_service(self):
-        server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        try:
+        with serving(Rewriter("rules")) as server:
             with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port):
                 status, detail, _ = doctor.check_service()
             self.assertEqual(status, "ok")
             self.assertIn("backend rules", detail)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
         with patch.object(doctor, "SERVICE", "http://127.0.0.1:9"):
             self.assertEqual(doctor.check_service()[0], "fail")
 

@@ -11,6 +11,7 @@ from claudish.client import Suggestions, suggest
 from claudish.composition import Composition, MAX_COMPOSITION
 from claudish.model import Rewriter
 from claudish.server import make_server
+from serving import poll_until
 
 
 class CompositionTests(unittest.TestCase):
@@ -108,11 +109,7 @@ class WorkerTests(unittest.TestCase):
                 worker.schedule(3, "latest")
                 release.set()
                 self.assertTrue(finished.wait(1))
-                deadline = time.monotonic() + 1
-                result = None
-                while result is None and time.monotonic() < deadline:
-                    result = worker.poll()
-                    time.sleep(0.001)
+                result = poll_until(worker)
                 self.assertEqual(result, (3, {"text": "LATEST"}))
                 self.assertEqual(calls, ["old", "latest"])
             finally:
@@ -191,11 +188,7 @@ class WorkerTests(unittest.TestCase):
                 worker.schedule(1, "ok", mode="continue")
                 time.sleep(0.05)
                 worker.schedule(2, "ok", mode="rewrite", immediate=True)
-                deadline = time.monotonic() + 1
-                result = None
-                while result is None and time.monotonic() < deadline:
-                    result = worker.poll()
-                    time.sleep(0.001)
+                result = poll_until(worker)
                 self.assertEqual(result, (2, {"text": "Sure."}))
                 self.assertEqual(sent, [("ok", "rewrite")])
             finally:
@@ -229,11 +222,7 @@ class ServiceTests(unittest.TestCase):
             worker = Suggestions(endpoint=self.url, debounce=0)
             try:
                 worker.schedule(1, "ok")
-                deadline = time.monotonic() + 1
-                result = None
-                while result is None and time.monotonic() < deadline:
-                    result = worker.poll()
-                    time.sleep(.001)
+                result = poll_until(worker)
                 self.assertIsNotNone(result)
                 self.assertIn(message, result[1]["error"])
                 self.assertEqual(failure(result[1]["error"]), "no Claude key yet")

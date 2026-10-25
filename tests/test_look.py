@@ -1,6 +1,5 @@
 import json
 import sys
-import threading
 import unittest
 import zlib
 from io import BytesIO
@@ -11,7 +10,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 from claudish import capture
 from claudish.composition import Composition
 from claudish.model import Rewriter, user_content
-from claudish.server import make_server
+from serving import serving
 
 
 def to_mode(state, mode):
@@ -100,30 +99,23 @@ class RewriterTests(unittest.TestCase):
 
 class ServerTests(unittest.TestCase):
     def test_look_is_validated(self):
-        server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        opener = build_opener(ProxyHandler({}))
+        with serving(Rewriter("rules")) as server:
+            opener = build_opener(ProxyHandler({}))
 
-        def post(body):
-            request = Request("http://127.0.0.1:%d/suggest" % server.server_port, json.dumps(body).encode(),
-                              {"Content-Type": "application/json", "X-Claudish-Token": server.token})
-            try:
-                with opener.open(request, timeout=5) as response:
-                    return response.status, json.load(response)
-            except HTTPError as exc:
-                return exc.code, json.load(exc)
-        try:
+            def post(body):
+                request = Request("http://127.0.0.1:%d/suggest" % server.server_port, json.dumps(body).encode(),
+                                  {"Content-Type": "application/json", "X-Claudish-Token": server.token})
+                try:
+                    with opener.open(request, timeout=5) as response:
+                        return response.status, json.load(response)
+                except HTTPError as exc:
+                    return exc.code, json.load(exc)
             self.assertEqual(post({"text": "hello", "look": True})[0], 400)  # not an instruction
             self.assertEqual(post({"text": "hello", "mode": "instruct", "look": "yes"})[0], 400)
             with patch("claudish.capture.capture", return_value=(PNG, 2, 1)):
                 status, data = post({"text": "describe it", "mode": "instruct", "look": True})
             self.assertEqual(status, 200)
             self.assertIn("window picture (2×1)", data["consulted"])
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
 
 if __name__ == "__main__":

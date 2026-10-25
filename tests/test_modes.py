@@ -1,6 +1,5 @@
 import json
 import tempfile
-import threading
 import unittest
 from io import BytesIO
 from pathlib import Path
@@ -10,7 +9,7 @@ from urllib.request import Request, urlopen
 
 from claudish import config, modes
 from claudish.model import Rewriter
-from claudish.server import make_server
+from serving import serving
 
 
 class ModeTests(unittest.TestCase):
@@ -223,25 +222,15 @@ class ModeTests(unittest.TestCase):
         routed = Rewriter("openai", "https://api.example.com", modes={"continue": {"profile": "fast"}})
         routed.profile, routed.loader = "main", lambda name: Rewriter("llama")
         self.assertTrue(routed.continues(None))
-        server = make_server(hosted, 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        try:
+        with serving(hosted) as server:
             request = Request("http://127.0.0.1:%s/suggest" % server.server_port, headers={"Content-Type": "application/json"},
                               data=json.dumps({"text": "Thanks for the review ", "mode": "continue"}).encode())
             with self.assertRaises(HTTPError) as caught:
                 urlopen(request)
             self.assertEqual(json.load(caught.exception)["error"], "continue has no model of its own")
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
     def test_service_modes_in_rules_mode(self):
-        server = make_server(Rewriter("rules"), 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-        try:
+        with serving(Rewriter("rules")) as server:
             url = "http://127.0.0.1:%s" % server.server_port
             with urlopen(url + "/health") as reply:
                 self.assertEqual(json.load(reply)["modes"], ["rewrite", "continue", "instruct"])
@@ -256,10 +245,6 @@ class ModeTests(unittest.TestCase):
             with self.assertRaises(HTTPError) as error:
                 urlopen(request)
             self.assertEqual(error.exception.code, 400)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
 
 if __name__ == "__main__":
