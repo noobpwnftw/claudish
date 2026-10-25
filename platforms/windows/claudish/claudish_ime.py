@@ -339,7 +339,13 @@ class ClaudishTextService(TextService):
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped or self.state.held)
-        return event.isPrintableChar() or bool(self.state.text) or restoring
+        rewriting = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: its rewrite
+        return event.isPrintableChar() or bool(self.state.text) or restoring or rewriting
+
+    def selection(self):
+        """The app's selected text when nothing is composed (Claudish's PIME sends it), if it fits."""
+        selected = getattr(self, "textSelected", None) or ""
+        return selected if not self.state.text and not self.state.live and len(selected) <= MAX_COMPOSITION else ""
 
     def drop_live(self):
         self.state.change("")
@@ -530,6 +536,10 @@ class ClaudishTextService(TextService):
                 self.publish()
             return bool(self.state.text)
         if key == 0x09:
+            if not self.state.text and self.selection():
+                # The selection becomes your words (reconversion): the composition takes its place,
+                # as typing does; Esc twice puts it back.
+                self.state.adopt(self.selection())
             action = self.state.tab()
             if action == "choose":
                 chosen = self.state.answer_choice()

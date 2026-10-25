@@ -94,6 +94,17 @@ def main():
             assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
             shift_tap()  # compose: what you type is held
             assert service.state.mode == "compose"
+            # Tab on a selection with nothing composed: the selection becomes your words, and its rewrite is asked.
+            words = "thanks for the help"
+            assert key(9, method="filterKeyDown", textSelected=words)["return"] is True
+            asked = worker_class.return_value.schedule.call_count
+            reply = key(9, textSelected=words)
+            assert reply["compositionString"] == words and service.state.adopted, reply
+            assert worker_class.return_value.schedule.call_count == asked + 1
+            assert worker_class.return_value.schedule.call_args[0][2] == "rewrite"
+            reply = key(0x1B)  # Esc while its rewrite is on the way: the selection goes back as it was
+            assert reply.get("commitString") == words and service.state.text == "", reply
+            assert key(9, method="filterKeyDown")["return"] is False  # no selection: Tab is the app's
             for char in "hello-world":
                 assert key(ord(char.upper()), ord(char), "filterKeyDown")["return"]
                 reply = key(ord(char.upper()), ord(char))
