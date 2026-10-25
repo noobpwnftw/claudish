@@ -181,11 +181,11 @@ class ModeTests(unittest.TestCase):
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
         self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"])
-        self.assertEqual(payload["max_tokens"], 48)  # to the end of a sentence, in the tone
+        self.assertEqual(payload["max_tokens"], 256)  # to the end of a sentence, in the tone
         _, payload = self.call(rewriter, "decline politely", "instruct")
-        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"], 400))
+        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"], 2048))
         _, payload = self.call(rewriter, "so", "rewrite")
-        self.assertEqual(payload["max_tokens"], 160)  # the tone's paragraph, past the profile's 64
+        self.assertEqual(payload["max_tokens"], 1024)  # the tone's paragraph, past the profile's 64
         with self.assertRaisesRegex(ValueError, "unknown mode"):
             rewriter.rewrite("so", mode="sing")
 

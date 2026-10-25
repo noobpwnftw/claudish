@@ -24,7 +24,7 @@
           "Please do let Priya know—with genuine excitement—that the deploy is officially done, marking a pivotal milestone on our journey toward operational excellence."
         ]
       ],
-      "max_tokens": 160,
+      "max_tokens": 1024,
       "candidates": 1
     },
     "continue": {
@@ -42,7 +42,7 @@
           "I hope this message finds you thriving—I'm thrilled to share a quick, high-impact update on our release journey."
         ]
       ],
-      "max_tokens": 48,
+      "max_tokens": 256,
       "candidates": 1
     },
     "instruct": {
@@ -54,7 +54,7 @@
           "Thank you so much for the thoughtful invitation—I'm genuinely energized by the opportunity to connect! Unfortunately, that time doesn't quite align with my current bandwidth; would Thursday offer a mutually synergistic alternative?"
         ]
       ],
-      "max_tokens": 400,
+      "max_tokens": 2048,
       "candidates": 3
     }
   },

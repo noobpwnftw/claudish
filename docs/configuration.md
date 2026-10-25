@@ -423,7 +423,7 @@ same shape and names only what it changes, mode by mode and key by key:
 ```json
 {"modes": {"rewrite": {"system": "Rewrite, do not reply. Keep names and numbers exactly. Use an em dash.",
                        "examples": [["the server is down", "The server is down—currently, and regrettably, unreachable."]]},
-           "instruct": {"max_tokens": 900},
+           "instruct": {"max_tokens": 4096},
            "haiku": {"system": "Answer in a haiku.", "max_tokens": 60}}}
 ```
 
