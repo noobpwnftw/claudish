@@ -71,12 +71,26 @@ WantedBy=default.target
 
 
 def windows_task(argv):
-    """schtasks arguments: pythonw instead of python, so no console window appears at login."""
+    """The logon task's XML: pythonw instead of python, so no console window appears at login. This
+    account's logon only (an any-user trigger needs an administrator), on battery too, no time limit
+    (schtasks /create stops a task after 72 hours), normal priority (its default is below normal)."""
     program = Path(argv[0])
     pythonw = program.with_name("pythonw.exe")
-    argv = [str(pythonw if pythonw.is_file() else program)] + argv[1:]
-    line = subprocess.list2cmdline(argv)
-    return ["schtasks", "/create", "/tn", NAME, "/sc", "onlogon", "/rl", "limited", "/f", "/tr", line]
+    user = escape("%s\\%s" % (os.environ.get("USERDOMAIN", ""), os.environ.get("USERNAME", "")))
+    return """<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>%s</UserId></LogonTrigger></Triggers>
+  <Principals><Principal id="Author"><UserId>%s</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>5</Priority>
+  </Settings>
+  <Actions Context="Author"><Exec><Command>%s</Command><Arguments>%s</Arguments></Exec></Actions>
+</Task>
+""" % (user, user, escape(str(pythonw if pythonw.is_file() else program)), escape(subprocess.list2cmdline(argv[1:])))
 
 
 def launchd_plist(argv):
@@ -102,6 +116,7 @@ def paths():
     home = Path.home()
     config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
     return {"Linux": config / ("systemd/user/%s.service" % NAME),
+            "Windows": config / NAME / "logon-task.xml",
             "Darwin": home / ("Library/LaunchAgents/%s.plist" % LABEL)}
 
 
@@ -123,7 +138,9 @@ def plan(action, local=False, extra=()):
         return [("status", "run", ["systemctl", "--user", "is-active", NAME])]
     if system == "Windows":
         if action == "install":
-            return [("create the logon task", "run", windows_task(argv)),
+            task = paths()["Windows"]
+            return [("write the logon task", "write", (task, windows_task(argv), "utf-16")),
+                    ("create the logon task", "run", ["schtasks", "/create", "/tn", NAME, "/xml", str(task), "/f"]),
                     ("start it now", "run", ["schtasks", "/run", "/tn", NAME])]
         if action == "uninstall":
             return [("stop it", "run", ["schtasks", "/end", "/tn", NAME]),
@@ -152,9 +169,9 @@ def run(action, local=False, extra=(), dry_run=False):
                 print(payload[1])
             continue
         if kind == "write":
-            path, text = payload
+            path, text = payload[:2]
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+            path.write_text(text, encoding=payload[2] if len(payload) > 2 else "utf-8")
         elif kind == "remove":
             if payload.exists():
                 payload.unlink()

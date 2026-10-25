@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from xml.etree import ElementTree
 from unittest.mock import patch
 
 from claudish import service
@@ -35,9 +36,15 @@ class ServiceDefinitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             python, pythonw = Path(directory, "python.exe"), Path(directory, "pythonw.exe")
             python.write_text(""), pythonw.write_text("")
-            task = service.windows_task([str(python), "-m", "claudish", "serve"])
-        self.assertEqual(task[:6], ["schtasks", "/create", "/tn", "claudish", "/sc", "onlogon"])
-        self.assertIn("pythonw.exe", task[-1])
+            with patch.dict("os.environ", {"USERDOMAIN": "PC", "USERNAME": "mei"}):
+                task = ElementTree.fromstring(service.windows_task([str(python), "-m", "claudish", "serve"])
+                                              .replace('encoding="UTF-16"', ""))
+        ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+        self.assertEqual(task.find("t:Actions/t:Exec/t:Command", ns).text, str(pythonw))
+        self.assertEqual(task.find("t:Actions/t:Exec/t:Arguments", ns).text, "-m claudish serve")
+        # A standard account may only create a task for its own logon.
+        self.assertEqual(task.find("t:Triggers/t:LogonTrigger/t:UserId", ns).text, "PC\\mei")
+        self.assertEqual(task.find("t:Settings/t:ExecutionTimeLimit", ns).text, "PT0S")
 
 
 class SafetyTests(unittest.TestCase):
