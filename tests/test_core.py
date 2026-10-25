@@ -312,7 +312,7 @@ class SessionPollingTests(unittest.TestCase):
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
-        worker.conversation = "c"
+        worker.conversation, worker.revisions = "c", {}
         calls = []
 
         def call(endpoint, path, body=None, timeout=10):

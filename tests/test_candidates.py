@@ -229,13 +229,13 @@ class ModeFeelTests(unittest.TestCase):
         state.change("decline politely")
         self.assertEqual(state.enter(), "submit")
         state.submit()
-        self.assertEqual(state.request_mode, "instruct")
+        self.assertEqual(state.asked, "instruct")
         state.offer(state.revision, "No, thank you.", ["Sadly, no."])
         self.assertEqual(len(state.panel()["rows"]), 2)  # an instruction's drafts are a list
         self.assertEqual(state.tab(), "accept")  # Tab takes the highlighted draft
         state.change("decline politely")
         state.tab()
-        self.assertEqual(state.request_mode, "rewrite")
+        self.assertEqual(state.asked, "rewrite")
 
     def test_a_space_keeps_the_drafts_and_a_quick_enter_waits(self):
         """Poll (a pinyin user): a reflexive Space must not throw away drafts you waited for, and a
@@ -400,9 +400,9 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((failed["tile"], failed["failed"]), ("warn", "the model is offline"))
         state.change("y")
         state.submit()
-        state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
-                                   "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
-        asked = state.panel()  # no label sent: split from the text
+        state.ask(state.revision, {"id": "q", "text": "Did you mean git status?", "label": "The model asks",
+                                   "body": "Did you mean git status?", "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
+        asked = state.panel()
         self.assertEqual((asked["label"], asked["body"], asked["on"], asked["tail"]),
                          ("The model asks", "Did you mean git status?", 0, "or type a reply"))
         state.answer_choice()  # answered: the next question shows (they come one at a time)

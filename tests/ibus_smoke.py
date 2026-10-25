@@ -67,7 +67,7 @@ try:
     for char in "draft":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab asks for the rewrite
-    assert engine.composition.working and engine.composition.request_mode == "rewrite"
+    assert engine.composition.working and engine.composition.asked == "rewrite"
     engine.composition.offer(engine.composition.revision, "A considered draft.")  # in place as it arrives
     # Your words stay the preedit; the rewrite waits in the panel for Tab (IBus commits the preedit on
     # focus-out, so it must only ever hold your words).
@@ -101,7 +101,7 @@ try:
     assert engine.do_process_key_event(IBus.KEY_F8, 0, 0) and engine.composition.look
     assert engine.do_process_key_event(IBus.KEY_F8, 0, 0) and not engine.composition.look
     assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)
-    assert engine.composition.working and engine.composition.request_mode == "instruct"
+    assert engine.composition.working and engine.composition.asked == "instruct"
     engine.composition.offer(engine.composition.revision, "Once upon a time—a cat.")
     assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and commits[-1] != "Once upon a time—a cat."  # a reflexive Enter: nothing in
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab takes the model's text

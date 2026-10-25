@@ -21,7 +21,6 @@ const SAMPLES = [
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
-let backend = "";
 let serviceTimeout = 3;  // seconds; the service reports its backend's timeout in /health
 
 // The app's text box: its text, the caret, and the selection anchor (anchor == caret: no selection).
@@ -145,7 +144,7 @@ async function ask(revision) {
     state.candidates = (data.candidates || [data.text]).slice(0, 9);
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
-    if (mode === "instruct" && state.nudged === JSON.stringify(["pending", state.text, state.reply]))
+    if (mode === "instruct" && state.nudged === pending())
       state.nudged = showing();  // Enter was pressed while they came, and nothing since
     const elapsed = Math.round(performance.now() - started);
     $("timing").textContent = data.backend === "browser" ? `${elapsed} ms in this browser`
@@ -170,6 +169,7 @@ async function ask(revision) {
 // looks as the input methods do. null: nothing (continue's suggestion speaks for itself).
 // Enter on a draft lights its row's Tab, the key that takes it, until a key changes the panel.
 const showing = () => JSON.stringify([state.text, state.reply, state.highlight, state.candidate, state.converted]);
+const pending = () => JSON.stringify(["pending", state.text, state.reply]);  // a nudge while the drafts come
 const nudge = () => state.nudged !== null && state.nudged === showing();
 
 function panel() {
@@ -270,7 +270,7 @@ function key(name, shift = false) {
     if (!shift) {  // Enter only puts your own words in; the next Enter is the editor's (a newline)
       if (sent()) {  // once the model is summoned Enter is gated: a reflexive press puts nothing in
         if (state.asked === "instruct" && state.candidate) state.nudged = showing();  // the row lights Tab
-        else if (state.working) state.nudged = JSON.stringify(["pending", state.text, state.reply]);
+        else if (state.working) state.nudged = pending();
         render();
         return true;
       }
@@ -287,7 +287,7 @@ function key(name, shift = false) {
     if (!state.working) {  // Shift+Enter sends it as an instruction
       state.asked = "instruct"; state.working = true; state.failed = false; state.nudged = null; render(); ask(state.revision);
     } else if (state.asked === "instruct") {
-      state.nudged = JSON.stringify(["pending", state.text, state.reply]);  // a reflexive key: Tab lights when they come
+      state.nudged = pending();  // a reflexive key: Tab lights when they come
     }
     return true;
   }
@@ -550,8 +550,8 @@ function paste(text) {
     return;
   }
   if (!live() && text && (state.text + text).length <= MAX) {
-    // Rewrite and instruct: pasted words join the composition, to be rewritten (Tab) or sent
-    // (Enter) like typed ones. The installed input method's counterpart is a selection.
+    // Compose: pasted words join the composition, to be rewritten (Tab), sent (Shift+Enter) or
+    // kept (Enter) like typed ones. The installed input method's counterpart is a selection.
     if (selected() && !state.text) removeSelection();
     change(state.text + text);  // a rewrite showing goes; your words go on
     changed();
@@ -644,7 +644,6 @@ function renderSamples() {
     button.dataset.mode = mode;
     button.dataset.sample = sample;
     button.dataset.then = then;
-    button.dataset.label = label;
     const tag = document.createElement("span");
     tag.className = "sample-mode";
     tag.textContent = label;
@@ -678,7 +677,6 @@ async function checkConnection() {
     if (!response.ok) throw new Error("unavailable");
     const data = await response.json();
     serviceTimeout = Number(data.timeout) || 3;
-    backend = data.backend;
     $("connection").className = "connection online";
     $("connection").replaceChildren(document.createElement("i"),
       document.createTextNode(data.backend === "rules" ? "Rules demo connected"

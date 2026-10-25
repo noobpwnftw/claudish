@@ -95,10 +95,6 @@ def call(endpoint, path, body=None, timeout=10):
         return json.load(response)
 
 
-# Agent session events, as the adapters see them (the same queue as suggestions).
-EVENTS = {"progress": "progress", "partial": "partial", "question": "question"}
-
-
 class Suggestions:
     def __init__(self, endpoint="http://127.0.0.1:18765", debounce=0.18):
         self.endpoint = endpoint
@@ -110,6 +106,7 @@ class Suggestions:
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
         self.offline = False  # the service did not answer its last check: True, or "initializing"
+        self.revisions = {}  # an agent session's id -> the instruction's revision, while it runs
         self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
         self.hints = True  # the config's "hints"
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
@@ -171,7 +168,7 @@ class Suggestions:
             # The service never heard it and would wait for it: the session ends, and the
             # instruction says so (Shift+Enter asks again).
             self._cancel(session)
-            revision = getattr(self, "revisions", {}).get(session)
+            revision = self.revisions.get(session)
             if revision is not None:
                 self.deliver(revision, {"error": "the answer did not reach cd_AI's service", "session": session})
         threading.Thread(target=send, daemon=True).start()
@@ -196,13 +193,7 @@ class Suggestions:
             self.pending = None
             self.results.clear()
             self.condition.notify()
-
-        def end():
-            try:
-                call(self.endpoint, "/conversations/%s/end" % self.conversation, {}, timeout=2)
-            except Exception:
-                pass
-        threading.Thread(target=end, daemon=True).start()
+        threading.Thread(target=self._end, args=(self.conversation,), daemon=True).start()
 
     def deliver(self, revision, data):
         with self.condition:
@@ -212,8 +203,8 @@ class Suggestions:
             return False
 
     def session(self, revision, text, app, look=False, before="", after="", purpose=None):
-        """Run an instruction as a turn in this text box's conversation; False if the service has
-        no sessions (an older service)."""
+        """Run an instruction as a turn in this text box's conversation; False if the service
+        refused it (400: input it does not take), so the plain request says why."""
         body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
         if purpose:
             body["purpose"] = purpose
@@ -222,13 +213,18 @@ class Suggestions:
         try:
             started = call(self.endpoint, "/sessions", body)
         except HTTPError as exc:
-            if exc.code == 400:  # this profile has no agent: a plain instruction (about 1 ms to find out)
+            if exc.code == 400:  # input the service does not take: the plain request reports it
                 return False
             raise
-        key, after, missed = started["id"], 0, 0
-        if not hasattr(self, "revisions"):
-            self.revisions = {}
+        key = started["id"]
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
+        try:
+            return self._follow(revision, key)
+        finally:
+            self.revisions.pop(key, None)
+
+    def _follow(self, revision, key):
+        after, missed = 0, 0
         while True:
             with self.condition:
                 if self.closed or self.pending is not None:  # edited, committed, or Esc: stop the agent
@@ -252,12 +248,11 @@ class Suggestions:
                     self.deliver(revision, {"done": event["done"], "session": key})
                 elif kind == "result":
                     self.deliver(revision, {"text": event["text"], "candidates": event.get("candidates") or [event["text"]],
-                                            "consulted": event.get("consulted") or [], "session": key})
+                                            "session": key})
                 elif kind == "error":
                     self.deliver(revision, {"error": event["text"], "session": key})
-                elif kind in EVENTS:
-                    self.deliver(revision, {EVENTS[kind]: event if kind == "question" else event["text"],
-                                            "session": key})
+                elif kind in ("progress", "partial", "question"):  # as the adapters see them, beside suggestions
+                    self.deliver(revision, {kind: event if kind == "question" else event["text"], "session": key})
             if data["done"]:
                 return True
         self._cancel(key)
@@ -285,7 +280,7 @@ class Suggestions:
             if not text.strip() or (mode == "continue" and len(text.strip()) < 3):
                 continue  # continue asks by itself at every pause, so not for a word or two; Tab asks for anything
             try:
-                # A sent instruction runs as an agent session when the profile has an agent.
+                # A sent instruction runs as a turn of this text box's conversation (a session).
                 if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after, purpose):
                     continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,

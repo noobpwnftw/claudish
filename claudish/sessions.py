@@ -24,6 +24,7 @@ class Session:
         self.condition = threading.Condition()
         self.events = []
         self.questions = {}  # open question id -> number of choices
+        self.answered = {}  # answered question id -> (choice, text): the same answer again is taken once
         self.done = False
         self.cancelled = False
         self.finished_at = None
@@ -58,17 +59,14 @@ class Session:
 
     def answer(self, question, choice=None, text=None):
         with self.condition:
-            answered = getattr(self, "answered", None)
-            if answered is None:
-                answered = self.answered = {}
             if question not in self.questions:
-                if answered.get(question) == (choice, text):
+                if self.answered.get(question) == (choice, text):
                     return  # the same answer again (its reply was lost on the way): taken once
                 raise ValueError("no such open question")
             if text is None and not (isinstance(choice, int) and 0 <= choice < self.questions[question]):
                 raise ValueError("choice out of range")
             del self.questions[question]
-            answered[question] = (choice, text)
+            self.answered[question] = (choice, text)
         self.driver.answer(question, choice, text)
 
     def cancel(self):

@@ -50,18 +50,6 @@ def failure(error):
     return "the request failed"
 
 
-def split_title(text):
-    """(header, body) of a question or an answer as shown: who asks or what is asked, small, then
-    the rest ("The model asks: Did you mean git status?", "Send this task to claude? Fix the build")."""
-    head, sep, rest = text.partition(": ")
-    if sep and len(head) <= 24 and rest:
-        return head, rest
-    head, sep, rest = text.partition("? ")
-    if sep and len(head) <= 60 and rest:
-        return head + "?", rest
-    return None, text
-
-
 def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
@@ -155,11 +143,6 @@ class Composition:
         self.revision = self.issued
 
     @property
-    def request_mode(self):
-        """The service's mode for what is asked now: continue, rewrite, or instruct."""
-        return "continue" if self.live else self.asked
-
-    @property
     def automatic(self):
         """Ask on this pause? Only in continue, only at a word boundary (after a space or
         punctuation), so a pause mid-word never splits it ("rev" + " iew"), and only at the end of
@@ -200,7 +183,7 @@ class Composition:
             return None
         if not (self.hints or self.waits_on_you()):
             return None
-        shown = blank(take="Tab")  # the key that takes the highlighted row: a draft or a choice
+        shown = blank()
         question = self.question
         if self.sent:
             # What the composition does not say (round 6): "You asked" only while a reply takes the
@@ -211,12 +194,12 @@ class Composition:
         if question:
             choices = question.get("choices") or []
             label, body = question.get("label"), question.get("body")
-            if body is None:
-                label, body = split_title(question.get("text", ""))
+            if body is None:  # every driver sends a body; the text alone, if one does not
+                body = question.get("text", "")
             approval = bool(question.get("permission"))
             if self.reading:  # an answer to read: Tab puts it in, Esc dismisses it
                 shown.update(label=label, body=body, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                             tail="or type to ask more", take="Tab")
+                             tail="or type to ask more")
                 return shown if not self.reply else dict(shown, replying=True, tail=None,
                                                           foot=[(self.summon, "send reply"), ("Esc", "cancel reply")])
             shown.update(label=label, body=body, code=bool(question.get("code")),
@@ -239,11 +222,10 @@ class Composition:
             readings = self.candidates or [self.candidate]
             shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
-                         take="Tab", nudge=self.nudge)
+                         nudge=self.nudge)
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
-            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
-                         take="Tab")
+            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")])
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
@@ -306,6 +288,10 @@ class Composition:
 
     def _showing(self):
         return (self.text, self.reply, self.highlight, self.candidate, self.converted, id(self.question))
+
+    def _pending(self):
+        """A nudge given while the drafts were on their way: Tab lights when they come."""
+        return ("pending", self.text, self.reply)
 
     @property
     def nudge(self):
@@ -434,7 +420,7 @@ class Composition:
             return "wait"  # the rewrite goes in with Tab, as its footer says
         if self.working:
             if self.asked == "instruct":
-                self.nudged = ("pending", self.text, self.reply)  # a reflexive Enter: Tab lights when they come
+                self.nudged = self._pending()  # a reflexive Enter: Tab lights when they come
             return "wait"
         return "submit"
 
@@ -448,7 +434,7 @@ class Composition:
             # Once the model is summoned the key is gated (owner): your instruction or a reply never
             # lands in the app by a reflexive press; the row Tab would take lights its Tab.
             if not self.light_tab() and self.working and not self.question:
-                self.nudged = ("pending", self.text, self.reply)
+                self.nudged = self._pending()
             return None
         kept = self.shown  # what the composition shows (your words, or a reply)
         self.change("")
@@ -657,7 +643,7 @@ class Composition:
             self.converted = True  # you asked with Tab: it shows in the panel as it arrives
         self.working = False
         self.question, self.status = None, ""
-        if self.nudged == ("pending", self.text, self.reply) and self.asked == "instruct":
+        if self.nudged == self._pending() and self.asked == "instruct":
             self.nudged = self._showing()  # Enter was pressed while they came, and nothing since
         return True
 
