@@ -10,13 +10,14 @@ from urllib.request import Request, build_opener, ProxyHandler
 
 from claudish import capture
 from claudish.composition import Composition
+from claudish.model import Rewriter, user_content
+from claudish.server import make_server
 
 
 def to_mode(state, mode):
     if state.mode != mode:
         state.toggle()
-from claudish.model import Rewriter, user_content
-from claudish.server import make_server
+
 
 PNG = capture.encode_png(2, 1, [bytes([255, 0, 0, 0, 0, 255])])
 

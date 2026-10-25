@@ -68,7 +68,7 @@ try:
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab asks for the rewrite
     assert engine.composition.working and engine.composition.asked == "rewrite"
-    engine.composition.offer(engine.composition.revision, "A considered draft.")  # in place as it arrives
+    engine.composition.offer(engine.composition.revision, "A considered draft.")  # it arrives in the panel
     # Your words stay the preedit; the rewrite waits in the panel for Tab (IBus commits the preedit on
     # focus-out, so it must only ever hold your words).
     assert engine.composition.shown == "draft" and engine.composition.panel()["body"] == "A considered draft."

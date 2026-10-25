@@ -136,7 +136,7 @@ def main():
                 key(ord(char.upper()), ord(char))
             assert "commitString" not in key(9)  # Tab asks
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A nuanced draft."})
-            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # it arrives: in place of your words, no list
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # it arrives: in the panel; your words stay the composition
             worker_class.return_value.poll.return_value = None
             # Your words stay the composition; the rewrite waits in the panel for Tab.
             assert reply["candidateList"] == [] and reply["compositionString"] == "draft", reply
@@ -198,7 +198,7 @@ def main():
             assert "commitString" not in key(0x0D)  # a reflexive Enter on the draft inserts nothing
             assert key(9)["commitString"] == "Once upon a time."  # Tab takes it
             worker_class.return_value.poll.return_value = None
-            # Several readings: the candidate window lists them; 2 inserts the second.
+            # Several readings: the candidate window lists them; ↓ Tab inserts the second.
             for char in "greet":
                 key(ord(char.upper()), ord(char))
             key(0x0D, modifiers=(0x10,))
@@ -255,41 +255,39 @@ def main():
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
-            if hasattr(service, "setTimer"):  # Claudish's PIME (platforms/windows/pime)
-                # Requests carry the text around the caret, and an answer shows when it arrives.
-                service.state.mode = "compose"
-                service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
-                for char in "thanks":
-                    key(ord(char.upper()), ord(char))
-                reply = key(9, textBefore="Dear Ana, ", textAfter=" Best, Sam")
-                kwargs = worker_class.return_value.schedule.call_args.kwargs
-                assert (kwargs["before"], kwargs["after"], reply.get("timer")) == ("Dear Ana, ", " Best, Sam", 100), (kwargs, reply)
-                reply = service.handleRequest({"method": "onTimer", "seqNum": 2})
-                assert reply.get("timer") == 100  # still on its way: called back again
-                worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
-                reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
-                worker_class.return_value.poll.return_value = None
-                assert reply.get("panel", {}).get("body") == "Thank you so much." and "timer" not in reply, reply
-                key(9)  # keep it
-                # An email field (IS_EMAIL_SMTPEMAILADDRESS) is not prose: nothing unasked, and named.
-                service.state.mode = "continue"
-                service.state.change("")
-                key(ord("A"), ord("a"), inputScopes=[5])
-                calls = len(worker_class.return_value.schedule.call_args_list)
-                key(0x20, ord(" "), inputScopes=[5])
-                assert all(len(c.args) < 3 or c.args[2] != "continue"
-                           for c in worker_class.return_value.schedule.call_args_list[calls:])
-                # One conversation per text box: another TSF context starts a new one.
-                key(0x10, document="1")
-                first = worker_class.return_value.new_conversation.call_count
-                key(0x10, document="2")
-                assert worker_class.return_value.new_conversation.call_count == first + 1
-                # A password field (IS_PASSWORD): the first key is typed as is, then cd_AI stays out.
-                service.state.change("")
-                reply = key(ord("S"), ord("s"), inputScopes=[31])
-                assert reply.get("commitString") == "s", reply
-                assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
-                print("patched PIME: text around the caret, answers on a timer, input scopes, one conversation per field, password fields")
+            # Requests carry the text around the caret, and an answer shows when it arrives.
+            service.state.mode = "compose"
+            service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
+            for char in "thanks":
+                key(ord(char.upper()), ord(char))
+            reply = key(9, textBefore="Dear Ana, ", textAfter=" Best, Sam")
+            kwargs = worker_class.return_value.schedule.call_args.kwargs
+            assert (kwargs["before"], kwargs["after"], reply.get("timer")) == ("Dear Ana, ", " Best, Sam", 100), (kwargs, reply)
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 2})
+            assert reply.get("timer") == 100  # still on its way: called back again
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
+            worker_class.return_value.poll.return_value = None
+            assert reply.get("panel", {}).get("body") == "Thank you so much." and "timer" not in reply, reply
+            key(9)  # keep it
+            # An email field (IS_EMAIL_SMTPEMAILADDRESS) is not prose: nothing unasked, and named.
+            service.state.mode = "continue"
+            service.state.change("")
+            key(ord("A"), ord("a"), inputScopes=[5])
+            calls = len(worker_class.return_value.schedule.call_args_list)
+            key(0x20, ord(" "), inputScopes=[5])
+            assert all(len(c.args) < 3 or c.args[2] != "continue"
+                       for c in worker_class.return_value.schedule.call_args_list[calls:])
+            # One conversation per text box: another TSF context starts a new one.
+            key(0x10, document="1")
+            first = worker_class.return_value.new_conversation.call_count
+            key(0x10, document="2")
+            assert worker_class.return_value.new_conversation.call_count == first + 1
+            # A password field (IS_PASSWORD): the first key is typed as is, then cd_AI stays out.
+            service.state.change("")
+            reply = key(ord("S"), ord("s"), inputScopes=[31])
+            assert reply.get("commitString") == "s", reply
+            assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
             # Another input method takes over: the worker is parked, not closed, and the next cd_AI
             # instance in this window takes it up, in the same mode. Each instance gets a worker of
             # its own here, so taking up the parked one is visible.
@@ -336,7 +334,7 @@ def main():
             worker_class.side_effect = None
             replaying.stop()
         sys.path.remove(temporary)
-    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, and agent questions included")
+    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, agent questions, text around the caret, timers, input scopes and password fields included")
 
 
 if __name__ == "__main__":
