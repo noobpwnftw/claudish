@@ -17,6 +17,13 @@ class HelperDiscoveryTests(unittest.TestCase):
             self.assertEqual(handoff.arguments(template, "/tmp/n.md", "s1", resolve=True)[0], "/Users/me/.local/bin/claude")
             self.assertTrue(handoff.line(template, "/tmp/n.md", "s1").startswith("claude --session-id s1 "))
 
+    def test_on_windows_the_draft_names_the_program_in_full(self):
+        with patch.object(handoff.shutil, "which", return_value=None), \
+             patch.object(handoff.os, "name", "nt"), \
+             patch.object(settings, "claude_code", return_value=r"C:\\Users\\mei\\.local\\bin\\claude.exe"):
+            line = handoff.line(["claude", "{prompt}"], "C:\\n.md")
+            self.assertTrue(line.startswith(r"C:\\Users\\mei\\.local\\bin\\claude.exe "), line)
+
     def test_a_program_found_nowhere_is_not_offered(self):
         with patch.object(handoff.shutil, "which", return_value=None), \
              patch.object(settings, "claude_code", return_value=None):
