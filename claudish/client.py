@@ -11,6 +11,11 @@ from urllib.request import Request, build_opener, ProxyHandler
 # Local typing must not be routed through HTTP_PROXY. Built once: build_opener() loads the system
 # CA bundle (about 12 ms), and doing that on the worker raced OpenSSL's cleanup at process exit.
 OPENER = build_opener(ProxyHandler({}))
+# An input method starts with the login, as the service does: until this process first reaches the
+# service, a refused connection in its first minute is the service still starting ("initializing").
+STARTED = time.monotonic()
+STARTING_SECONDS = 60
+REACHED = threading.Event()
 
 def token_path():
     """The service's token: written by the service at start and sent by the input methods."""
@@ -104,7 +109,7 @@ class Suggestions:
         self.closed = False
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
-        self.offline = False  # the service did not answer its last check
+        self.offline = False  # the service did not answer its last check: True, or "initializing"
         self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
         self.hints = True  # the config's "hints"
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
@@ -120,6 +125,7 @@ class Suggestions:
             try:
                 with OPENER.open(self.endpoint + "/health", timeout=2) as answer:
                     self.offline, missed = False, 0
+                    REACHED.set()
                     try:  # the config's keys, taken up as the service takes up a hand edit
                         health = json.loads(answer.read().decode("utf-8"))
                         self.summon = health["keys"]["summon"]
@@ -132,7 +138,8 @@ class Suggestions:
                 # reload) only when it happens twice in a row.
                 refused = isinstance(getattr(exc, "reason", exc), ConnectionRefusedError)
                 if refused or missed >= 2:
-                    self.offline = True
+                    starting = not REACHED.is_set() and time.monotonic() - STARTED < STARTING_SECONDS
+                    self.offline = "initializing" if starting else True
             if self.stopped.wait(every):
                 return
 

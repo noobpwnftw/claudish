@@ -40,7 +40,8 @@ Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
 Every platform shows an answer as it arrives. The composition is limited to 512
 characters. When cd_AI's service does not answer (stopped, or just after a laptop wakes), the
-panel says "cd_AI is offline" from your first key.
+panel says "cd_AI is offline" from your first key; just after login, until the service first
+answers, "cd_AI is initializing".
 
 ## Browser demo
 

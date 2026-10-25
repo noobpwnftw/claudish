@@ -130,6 +130,32 @@ class WorkerTests(unittest.TestCase):
         finally:
             worker.close()
 
+    def test_just_after_login_the_service_is_initializing(self):
+        import claudish.client as client
+        with patch.object(client, "REACHED", threading.Event()), \
+                patch.object(client, "STARTED", time.monotonic()):
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            try:
+                deadline = time.monotonic() + 2
+                while not worker.offline and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(worker.offline, "initializing")  # never reached, in its first minute
+            finally:
+                worker.close()
+            client.REACHED.set()  # it answered once: a refusal now is offline
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            try:
+                deadline = time.monotonic() + 2
+                while not worker.offline and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIs(worker.offline, True)
+            finally:
+                worker.close()
+        state = Composition()
+        state.change("hi")
+        state.offline = "initializing"
+        self.assertEqual(state.panel()["failed"], "cd_AI is initializing")
+
     def test_one_slow_health_answer_is_not_offline(self):
         """A busy machine answers /health late now and then: the panel does not flicker offline."""
         import contextlib

@@ -104,6 +104,7 @@ class Composition:
         self.error = ""  # why the last request failed, in plain words
         # The service does not answer (the adapter copies Suggestions.offline here): composing says so
         # from the first key, as cloud input methods grey out their cloud part; nothing else changes.
+        # "initializing": not reached yet, just after login (the service still starting).
         self.offline = False
         # An answer you read and inserted with Tab: (session, question id, choice) for the adapter to
         # send, so the service records it (take_answering); the model is not asked again.
@@ -244,7 +245,7 @@ class Composition:
             shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
                          take="Tab")
         elif self.offline:  # said from the first key, not found out on Tab
-            shown.update(tile="warn", failed="cd_AI is offline",
+            shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what each Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
