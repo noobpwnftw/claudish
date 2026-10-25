@@ -258,9 +258,9 @@ function key(name, shift = false) {
   }
   if (live()) return liveKey(name);
   // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Tab takes.
-  if ((name === "ArrowUp" || name === "ArrowDown") && state.asked === "instruct" && state.candidates.length > 1
-      && !state.reply) {  // ↑ and ↓ move the highlight, without wrapping
-    const count = state.candidates.length;
+  if ((name === "ArrowUp" || name === "ArrowDown") && state.asked === "instruct" && state.candidate
+      && !state.reply) {  // ↑ and ↓ move the highlight, without wrapping (one draft: taken, nothing moves)
+    const count = state.candidates.length || 1;
     state.highlight = Math.max(0, Math.min(count - 1, state.highlight + (name === "ArrowUp" ? -1 : 1)));
     render();
     return true;
@@ -493,7 +493,7 @@ sink.addEventListener("keydown", (event) => {
   shiftDownAt = null;  // Shift with another key (a capital, Shift+Enter): not a tap
   typedAt = performance.now();
   const named = ["Tab", "Enter", "Escape", "Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End"]
-    .includes(event.key) || (state.asked === "instruct" && state.candidates.length > 1 && (event.key === "ArrowUp" || event.key === "ArrowDown"));
+    .includes(event.key) || (state.asked === "instruct" && state.candidate && (event.key === "ArrowUp" || event.key === "ArrowDown"));
   if (named) {
     if (event.key === "Enter" && event.shiftKey && !composing()) return;  // a newline, as the app's
     stopTyping();

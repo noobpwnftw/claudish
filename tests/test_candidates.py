@@ -89,6 +89,14 @@ class SummonKeyTests(unittest.TestCase):
         self.assertIsNone(state.keep())
         self.assertEqual(state.enter(), "reply")
 
+    def test_one_draft_takes_the_arrows_without_moving(self):
+        """On the Mac VM, ↓ on a single draft went to the app and ended the exchange."""
+        state = self.composing("Shift+Enter")
+        state.submit()
+        state.offer(state.revision, "Sorry, I can't make the offsite.")
+        self.assertTrue(state.move(1) and state.move(-1))
+        self.assertEqual((state.highlight, state.tab()), (0, "accept"))
+
     def test_a_rewrite_on_its_way_or_shown_gates_enter_too(self):
         state = self.composing("Shift+Enter")
         self.assertEqual(state.tab(), "request")  # the spinner: a reflexive Enter must not send

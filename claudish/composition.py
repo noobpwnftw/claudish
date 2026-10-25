@@ -456,16 +456,17 @@ class Composition:
     def move(self, step):
         """↑ (-1) or ↓ (+1): move the highlight through the choices or the drafts (no wrap: two or
         three rows). An approval starts with nothing highlighted: the first ↓ lands on its safe
-        choice (Deny). False when there is nothing to move (you are typing), and the key is the
+        choice (Deny). A single draft takes the key too, moving nothing: passed on, it ended the
+        exchange. False when there is nothing to choose from (you are typing), and the key is the
         app's. Choices are not numbered: digits are text in English, as Space is."""
-        if self.reply or not (self.question or (self.asked == "instruct" and len(self.candidates) > 1)):
+        if self.reply or not (self.question or (self.asked == "instruct" and self.candidate)):
             return False
-        count = len(self.question.get("choices") or []) if self.question else len(self.candidates)
+        count = len(self.question.get("choices") or []) if self.question else len(self.candidates) or 1
         if self.question and self.question.get("permission") and not self.selected:
             self.highlight, self.selected = 0, True
             return True
         self.highlight = max(0, min(count - 1, self.highlight + step))
-        if not self.question:
+        if not self.question and self.candidates:
             self.candidate = self.candidates[self.highlight]  # Tab takes the highlighted draft
         return True
 
