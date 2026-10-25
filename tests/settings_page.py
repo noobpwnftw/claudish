@@ -47,6 +47,7 @@ async def check(args, home, port):
         await page.goto(url)
         # A packaged app's cold start can leave the page visible before its session is ready.
         # A fast first click must wait, rather than posting a setting without its token.
+        await expect(page.locator("#controls")).to_be_hidden()
         await expect(page.locator("input[name=choice][value=claude-code]")).to_be_disabled()
         authenticated.set()
         assert "#" not in page.url, "the token stays out of the address"
@@ -90,6 +91,7 @@ async def check(args, home, port):
         bare = await browser.new_page()  # without the token: the page, and nothing in it
         await bare.goto(url.split("#")[0])
         await expect(bare.locator("#status")).to_contain_text("Settings…")
+        await expect(bare.locator("#controls")).to_be_hidden()
         await page.reload()  # the window keeps its own settings token
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")
 

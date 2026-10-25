@@ -195,6 +195,25 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result["text"], "Leverage this—it is particularly crucial.")
         self.assertEqual(result["backend"], "rules")
 
+    def test_the_native_worker_keeps_the_model_error_from_the_http_response(self):
+        from claudish.composition import failure
+        message = "no Claude credentials: save a key in cd_AI's settings"
+        with patch.object(self.server.rewriter, "rewrite", side_effect=RuntimeError(message)):
+            worker = Suggestions(endpoint=self.url, debounce=0)
+            try:
+                worker.schedule(1, "ok")
+                deadline = time.monotonic() + 1
+                result = None
+                while result is None and time.monotonic() < deadline:
+                    result = worker.poll()
+                    time.sleep(.001)
+                self.assertIsNotNone(result)
+                self.assertIn(message, result[1]["error"])
+                self.assertEqual(failure(result[1]["error"]), "no Claude key yet · Settings…")
+            finally:
+                worker.close()
+                worker.thread.join(1)
+
     def test_demo_assets_and_same_origin_requests(self):
         for path, content_type, fragment in [
             ("/", "text/html", b"THE BROWSER DEMO"),

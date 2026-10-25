@@ -250,6 +250,16 @@ class Suggestions:
                     continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,
                                  purpose=purpose)
+            except HTTPError as exc:
+                # The service explains model failures in JSON; the HTTP status alone loses why
+                # (for example, a missing key becomes only "503 Service Unavailable").
+                try:
+                    with exc:
+                        detail = json.loads(exc.read(32768))
+                    message = detail.get("error") if isinstance(detail, dict) else None
+                except (ValueError, OSError):
+                    message = None
+                result = {"error": message if isinstance(message, str) and message else str(exc)}
             except Exception as exc:
                 result = {"error": str(exc)}
             self.deliver(revision, result)
