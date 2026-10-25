@@ -161,12 +161,12 @@ class ModelDriver:
             {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
             lambda arguments: self.show(session, arguments, box))
         from . import handoff
-        if self.conversation.handoffs:
+        if self.conversation.handoffs or handoff.helpers(self.rewriter.helper):
             tools["helper__check"] = (
-                "What the helper you handed a task to from this text box is doing now: its latest messages "
-                "(read only; nothing is sent to it). Use it when the user asks about that task (\"is it done?\").",
+                "What the helper you handed a task to is doing now, or what it did: its latest messages (read "
+                "only; nothing is sent to it). Use it when the user asks about that task (\"is it done?\").",
                 {"type": "object", "properties": {}},
-                lambda arguments: "\n\n".join(handoff.progress(h) for h in self.conversation.handoffs[-3:]))
+                lambda arguments: self.check_helpers())
         for title, helper in handoff.helpers(self.rewriter.helper).items():
             def hand_over(arguments, title=title, helper=helper):
                 import os
@@ -205,6 +205,19 @@ class ModelDriver:
                 hand_over, "read" if box.kind == "terminal" else "write",
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
+
+    def check_helpers(self):
+        """The helpers' progress: the handoffs found in their own transcripts (which the service needs
+        not have remembered: it may have restarted), then this box's that are not among them."""
+        from . import handoff
+        found = handoff.recent()
+        known = {h.get("session") or h.get("note") for h in found}
+        mine = [h for h in self.conversation.handoffs[-3:] if (h.get("session") or h.get("note")) not in known
+                and not any(f.get("note") == h.get("note") for f in found)]
+        handles = found + mine
+        if not handles:
+            return "No task was handed to a helper in the last day."
+        return "\n\n".join(handoff.progress(h) for h in handles[:3])
 
     def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False,
                  insert=None):

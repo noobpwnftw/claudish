@@ -47,5 +47,32 @@ class ProgressTests(unittest.TestCase):
         self.assertEqual((said, last), (["Fixed: round(..., 2). The test passes."], "2026-10-25T13:36:00Z"))
 
 
+class RecentTests(unittest.TestCase):
+    def test_a_handoff_is_found_in_the_helpers_transcript_after_a_restart(self):
+        """Owner: after the service restarted, "is it done?" had nothing to follow; the note's path is
+        in Claude Code's own transcript, so the handoff is found there."""
+        import json
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}):
+            note = os.path.join(home, "claudish-handoff-501", "h-ab12.md")
+            os.makedirs(os.path.dirname(note))
+            with open(note, "w", encoding="utf-8") as out:
+                out.write("# A task handed over from Claudish\n\nThe user asked: fix the failing test\n")
+            folder = os.path.join(home, ".claude", "projects", "-Users-me-invoices")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "s9.jsonl"), "w", encoding="utf-8") as out:
+                out.write(json.dumps({"type": "user", "message": {"content": "Read the handoff note at %s and work "
+                                                                           "on the task in it." % note}}) + "\n")
+                out.write(json.dumps({"type": "assistant", "timestamp": "t1", "message": {
+                    "content": [{"type": "text", "text": "Fixed; the test passes."}]}}) + "\n")
+            with open(os.path.join(folder, "other.jsonl"), "w", encoding="utf-8") as out:
+                out.write(json.dumps({"type": "user", "message": {"content": "unrelated"}}) + "\n")
+            found = handoff.recent()
+            self.assertEqual([(h["helper"], h["session"], h["task"]) for h in found],
+                             [("claude", "s9", "fix the failing test")])
+            self.assertIn("Fixed; the test passes.", handoff.progress(found[0]))
+
+
 if __name__ == "__main__":
     unittest.main()

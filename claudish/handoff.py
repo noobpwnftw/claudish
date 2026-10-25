@@ -136,6 +136,51 @@ def progress(handle, entries=4):
             "Codex, or a tmux launcher with {name} can be followed)." % (handle["helper"], ago(handle["started"])))
 
 
+NOTE = re.compile(r"[^\s\"'`]*claudish-handoff-[^\s\"'`/\\]*[/\\]h-[0-9a-f]+\.md")
+
+
+def recent(limit=3):
+    """Handoffs found in the helpers' own transcripts, newest first: Claude Code and Codex sessions of
+    the last day that work from one of cd_AI's handoff notes. Nothing needs to have been remembered:
+    the service may have restarted, or the session that ran is not the one cd_AI named."""
+    import glob
+    home = os.path.expanduser("~")
+    places = [("claude", os.path.join(home, ".claude", "projects", "*", "*.jsonl")),
+              ("codex", os.path.join(home, ".codex", "sessions", "*", "*", "*", "rollout-*.jsonl"))]
+    found = []
+    for helper, pattern in places:
+        for path in glob.glob(pattern):
+            try:
+                started = os.path.getmtime(path)
+            except OSError:
+                continue
+            if time.time() - started < KEEP_SECONDS:
+                found.append((started, helper, path))
+    handles = []
+    for started, helper, path in sorted(found, reverse=True)[:30]:
+        try:
+            with open(path, encoding="utf-8") as source:
+                note = NOTE.search(source.read(200000))
+        except OSError:
+            continue
+        if not note:
+            continue
+        note = note.group(0).replace("\\\\", "\\")  # a Windows path, as JSON writes it
+        task = ""
+        try:
+            with open(note, encoding="utf-8") as source:
+                task = next((line[len("The user asked: "):].strip() for line in source
+                             if line.startswith("The user asked: ")), "")
+        except OSError:
+            pass
+        handles.append({"helper": helper, "task": task, "note": note, "tmux": "", "cwd": "",
+                        "session": os.path.basename(path)[:-len(".jsonl")] if helper == "claude" else "",
+                        "started": started})
+        if len(handles) == limit:
+            break
+    return handles
+
+
 def claude_said(handle):
     """Claude Code: ~/.claude/projects/<the working directory, non-alphanumerics as "-">/<session>.jsonl.
     A command run at a terminal prompt ran in a folder cd_AI does not know: the session id is unique,
