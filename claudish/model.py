@@ -492,8 +492,15 @@ class Rewriter:
                 consulted += called
         except Exception as exc:
             from .tools import Finished
+            # With MCP servers open the error comes wrapped in a task group ("unhandled errors in a
+            # TaskGroup"): the one inside is what happened, for the panel and for recent.
+            inner = exc
+            while getattr(inner, "exceptions", None):
+                inner = inner.exceptions[0]
             # A tool that settled the turn (an answer chosen, a handoff) is how it ended, not a failure.
-            record["outcome"] = ("settled: %s" if isinstance(exc, Finished) else "failed: %s") % exc
+            record["outcome"] = ("settled: %s" if isinstance(inner, Finished) else "failed: %s") % inner
+            if inner is not exc:
+                raise inner from exc
             raise
         finally:
             if serial:
