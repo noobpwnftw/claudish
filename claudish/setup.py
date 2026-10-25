@@ -264,7 +264,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
     print("\nChecking the whole chain (claudish doctor):\n")
     status = doctor.main()
     if platform.system() == "Linux" and any(label == "Input method" and state == "todo" for label, state, _, _ in steps):
-        print("\nLog out and back in, then add English → cd_AI — Claudish in your input sources.")
+        print("\nLog out and back in, then add English → Claudish in your input sources.")
     settings()
     return status
 

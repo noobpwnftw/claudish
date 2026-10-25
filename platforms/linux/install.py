@@ -35,7 +35,7 @@ COMPONENT = '''<?xml version="1.0" encoding="utf-8"?>
   <author>Claudish contributors</author>
   <engines><engine>
     <name>claudish</name>
-    <longname>cd_AI — Claudish</longname>
+    <longname>Claudish</longname>
     <description>English goes in, em dashes come out</description>
     <language>en</language>
     <license>MIT</license>
@@ -119,7 +119,7 @@ def main():
                 print("Installed and enabled the GNOME Shell extension", EXTENSION, "(it draws cd_AI's panel)")
             else:
                 print("Linked the GNOME Shell extension %s; enable it in Extensions." % EXTENSION)
-    print("Log out and back in, then add English → cd_AI — Claudish in Input Sources.")
+    print("Log out and back in, then add English → Claudish in Input Sources.")
     print("The source folder must stay in place. Remove with --uninstall%s." % (" --system" if args.system else ""))
 
 

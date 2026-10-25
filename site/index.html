@@ -123,9 +123,9 @@
           <li><a class="button primary" href="https://github.com/noobpwnftw/claudish/releases/latest/download/cd_AI.pkg">macOS · cd_AI.pkg</a>
             <span>Apple silicon. Not signed by Apple, so macOS blocks it once: click <b>Done</b> (not Move to Trash), then System Settings → Privacy &amp; Security → <b>Open Anyway</b>, twice. Then log out and back in.</span></li>
           <li><a class="button primary" href="https://github.com/noobpwnftw/claudish/releases/latest/download/cd_AI-setup.exe">Windows 11 · cd_AI-setup.exe</a>
-            <span>Not signed, so SmartScreen asks: <b>More info</b> → <b>Run anyway</b>. Then restart, and pick cd_AI with Win+Space.</span></li>
+            <span>Not signed, so SmartScreen asks: <b>More info</b> → <b>Run anyway</b>. Then restart, and pick Claudish with Win+Space.</span></li>
           <li><div class="oneline"><code id="linux-line">curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.1/scripts/install.sh | sh</code><button class="copy" type="button" data-copy="linux-line">Copy</button></div>
-            <span>Linux (IBus). Then log out and back in, and add English → cd_AI — Claudish in your input sources.</span></li>
+            <span>Linux (IBus). Then log out and back in, and add English → Claudish in your input sources.</span></li>
         </ul>
         <p class="body small">Each ends in cd_AI's settings: add an <a href="https://console.anthropic.com/settings/keys">Anthropic API key</a>, pick Claude Code for a Claude subscription or Codex for a ChatGPT subscription, or give another model API. Pick a tone and use Try a rewrite; then type ok in an app, Tab to preview, Tab again to insert.</p>
         <h3 class="by-hand">A development checkout, with a coding agent</h3>
@@ -140,7 +140,7 @@
 4. Run `python -m claudish setup --yes`. It writes a config, registers the input method (on Linux; on Windows the input method comes from cd_AI-setup.exe, see docs/install.md), and starts cd_AI at login.
 5. Run `python -m claudish settings` if the installer has not opened it. Help me pick my existing model: Claude Code for a Claude subscription, Codex for a ChatGPT subscription, Claude with an API key, or another model API. If a subscription command is missing or not logged in, help install it and log in. Use Try a rewrite in Settings to check that my chosen model answers. Let me enter any key in Settings myself.
 6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
-7. Finish by telling me how to start: on Linux, log out and back in and add "cd_AI — Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick cd_AI with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Shift+Enter sends my words as an instruction, Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
+7. Finish by telling me how to start: on Linux, log out and back in and add "English → Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick Claudish with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Shift+Enter sends my words as an instruction, Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
         </div>
         <h3 class="by-hand">Or by hand</h3>
         <pre class="commands">git clone https://github.com/noobpwnftw/claudish

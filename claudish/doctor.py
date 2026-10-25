@@ -166,7 +166,7 @@ def check_ime_linux():
     try:
         engines = subprocess.run(["ibus", "list-engine"], capture_output=True, text=True, timeout=5).stdout
         if "claudish" in engines:
-            results.append(("IBus engine", "ok", "IBus lists cd_AI — Claudish", None))
+            results.append(("IBus engine", "ok", "IBus lists Claudish", None))
         else:
             results.append(("IBus engine", "warn", "the running IBus does not list Claudish yet",
                             "log out and back in, or run `ibus restart` in a session with the search path set"))

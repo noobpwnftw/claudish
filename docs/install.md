@@ -41,7 +41,7 @@ are missing), clones cd_AI into `~/.local/share/claudish`, makes its own Python 
 links `claudish` into `~/.local/bin`, and runs `claudish setup`. Setup asks for a tone, writes the
 config, registers the input method with IBus, starts the service at every login (a systemd user
 unit), and opens cd_AI's settings in your browser. Then **log out and back in**, and add
-**English → cd_AI — Claudish** in **Settings → Keyboard → Input Sources**. Running the same line
+**English → Claudish** in **Settings → Keyboard → Input Sources**. Running the same line
 again updates cd_AI and restarts its service.
 
 **By hand**, from a checkout: `sudo apt install ibus python3-gi gir1.2-ibus-1.0`, then
@@ -58,7 +58,7 @@ login. The engine keeps your keyboard layout. The checkout must stay where it is
 
 **Uninstall:**
 
-1. Remove **cd_AI — Claudish** from **Settings → Keyboard → Input Sources**.
+1. Remove **English → Claudish** from **Settings → Keyboard → Input Sources**.
 2. `claudish service uninstall`
 3. `/usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --uninstall`
 4. `rm -rf ~/.local/share/claudish ~/.local/bin/claudish`
@@ -71,7 +71,7 @@ The config stays in `~/.config/claudish/`.
 **The installer**, `cd_AI-setup.exe` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for x64 and ARM64 Windows 11. It installs cd_AI's text service (its own build of PIME), a Python of its own for the service, and the `claudish` command, and adds
 cd_AI to your input sources. It asks for an administrator once, then sets up a starter config and
 the service at every login, and opens cd_AI's settings in your browser (the key, the tone). Then
-**restart**, and pick cd_AI with Win+Space: it is listed under **English (United States)**, shown as
+**restart**, and pick **Claudish** with Win+Space: it is listed under **English (United States)**, shown as
 ENG in the taskbar. An update also asks for a restart: the text service is
 loaded in every app, so Windows replaces it at the next one.
 

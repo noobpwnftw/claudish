@@ -55,14 +55,14 @@ the address of another model API, and pick a tone. Use **Try a rewrite** in Sett
   in the input menu.
 - **Windows 11**: **cd_AI-setup.exe**. It is not signed, so
   SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**. Then
-  restart, and pick **cd_AI** with Win+Space.
+  restart, and pick **Claudish** with Win+Space.
 - **Linux** (IBus; fcitx5 is not supported yet), as your user:
 
   ```sh
   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.1.1/scripts/install.sh | sh
   ```
 
-  Then log out and back in, and add **English → cd_AI — Claudish** in **Settings → Keyboard → Input
+  Then log out and back in, and add **English → Claudish** in **Settings → Keyboard → Input
   Sources**.
 
 A local model instead: `claudish setup --profile local`. Details, uninstalling, and building from
