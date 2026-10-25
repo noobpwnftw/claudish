@@ -17,9 +17,6 @@ def load(path):
     where = "templates %s" % path
     if not isinstance(data, dict) or set(data) - SECTIONS:
         raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))
-    tones = data.get("tones")
-    if isinstance(tones, dict) and "voice" in tones and "tone" not in tones:
-        tones["tone"] = tones.pop("voice")  # its name before 0.1.0
     for name, mode in (data.get("modes") or {}).items():
         check_mode(where, name, mode, name in TEMPLATES["modes"])
     for name, tone in ((data.get("tones") or {}).get("named") or {}).items():

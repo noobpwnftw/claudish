@@ -41,7 +41,9 @@ def from_server(spec, servers):
 
 
 class Provider:
-    def __init__(self, spec, base, servers=None):
+    def __init__(self, spec, base, servers=None, listing=False):
+        """listing: an MCP server's connection settings only, for listing its tools and resources."""
+        self.listing = listing
         kind = spec.get("type")
         if kind == "mcp":
             spec = from_server(spec, servers)
@@ -105,7 +107,7 @@ class Provider:
             if not (isinstance(env, dict) and all(isinstance(v, str) for v in env.values())):
                 raise ValueError("mcp env must map names to strings")
             self.env = {key: os.path.expandvars(value) for key, value in env.items()}
-            if getattr(self, "listing", False):
+            if self.listing:
                 self.name = spec.get("name") or "listing"
                 return
             if bool(self.tool) == bool(self.resource):
@@ -166,7 +168,7 @@ def read_mcp(provider):
                 read_stream, write_stream = streams[0], streams[1]
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
-                    if getattr(provider, "listing", False):
+                    if provider.listing:
                         tools = (await session.list_tools()).tools
                         try:
                             resources = (await session.list_resources()).resources
@@ -192,10 +194,7 @@ def read_mcp(provider):
 
 def list_server(server, timeout=15):
     """{"tools": [(name, summary)], "resources": [uri]} for one mcp_servers entry."""
-    provider = Provider.__new__(Provider)
-    provider.listing = True
-    Provider.__init__(provider, {"type": "mcp", "server": "_", "timeout": timeout}, Path.cwd(), {"_": server})
-    return read_mcp(provider)
+    return read_mcp(Provider({"type": "mcp", "server": "_", "timeout": timeout}, Path.cwd(), {"_": server}, listing=True))
 
 
 class Context:

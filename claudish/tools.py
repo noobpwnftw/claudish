@@ -1,10 +1,11 @@
-"""Agentic instruct (G17): an instruction may call the profile's read-only MCP tools, then draft.
+"""Agentic instruct (G17): an instruction may call the profile's MCP tools, then draft.
 
 Profile: "tools": ["notes", {"server": "github", "trust": ["get_pull_request"]}] names entries of
-mcp_servers. Only tools the server marks read-only (readOnlyHint) are offered, plus the ones the
-user vouches for with "trust"; tools with side effects wait for an approval channel (G18). Every
-call is listed in "consulted", the loop is bounded in steps and time, and the result is still
-only a candidate. Claudish's own read-only tools (the text box) join them, with or without MCP.
+mcp_servers. Tools the server marks read-only (readOnlyHint), and the ones the user vouches for
+with "trust", run unasked; tools that write or destroy are offered only when the instruction can
+ask, and are asked about before they run; "deny" names tools never offered. Every call is listed
+in "consulted", the loop is bounded in steps and time, and the result is still only a candidate.
+Claudish's own read-only tools (the text box) join them, with or without MCP.
 """
 import json
 import time
@@ -53,9 +54,8 @@ class Toolbox:
                 raise ValueError('tools: server %r is not in "mcp_servers"' % name)
             if SEPARATOR in name:
                 raise ValueError("tools: server names may not contain %r" % SEPARATOR)
-            provider = Provider.__new__(Provider)
-            provider.listing = True  # connection settings only; tools are chosen per call
-            Provider.__init__(provider, {"type": "mcp", "server": name, "timeout": timeout}, None, servers)
+            # Connection settings only; tools are chosen per call.
+            provider = Provider({"type": "mcp", "server": name, "timeout": timeout}, None, servers, listing=True)
             self.servers.append((name, trust, deny, provider))
             self.configs[name] = dict(servers[name])
 

@@ -1,9 +1,11 @@
 """Helpers (G39): an agent such as Claude Code, offered to the model as one more tool that acts.
 
 The profile's "helper" is the command that starts it, with {prompt} (a request to read a note) or
-{note} (the note's path), for example ["claude", "{prompt}"]. Like any tool that acts, it is
-asked about first, in words ("Send this task to claude?"); on yes, the task and what was observed
-go in a note, and the helper opens in a new terminal window, in any text box. Helpers that skip their own permission prompts are refused.
+{note} (the note's path), for example ["claude", "{prompt}"]. The task and what was observed go
+in a note. At a terminal prompt the helper's command line is the draft, unasked: Tab puts it at
+the prompt and Enter runs it there. In any other text box it is asked about first, in words
+("Send this task to claude?"), and on yes the helper opens in a new terminal window. Helpers that
+skip their own permission prompts are refused.
 """
 import os
 import re

@@ -46,7 +46,7 @@ class Lines:
 
 
 class Warm:
-    """What both share: a state, a lock (one request at a time), start and stop."""
+    """What both share: a state, a lock (one request at a time), the CLI process, start and stop."""
     name = "the model"
 
     def __init__(self, command, model=None, cwd=None, restart_after=200):
@@ -56,6 +56,7 @@ class Warm:
         self.lock = threading.Lock()
         self.lifecycle = threading.RLock()
         self.stopped = threading.Event()
+        self.process = self.lines = None
 
     def start(self):
         """At service start: warm up in the background; the service answers meanwhile."""
@@ -93,6 +94,18 @@ class Warm:
                 os.makedirs(self.cwd, exist_ok=True)
             self.process = spawn(*args, **kwargs)
             self.lines = Lines(self.process.stdout)
+
+    def launch(self):
+        """The CLI (argv), replacing the one running, its output read as lines."""
+        import subprocess
+        self.kill()
+        self.spawn(self.argv(), self.name, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                   stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
+                   bufsize=1, cwd=self.cwd)
+
+    def alive(self):
+        process = self.process
+        return process is not None and process.poll() is None
 
     def ask(self, prompt, timeout):
         """One rewrite, as its own conversation; RuntimeError with words for the panel."""
@@ -156,24 +169,12 @@ class ClaudeCode(Warm):
 
     def __init__(self, command, model="haiku", cwd=None, restart_after=200):
         super().__init__(command, model or "haiku", cwd, restart_after)
-        self.process = self.lines = None
 
     def argv(self):
         return [self.binary()] + self.command[1:] + [
             "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model, "--tools", "", "--strict-mcp-config", "--no-session-persistence",
             "--setting-sources", "", "--disable-slash-commands", "--system-prompt", NEUTRAL]
-
-    def launch(self):
-        import subprocess
-        self.kill()
-        self.spawn(self.argv(), "Claude Code", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                   stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                   bufsize=1, cwd=self.cwd)
-
-    def alive(self):
-        process = self.process
-        return process is not None and process.poll() is None
 
     def exchange(self, prompt, timeout):
         self.check_running()
@@ -219,7 +220,6 @@ class Codex(Warm):
 
     def __init__(self, command, model="gpt-6-luna", cwd=None, restart_after=200):
         super().__init__(command, model or "gpt-6-luna", cwd, restart_after)
-        self.process = self.lines = None
         self.counter = self.served = 0
 
     def argv(self):
@@ -227,18 +227,10 @@ class Codex(Warm):
         return [self.binary()] + self.command[1:] + ["app-server"] + off
 
     def launch(self):
-        import subprocess
-        self.kill()
-        self.spawn(self.argv(), "Codex", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                   stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                   bufsize=1, cwd=self.cwd)
+        super().launch()
         self.served = 0
         self.call("initialize", {"clientInfo": {"name": "claudish", "version": "0.1"}}, time.monotonic() + 30)
         self.send({"jsonrpc": "2.0", "method": "initialized"})
-
-    def alive(self):
-        process = self.process
-        return process is not None and process.poll() is None
 
     def send(self, message):
         process = self.process

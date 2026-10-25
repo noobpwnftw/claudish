@@ -15,7 +15,6 @@ Claudish tone and its prose examples apply only to prose boxes.
 from .modes import TEMPLATES
 from .screen import is_terminal
 
-ACTIONS = {"continue": "complete", "rewrite": "replace", "instruct": "insert"}
 WINDOW_BEFORE, WINDOW_AFTER = 1500, 500
 
 # Free-form text needs no description of its kind. The box's words (what each kind is, what it

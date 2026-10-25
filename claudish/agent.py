@@ -242,8 +242,8 @@ class ClaudeCodeDriver:
             return self.next_question(request_id)
         tool = body.get("display_name") or body.get("tool_name") or "a tool"
         self.pending[request_id] = body.get("input") or {}
-        # What is approved is the body, in full; the safe choice is 1 (a reflexive 1 never
-        # approves) and nothing is highlighted (docs/design/design.md).
+        # What is approved is the body, in full; the safe choice (Deny) is listed first and nothing
+        # is highlighted (docs/design/design.md).
         tool_input = body.get("input") if isinstance(body.get("input"), dict) else {}
         command = tool_input.get("command")
         label = "Claude Code wants to run" if isinstance(command, str) else "Claude Code wants to use %s" % tool
@@ -284,7 +284,7 @@ class ClaudeCodeDriver:
         if question not in self.pending:
             return
         tool_input = self.pending.pop(question)
-        if text is None and choice == 1:  # Allow is 2 on screen: the safe choice comes first
+        if text is None and choice == 1:  # Allow, listed after the safe choice
             decision = {"behavior": "allow", "updatedInput": tool_input}
         else:  # Deny, or free text: the user's words go back to the agent as the reason
             decision = {"behavior": "deny", "message": text or "The user declined this tool call."}
