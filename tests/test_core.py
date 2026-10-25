@@ -301,7 +301,8 @@ class SessionPollingTests(unittest.TestCase):
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
-        worker.conversation, worker.revisions = "c", {}
+        worker.conversation, worker.revisions, worker.wanted = "c", {}, None
+        worker.results = collections.deque()
         calls = []
 
         def call(endpoint, path, body=None, timeout=10):
@@ -311,11 +312,50 @@ class SessionPollingTests(unittest.TestCase):
             if path.endswith("/cancel"):
                 return {"ok": True}
             raise OSError("timed out")
-        with patch.object(client, "call", call), patch.object(client.time, "sleep"):
-            with self.assertRaises(OSError):
-                worker.session(1, "fix it", "app")
+
+        class Now:  # the follower thread, run at once
+            def __init__(self, target, args=(), daemon=None):
+                self.target, self.args = target, args
+
+            def start(self):
+                self.target(*self.args)
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"), \
+                patch.object(client.threading, "Thread", Now):
+            self.assertTrue(worker.session(1, "fix it", "app"))
         self.assertEqual([c for c in calls if c.startswith("/sessions/k?")].__len__(), 3)
         self.assertEqual(calls[-1], "/sessions/k/cancel")
+        self.assertEqual(worker.results[-1], (1, {"error": "timed out", "session": "k"}))  # the instruction says so
+
+    def test_a_held_exchanges_session_goes_on_and_a_late_answer_fails_it(self):
+        """Owner: Shift on a question cancelled its session (a new request stopped it); the reply
+        typed later went to the dead session, and the panel stayed at working."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
+        worker.wanted = {5, 3}  # on screen: 5 (continue); held: 3, the exchange
+        worker.pending = (5, "typing", "continue", None, False, False, "", "", None, 0)  # continue asks meanwhile
+        polls = iter([{"events": [{"seq": 0, "type": "question", "id": "q", "text": "Which?", "choices": []}], "done": False},
+                      {"events": [{"seq": 1, "type": "error", "text": "no answer, so the instruction stopped"}], "done": True}])
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if "/answer" in path:
+                raise HTTPError(path, 400, "no such open question", None, None)
+            return next(polls) if "?after=" in path else {"ok": True}
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"):
+            worker.revisions["k"] = 3
+            worker._follow(3, "k")  # not stopped by continue's request: its revision is still wanted
+            self.assertNotIn("/sessions/k/cancel", calls)
+            self.assertEqual([r[1].get("question", {}).get("id") for r in worker.results][:1], ["q"])
+            worker.results.clear()
+            worker.answer("k", "q", text="the second one")
+            deadline = time.monotonic() + 2
+            while not worker.results and time.monotonic() < deadline:
+                time.sleep(0.005)
+        self.assertEqual(worker.results[-1][0], 3)
+        self.assertIn("had ended", worker.results[-1][1]["error"])  # the panel says so instead of working
 
 
     def test_an_answer_that_cannot_be_sent_fails_the_instruction(self):

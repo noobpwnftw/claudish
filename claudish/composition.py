@@ -465,6 +465,8 @@ class Composition:
         """The worker's view of the service, copied each poll: the config's keys and hints, and
         whether it answers. True when that changed (offline or back)."""
         self.summon, self.hints = worker.summon, worker.hints
+        # What the worker's agent sessions are for: the exchange on screen and a held one.
+        worker.wanted = {self.revision} | ({self.held.revision} if self.held is not None else set())
         changed, self.offline = self.offline != worker.offline, worker.offline
         return changed
 

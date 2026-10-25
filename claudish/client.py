@@ -106,7 +106,10 @@ class Suggestions:
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
         self.offline = False  # the service did not answer its last check: True, or "initializing"
-        self.revisions = {}  # an agent session's id -> the instruction's revision, while it runs
+        self.revisions = {}  # an agent session's id -> the instruction's revision (its answers' errors go there)
+        # The revisions the composition still shows (Composition.follow sets them): the current one and
+        # a held exchange's. A session for another one is over for the person: it is cancelled.
+        self.wanted = None
         self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
         self.hints = True  # the config's "hints"
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
@@ -145,7 +148,10 @@ class Suggestions:
         with self.condition:
             self.pending = (revision, text, mode, app, look, immediate, before, after, purpose,
                             time.monotonic() + (0 if immediate else self.debounce))
+            # A newer request makes earlier suggestions stale; an agent session's events stay.
+            kept = [result for result in self.results if "session" in result[1]]
             self.results.clear()
+            self.results.extend(kept)
             self.condition.notify()
 
     def poll(self):
@@ -159,18 +165,24 @@ class Suggestions:
         body.update({"text": text} if text is not None else {"choice": choice})
 
         def send():
+            error = "the answer did not reach cd_AI's service"
             for attempt in range(3):
                 try:
                     call(self.endpoint, "/sessions/%s/answer" % session, body, timeout=5)
                     return
+                except HTTPError as exc:
+                    if exc.code < 500:  # the service has no such open question: the instruction is over
+                        error = "the instruction had ended (no answer in time, or it was stopped)"
+                        break
+                    time.sleep(0.5)
                 except Exception:
                     time.sleep(0.5)
-            # The service never heard it and would wait for it: the session ends, and the
-            # instruction says so (Shift+Enter asks again).
+            # The service never took it: the session ends, and the instruction says so (the summon
+            # key asks again), whatever else is pending.
             self._cancel(session)
             revision = self.revisions.get(session)
             if revision is not None:
-                self.deliver(revision, {"error": "the answer did not reach cd_AI's service", "session": session})
+                self.deliver(revision, {"error": error, "session": session}, always=True)
         threading.Thread(target=send, daemon=True).start()
 
     def new_conversation(self):
@@ -195,9 +207,12 @@ class Suggestions:
             self.condition.notify()
         threading.Thread(target=self._end, args=(self.conversation,), daemon=True).start()
 
-    def deliver(self, revision, data):
+    def deliver(self, revision, data, always=False):
+        """A result for the composition. A newer request drops a plain one; an agent session's
+        events go through (always), tagged with their revision: the composition takes them for its
+        current exchange or a held one, and ignores the rest."""
         with self.condition:
-            if not self.closed and self.pending is None:
+            if not self.closed and (always or self.pending is None):
                 self.results.append((revision, data))
                 return True
             return False
@@ -218,17 +233,24 @@ class Suggestions:
             raise
         key = started["id"]
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
+        for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
+            del self.revisions[old]
+        # Followed beside the requests: a held exchange's agent goes on while continue suggests.
+        threading.Thread(target=self._follow_session, args=(revision, key), daemon=True).start()
+        return True
+
+    def _follow_session(self, revision, key):
         try:
-            return self._follow(revision, key)
-        finally:
-            self.revisions.pop(key, None)
+            self._follow(revision, key)
+        except Exception as exc:
+            self.deliver(revision, {"error": str(exc), "session": key}, always=True)
 
     def _follow(self, revision, key):
         after, missed = 0, 0
         while True:
             with self.condition:
-                if self.closed or self.pending is not None:  # edited, committed, or Esc: stop the agent
-                    break
+                if self.closed or (self.wanted is not None and revision not in self.wanted):
+                    break  # edited, committed, Esc, or a new instruction: the agent stops
             try:
                 data = call(self.endpoint, "/sessions/%s?after=%d" % (key, after), timeout=5)
                 missed = 0
@@ -245,14 +267,15 @@ class Suggestions:
                 after = event["seq"] + 1
                 kind = event["type"]
                 if kind == "result" and event.get("done"):
-                    self.deliver(revision, {"done": event["done"], "session": key})
+                    self.deliver(revision, {"done": event["done"], "session": key}, always=True)
                 elif kind == "result":
                     self.deliver(revision, {"text": event["text"], "candidates": event.get("candidates") or [event["text"]],
-                                            "session": key})
+                                            "session": key}, always=True)
                 elif kind == "error":
-                    self.deliver(revision, {"error": event["text"], "session": key})
+                    self.deliver(revision, {"error": event["text"], "session": key}, always=True)
                 elif kind in ("progress", "partial", "question"):  # as the adapters see them, beside suggestions
-                    self.deliver(revision, {kind: event if kind == "question" else event["text"], "session": key})
+                    self.deliver(revision, {kind: event if kind == "question" else event["text"], "session": key},
+                                 always=True)
             if data["done"]:
                 return True
         self._cancel(key)
