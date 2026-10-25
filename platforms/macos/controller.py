@@ -207,6 +207,7 @@ class ClaudishInputController(IMKInputController):
     def poll(self):
         if not self.active or self.worker is None:
             return
+        self.state.summon = self.worker.summon  # the config's keys
         if self.state.offline != self.worker.offline:  # the service stopped or came back
             self.state.offline = self.worker.offline
             if self.state.text and not self.state.live:
@@ -571,11 +572,12 @@ class ClaudishInputController(IMKInputController):
             return True
         if self.state.live:
             return self.live_key(client, key, chars)
-        if key in (36, 76) and flags & NSEventModifierFlagShift and self.state.text:
-            kept = self.state.keep()  # Shift+Enter: as it is, and keep composing
+        shift = bool(flags & NSEventModifierFlagShift)
+        if key in (36, 76) and not self.state.talks(shift) and self.state.text:
+            kept = self.state.keep()  # the keeper key: as it is, and keep composing
             self.changed(client)
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
-            return True
+            return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if key in (36, 76):  # Return, keypad Enter
             action = self.state.enter()  # Enter talks to the model; it never inserts its text
             if action == "choose":  # answer with the highlighted choice

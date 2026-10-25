@@ -146,6 +146,7 @@ class ClaudishEngine(IBus.Engine):
         self.timer = GLib.timeout_add(40, self.poll)
 
     def poll(self):
+        self.composition.summon = self.suggestions.summon  # the config's keys
         if self.composition.offline != self.suggestions.offline:  # the service stopped or came back
             self.composition.offline = self.suggestions.offline
             if self.composition.text and not self.composition.live:
@@ -351,13 +352,14 @@ class ClaudishEngine(IBus.Engine):
         if self.composition.live:
             return self.live_key(keyval)
         # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
-        if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and state & IBus.ModifierType.SHIFT_MASK:
-            kept = self.composition.keep()  # Shift+Enter: as it is, and keep composing
+        shift = bool(state & IBus.ModifierType.SHIFT_MASK)
+        if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
+            kept = self.composition.keep()  # the keeper key: as it is, and keep composing
             if not kept:
                 return False
             self.changed()
             self.commit_text(IBus.Text.new_from_string(kept))
-            return True
+            return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter):
             action = self.composition.enter()
             if action == "choose":  # answer with the highlighted choice

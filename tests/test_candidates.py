@@ -50,6 +50,36 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual(state.panel()["rows"], [])
 
 
+class SummonKeyTests(unittest.TestCase):
+    """"keys": {"summon": "Shift+Enter"}: Enter puts your words in, Shift+Enter sends them to the
+    model; once an exchange is open, Enter answers it in either layout."""
+
+    def composing(self, summon):
+        state = Composition()
+        state.mode, state.summon = "compose", summon
+        state.change("running late")
+        return state
+
+    def test_the_default_layout(self):
+        state = self.composing("Enter")
+        self.assertEqual((state.talks(False), state.talks(True)), (True, False))
+        self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Enter", "ask"), ("Shift+Enter", "keep")])
+
+    def test_shift_enter_summons_and_enter_keeps(self):
+        state = self.composing("Shift+Enter")
+        self.assertEqual((state.talks(False), state.talks(True)), (False, True))
+        self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Shift+Enter", "ask"), ("Enter", "keep")])
+        state.offline = True
+        self.assertEqual(state.panel()["foot"], [("Enter", "keep")])
+
+    def test_an_open_exchange_answers_to_enter_in_either_layout(self):
+        state = self.composing("Shift+Enter")
+        state.submit()
+        self.assertEqual((state.talks(False), state.talks(True)), (True, False))
+        state.question = {"text": "Which day?", "choices": [{"label": "Friday"}]}
+        self.assertTrue(state.talks(False))
+
+
 class ModeFeelTests(unittest.TestCase):
     """Each mode looks different at the caret: a rewrite waits in the panel, an instruction lists drafts."""
 

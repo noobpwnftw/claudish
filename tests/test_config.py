@@ -47,6 +47,16 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual((name, settings["backend"], settings["claude_model"]),
                          ("claude", "claude", "claude-opus-5-5"))
 
+    def test_the_summon_key(self):
+        self.assertEqual(config.resolve()[1]["summon"], "Enter")
+        profiles = {"profiles": {"r": {"backend": "rules"}}}
+        self.write(dict(profiles, keys={"summon": "Shift+Enter"}))
+        self.assertEqual(config.resolve()[1]["summon"], "Shift+Enter")
+        for keys in ({"summon": "Ctrl+Enter"}, {"send": "Enter"}, ["Enter"]):
+            self.write(dict(profiles, keys=keys))
+            with self.assertRaisesRegex(ValueError, '"keys" takes "summon"'):
+                config.resolve()
+
     def test_invalid_configs_fail_with_clear_messages(self):
         for profile, message in [({"api_key": "sk-secret"}, "api_key_env"),
                                  ({"modle": "typo"}, "unknown keys modle"),

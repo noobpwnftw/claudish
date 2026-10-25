@@ -107,7 +107,7 @@ class ClaudeBackendTests(unittest.TestCase):
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
                     self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "routes": {},
                                                        "profile": None, "modes": ["rewrite", "continue", "instruct"],
-                                                       "timeout": 3})
+                                                       "timeout": 3, "keys": {"summon": "Enter"}})
             finally:
                 server.shutdown()
                 server.server_close()

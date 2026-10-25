@@ -99,6 +99,22 @@ class Composition:
         # The service does not answer (the adapter copies Suggestions.offline here): composing says so
         # from the first key, as cloud input methods grey out their cloud part; nothing else changes.
         self.offline = False
+        # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
+        # by the adapter like offline); the other one puts them in as typed.
+        self.summon = "Enter"
+
+    @property
+    def keeper(self):
+        """The key that puts your words in as typed."""
+        return "Shift+Enter" if self.summon == "Enter" else "Enter"
+
+    def talks(self, shift):
+        """Whether Enter (Shift+Enter with shift) talks to the model rather than keeping your words.
+        Only sending your words differs between the two layouts: once an exchange is open (drafts, a
+        question, a failure to retry), Enter answers it, as in a candidate window."""
+        if self.summon == "Enter" or self.sent or self.question:
+            return not shift
+        return shift
 
     def change(self, text):
         self.reply = ""
@@ -208,10 +224,10 @@ class Composition:
                          take="Tab")
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is offline",
-                         foot=[("Shift+Enter", "keep")] + ([("Esc", "drop")] if self.editing else []))
+                         foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what Enter does must be known)
-            shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), ("Enter", "ask")]
-                             + ([("Esc", "drop")] if self.editing else [("Shift+Enter", "keep")]))
+            shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
+                             + ([("Esc", "drop")] if self.editing else [(self.keeper, "keep")]))
         if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
@@ -371,8 +387,8 @@ class Composition:
         return "submit"
 
     def keep(self):
-        """Shift+Enter: insert what you see, as it is, and keep composing; "" with nothing composed
-        (then Shift+Enter is the app's, a newline in most chat boxes)."""
+        """The keeper key (Shift+Enter, or Enter when Shift+Enter summons): insert what you see, as it
+        is, and keep composing; "" with nothing composed (then the key is the app's)."""
         if not self.text or self.live:
             return ""
         kept = self.shown  # what the composition shows (your words, or a reply)

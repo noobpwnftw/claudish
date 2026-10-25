@@ -32,7 +32,6 @@ owner: the funded Anthropic-key check, then publishing.
 | ID | Goal |
 | --- | --- |
 | G64 | A drafts or rewrite panel taller than the screen: cap its height on every platform (rows scroll), as the lab draws it |
-| G47 | Configurable compose keys (`keys.summon`), read by the shared state |
 | G50 | Continue's Tab in macOS Terminal: follow the platform's input-method behavior; keep the limitation documented until verified |
 | G60 | fcitx5 on Linux |
 | G30 | `claudish update`, keeping the previous version to roll back to |

@@ -44,6 +44,7 @@ def main():
                 patch("pime_claudish.claudish_ime.focused_app", return_value="notepad.exe"):
             worker_class.return_value.poll.return_value = None
             worker_class.return_value.offline = False
+            worker_class.return_value.summon = "Enter"
             service = ClaudishTextService(None)
             replayed = []  # keys pressed again for the app after a commit
             replaying = patch("pime_claudish.claudish_ime.replay", lambda vk, modifiers=(): replayed.append((vk, modifiers)))
@@ -176,6 +177,13 @@ def main():
             assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is False
             assert key(0x0D)["return"] is False and replayed == before
             assert service.state.mode == "compose" and service.state.text == ""
+            # "keys": {"summon": "Shift+Enter"}: Enter keeps your words and is pressed again for the app.
+            worker_class.return_value.summon = "Shift+Enter"
+            for char in "sent":
+                key(ord(char.upper()), ord(char))
+            assert key(0x0D)["commitString"] == "sent" and replayed == before + [(0x0D, [])], replayed
+            worker_class.return_value.summon = "Enter"
+            before = list(replayed)
             # Compose: no request while typing; Enter sends it as an instruction; the next Enter inserts.
             calls = worker_class.return_value.schedule.call_count
             for char in "story":
@@ -276,7 +284,7 @@ def main():
             # instance in this window takes it up, in the same mode. Each instance gets a worker of
             # its own here, so taking up the parked one is visible.
             from unittest.mock import MagicMock
-            worker_class.side_effect = lambda: MagicMock(offline=False, **{"poll.return_value": None})
+            worker_class.side_effect = lambda: MagicMock(offline=False, summon="Enter", **{"poll.return_value": None})
             parked_worker = service.worker
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_not_called()

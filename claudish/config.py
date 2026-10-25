@@ -25,6 +25,8 @@ DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": N
             "context": None, "max_context_chars": 6000, "modes": None, "command": None, "hosted": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
+# The key that sends your words to the model, the default first; the other one puts them in as typed.
+SUMMON_KEYS = ("Enter", "Shift+Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
          "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
@@ -40,6 +42,7 @@ def resolve(path=None, profile=None, overrides=None):
     templates: the profile's templates file, read (modes.load), or None for the shipped ones;
     settings["modes"] becomes name -> {"profile"}: which profile answers a mode."""
     settings, name, base, servers, known = dict(DEFAULTS), None, Path.cwd(), {}, set()
+    summon = SUMMON_KEYS[0]
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
         try:
@@ -53,6 +56,10 @@ def resolve(path=None, profile=None, overrides=None):
         name = profile or data.get("profile") or next(iter(profiles))
         if name not in profiles:
             raise ValueError("profile %r is not in %s (have: %s)" % (name, path, ", ".join(profiles)))
+        keys = data.get("keys") or {}
+        if not (isinstance(keys, dict) and set(keys) <= {"summon"} and keys.get("summon", "Enter") in SUMMON_KEYS):
+            raise ValueError('"keys" takes "summon": "Enter" or "Shift+Enter" (the other key puts your words in)')
+        summon = keys.get("summon", summon)
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
@@ -118,6 +125,7 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError("profile %r: binding for %r names profile %r, which is not in the config"
                              % (name, binding.pattern, binding.profile))
     settings["mcp_servers"] = servers
+    settings["summon"] = summon
     return name, settings, templates, context
 
 

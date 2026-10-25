@@ -381,6 +381,19 @@ you. The tones are templates like the rest ([Templates](#templates)): change one
 under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
 over the tone. Instructions typed in a terminal always get a command line.
 
+### Keys
+
+`"keys"`, beside `"profile"`, sets which key sends your words to the model:
+
+```json
+{"profile": "claude", "keys": {"summon": "Shift+Enter"}, "profiles": {"claude": {"backend": "claude"}}}
+```
+
+`"Enter"` (the default) asks with Enter, and Shift+Enter puts your words in as typed.
+With `"Shift+Enter"`, Enter puts them in and goes on to the app, so a chat box sends in one press,
+and Shift+Enter asks. Once drafts or a question show, Enter answers them either way. The panel's
+footer names the keys. A change applies within a few seconds, without a restart.
+
 ## Modes
 
 Every request names a mode:
@@ -391,7 +404,7 @@ Every request names a mode:
 | `continue` | the start of a sentence | your text plus the next few words |
 | `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
 
-At the caret, compose's Tab asks for `rewrite`, its Enter sends `instruct`, and continue mode
+At the caret, compose's Tab asks for `rewrite`, its Enter (or Shift+Enter, [Keys](#keys)) sends `instruct`, and continue mode
 (a Shift tap) asks for `continue`. Adapters send `"mode"` in `/suggest`, and
 `/health` lists the modes. A profile's templates can change any mode, or add one
 of its own; its `"modes"` says only which profile answers a mode (above).

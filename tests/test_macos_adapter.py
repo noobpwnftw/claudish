@@ -155,6 +155,7 @@ class Worker:
         self.result = None
         self.closed = False
         self.offline = False
+        self.summon = "Enter"
         self.modes = []
 
     def answer(self, session, question, choice=None, text=None):
@@ -279,6 +280,15 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter keeps your words as they are
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_enter_keeps_and_reaches_the_app_when_shift_enter_summons(self):
+        self.controller.worker.summon = "Shift+Enter"  # "keys": {"summon": "Shift+Enter"}
+        self.type_text("on my way")
+        self.assertFalse(self.key(36, "\r"))  # the app gets its Enter: a chat box sends
+        self.assertEqual(self.client.commits, ["on my way"])
+        self.type_text("say thanks")
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter asks the model
+        self.assertEqual(self.controller.worker.modes[-1], "instruct")
 
     def test_rewrite_converts_in_place_without_a_list(self):
         self.type_text("draft")

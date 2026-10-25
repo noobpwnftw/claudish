@@ -125,5 +125,5 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 ## Open
 
 How much context continue gets; per-app input behavior (first, continue's Tab in macOS
-Terminal); keys you can rebind (Enter asks and Shift+Enter keeps, as above); screen-reader
-announcements.
+Terminal); which of Enter and Shift+Enter asks by default (both layouts exist: `"keys"` in
+docs/configuration.md); screen-reader announcements.

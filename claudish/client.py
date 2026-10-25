@@ -105,6 +105,7 @@ class Suggestions:
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
         self.offline = False  # the service did not answer its last check
+        self.summon = "Enter"  # the key that sends your words to the model (the config's "keys")
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -116,8 +117,12 @@ class Suggestions:
         missed = 0
         while True:
             try:
-                with OPENER.open(self.endpoint + "/health", timeout=2):
+                with OPENER.open(self.endpoint + "/health", timeout=2) as answer:
                     self.offline, missed = False, 0
+                    try:  # the config's keys, taken up as the service takes up a hand edit
+                        self.summon = json.loads(answer.read().decode("utf-8"))["keys"]["summon"]
+                    except (ValueError, KeyError, TypeError):
+                        pass
             except Exception as exc:
                 missed += 1
                 # Nothing listening is offline at once; a slow answer (a busy machine, a settings

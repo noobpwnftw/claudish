@@ -459,6 +459,7 @@ class ClaudishTextService(TextService):
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         if self.worker:
             self.state.offline = self.worker.offline  # the service stopped or came back
+            self.state.summon = self.worker.summon  # the config's keys
         result = self.worker.poll() if self.worker else None
         if result:
             revision, data = result
@@ -495,9 +496,12 @@ class ClaudishTextService(TextService):
             if key not in (0x11, 0x12, 0x5B, 0x5C):
                 replay(key, held(event))
             return True
-        if key == 0x0D and event.isKeyDown(0x10) and self.state.text and not self.state.live:
-            self.setCommitString(self.state.keep())  # Shift+Enter: as it is, and keep composing
+        shift = event.isKeyDown(0x10)
+        if key == 0x0D and not self.state.talks(shift) and self.state.text and not self.state.live:
+            self.setCommitString(self.state.keep())  # the keeper key: as it is, and keep composing
             self.changed()
+            if not shift:  # a plain Enter goes on to the app (a chat box sends), as a shortcut does
+                replay(key, held(event))
             return True
         if key == 0x0D:
             action = self.state.enter()  # Enter talks to the model; it never inserts its text
