@@ -393,6 +393,9 @@ class ClaudishEngine(IBus.Engine):
                 self.render()
                 return True
             if action == "accept":
+                answering = self.composition.take_answering()  # an answer to read: recorded, not asked again
+                if answering:
+                    self.suggestions.answer(*answering)
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 before, after = around or self.around_caret()  # where the rewrite goes

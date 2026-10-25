@@ -285,12 +285,18 @@ class ModeFeelTests(unittest.TestCase):
         state.mode = "compose"
         state.change("what does this error mean")
         state.submit()
-        state.ask(state.revision, {"id": "r", "read": True, "label": "The model says", "body": "A quote is open.",
-                                   "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
+        read = {"id": "r", "read": True, "label": "The model says", "body": "A quote is open.\nClose it.",
+                "insert": "A quote is open. Close it.", "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}
+        state.ask(state.revision, dict(read), "s")
         shown = state.panel()
         self.assertEqual((shown["rows"], shown["foot"]), ([], [("Tab", "insert"), ("Esc", "dismiss")]))
-        self.assertEqual((state.enter(), state.tab(), state.highlight), ("wait", "choose", 0))  # Tab: Insert it
         self.assertEqual(state.escape(), "dismiss")
+        # Tab: what you read goes in now (its insertable form), "Insert it" goes back to be recorded,
+        # and no second answer is waited for (owner: it took a second Tab).
+        state.ask(state.revision, dict(read), "s")
+        self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))
+        self.assertEqual((state.take_answering(), state.take_answering()), (("s", "r", 0), None))
+        self.assertEqual(state.commit(True), "A quote is open. Close it.")
 
     def test_enter_on_the_models_text_lights_tab_until_the_next_key(self):
         """Round 5 (seven reviewers): Enter never inserts the model's text, but a key that does

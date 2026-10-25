@@ -210,8 +210,7 @@ class AskAndHelperTests(unittest.TestCase):
         it in that folder; no window opens and nothing is asked."""
         import os
         import tempfile
-        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the tests fail and fix it"})]),
-                         answer("OK"))
+        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the tests fail and fix it"})]))
         with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch") as launch, \
                 patch.dict(os.environ, {"XDG_RUNTIME_DIR": tempfile.mkdtemp()}):
@@ -227,8 +226,7 @@ class AskAndHelperTests(unittest.TestCase):
     def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
         import os
         import tempfile
-        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the build fails and fix it"})]),
-                         answer("OK"))
+        model = Scripted(answer(calls=[("helper__claude", {"task": "Find why the build fails and fix it"})]))
         folder = tempfile.mkdtemp()
         with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch", return_value=True) as launch, \
@@ -316,8 +314,7 @@ class ShowTests(unittest.TestCase):
     """An answer to read: shown as is, inserted or dismissed."""
 
     def drive(self, choice):
-        model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize: add tokenize.o."})]),
-                         answer("OK"))
+        model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize: add tokenize.o."})]))
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
         with patch.object(rewriter, "chat", model):
@@ -337,7 +334,7 @@ class ShowTests(unittest.TestCase):
         self.assertEqual(result["candidates"], ["The linker cannot find tokenize: add tokenize.o."])
 
     def test_an_inserted_answer_still_fits_the_box(self):
-        model = Scripted(answer(calls=[("user__show", {"answer": "make clean\nmake"})]), answer("OK"))
+        model = Scripted(answer(calls=[("user__show", {"answer": "make clean\nmake"})]))
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
         with patch.object(rewriter, "chat", model):
@@ -362,8 +359,9 @@ class FollowUpTests(unittest.TestCase):
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
         conversation = rewriter.conversations.get("term")
+        # No "OK" round after the answer: choosing ends the turn, and the conversation keeps it.
         model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize."})]),
-                         answer("OK"), answer("cc -o app main.o parse.o tokenize.o"))
+                         answer("cc -o app main.o parse.o tokenize.o"))
         with patch.object(rewriter, "chat", model):
             for text, choice in (("what does this error mean", 1), ("well then fix it for me", None)):
                 session, thread = run(ModelDriver(rewriter, conversation, purpose="terminal",
@@ -377,6 +375,8 @@ class FollowUpTests(unittest.TestCase):
         later = json.dumps(model.sent[-1]["messages"])
         self.assertIn("what does this error mean", later)
         self.assertIn("The linker cannot find tokenize.", later)  # what was shown, though dismissed
+        self.assertIn("they dismissed it", later)
+        self.assertEqual(len(model.sent), 2)  # one call per turn
         self.assertEqual(session.events[-1]["text"], "cc -o app main.o parse.o tokenize.o")
 
 
@@ -393,7 +393,7 @@ class HandleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "USERPROFILE": home, "XDG_RUNTIME_DIR": home}), \
                 patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
                 patch("claudish.handoff.launch", return_value=True) as launch:
-            model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the link error"})]), answer("OK"))
+            model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the link error"})]))
             with patch.object(rewriter, "chat", model):
                 session, thread = run(ModelDriver(rewriter, conversation), "have claude fix the build")
                 deadline = time.monotonic() + 5

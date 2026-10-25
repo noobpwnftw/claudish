@@ -12,6 +12,7 @@ import time
 
 from .handoff import display_name as handoff_name
 from .textbox import Textbox
+from .tools import Finished
 
 IDLE_SECONDS = 1800
 KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs: compaction)
@@ -107,6 +108,7 @@ class ModelDriver:
         local.update(self.own_tools(session, box))
         tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
         self.handed = self.inserted = self.command = None
+        self.settled = None  # what a settling tool did, for this conversation's next turn
         try:
             result = rewriter.answer(
                 "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
@@ -115,9 +117,14 @@ class ModelDriver:
         except Exception as exc:  # with MCP servers open, a stop arrives wrapped in an exception group
             if self.cancelled:
                 return
-            if not (isinstance(exc, RuntimeError) and (self.inserted or self.handed or self.command)):
+            if not (self.inserted or self.handed or self.command):
                 raise
-            result = {"consulted": []}  # the model said nothing after an answer was chosen or a helper opened
+            # An answer you read and chose, or a handoff, ends the turn without asking the model again;
+            # the conversation keeps what happened, so the next instruction in this box knows.
+            result = {"consulted": []}
+            if self.settled:
+                self.conversation.remember([{"role": "user", "content": prompt},
+                                            {"role": "assistant", "content": self.settled}])
         if self.cancelled:
             return
         if self.inserted:  # an answer you read and chose to insert
@@ -139,16 +146,18 @@ class ModelDriver:
         back to the model), and the profile's helper, which acts and so is asked about first."""
         tools = {"user__ask": (
             "Ask the user a short question, shown as is with up to three choices, when the instruction is "
-            "ambiguous or needs their decision (\"Did you mean git status?\"). Their answer is the result.",
+            "ambiguous or needs their decision (\"Did you mean git status?\"), or to offer actions to choose "
+            "from, each choice an action. Their answer is the result.",
             {"type": "object", "properties": {
                 "question": {"type": "string"},
                 "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
              "required": ["question"]},
             lambda arguments: self.ask_user(session, arguments))}
         tools["user__show"] = (
-            "Show the user an answer to read instead of text for the text box, when they asked to understand "
+            "Show the user an answer to read instead of text for the text box, only when they asked to understand "
             "something (\"what does this error mean?\", \"what is the amount due?\"): a few sentences at most. "
-            "They may insert it or dismiss it.",
+            "Never for something to do: draft it, or hand it over. They may insert it or dismiss it; that ends "
+            "the instruction.",
             {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
             lambda arguments: self.show(session, arguments, box))
         from . import handoff
@@ -173,7 +182,8 @@ class ModelDriver:
                         self.command = command
                         self.conversation.handoffs.append({"helper": title, "task": task, "session": session,
                                                            "note": note, "tmux": "", "cwd": "", "started": time.time()})
-                        return "Its command is at the prompt for the user to run. Reply with just: OK"
+                        self.settled = "I offered %s's command at the prompt for this task: %s" % (title, task)
+                        raise Finished(self.settled)
                 launcher = getattr(self.rewriter, "launcher", None)
                 window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
                 if not handoff.launch(helper, note, launcher, session, window):
@@ -183,7 +193,8 @@ class ModelDriver:
                                                    "tmux": window if launcher and launcher[0] == "tmux" else "",
                                                    "cwd": os.path.expanduser("~"), "started": time.time()})
                 self.handed = "%s opened in a new window" % title
-                return "Handed over. Reply with just: OK"
+                self.settled = "I handed this task to %s in a new window: %s" % (title, task)
+                raise Finished(self.settled)
             tools["helper__" + title] = (
                 "Hand the task to %s, a coding agent that works on the user's machine (in a terminal, its "
                 "command is offered at the prompt; elsewhere in a new terminal window), when it takes more "
@@ -195,7 +206,8 @@ class ModelDriver:
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 
-    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False):
+    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False,
+                 insert=None):
         """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
         model's own question: its first choice highlighted, Tab answers) or "permission" (an
         approval: nothing highlighted until ↓, which lands on its safe choice, listed first; a
@@ -208,7 +220,8 @@ class ModelDriver:
         waiter = [threading.Event(), None]
         self.pending[key] = waiter
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
-                     label=label, body=text if body is None else body, code=code, read=read)
+                     label=label, body=text if body is None else body, code=code, read=read,
+                     **({"insert": insert} if insert is not None else {}))
         if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the instruction ends, as on Esc
             self.pending.pop(key, None)
             self.cancel()  # a model told "no answer" asks again; the loop stops at its next call
@@ -222,15 +235,19 @@ class ModelDriver:
         text = str(arguments.get("answer") or "").strip()[:1000]
         if not text:
             return "Nothing to show."
+        fitted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
+        # Tab inserts `insert` at once, in the input method; the choice comes back to record it.
         choice, words = self.question(session, MODEL_SAYS + text,
                                       [{"label": "Insert it", "legend": "at the caret"},
                                        {"label": "Dismiss", "legend": "nothing is inserted"}],
-                                      label=MODEL_SAYS.rstrip(": "), body=text, read=True)
+                                      label=MODEL_SAYS.rstrip(": "), body=text, read=True, insert=fitted)
         if words is None and choice == 0:
-            self.inserted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
+            self.inserted = fitted
+            self.settled = "I showed the user this answer, and they inserted it: " + text
         else:
             self.handed = "read and dismissed"
-        return "Shown to the user. Reply with just: OK"
+            self.settled = "I showed the user this answer, and they dismissed it: " + text
+        raise Finished(self.settled)
 
     def ask_user(self, session, arguments):
         """The model's own question, shown as is and marked as the model's."""

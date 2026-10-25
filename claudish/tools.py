@@ -154,10 +154,17 @@ class Toolbox:
                                 progress(summary)
                             try:
                                 result = str(callers[function["name"]](arguments))[:8000]
+                            except Finished:
+                                raise
                             except Exception as exc:  # a failed tool is information for the model
                                 result = "error: %s" % (exc,)
                     messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
         raise RuntimeError("the tool loop did not finish")
+
+
+class Finished(RuntimeError):
+    """A tool settled the turn (an answer you read and chose, a handoff): the loop stops without
+    asking the model again."""
 
 
 def opened(provider, limit):

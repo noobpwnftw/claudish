@@ -609,6 +609,9 @@ class ClaudishInputController(IMKInputController):
                 self.changed(client)
                 return True
             if action == "accept":
+                answering = self.state.take_answering()  # an answer to read: recorded, not asked again
+                if answering and self.worker is not None:
+                    self.worker.answer(*answering)
                 self.finish(client, suggested=True)
             elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 if self.worker is not None:

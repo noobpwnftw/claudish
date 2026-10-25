@@ -100,6 +100,9 @@ class Composition:
         # The service does not answer (the adapter copies Suggestions.offline here): composing says so
         # from the first key, as cloud input methods grey out their cloud part; nothing else changes.
         self.offline = False
+        # An answer you read and inserted with Tab: (session, question id, choice) for the adapter to
+        # send, so the service records it (take_answering); the model is not asked again.
+        self.answering = None
         # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
         # by the adapter like offline); the other one puts them in as typed.
         self.summon = "Shift+Enter"
@@ -289,8 +292,15 @@ class Composition:
         read: insert it). Tab takes everything the model offers; Shift+Enter only sends words."""
         if not self.text:
             return "pass"
-        if self.question:  # an answer to read, or the highlighted choice (an approval: ↓ first)
-            return "choose" if not self.reply and (self.reading or self.asks or self.selected) else "wait"
+        if self.question and self.reading and not self.reply:
+            # What you read goes in now, as shown (a terminal's one line); "Insert it" goes back to
+            # the service to be recorded, and no second answer is waited for.
+            insert = self.question.get("insert") or self.question.get("body") or ""
+            self.answering = self.answer_choice(0)
+            self.candidate = insert
+            return "accept"
+        if self.question:  # the highlighted choice (an approval: ↓ first)
+            return "choose" if not self.reply and (self.asks or self.selected) else "wait"
         if self.reply:  # a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
             return "wait"
         if self.converted or (self.asked == "instruct" and self.candidate):
@@ -481,6 +491,11 @@ class Composition:
             return "choose"
         self.candidate = self.candidates[index]
         return "accept"
+
+    def take_answering(self):
+        """The answer to send for an answer to read you inserted (see answering), once."""
+        answering, self.answering = self.answering, None
+        return answering
 
     def answer_choice(self, index=None):
         """(session, question id, choice index) for the highlighted choice (or `index`), or None.

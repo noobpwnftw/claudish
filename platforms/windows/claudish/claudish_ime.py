@@ -555,6 +555,9 @@ class ClaudishTextService(TextService):
             if action != "accept":  # convert shows the rewrite in place; wait shows nothing new
                 self.publish()
                 return True
+            answering = self.state.take_answering()  # an answer to read: recorded, not asked again
+            if answering and self.worker:
+                self.worker.answer(*answering)
             self.setCommitString(self.state.commit(True))
         elif key in (0x26, 0x28) and self.state.move(-1 if key == 0x26 else 1):  # ↑ and ↓ move the highlight
             self.publish()
