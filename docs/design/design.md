@@ -28,9 +28,11 @@ tone.
 ## Two modes, one key grammar
 
 A Shift tap (Shift pressed and released alone, not right after another key) switches mode, as
-Shift switches English and pinyin. The taskbar, menu bar or top bar shows the mode all along; a
-switch shows the mode's tile and name briefly at the caret ("compose · Shift continue"); like
-every toast, it lasts two seconds or until the next key, since it was said where the caret was.
+Shift switches English and pinyin. The taskbar, menu bar or top bar shows the mode all along. On
+Linux and Windows a switch shows the mode's tile and name briefly at the caret ("compose · Shift
+continue"); like every toast, it lasts two seconds or until the next key, since it was said where
+the caret was. On macOS the system announces the new input mode at the caret, so cd_AI's toast is
+off there.
 
 - **Compose** (where cd_AI starts): your words are held as the platform's composition (one plain
   underline) until you choose, as in a CJK input method.
@@ -51,6 +53,9 @@ cd_AI ships no model: compose uses the profile's model (Claude by default). With
 | Esc | one step back: cancel the reply you typed, then edit the instruction, then drop it |
 | Shift+Esc | brings back what Esc dropped, or the exchange a focus change held |
 | F8 | attaches a picture of the window to the instruction |
+
+Shift+Enter asks and Enter keeps by default (owner, 2026-10-25, after a poll: Enter is the key
+people send and confirm with); `"keys"` swaps them.
 
 A composition is one line (owner, 2026-10-25): finish it, or keep it with Enter and start the next
 line, which is the app's. So Shift+Enter with words composed asks the model, though chat boxes use it
@@ -129,5 +134,4 @@ scaling and caret rectangles on Wayland (GTK4, Electron, terminals).
 ## Open
 
 How much context continue gets; per-app input behavior (first, continue's Tab in macOS
-Terminal); screen-reader announcements. Shift+Enter asks and Enter keeps by default (owner,
-2026-10-25, after a poll: Enter is the key people send and confirm with); `"keys"` swaps them.
+Terminal); screen-reader announcements.

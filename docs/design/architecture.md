@@ -63,8 +63,8 @@ away or after 30 idle minutes.
 | Class | From | What happens |
 | --- | --- | --- |
 | read | `readOnlyHint`, or listed in `trust` | runs; listed in what was consulted |
-| write | everything else | asks: Deny first, Allow, Allow for this session |
-| destructive | `destructiveHint` | asks every time; never for the session; the question says it is destructive |
+| write | everything else | asks: Deny first, Allow, Allow for this conversation |
+| destructive | `destructiveHint` | asks every time; never for the conversation; the question says it is destructive |
 | denied | listed in `deny` | never offered to the model |
 
 A question shows what will actually happen (the tool and its key arguments), not a paraphrase.
