@@ -26,7 +26,7 @@ DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": N
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
 # The key that sends your words to the model, the default first; the other one puts them in as typed.
-SUMMON_KEYS = ("Enter", "Shift+Enter")
+SUMMON_KEYS = ("Shift+Enter", "Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
          "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "hosted": bool, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
@@ -57,7 +57,7 @@ def resolve(path=None, profile=None, overrides=None):
         if name not in profiles:
             raise ValueError("profile %r is not in %s (have: %s)" % (name, path, ", ".join(profiles)))
         keys = data.get("keys") or {}
-        if not (isinstance(keys, dict) and set(keys) <= {"summon"} and keys.get("summon", "Enter") in SUMMON_KEYS):
+        if not (isinstance(keys, dict) and set(keys) <= {"summon"} and keys.get("summon", SUMMON_KEYS[0]) in SUMMON_KEYS):
             raise ValueError('"keys" takes "summon": "Enter" or "Shift+Enter" (the other key puts your words in)')
         summon = keys.get("summon", summon)
         servers = data.get("mcp_servers") or {}

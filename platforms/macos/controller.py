@@ -576,6 +576,8 @@ class ClaudishInputController(IMKInputController):
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
             self.changed(client)
+            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+                return True
             client.insertText_replacementRange_(kept, (NSNotFound, 0))
             return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if key in (36, 76):  # Return, keypad Enter

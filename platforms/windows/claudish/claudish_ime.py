@@ -93,6 +93,12 @@ def held(event):
     return [key for key in MODIFIER_KEYS if event.isKeyDown(key)]
 
 
+def drawn(panel):
+    """The panel as drawn: a row's key column is narrow, so Shift+Enter shows as its symbols there
+    (the footer says it whole)."""
+    return dict(panel, take="⇧↵") if panel and panel.get("take") == "Shift+Enter" else panel
+
+
 def replay(vk, modifiers=()):
     """Press the key again for the app just after cd_AI commits what was composed, so one press of a
     shortcut or navigation key both commits and acts. A modifier that was down with it and is up by
@@ -296,7 +302,7 @@ class ClaudishTextService(TextService):
             self.setShowCandidates(False)
             self.setToast(spec, 30)
         else:
-            self.setPanel(spec)
+            self.setPanel(drawn(spec))
             self.setShowCandidates(True)
         return True
 
@@ -375,7 +381,7 @@ class ClaudishTextService(TextService):
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
         panel = self.state.panel()
-        self.setPanel(panel)
+        self.setPanel(drawn(panel))
         # The rows also go to TSF's candidate list, for apps that draw candidates themselves.
         self.setCandidateList([row["text"] for row in panel["rows"]] if panel else [])
         self.setShowCandidates(bool(panel))
@@ -498,7 +504,11 @@ class ClaudishTextService(TextService):
             return True
         shift = event.isKeyDown(0x10)
         if key == 0x0D and not self.state.talks(shift) and self.state.text and not self.state.live:
-            self.setCommitString(self.state.keep())  # the keeper key: as it is, and keep composing
+            kept = self.state.keep()  # the keeper key: as it is, and keep composing
+            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+                self.publish()
+                return True
+            self.setCommitString(kept)
             self.changed()
             if not shift:  # a plain Enter goes on to the app (a chat box sends), as a shortcut does
                 replay(key, held(event))

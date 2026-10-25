@@ -105,7 +105,7 @@ class Suggestions:
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
         self.offline = False  # the service did not answer its last check
-        self.summon = "Enter"  # the key that sends your words to the model (the config's "keys")
+        self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()

@@ -41,14 +41,14 @@ class CompositionTests(unittest.TestCase):
 
     def test_offline_is_said_from_the_first_key_and_nothing_else_changes(self):
         """Owner poll, 2026-10-24: as cloud input methods grey out their cloud part, compose says the
-        service is offline before Tab fails; your words stay held, Shift+Enter keeps them."""
+        service is offline before Tab fails; your words stay held, Enter keeps them."""
         state = Composition()
         state.offline = True
         for char in "hi there":
             state.insert(char)
         shown = state.panel()
         self.assertEqual((shown["tile"], shown["failed"]), ("warn", "cd_AI is offline"))
-        self.assertEqual(shown["foot"][0], ("Shift+Enter", "keep"))
+        self.assertEqual(shown["foot"][0], ("Enter", "keep"))
         self.assertEqual((state.text, state.commit()), ("hi there", "hi there"))
         state.offline = False
         state.insert("x")

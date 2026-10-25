@@ -51,8 +51,8 @@ class CompositionTests(unittest.TestCase):
 
 
 class SummonKeyTests(unittest.TestCase):
-    """"keys": {"summon": "Shift+Enter"}: Enter puts your words in, Shift+Enter sends them to the
-    model; once an exchange is open, Enter answers it in either layout."""
+    """By default Enter puts your words in and Shift+Enter sends them to the model; "keys":
+    {"summon": "Enter"} swaps them. Once an exchange is open, Enter answers it in either layout."""
 
     def composing(self, summon):
         state = Composition()
@@ -60,24 +60,33 @@ class SummonKeyTests(unittest.TestCase):
         state.change("running late")
         return state
 
-    def test_the_default_layout(self):
+    def test_enter_asks_when_set_so(self):
         state = self.composing("Enter")
         self.assertEqual((state.talks(False), state.talks(True)), (True, False))
         self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Enter", "ask"), ("Shift+Enter", "keep")])
 
-    def test_shift_enter_summons_and_enter_keeps(self):
+    def test_by_default_shift_enter_asks_and_enter_keeps(self):
+        self.assertEqual(Composition().summon, "Shift+Enter")
         state = self.composing("Shift+Enter")
         self.assertEqual((state.talks(False), state.talks(True)), (False, True))
         self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Shift+Enter", "ask"), ("Enter", "keep")])
         state.offline = True
         self.assertEqual(state.panel()["foot"], [("Enter", "keep")])
 
-    def test_an_open_exchange_answers_to_enter_in_either_layout(self):
+    def test_one_key_talks_to_the_model_throughout(self):
+        """Owner: the first instruction with Shift+Enter and follow-ups with Enter was the quirk."""
         state = self.composing("Shift+Enter")
         state.submit()
-        self.assertEqual((state.talks(False), state.talks(True)), (True, False))
+        state.offer(state.revision, "Sorry, running late.")
+        self.assertEqual((state.talks(False), state.talks(True)), (False, True))
+        self.assertIsNone(state.keep())  # a reflexive Enter on drafts: nothing goes in, Tab lights
+        self.assertTrue(state.panel()["nudge"])
         state.question = {"text": "Which day?", "choices": [{"label": "Friday"}]}
-        self.assertTrue(state.talks(False))
+        panel = state.panel()
+        self.assertEqual((panel["take"], panel["foot"][-1]), ("Shift+Enter", ("Shift+Enter", "confirm")))
+        state.insert("Monday")  # a reply: Shift+Enter sends it, Enter puts it in as typed
+        self.assertEqual(state.panel()["foot"][0], ("Shift+Enter", "send reply"))
+        self.assertEqual(state.keep(), "Monday")
 
 
 class ModeFeelTests(unittest.TestCase):
@@ -216,8 +225,8 @@ class ModeFeelTests(unittest.TestCase):
         state.mode = "compose"
         state.change("say hi")
         # What Enter does shows from the first key (CJK reviewers: Enter sends your words away).
-        self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Enter", "ask"), ("Shift+Enter", "keep")])
-        self.assertEqual(state.hint(), "Tab rewrite · Enter ask · Shift+Enter keep")
+        self.assertEqual(state.panel()["foot"], [("Tab", "rewrite"), ("Shift+Enter", "ask"), ("Enter", "keep")])
+        self.assertEqual(state.hint(), "Tab rewrite · Shift+Enter ask · Enter keep")
         state.submit()
         working = state.panel()
         self.assertEqual((working["status"], working["busy"], working["foot"]), ("working", True, [("Esc", "stop")]))
@@ -332,7 +341,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.enter(), state.answer_choice()), ("choose", ("s", "p", 1)))
         state.ask(state.revision, {"id": "q", "permission": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
         state.insert("2")  # a digit is text: your reply ("2 tests are flaky"), never an approval
-        self.assertEqual((state.shown, state.panel()["foot"][0]), ("2", ("Enter", "deny with reason")))
+        self.assertEqual((state.shown, state.panel()["foot"][0]), ("2", ("Shift+Enter", "deny with reason")))
 
     def test_esc_says_what_it_dropped_and_shift_esc_restores_a_reply(self):
         state = Composition()
@@ -362,7 +371,7 @@ class ModeFeelTests(unittest.TestCase):
         state.insert(" ")
         state.insert("days")
         self.assertEqual((state.shown, state.panel()["replying"]), ("3 days", True))  # digits are text
-        self.assertEqual(state.panel()["foot"], [("Enter", "send reply"), ("Esc", "cancel reply")])
+        self.assertEqual(state.panel()["foot"], [("Shift+Enter", "send reply"), ("Esc", "cancel reply")])
         self.assertFalse(state.move(1))  # typing: nothing is highlighted
         self.assertEqual(state.answer_text()[2], "3 days")
         self.assertEqual(state.panel()["thread"][-1], {"label": "You answered", "body": "3 days"})

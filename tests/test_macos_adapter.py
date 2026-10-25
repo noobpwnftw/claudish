@@ -155,7 +155,7 @@ class Worker:
         self.result = None
         self.closed = False
         self.offline = False
-        self.summon = "Enter"
+        self.summon = "Shift+Enter"
         self.modes = []
 
     def answer(self, session, question, choice=None, text=None):
@@ -277,12 +277,11 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.client.commits)
         self.key(51)
         self.assertEqual(self.client.marked, "Hi-")
-        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter keeps your words as they are
+        self.assertFalse(self.key(36, "\r"))  # Enter keeps your words as they are, and the app gets its Enter
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
-    def test_enter_keeps_and_reaches_the_app_when_shift_enter_summons(self):
-        self.controller.worker.summon = "Shift+Enter"  # "keys": {"summon": "Shift+Enter"}
+    def test_enter_keeps_and_reaches_the_app_and_shift_enter_asks(self):
         self.type_text("on my way")
         self.assertFalse(self.key(36, "\r"))  # the app gets its Enter: a chat box sends
         self.assertEqual(self.client.commits, ["on my way"])
@@ -321,7 +320,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.key(98)  # instruct
         self.type_text("say hi")
         state, worker = self.controller.state, self.controller.worker
-        self.key(36)  # send
+        self.key(36, "\r", 1 << 17)  # send
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
@@ -329,7 +328,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((state.text, state.candidates, self.module.PANEL.rows), ("say hi", [], []))
         self.assertEqual(self.client.marked, "say hi")
         self.type_text(", warmly")  # refine and send again: a follow-up in the same conversation
-        self.key(36)
+        self.key(36, "\r", 1 << 17)
         self.assertTrue(state.working and worker.immediate)
         self.assertTrue(self.key(53))  # Esc while it works: back to the instruction
         self.assertFalse(state.working)
@@ -381,7 +380,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.shift_tap()
         self.assertEqual((state.mode, state.text), ("compose", ""))  # the words are in the app already
         self.type_text("say thanks")
-        self.key(36)  # Enter: an instruction
+        self.key(36, "\r", 1 << 17)  # Shift+Enter: an instruction
         self.assertEqual(self.controller.worker.modes[-1], "instruct")
         self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
         self.controller.pollSuggestions_(None)
@@ -399,7 +398,7 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_instruct_lists_several_drafts_and_arrow_tab_takes_one(self):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
-        self.assertTrue(self.key(36))
+        self.assertTrue(self.key(36, "\r", 1 << 17))
         self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "x")  # it stays marked: the keys keep coming
         self.assertEqual(self.client.attributes, {"NSUnderline": 1, "NSUnderlineColor": "textColor"})  # one plain underline
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
@@ -413,7 +412,7 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_an_approval_is_answered_with_the_arrows(self):
         self.key(0, "x")
         state, worker = self.controller.state, self.controller.worker
-        self.assertTrue(self.key(36))  # send: the agent starts working
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # send: the agent starts working
         question = {"id": "perm-1", "text": "Allow Bash?", "permission": True, "label": "Claude Code wants to run",
                     "body": "git status", "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}
         worker.result = (state.revision, {"question": question, "session": "s1"})
@@ -422,7 +421,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((spec["label"], spec["body"], self.module.PANEL.rows, spec["on"]),
                          ("Claude Code wants to run", "git status", ["Deny", "Allow"], -1))
         self.assertTrue(self.key(125) and self.key(125))  # ↓ Deny, ↓ Allow
-        self.assertTrue(self.key(36))  # and Enter confirms it
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # and Shift+Enter confirms it
         self.assertEqual(worker.answered, ("s1", "perm-1", 1))
         self.assertIsNone(state.question)
         self.assertEqual(self.client.commits, [])  # an answer is not text
@@ -430,7 +429,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.pollSuggestions_(None)
         self.type_text("not 2")  # words instead of a choice, digits included: a reply
         self.assertEqual(self.client.marked, "not 2")
-        self.assertTrue(self.key(36))
+        self.assertTrue(self.key(36, "\r", 1 << 17))
         self.assertEqual(worker.answered_text, ("s1", "perm-2", "not 2"))
 
     def test_instruct_waits_for_enter_then_inserts_the_result(self):
@@ -441,17 +440,17 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(len(worker.modes), sent)  # no requests while typing an instruction
         self.assertTrue(self.key(100))  # F8: send a picture of the window too
         self.assertTrue(state.look)
-        self.assertTrue(self.key(36))  # Enter sends
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter sends
         self.assertTrue(state.working and worker.immediate and worker.look)
-        self.assertTrue(self.key(36))  # still working: Enter waits
+        self.assertTrue(self.key(36))  # still working: Enter puts nothing in
         self.assertEqual(self.client.commits, [])
         worker.result = (state.revision, {"error": "agent failed"})
         self.controller.pollSuggestions_(None)
         self.assertTrue(state.failed and not state.working)
-        self.key(36)  # retry
+        self.key(36, "\r", 1 << 17)  # retry
         worker.result = (state.revision, {"text": "Once upon a time—a cat."})
         self.controller.pollSuggestions_(None)
-        self.key(36)  # a second Enter inserts nothing: Enter talks to the model
+        self.key(36)  # a reflexive Enter on the draft inserts nothing
         self.assertEqual(self.client.commits, [])
         self.key(48)  # Tab takes the result
         self.assertEqual(self.client.commits, ["Once upon a time—a cat."])
@@ -479,7 +478,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits[-1], "plain")
         self.key(0, "x")  # compose (see setUp), then an instruction with two readings
         state, worker = self.controller.state, self.controller.worker
-        self.key(36)
+        self.key(36, "\r", 1 << 17)
         worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
         self.controller.pollSuggestions_(None)
         self.module.PANEL.pick(2)  # a click on the second row
@@ -623,7 +622,7 @@ class MacOSAdapterTests(unittest.TestCase):
                                           modifierFlags=lambda: 0, characters=lambda c=char: c), client)
             self.assertEqual(client.whole(), "Dear Ana,\n\nsay hi")  # the instruction is marked text
             fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 36,
-                                      modifierFlags=lambda: 0, characters=lambda: "\r"), client)
+                                      modifierFlags=lambda: 1 << 17, characters=lambda: "\r"), client)  # Shift+Enter
             self.assertEqual(fresh.worker.sent, ("say hi", "Dear Ana,\n\n", ""))
         finally:
             fresh.inputControllerWillClose()

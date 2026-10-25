@@ -101,7 +101,7 @@ class Composition:
         self.offline = False
         # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
         # by the adapter like offline); the other one puts them in as typed.
-        self.summon = "Enter"
+        self.summon = "Shift+Enter"
 
     @property
     def keeper(self):
@@ -109,12 +109,10 @@ class Composition:
         return "Shift+Enter" if self.summon == "Enter" else "Enter"
 
     def talks(self, shift):
-        """Whether Enter (Shift+Enter with shift) talks to the model rather than keeping your words.
-        Only sending your words differs between the two layouts: once an exchange is open (drafts, a
-        question, a failure to retry), Enter answers it, as in a candidate window."""
-        if self.summon == "Enter" or self.sent or self.question:
-            return not shift
-        return shift
+        """Whether Enter (Shift+Enter with shift) talks to the model rather than keeping your words:
+        the summon key does everything that goes to the model (an instruction, a follow-up, a reply,
+        a choice), the other key only ever puts your own words in (owner, 2026-10-25)."""
+        return not shift if self.summon == "Enter" else shift
 
     def change(self, text):
         self.reply = ""
@@ -180,7 +178,7 @@ class Composition:
         draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
-        shown = blank()
+        shown = blank(take=self.summon)  # the key that answers a question's choice
         question = self.question
         if self.sent:
             # What the composition does not say (round 6): "You asked" only while a reply takes the
@@ -197,11 +195,11 @@ class Composition:
                 shown.update(label=label, body=body, foot=[("Tab", "insert"), ("Esc", "dismiss")],
                              tail="or type to ask more", take="Tab")
                 return shown if not self.reply else dict(shown, replying=True, tail=None,
-                                                          foot=[("Enter", "send reply"), ("Esc", "cancel reply")])
+                                                          foot=[(self.summon, "send reply"), ("Esc", "cancel reply")])
             shown.update(label=label, body=body, code=bool(question.get("code")),
                          on=self.highlight if self.asks or self.selected else -1,
                          rows=[{"text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
-                         foot=[("↑↓", "choose")] + ([("Enter", "confirm")] if not approval or self.selected else []),
+                         foot=[("↑↓", "choose")] + ([(self.summon, "confirm")] if not approval or self.selected else []),
                          tail="or type why not" if not self.asks else "or type a reply")
         elif self.working and not self.reply:
             status = " ".join((self.status or "").split())
@@ -211,7 +209,7 @@ class Composition:
         elif self.working:  # typing while it works: your next words, sent when you press Enter
             shown["status"], shown["busy"] = "working", True
         elif self.failed:  # Tab retries a rewrite, Enter an instruction: each key asks again
-            retry = "Tab" if self.asked == "rewrite" else "Enter"
+            retry = "Tab" if self.asked == "rewrite" else self.summon
             shown.update(tile="warn", failed=self.error or "the request failed", foot=[(retry, "retry"), ("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
             readings = self.candidates or [self.candidate]
@@ -231,7 +229,7 @@ class Composition:
         if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
-            shown.update(on=-1, replying=True, tail=None, foot=[("Enter", enter),
+            shown.update(on=-1, replying=True, tail=None, foot=[(self.summon, enter),
                                                                  ("Esc", "cancel reply" if question else "cancel")])
         return shown
 
@@ -388,9 +386,18 @@ class Composition:
 
     def keep(self):
         """The keeper key (Shift+Enter, or Enter when Shift+Enter summons): insert what you see, as it
-        is, and keep composing; "" with nothing composed (then the key is the app's)."""
+        is, and keep composing; "" with nothing composed (then the key is the app's); None while an
+        exchange shows and nothing is typed (the key is taken, nothing goes in)."""
         if not self.text or self.live:
             return ""
+        if self.summon != "Enter" and (self.sent or self.question) and not self.reply.strip():
+            # Drafts or a question showing, nothing typed: a reflexive Enter puts nothing in (your
+            # instruction never lands in the app); on drafts it lights Tab, the key that takes one.
+            if self.asked == "instruct" and self.candidate:
+                self.nudged = self._showing()
+            elif self.working:
+                self.nudged = ("pending", self.text, self.reply)
+            return None
         kept = self.shown  # what the composition shows (your words, or a reply)
         self.change("")
         return kept

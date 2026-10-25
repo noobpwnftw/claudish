@@ -154,7 +154,9 @@ export default class CdAiExtension extends Extension {
             line.add_child(text);
             if (takes) {  // the trailing column: the highlighted row's Enter
                 // Tab takes a draft; lit after Enter on the model's text (panel.nudge)
-                const take = label(on ? panel.take || 'Enter' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
+                // A narrow column: Shift+Enter as its symbols (the footer says it whole).
+                const key = panel.take === 'Shift+Enter' ? '⇧↵' : panel.take || 'Enter';
+                const take = label(on ? key : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
                 line.add_child(take);
             }
             box.add_child(line);

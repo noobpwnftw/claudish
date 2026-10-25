@@ -13,11 +13,11 @@ window.LAB_STATES = {
     "rewrite"
    ],
    [
-    "Enter",
+    "Shift+Enter",
     "ask"
    ],
    [
-    "Shift+Enter",
+    "Enter",
     "keep"
    ]
   ],
@@ -27,7 +27,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "rewriting": {
@@ -49,7 +49,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "converted": {
@@ -97,7 +97,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "drafts": {
@@ -208,7 +208,7 @@ window.LAB_STATES = {
     "choose"
    ],
    [
-    "Enter",
+    "Shift+Enter",
     "confirm"
    ]
   ],
@@ -218,7 +218,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "reply": {
@@ -244,7 +244,7 @@ window.LAB_STATES = {
   "on": -1,
   "foot": [
    [
-    "Enter",
+    "Shift+Enter",
     "send reply"
    ],
    [
@@ -258,7 +258,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": true,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "answered": {
@@ -285,7 +285,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "permission": {
@@ -316,7 +316,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "handoff": {
@@ -347,7 +347,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "answer": {
@@ -395,7 +395,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "failed": {
@@ -407,7 +407,7 @@ window.LAB_STATES = {
   "on": -1,
   "foot": [
    [
-    "Enter",
+    "Shift+Enter",
     "retry"
    ],
    [
@@ -421,7 +421,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": "the model is offline",
   "replying": false,
-  "take": "Enter",
+  "take": "Shift+Enter",
   "nudge": false
  },
  "terminal": {

@@ -48,10 +48,10 @@ class ConfigTests(unittest.TestCase):
                          ("claude", "claude", "claude-opus-5-5"))
 
     def test_the_summon_key(self):
-        self.assertEqual(config.resolve()[1]["summon"], "Enter")
-        profiles = {"profiles": {"r": {"backend": "rules"}}}
-        self.write(dict(profiles, keys={"summon": "Shift+Enter"}))
         self.assertEqual(config.resolve()[1]["summon"], "Shift+Enter")
+        profiles = {"profiles": {"r": {"backend": "rules"}}}
+        self.write(dict(profiles, keys={"summon": "Enter"}))
+        self.assertEqual(config.resolve()[1]["summon"], "Enter")
         for keys in ({"summon": "Ctrl+Enter"}, {"send": "Enter"}, ["Enter"]):
             self.write(dict(profiles, keys=keys))
             with self.assertRaisesRegex(ValueError, '"keys" takes "summon"'):

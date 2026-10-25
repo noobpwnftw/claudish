@@ -44,7 +44,7 @@ def main():
                 patch("pime_claudish.claudish_ime.focused_app", return_value="notepad.exe"):
             worker_class.return_value.poll.return_value = None
             worker_class.return_value.offline = False
-            worker_class.return_value.summon = "Enter"
+            worker_class.return_value.summon = "Shift+Enter"
             service = ClaudishTextService(None)
             replayed = []  # keys pressed again for the app after a commit
             replaying = patch("pime_claudish.claudish_ime.replay", lambda vk, modifiers=(): replayed.append((vk, modifiers)))
@@ -167,24 +167,19 @@ def main():
             shift_tap()  # compose, starting empty: the words are in the app already
             for char in "as is":
                 key(ord(char.upper()), ord(char))
-            for _ in range(2):  # TSF's test, then the key: Shift+Enter is taken both times
-                assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is True
+            for _ in range(2):  # TSF's test, then the key: Enter is taken both times
+                assert key(0x0D, method="filterKeyDown")["return"] is True
             before = list(replayed)
-            assert key(0x0D, modifiers=(0x10,))["commitString"] == "as is"  # Shift+Enter keeps it as it is
-            assert replayed == before  # and nothing reaches the app after it: no newline
+            # Enter keeps it as it is, then is pressed again for the app (a chat box sends).
+            assert key(0x0D)["commitString"] == "as is" and replayed == before + [(0x0D, [])], replayed
             assert service.state.mode == "compose" and service.state.text == ""
+            before = list(replayed)
             # With nothing composed, Shift+Enter and Enter are the app's (a newline), never replayed.
             assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is False
+            assert key(0x0D, modifiers=(0x10,))["return"] is False
             assert key(0x0D)["return"] is False and replayed == before
             assert service.state.mode == "compose" and service.state.text == ""
-            # "keys": {"summon": "Shift+Enter"}: Enter keeps your words and is pressed again for the app.
-            worker_class.return_value.summon = "Shift+Enter"
-            for char in "sent":
-                key(ord(char.upper()), ord(char))
-            assert key(0x0D)["commitString"] == "sent" and replayed == before + [(0x0D, [])], replayed
-            worker_class.return_value.summon = "Enter"
-            before = list(replayed)
-            # Compose: no request while typing; Enter sends it as an instruction; the next Enter inserts.
+            # Compose: no request while typing; Shift+Enter sends it as an instruction; Enter then inserts nothing.
             calls = worker_class.return_value.schedule.call_count
             for char in "story":
                 key(ord(char.upper()), ord(char))
@@ -192,20 +187,20 @@ def main():
             reply = key(0x77)  # F8: send a picture of the window too
             assert service.state.look and said(reply, "window"), reply
             assert reply.get("clearOnEnd") is False, reply  # words being typed: a focus change keeps them
-            reply = key(0x0D)
+            reply = key(0x0D, modifiers=(0x10,))
             assert service.state.working and said(reply, "working"), reply
             assert reply.get("clearOnEnd") is True, reply  # sent: a focus change clears it from the text
             assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
             assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
             assert "commitString" not in key(0x0D)  # still working
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
-            assert "commitString" not in key(0x0D)  # Enter talks to the model; it never inserts its text
+            assert "commitString" not in key(0x0D)  # a reflexive Enter on the draft inserts nothing
             assert key(9)["commitString"] == "Once upon a time."  # Tab takes it
             worker_class.return_value.poll.return_value = None
             # Several readings: the candidate window lists them; 2 inserts the second.
             for char in "greet":
                 key(ord(char.upper()), ord(char))
-            key(0x0D)
+            key(0x0D, modifiers=(0x10,))
             worker_class.return_value.poll.return_value = (service.state.revision,
                                                            {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
             reply = key(0x10)  # Shift: a key that only polls and publishes
@@ -213,10 +208,10 @@ def main():
             worker_class.return_value.poll.return_value = None
             key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
             assert key(9)["commitString"] == "Hi there."  # Tab inserts the highlighted draft
-            # An agent session asks a question: the choices are the list, and Enter takes the highlighted one.
+            # An agent session asks a question: the choices are the list, and Shift+Enter takes the highlighted one.
             for char in "check":
                 key(ord(char.upper()), ord(char))
-            key(0x0D)
+            key(0x0D, modifiers=(0x10,))
             question = {"id": "perm-1", "text": "Allow Bash?",
                         "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
@@ -224,7 +219,9 @@ def main():
             assert reply.get("candidateList") == ["Allow", "Deny"], reply
             assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
-            reply = key(0x0D)
+            assert "commitString" not in key(0x0D)  # Enter puts nothing in and answers nothing
+            assert not worker_class.return_value.answer.called
+            reply = key(0x0D, modifiers=(0x10,))
             assert "commitString" not in reply, reply
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
             # Another question: typed words answer it (a digit in them is text).
@@ -234,7 +231,7 @@ def main():
             for char in "no 2":
                 key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
             assert service.state.reply == "no 2" and not worker_class.return_value.answer.call_args.kwargs
-            key(0x0D)
+            key(0x0D, modifiers=(0x10,))
             assert worker_class.return_value.answer.call_args.kwargs == {"text": "no 2"}, worker_class.return_value.answer.call_args
             # Esc stops the session and goes back to the instruction; Esc again drops it unsent.
             reply = key(0x1B)
@@ -284,7 +281,7 @@ def main():
             # instance in this window takes it up, in the same mode. Each instance gets a worker of
             # its own here, so taking up the parked one is visible.
             from unittest.mock import MagicMock
-            worker_class.side_effect = lambda: MagicMock(offline=False, summon="Enter", **{"poll.return_value": None})
+            worker_class.side_effect = lambda: MagicMock(offline=False, summon="Shift+Enter", **{"poll.return_value": None})
             parked_worker = service.worker
             service.handleRequest({"method": "onDeactivate"})
             worker_class.return_value.close.assert_not_called()

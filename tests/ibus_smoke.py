@@ -94,35 +94,35 @@ try:
     del engine.before_caret
     shift_tap()
     assert engine.composition.mode == "compose" and engine.composition.text == ""  # the words are in the app
-    # Compose holds the text; Enter sends it as an instruction, and the next Enter inserts the result.
+    # Compose holds the text; Shift+Enter sends it as an instruction; Enter then talks to the exchange.
     for char in "story":
         engine.do_process_key_event(ord(char), 0, 0)
     assert not engine.composition.working
     assert engine.do_process_key_event(IBus.KEY_F8, 0, 0) and engine.composition.look
     assert engine.do_process_key_event(IBus.KEY_F8, 0, 0) and not engine.composition.look
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)
     assert engine.composition.working and engine.composition.request_mode == "instruct"
     engine.composition.offer(engine.composition.revision, "Once upon a time—a cat.")
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and commits[-1] != "Once upon a time—a cat."  # Enter talks
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and commits[-1] != "Once upon a time—a cat."  # a reflexive Enter: nothing in
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # Tab takes the model's text
     assert commits[-1] == "Once upon a time—a cat."
     # Several readings of an instruction: a list (not numbered: digits are text); ↓ Tab inserts the second.
     for char in "greet":
         engine.do_process_key_event(ord(char), 0, 0)
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)
     engine.composition.offer(engine.composition.revision, "Hello.", ["Hi there.", "Greetings."])
     assert len(engine.composition.panel()["rows"]) > 1  # the drafts, as rows
     engine.render()
     assert engine.do_process_key_event(IBus.KEY_Down, 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
     assert commits[-1] == "Hi there." and not engine.composition.text
-    # Shift+Enter keeps your words as they are, and stays in compose.
+    # Enter keeps your words as they are, goes on to the app (a chat box sends), and stays in compose.
     for char in "as is":
         engine.do_process_key_event(ord(char), 0, 0)
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)
+    assert not engine.do_process_key_event(IBus.KEY_Return, 0, 0)
     assert commits[-1] == "as is" and engine.composition.mode == "compose" and not engine.composition.text
-    assert not engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)  # nothing composed
-    # Esc with just your words drops them (Shift+Enter keeps them).
+    assert not engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK)  # nothing composed: the app's
+    # Esc with just your words drops them (Enter keeps them).
     for char in "nope":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.text
@@ -139,7 +139,7 @@ try:
     # A shortcut while an instruction is out: the instruction is cleared, held with its exchange for Shift+Esc.
     for char in "fix it":
         engine.do_process_key_event(ord(char), 0, 0)
-    assert engine.do_process_key_event(IBus.KEY_Return, 0, 0) and engine.composition.sent
+    assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK) and engine.composition.sent
     assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
     assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
     engine.composition.held = None
@@ -165,6 +165,6 @@ try:
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Enter), live continue, F8, candidate list, mode menu, quiet in terminals, password bypass")
+    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()

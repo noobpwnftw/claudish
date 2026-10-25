@@ -355,6 +355,9 @@ class ClaudishEngine(IBus.Engine):
         shift = bool(state & IBus.ModifierType.SHIFT_MASK)
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
             kept = self.composition.keep()  # the keeper key: as it is, and keep composing
+            if kept is None:  # an exchange shows and nothing is typed: taken, nothing goes in
+                self.render()
+                return True
             if not kept:
                 return False
             self.changed()
