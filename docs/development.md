@@ -54,75 +54,26 @@ the rigs; it is not part of the shipped source.
 
 ## Current evidence and next checks
 
-As of 2026-10-25, the product has native typing recordings and repeatable checks, but no published
-release. The merge gate runs the unit tests, both adapter smokes and the settings browser check.
-The browser check includes subscription startup/failure/retry, a first rewrite and stale example
-responses, including a delayed Settings session before controls become usable. CLI protocol tests
-use stand-ins; they do not establish account access. The native worker also checks that an HTTP
-error retains the model's reason, and Mac caret tests distinguish inline offsets from document
-positions. Concurrent HTTP saves also check that a slow model selection preserves a tone saved from another window. Separate browser runs through
-the real logged-in Claude Code/Haiku and Codex backends produced Settings rewrites in
-2.61 s and 2.08 s on 2026-10-25 (one request each, not a latency benchmark). Settings and the site were checked
-at 320, 560, 1024 and 1440 px in both themes without horizontal overflow.
+As of 2026-10-25 there is no published release. The merge gate runs the unit tests, both adapter
+smokes, the settings page in a browser, and a syntax check of the GNOME extension.
 
-The TextEdit recording shows a rewrite accepted with Tab. The Terminal recording shows a typo
-question, the handoff command inserted at the prompt, Claude Code starting in the invoice project,
-and its fix passing the fixture's test. These are actual Mac VM captures. Windows ARM64 has
-install/update/restart and six instruction/focus/tool flows checked; Linux has the six Docker
-typing scenarios below.
+- **macOS 26, Apple silicon (VM):** the candidate from `926e0bc` installs, starts its service at
+  login and passes `doctor`; its MCP tools load. The owner hand-tested the day's builds in TextEdit
+  and Terminal: rewrites, drafts, an answer inserted with one Tab, a reply typed over an answer, a
+  Claude Code handoff with a session and "is it done?", and an MCP tool's approval. Models: Gemma 4
+  E4B on another machine, and Claude Code. Both README recordings come from this VM.
+- **Windows 11 ARM64 (VM):** the candidate installs for a standard account through an
+  administrator's password, registers that account's logon task, and the service runs after a
+  restart (`doctor` all ok). The panel was checked drawing a long status and every footer. Not yet:
+  Windows x64, a logged-in subscription, a hand-typed session on this build.
+- **Linux:** the Docker rig's six typing scenarios (real IBus, GTK and Qt on X11) pass; GNOME Shell
+  on Wayland, headless in a container, draws every design-lab state (`.tools/rigs/linux-gnome`).
+  Not yet: a real desktop session, KDE, fcitx5.
+- **Settings and the site:** checked at 320, 560, 1024 and 1440 px in both themes.
 
-The macOS Apple-silicon package and Windows ARM64 installer were rebuilt from `04cac81` on
-2026-10-25, update-installed and checked again after reboot. Installed Settings produced a real
-rewrite through Claude Code on macOS (3.22 s, one request) and the Gemma API in Windows Edge.
-TextEdit and Notepad both previewed `ok` on Tab and inserted the result on a second Tab. These
-used existing rig accounts with working model access; they do not establish a browser-download
-install. Windows has no subscription CLI installed, so its subscription path remains unchecked.
-The original macOS rig account selects Claude Code; its other profiles remain available.
-
-A separate standard macOS account then installed the same package without a prior config or key.
-The owner completed OS first-login setup and allowed the input method and local-network access.
-Installed Settings selected the rig's model API, discovered its only model with Model left blank,
-and produced a real rewrite. After logout/login, the service started automatically and TextEdit
-accepted a real rewrite; the text and screenshots are retained with the candidates below. The
-package was installed while OS setup was still active, so automatic Settings opening timed out;
-Settings was opened after the desktop was ready. These packages predate the source concurrency
-fix `051db05`.
-
-A later Mac candidate from `988a133` built over SSH after excluding unused Tk, whose bundling
-recipe aborted from a logged-out account. Safari downloaded the package with a matching SHA-256
-and browser quarantine metadata. With the fixture's config backed up, the owner completed native
-Installer and Settings appeared automatically. The owner found that first page unclickable;
-after reboot and signing into the fixture again, reopening Settings from the input menu worked
-through the API rewrite. The screenshot of the first page is not a usable-first-opening pass.
-The following fixes hide controls until Settings loads, retain model-error details in the native
-panel, and pass inline-relative positions to InputMethodKit's line-rectangle query. New Mac
-candidate `06c6004` contains those fixes and was update-installed on the fixture, preserving its
-model API profile. The owner reported the fix works and took over interactive rig testing.
-First-session usability and native anchor checks remain owner-driven; diagnostic captures alone
-are not acceptance passes. Candidates and their precise checks are retained in `dist/candidates/`
-with manifests.
-
-Candidate packages, source commit, SHA-256 hashes and screenshots are retained locally in
-`dist/candidates/04cac81/manifest.json` and its adjacent `evidence/` directory. They are not
-published downloads. A separate isolated source-service check with no config or credentials
-confirmed that Settings opens and a rewrite reports the missing model/key.
-
-The next checks, in order, are in [ROADMAP.md](../ROADMAP.md). In particular:
-
-- Check automatic first opening of Settings on a prepared fresh Mac account (the Windows
-  fresh-account flow passed on 2026-10-25). Exercise a Windows subscription with a logged-in CLI.
-- Integrate the release preparation with current main and check the download/install path.
-  A funded Anthropic-key rewrite and its failure states remain unchecked on the installed Mac
-  and Windows packages; publishing requires the owner.
-- Check Windows x64, both native panel themes against the design lab, and current Wayland
-  behavior. The documented macOS Terminal continue/Tab limitation remains.
-
-The browser demo keeps its pinned Qwen2.5 0.5B model, selected from candidates that fit browser
-constraints. Model size, loading time and speed matter alongside quality there. The broader
-[G53 study](../benchmarks/README.md#choosing-the-models-g53-2026-10-24) includes CPU and browser
-timings as well as quality; its [current choices](../benchmarks/README.md#current-choices) explain
-the different decisions. Revisit the browser choice only with a better measured tradeoff.
-The native recordings complement the interactive demo.
+Still to check before calling a release done: browser-download installs (Safari, Edge), a funded
+Anthropic API key and its failure states on both packages, Codex from a package, Windows x64.
+Candidates and what was checked on each are kept in `dist/candidates/` with a manifest.
 
 ## Build the tested CUDA backend
 
