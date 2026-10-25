@@ -463,7 +463,10 @@ class ClaudishInputController(IMKInputController):
         shown = self.state.shown  # rewrite after Tab: the rewrite, in place of your words
         # Cocoa ranges count UTF-16 code units, rather than Python code points.
         length = len(shown.encode("utf-16-le")) // 2
-        client.setMarkedText_selectionRange_replacementRange_(marked(shown), (length, 0), (NSNotFound, 0))
+        if shown:
+            client.setMarkedText_selectionRange_replacementRange_(marked(shown), (length, 0), (NSNotFound, 0))
+        else:  # empty marked text would leave a terminal composing: the next Return beeps
+            unmark(client)
         self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method
@@ -584,10 +587,11 @@ class ClaudishInputController(IMKInputController):
         shift = bool(flags & NSEventModifierFlagShift)
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
+            if kept is not None:  # inserting ends the composition: no empty marked text before the key
+                client.insertText_replacementRange_(kept, (NSNotFound, 0))
             self.changed(client)
             if kept is None:  # the model is asked: taken, nothing goes in
                 return True
-            client.insertText_replacementRange_(kept, (NSNotFound, 0))
             return shift  # a plain Enter goes on to the app (a chat box sends), as after a shortcut
         if key in (36, 76):  # Return, keypad Enter
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text

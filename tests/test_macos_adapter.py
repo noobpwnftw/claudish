@@ -289,6 +289,20 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter asks the model
         self.assertEqual(self.controller.worker.modes[-1], "instruct")
 
+    def test_enter_keeps_without_leaving_empty_marked_text(self):
+        # Terminal beeps at a Return that arrives with (empty) marked text still open.
+        calls = []
+        client = self.client
+        client.markedRange = lambda: (0, len(client.marked))
+        mark, insert = client.setMarkedText_selectionRange_replacementRange_, client.insertText_replacementRange_
+        client.setMarkedText_selectionRange_replacementRange_ = lambda text, *rest: (
+            calls.append(("mark", getattr(text, "text", text))), mark(text, *rest))
+        client.insertText_replacementRange_ = lambda text, *rest: (calls.append(("insert", text)), insert(text, *rest))
+        self.type_text("ls")
+        del calls[:]
+        self.assertFalse(self.key(36, "\r"))
+        self.assertEqual(calls, [("insert", "ls")])
+
     def test_rewrite_converts_in_place_without_a_list(self):
         self.type_text("draft")
         state = self.controller.state
