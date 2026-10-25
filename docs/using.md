@@ -107,7 +107,8 @@ It reads GNOME Terminal, Windows Terminal, the classic Windows console and Termi
 **Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
 Esc only while there is marked text. An instruction stays marked while its drafts show,
 so they work there; continue's suggestion is not marked text, so Tab completes in the
-shell instead of taking it.
+shell instead of taking it, and after Esc drops your words Shift+Esc goes to the shell. In a
+terminal a drop shows no toast.
 
 On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
 cases (23 need a fix, 7 are legitimate commands that failed for environmental

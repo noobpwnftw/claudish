@@ -449,7 +449,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def changed(self, client):
-        self.state.quiet = is_terminal(self.app(client))  # a terminal's command line is not prose
+        self.state.quiet = self.state.terminal = is_terminal(self.app(client))  # a terminal's command line is not prose
         after = self.around_caret(client)[1] if self.state.live else ""
         self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")

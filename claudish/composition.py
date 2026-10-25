@@ -85,6 +85,9 @@ class Composition:
         self.converted = False  # compose: a rewrite waits in the panel for Tab (your words stay)
         self.adopted = False  # the composition is text taken from the app (a selection): never dropped
         self.quiet = False  # the field is not prose (a URL, an email address, a number): nothing unasked
+        # A terminal: it may keep Esc from an input method when nothing is marked (Terminal.app), so a
+        # drop says nothing there (Shift+Esc still restores where the key arrives).
+        self.terminal = False
         self.inside = False  # text follows the caret on its line: continue waits for the end of a line
         self.question = None  # an agent session's open question: {"id", "text", "choices", "session"}
         self.reply = ""  # what you type while an instruction's exchange is open: a reply, or your next words
@@ -271,8 +274,8 @@ class Composition:
 
     def dropped_toast(self):
         """After Esc discarded words: say so, briefly, with the key that brings them back (None with
-        hints off)."""
-        if not self.hints:
+        hints off, or in a terminal)."""
+        if not self.hints or self.terminal:
             return None
         return blank(status="dropped", foot=[("Shift+Esc", "restore")])
 

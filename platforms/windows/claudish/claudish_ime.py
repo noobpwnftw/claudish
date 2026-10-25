@@ -384,7 +384,8 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
-        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits") or is_terminal(focused_app())
+        self.state.terminal = is_terminal(focused_app())
+        self.state.quiet = self.field() in ("url", "email", "number", "phone", "digits") or self.state.terminal
         after = self.around()[1] if self.state.live else ""
         self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
         if self.worker and self.state.automatic:
@@ -582,8 +583,9 @@ class ClaudishTextService(TextService):
                     self.worker.answer(*chosen)
                 self.publish()
                 return True
-            if action in ("clear", "drop") and self.state.hints:  # words discarded: said, with the key that brings them back
-                self.setToast(self.state.dropped_toast(), 2)
+            toast = self.state.dropped_toast() if action in ("clear", "drop") else None
+            if toast:  # words discarded: said, with the key that brings them back
+                self.setToast(toast, 2)
             if action == "clear":  # the reply goes; the question stays
                 self.publish()
                 return True

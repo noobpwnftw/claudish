@@ -148,6 +148,12 @@ class HintsTests(unittest.TestCase):
         state.ask(state.revision, {"id": "q", "text": "Which meeting?", "choices": [{"label": "Standup"}]}, "s")
         self.assertEqual(state.panel()["rows"][0]["text"], "Standup")
 
+    def test_a_drop_in_a_terminal_says_nothing(self):
+        state = Composition()
+        self.assertTrue(state.dropped_toast())
+        state.terminal = True  # Terminal.app keeps Esc from an input method when nothing is marked
+        self.assertIsNone(state.dropped_toast())
+
     def test_by_default_hints_show(self):
         state = Composition()
         state.change("running late")

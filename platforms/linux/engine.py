@@ -422,8 +422,9 @@ class ClaudishEngine(IBus.Engine):
                     self.suggestions.answer(*chosen)
                 self.render()
                 return True
-            if action in ("clear", "drop") and screen().shell and self.composition.hints:  # said, with the key that brings it back
-                screen().publish(None, "", self.composition.dropped_toast())
+            toast = self.composition.dropped_toast() if action in ("clear", "drop") else None
+            if toast and screen().shell:  # said, with the key that brings it back
+                screen().publish(None, "", toast)
             if action == "keep":
                 self.finish()
             elif action == "clear":
@@ -478,8 +479,8 @@ class ClaudishEngine(IBus.Engine):
     def update_quiet(self):
         """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;
         Tab and Shift+Enter in compose still ask."""
-        self.composition.quiet = (self.purpose in ("url", "email", "number", "phone", "digits", "terminal")
-                                  or is_terminal(self.app))
+        self.composition.terminal = self.purpose == "terminal" or is_terminal(self.app)
+        self.composition.quiet = self.purpose in ("url", "email", "number", "phone", "digits") or self.composition.terminal
 
     def switch_mode(self):
         """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose
