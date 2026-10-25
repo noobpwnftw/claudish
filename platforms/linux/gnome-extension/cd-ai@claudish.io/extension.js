@@ -109,7 +109,7 @@ export default class CdAiExtension extends Extension {
     }
 
     // The panel's anatomy: an optional header (a small label, then the content as is), the rows
-    // (the highlighted one a neutral fill with the accent bar and its own Enter key; every row keeps
+    // (the highlighted one a neutral fill with the accent bar and the key that takes it; every row keeps
     // that key's column), and one footer (the tile or a warning mark, what is happening, each key
     // with its verb, the free words).
     _fill(box, panel) {
@@ -152,11 +152,9 @@ export default class CdAiExtension extends Extension {
                 ? `${words}<span fgalpha="62%"> — ${GLib.markup_escape_text(row.legend, -1)}</span>` : words);
             text.x_expand = true;
             line.add_child(text);
-            if (takes) {  // the trailing column: the highlighted row's Enter
-                // Tab takes a draft; lit after Enter on the model's text (panel.nudge)
-                // A narrow column: Shift+Enter as its symbols (the footer says it whole).
-                const key = panel.take === 'Shift+Enter' ? '⇧↵' : panel.take || 'Enter';
-                const take = label(on ? key : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
+            if (takes) {  // the trailing column: the key that takes the highlighted row
+                // Tab takes a draft or a choice; lit after Enter on the model's text (panel.nudge)
+                const take = label(on ? panel.take || 'Tab' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
                 line.add_child(take);
             }
             box.add_child(line);

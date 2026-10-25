@@ -421,7 +421,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual((spec["label"], spec["body"], self.module.PANEL.rows, spec["on"]),
                          ("Claude Code wants to run", "git status", ["Deny", "Allow"], -1))
         self.assertTrue(self.key(125) and self.key(125))  # ↓ Deny, ↓ Allow
-        self.assertTrue(self.key(36, "\r", 1 << 17))  # and Shift+Enter confirms it
+        self.assertTrue(self.key(48, "\t"))  # and Tab confirms it
         self.assertEqual(worker.answered, ("s1", "perm-1", 1))
         self.assertIsNone(state.question)
         self.assertEqual(self.client.commits, [])  # an answer is not text

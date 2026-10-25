@@ -27,7 +27,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "rewriting": {
@@ -49,7 +49,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "converted": {
@@ -97,7 +97,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "drafts": {
@@ -208,7 +208,7 @@ window.LAB_STATES = {
     "choose"
    ],
    [
-    "Shift+Enter",
+    "Tab",
     "confirm"
    ]
   ],
@@ -218,7 +218,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "reply": {
@@ -258,7 +258,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": true,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "answered": {
@@ -285,7 +285,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "permission": {
@@ -316,7 +316,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "handoff": {
@@ -347,7 +347,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "answer": {
@@ -395,7 +395,7 @@ window.LAB_STATES = {
   "busy": true,
   "failed": null,
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "failed": {
@@ -421,7 +421,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": "the model is offline",
   "replying": false,
-  "take": "Shift+Enter",
+  "take": "Tab",
   "nudge": false
  },
  "terminal": {
@@ -482,7 +482,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Tab",
   "nudge": false
  },
  "returned": {
@@ -504,7 +504,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Tab",
   "nudge": false
  },
  "mode-compose": {
@@ -526,7 +526,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Tab",
   "nudge": false
  },
  "mode-continue": {
@@ -548,7 +548,7 @@ window.LAB_STATES = {
   "busy": false,
   "failed": null,
   "replying": false,
-  "take": "Enter",
+  "take": "Tab",
   "nudge": false
  }
 };

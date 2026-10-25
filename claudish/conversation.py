@@ -197,9 +197,9 @@ class ModelDriver:
 
     def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False):
         """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
-        model's own question: its first choice highlighted, Enter answers) or "permission" (an
+        model's own question: its first choice highlighted, Shift+Enter answers) or "permission" (an
         approval: nothing highlighted until ↓, which lands on its safe choice, listed first; a
-        reflexive Enter approves nothing). label and body: how the panel shows it (who asks, then
+        reflexive key approves nothing). label and body: how the panel shows it (who asks, then
         what)."""
         if self.cancelled:
             return 1, "cancelled"

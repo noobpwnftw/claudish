@@ -32,8 +32,8 @@ CloseApplications=no
 ChangesEnvironment=yes
 
 [Messages]
-FinishedLabelNoIcons=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter keeps your words.
-FinishedLabel=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter keeps your words.
+FinishedLabelNoIcons=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter asks the model; Enter keeps your words.
+FinishedLabel=Setup has finished installing [name]. Restart Windows, then pick cd_AI with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter asks the model; Enter keeps your words.
 
 [Files]
 ; The text service's DLLs are loaded in every app that takes text: in use, they are replaced at the

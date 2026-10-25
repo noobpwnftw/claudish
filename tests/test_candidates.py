@@ -83,10 +83,11 @@ class SummonKeyTests(unittest.TestCase):
         self.assertTrue(state.panel()["nudge"])
         state.question = {"text": "Which day?", "choices": [{"label": "Friday"}]}
         panel = state.panel()
-        self.assertEqual((panel["take"], panel["foot"][-1]), ("Shift+Enter", ("Shift+Enter", "confirm")))
-        state.insert("Monday")  # a reply: Shift+Enter sends it, Enter puts it in as typed
+        self.assertEqual((panel["take"], panel["foot"][-1]), ("Tab", ("Tab", "confirm")))  # Tab takes a choice
+        state.insert("Monday")  # a reply: Shift+Enter sends it; Enter is gated once the model is summoned
         self.assertEqual(state.panel()["foot"][0], ("Shift+Enter", "send reply"))
-        self.assertEqual(state.keep(), "Monday")
+        self.assertIsNone(state.keep())
+        self.assertEqual(state.enter(), "reply")
 
 
 class ModeFeelTests(unittest.TestCase):
@@ -193,19 +194,19 @@ class ModeFeelTests(unittest.TestCase):
         # after sending can never insert a draft nobody read (owner, 2026-10-24).
         self.assertEqual((state.enter(), state.tab()), ("wait", "accept"))
 
-    def test_enter_takes_the_first_choice_of_a_question_but_never_approves(self):
+    def test_tab_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
         state.mode = "compose"
         state.change("fix")
         state.submit()
         state.ask(state.revision, {"id": "q", "text": "The model asks: Did you mean git status?",
                                    "choices": [{"label": "Yes"}, {"label": "No"}]}, "s")
-        self.assertEqual((state.enter(), state.tab()), ("choose", "wait"))  # an answer is Enter's; Tab takes text
+        self.assertEqual((state.enter(), state.tab()), ("wait", "choose"))  # Tab takes what the model offers
         state.answer_choice()
         state.ask(state.revision, {"id": "p", "text": "Allow notes.delete?", "permission": True,
                                    "choices": [{"label": "Allow"}, {"label": "Deny"}]}, "s")
-        self.assertEqual(state.enter(), "wait")  # an approval needs a highlighted choice (↓ first)
-        self.assertEqual(state.tab(), "wait")
+        self.assertEqual(state.tab(), "wait")  # an approval needs a highlighted choice (↓ first)
+        self.assertEqual(state.enter(), "wait")
 
     def test_continue_waits_for_the_end_of_a_line(self):
         state = Composition()
@@ -324,8 +325,8 @@ class ModeFeelTests(unittest.TestCase):
         self.assertFalse(answer.panel()["nudge"])
 
     def test_choices_are_not_numbered_and_an_approval_starts_unhighlighted(self):
-        """Owner: digits are text in English, as Space is; "2 + Enter" and "↓ + Enter" are both two
-        strokes. Choices are chosen with ↑/↓ and Enter; an approval starts with nothing
+        """Owner: digits are text in English, as Space is; "2 + Tab" and "↓ + Tab" are both two
+        strokes. Choices are chosen with ↑/↓ and Tab; an approval starts with nothing
         highlighted, the first ↓ lands on Deny, and a reply starting with a digit is just a reply."""
         state = Composition()
         state.mode = "compose"
@@ -334,11 +335,11 @@ class ModeFeelTests(unittest.TestCase):
         state.ask(state.revision, {"id": "p", "permission": True, "label": "Claude Code wants to run", "body": "git push",
                                    "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
         approval = state.panel()
-        self.assertEqual((approval["on"], [r["text"] for r in approval["rows"]], state.enter()), (-1, ["Deny", "Allow"], "wait"))
+        self.assertEqual((approval["on"], [r["text"] for r in approval["rows"]], state.tab()), (-1, ["Deny", "Allow"], "wait"))
         self.assertTrue(state.move(1))  # the first ↓: Deny
         self.assertEqual(state.panel()["on"], 0)
-        self.assertTrue(state.move(1))  # ↓ again: Allow, then Enter confirms
-        self.assertEqual((state.enter(), state.answer_choice()), ("choose", ("s", "p", 1)))
+        self.assertTrue(state.move(1))  # ↓ again: Allow, then Tab confirms
+        self.assertEqual((state.tab(), state.answer_choice()), ("choose", ("s", "p", 1)))
         state.ask(state.revision, {"id": "q", "permission": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
         state.insert("2")  # a digit is text: your reply ("2 tests are flaky"), never an approval
         self.assertEqual((state.shown, state.panel()["foot"][0]), ("2", ("Shift+Enter", "deny with reason")))

@@ -1,7 +1,7 @@
 "use strict";
 // The demo is an input method, drawn: one editor, a composition at the caret, a candidate window,
 // and the same rules as claudish/composition.py (continue types straight in; compose holds your
-// words: Tab rewrites them, Enter does them as an instruction; a Shift tap switches). Typed keys arrive through a hidden textarea, so phone
+// words: Tab rewrites them, Shift+Enter does them as an instruction, Enter keeps them; a Shift tap switches). Typed keys arrive through a hidden textarea, so phone
 // keyboards and the browser's own input methods still work.
 const $ = (id) => document.getElementById(id);
 const sink = $("input");
@@ -10,14 +10,14 @@ const PREEDIT = $("preedit"), CARET = $("caret"), GHOST = $("ghost"), PLACEHOLDE
 const MAX = 512;
 const HINTS = {
   continue: "Type as usual. Pause after a word: the rest of the sentence waits in grey; Tab takes it. Tap Shift to compose.",
-  compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Enter asks the model to do it; Shift+Enter keeps it as it is. Tap Shift to type straight in.",
+  compose: "Type, or select some text. Tab offers a rewrite (Tab again takes it); Shift+Enter asks the model to do it; Enter keeps it as it is. Tap Shift to type straight in.",
 };
 const SHIFT_TAP_MS = 500;  // Shift alone, released within this: the mode switch
 // [label, mode, text, the key that finishes it]
 const SAMPLES = [
   ["rewrite", "compose", "This is very important.", "Tab"],
   ["continue", "continue", "Thanks for the quick review on ", ""],
-  ["ask", "compose", "decline the meeting politely, propose Thursday", "Enter"],
+  ["ask", "compose", "decline the meeting politely, propose Thursday", "Shift+Enter"],
 ];
 const IN_BROWSER = document.querySelector('meta[name="claudish-backend"]')?.content === "browser";
 let browserBackend = null;
@@ -178,11 +178,11 @@ function panel() {
                  status: null, busy: false, failed: null, replying: false};
   // Once the composition no longer shows your instruction (you type a reply), the panel says it.
   if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
-  const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Enter", "ask"], ["Esc", "cancel"]]} : {};
+  const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]} : {};
   if (state.working) return {...shown, status: state.asked === "rewrite" ? "rewriting" : "working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
   if (state.failed) return {...shown, tile: "warn", failed: state.error || "the request failed",  // Tab retries a rewrite
-                            foot: [[state.asked === "rewrite" ? "Tab" : "Enter", "retry"], ["Esc", "edit"]], ...typing};
+                            foot: [[state.asked === "rewrite" ? "Tab" : "Shift+Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates.length ? state.candidates : [state.candidate];
     return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight,
@@ -191,8 +191,8 @@ function panel() {
   }
   if (state.converted) return {...shown, label: "Rewrite", body: state.candidate,
                                foot: [["Tab", "insert"], ["Esc", "dismiss"]], take: "Tab"};
-  // Composing: the keys show from the first key (what Enter does must be known).
-  return {...shown, foot: [["Tab", "rewrite"], ["Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Shift+Enter", "keep"]]};
+  // Composing: the keys show from the first key (what each Enter does must be known).
+  return {...shown, foot: [["Tab", "rewrite"], ["Shift+Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Enter", "keep"]]};
 }
 // A click on a draft: it goes in at the caret (choices are not numbered; the mouse picks directly).
 function pickRow(number) {
@@ -236,7 +236,7 @@ function toast(spec = null) {
 
 // Keys, as an input method sees them. Returns true when the key was taken.
 function key(name, shift = false) {
-  flash(name);
+  flash(name === "Enter" && shift ? "Shift+Enter" : name);
   document.querySelectorAll("#editor > .k-toast").forEach((old) => old.remove());  // a key ends a toast
   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(name)) {
     settle();
@@ -257,7 +257,7 @@ function key(name, shift = false) {
     return true;
   }
   if (live()) return liveKey(name);
-  // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Enter takes.
+  // Choices are not numbered: digits are text, as Space is; ↑ and ↓ choose, Tab takes.
   if ((name === "ArrowUp" || name === "ArrowDown") && state.asked === "instruct" && state.candidates.length > 1
       && !state.reply) {  // ↑ and ↓ move the highlight, without wrapping
     const count = state.candidates.length;
@@ -267,20 +267,27 @@ function key(name, shift = false) {
   }
   if (name === "Enter") {
     if (!state.text) { commit("\n"); render(); return true; }  // nothing composed: a newline
-    if (shift) { commit(shown()); change(""); changed(); return true; }  // Shift+Enter: as it is
+    if (!shift) {  // Enter only puts your own words in, then is the editor's (a newline)
+      if (sent()) {  // once the model is summoned Enter is gated: a reflexive press puts nothing in
+        if (state.asked === "instruct" && state.candidate) state.nudged = showing();  // the row lights Tab
+        else if (state.working) state.nudged = JSON.stringify(["pending", state.text, state.reply]);
+        render();
+        return true;
+      }
+      commit(shown() + "\n"); change(""); changed(); return true;
+    }
     if (sent() && state.reply.trim()) {  // your next words: a follow-up instruction
       change(state.reply.trim());
       state.asked = "instruct"; state.working = true; render(); ask(state.revision);
       return true;
     }
-    // Enter talks to the model: it never inserts the model's text (Tab does), so a reflexive second
-    // Enter after sending inserts nothing.
+    // Shift+Enter talks to the model: it never inserts the model's text (Tab does).
     if (state.asked === "instruct" && state.candidate) { state.nudged = showing(); render(); return true; }  // the row lights Tab
     if (state.converted) return true;  // the rewrite goes in with Tab, as its footer says
-    if (!state.working) {  // the first Enter sends it as an instruction
+    if (!state.working) {  // Shift+Enter sends it as an instruction
       state.asked = "instruct"; state.working = true; state.failed = false; state.nudged = null; render(); ask(state.revision);
     } else if (state.asked === "instruct") {
-      state.nudged = JSON.stringify(["pending", state.text, state.reply]);  // a reflexive Enter: Tab lights when they come
+      state.nudged = JSON.stringify(["pending", state.text, state.reply]);  // a reflexive key: Tab lights when they come
     }
     return true;
   }
@@ -293,7 +300,7 @@ function key(name, shift = false) {
       if (words.length <= MAX) { removeSelection(); change(words); state.adopted = true; }
     }
     if (!state.text) return false;
-    if (state.reply) return true;  // a reply you are typing: Enter sends it, and Tab takes nothing over it
+    if (state.reply) return true;  // a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
     // The first Tab asks for the rewrite, which takes your words' place as it arrives; the next
     // keeps it (or an instruction's first draft). A pending answer is not stale text: Tab waits.
     if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft
@@ -450,6 +457,15 @@ function showMode() {
   $("hint").textContent = HINTS[state.mode];
 }
 function setStatus(text) { $("status").textContent = text; }
+// The key strip is tappable (a phone keyboard has no Shift+Enter): a tap is that key's press.
+document.addEventListener("pointerdown", (event) => {
+  const strip = event.target.closest(".keystrip [data-key]");
+  if (!strip || strip.dataset.key === "Shift") return;
+  event.preventDefault();  // the editor keeps the focus
+  stopTyping();
+  const [name, shift] = strip.dataset.key === "Shift+Enter" ? ["Enter", true] : [strip.dataset.key, false];
+  key(name, shift);
+});
 function flash(name) {
   const strip = document.querySelector(`[data-key="${name === "ArrowUp" ? "ArrowDown" : name}"]`);
   if (!strip) return;
@@ -614,7 +630,8 @@ $("samples").addEventListener("click", (event) => {
   typing = setInterval(() => {
     if (!chars.length) {
       stopTyping();
-      if (button.dataset.then) key(button.dataset.then);
+      if (button.dataset.then === "Shift+Enter") key("Enter", true);
+      else if (button.dataset.then) key(button.dataset.then);
       return;
     }
     key(chars.shift());

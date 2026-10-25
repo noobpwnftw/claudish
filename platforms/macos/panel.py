@@ -31,7 +31,7 @@ KEYS = {"Enter": "↩", "Esc": "esc", "Tab": "⇥", "Shift": "⇧", "Shift+Enter
 
 
 def spec_take(spec):
-    return (spec or {}).get("take") or "Enter"
+    return (spec or {}).get("take") or "Tab"
 
 
 def rounded_mask(radius):
@@ -337,7 +337,7 @@ class Panel:
             bar = box(NSColor.controlAccentColor(), 1.5)
             bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
             row.addSubview_(bar)
-            key = spec_take(self.spec)  # Tab takes a draft; Enter confirms a choice
+            key = spec_take(self.spec)  # Tab takes a draft or a choice
             take = key_label(key, bool(self.spec.get("nudge")))
             if self.spec.get("nudge"):  # the lit keycap: centred in the row, at its right edge
                 size = take.frame().size

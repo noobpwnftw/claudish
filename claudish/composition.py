@@ -5,13 +5,14 @@ import time
 MAX_COMPOSITION = 512
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
 # compose (where cd_AI starts) holds what you type: Tab shows a rewrite (Tab again puts it in),
-# Enter sends it as an instruction and offers drafts, Shift+Enter keeps it as it is, and Esc steps
+# Shift+Enter sends it as an instruction and offers drafts, Enter keeps it as it is, and Esc steps
 # back until it is gone. continue types like en_US: your keys go straight in, and the rest of the
 # sentence waits after the caret for Tab (docs/design/design.md).
 MODES = ("compose", "continue")
-# Tab takes the model's text (a suggestion, a rewrite, a draft, an answer to read); Enter talks to the
-# model (sends an instruction, a reply, an answer to its question). Enter never inserts the model's
-# words, so a reflexive second Enter after sending can insert nothing (owner, 2026-10-24).
+# Tab takes the model's text (a suggestion, a rewrite, a draft, an answer to read); Shift+Enter talks
+# to the model (sends an instruction, a follow-up, a reply, an answer to its question); Enter only puts
+# your own words in. Neither inserts the model's words, so a reflexive Enter after sending inserts
+# nothing (owner, 2026-10-24; Enter and Shift+Enter swapped by default, 2026-10-25).
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
@@ -63,7 +64,7 @@ def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None,
-                 "replying": False, "take": "Enter", "nudge": False}, **shown)
+                 "replying": False, "take": "Tab", "nudge": False}, **shown)
 
 
 class Composition:
@@ -90,10 +91,10 @@ class Composition:
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
         self.dropped_reply = False
         self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
-        self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes a draft, Enter an answer)
+        self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes it: a draft or a choice)
         self.held = None  # a sent instruction's exchange, held when focus left the text box
         self.held_app, self.held_at = None, 0.0
-        self.selected = False  # an approval has a row highlighted (↓ first): only then does Enter answer it
+        self.selected = False  # an approval has a row highlighted (↓ first): only then does Tab answer it
         self.status = ""  # what the agent is doing, or its draft so far
         self.error = ""  # why the last request failed, in plain words
         # The service does not answer (the adapter copies Suggestions.offline here): composing says so
@@ -144,7 +145,7 @@ class Composition:
         """Ask on this pause? Only in continue, only at a word boundary (after a space or
         punctuation), so a pause mid-word never splits it ("rev" + " iew"), and only at the end of
         a line: in the middle of text a suggestion would push or cover what follows (adapters set
-        inside). A rewrite is asked for with Tab and an instruction with Enter: nothing is sent
+        inside). A rewrite is asked for with Tab and an instruction with Shift+Enter: nothing is sent
         while you compose."""
         if self.mode == "continue" and not self.quiet and not self.inside:
             return bool(self.text) and not self.text[-1].isalnum() and not self.taken
@@ -178,7 +179,7 @@ class Composition:
         draft: its Tab lit). Continue shows no panel: its suggestion speaks for itself."""
         if self.live or not (self.text or self.question):
             return None
-        shown = blank(take=self.summon)  # the key that answers a question's choice
+        shown = blank(take="Tab")  # the key that takes the highlighted row: a draft or a choice
         question = self.question
         if self.sent:
             # What the composition does not say (round 6): "You asked" only while a reply takes the
@@ -199,16 +200,16 @@ class Composition:
             shown.update(label=label, body=body, code=bool(question.get("code")),
                          on=self.highlight if self.asks or self.selected else -1,
                          rows=[{"text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
-                         foot=[("↑↓", "choose")] + ([(self.summon, "confirm")] if not approval or self.selected else []),
+                         foot=[("↑↓", "choose")] + ([("Tab", "confirm")] if not approval or self.selected else []),
                          tail="or type why not" if not self.asks else "or type a reply")
         elif self.working and not self.reply:
             status = " ".join((self.status or "").split())
             shown.update(status=(status[:77] + "…" if len(status) > 80 else status)
                          or ("rewriting" if self.asked == "rewrite" else "working"),
                          busy=True, foot=[("Esc", "stop")])
-        elif self.working:  # typing while it works: your next words, sent when you press Enter
+        elif self.working:  # typing while it works: your next words, sent with Shift+Enter
             shown["status"], shown["busy"] = "working", True
-        elif self.failed:  # Tab retries a rewrite, Enter an instruction: each key asks again
+        elif self.failed:  # Tab retries a rewrite, Shift+Enter an instruction: each key asks again
             retry = "Tab" if self.asked == "rewrite" else self.summon
             shown.update(tile="warn", failed=self.error or "the request failed", foot=[(retry, "retry"), ("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
@@ -223,10 +224,10 @@ class Composition:
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
-        else:  # composing: the keys show from the first key (what Enter does must be known)
+        else:  # composing: the keys show from the first key (what each Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
                              + ([("Esc", "drop")] if self.editing else [(self.keeper, "keep")]))
-        if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Enter sends it
+        if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
             shown.update(on=-1, replying=True, tail=None, foot=[(self.summon, enter),
@@ -246,7 +247,7 @@ class Composition:
 
     def hint(self):
         """The panel as one line of plain words, for a window that can only show text (IBus's
-        auxiliary text where cd_AI's own panel is not drawn): "Tab rewrite · Enter ask"."""
+        auxiliary text where cd_AI's own panel is not drawn): "Tab rewrite · Shift+Enter ask"."""
         shown = self.panel()
         if not shown:
             return ""
@@ -274,8 +275,8 @@ class Composition:
 
     @property
     def asks(self):
-        """A question Enter answers with its highlighted choice from the start: the model's own
-        question. An approval (permission) starts with nothing highlighted: Enter answers only once
+        """A question Tab answers with its highlighted choice from the start: the model's own
+        question. An approval (permission) starts with nothing highlighted: Tab answers only once
         ↓ has highlighted a choice (Deny first)."""
         return bool(self.question) and not self.reply and not self.question.get("permission")
 
@@ -283,12 +284,13 @@ class Composition:
         """What Tab does (it takes the model's text): "pass" (the app's), "request" (ask for a
         rewrite; it waits in the panel when it comes), "wait" (asked already), "convert" (a rewrite
         that came earlier: show it in the panel), "accept" (the rewrite shown, or the highlighted
-        draft), or "choose" (an answer to read: insert it)."""
+        draft), or "choose" (a question's highlighted choice, Allow or Deny included, or an answer to
+        read: insert it). Tab takes everything the model offers; Shift+Enter only sends words."""
         if not self.text:
             return "pass"
-        if self.question:  # Tab inserts an answer to read; a question's choice is Enter's
-            return "choose" if self.reading and not self.reply else "wait"
-        if self.reply:  # a reply you are typing: Enter sends it, and Tab takes nothing over it
+        if self.question:  # an answer to read, or the highlighted choice (an approval: ↓ first)
+            return "choose" if not self.reply and (self.reading or self.asks or self.selected) else "wait"
+        if self.reply:  # a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
             return "wait"
         if self.converted or (self.asked == "instruct" and self.candidate):
             return "accept"
@@ -311,7 +313,7 @@ class Composition:
         goes; its question stays); "back" (still composing: your words again instead of the
         rewrite, or your instruction again with its drafts closed and a pending answer dropped);
         "keep" (a selection taken from the app goes back as it was); or "drop" (what you typed goes,
-        nothing is inserted: Shift+Enter keeps it instead)."""
+        nothing is inserted: Enter keeps it instead)."""
         if not self.text:
             return "pass"
         if self.reading and not self.reply:
@@ -356,7 +358,7 @@ class Composition:
         return self.text
 
     def enter(self):
-        """What Enter does (it talks to the model): "pass" (the
+        """What the summon key does (Shift+Enter; it talks to the model): "pass" (the
         app's), "submit" (send it as an instruction), "reply" (send what you typed to the model's
         question), "choose" (answer with the highlighted choice), or "wait" (nothing to send: on a
         draft, the row lights Tab, the key that takes it)."""
@@ -365,9 +367,7 @@ class Composition:
         if self.question:
             if self.reply.strip():
                 return "reply"
-            if self.reading:
-                return "wait"  # an answer to read goes in with Tab, never with Enter
-            return "choose" if self.asks or self.selected else "wait"
+            return "wait"  # a choice, or an answer to read, is Tab's
         if self.sent and self.reply.strip():
             # Your next words, typed while it worked or with its drafts showing: a follow-up
             # instruction in the same conversation.
@@ -385,14 +385,14 @@ class Composition:
         return "submit"
 
     def keep(self):
-        """The keeper key (Shift+Enter, or Enter when Shift+Enter summons): insert what you see, as it
+        """The keeper key (Enter, or Shift+Enter when Enter summons): insert what you see, as it
         is, and keep composing; "" with nothing composed (then the key is the app's); None while an
         exchange shows and nothing is typed (the key is taken, nothing goes in)."""
         if not self.text or self.live:
             return ""
-        if self.summon != "Enter" and (self.sent or self.question) and not self.reply.strip():
-            # Drafts or a question showing, nothing typed: a reflexive Enter puts nothing in (your
-            # instruction never lands in the app); on drafts it lights Tab, the key that takes one.
+        if self.sent or self.question:
+            # Once the model is summoned the key is gated (owner): your instruction or a reply never
+            # lands in the app by a reflexive press; on drafts it lights Tab, the key that takes one.
             if self.asked == "instruct" and self.candidate:
                 self.nudged = self._showing()
             elif self.working:

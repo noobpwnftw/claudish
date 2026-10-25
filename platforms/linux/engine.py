@@ -351,7 +351,7 @@ class ClaudishEngine(IBus.Engine):
             return True
         if self.composition.live:
             return self.live_key(keyval)
-        # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Shift+Enter).
         shift = bool(state & IBus.ModifierType.SHIFT_MASK)
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
             kept = self.composition.keep()  # the keeper key: as it is, and keep composing
@@ -376,7 +376,7 @@ class ClaudishEngine(IBus.Engine):
                 self.suggestions.answer(session, question, text=words)
                 self.render()
                 return True
-            if action == "submit":  # Instruct: Enter sends the held text now.
+            if action == "submit":  # Instruct: Shift+Enter sends the held text now.
                 self.composition.submit()
                 before, after = self.around_caret()  # the text box, for this turn of its conversation
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
@@ -481,7 +481,7 @@ class ClaudishEngine(IBus.Engine):
 
     def update_quiet(self):
         """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;
-        Tab and Enter in compose still ask."""
+        Tab and Shift+Enter in compose still ask."""
         self.composition.quiet = (self.purpose in ("url", "email", "number", "phone", "digits", "terminal")
                                   or is_terminal(self.app))
 

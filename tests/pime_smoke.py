@@ -208,7 +208,7 @@ def main():
             worker_class.return_value.poll.return_value = None
             key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
             assert key(9)["commitString"] == "Hi there."  # Tab inserts the highlighted draft
-            # An agent session asks a question: the choices are the list, and Shift+Enter takes the highlighted one.
+            # An agent session asks a question: the choices are the list, and Tab takes the highlighted one.
             for char in "check":
                 key(ord(char.upper()), ord(char))
             key(0x0D, modifiers=(0x10,))
@@ -220,8 +220,9 @@ def main():
             assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
             assert "commitString" not in key(0x0D)  # Enter puts nothing in and answers nothing
+            assert "commitString" not in key(0x0D, modifiers=(0x10,))  # nor does Shift+Enter: no words to send
             assert not worker_class.return_value.answer.called
-            reply = key(0x0D, modifiers=(0x10,))
+            reply = key(9)
             assert "commitString" not in reply, reply
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
             # Another question: typed words answer it (a digit in them is text).

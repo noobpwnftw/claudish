@@ -93,12 +93,6 @@ def held(event):
     return [key for key in MODIFIER_KEYS if event.isKeyDown(key)]
 
 
-def drawn(panel):
-    """The panel as drawn: a row's key column is narrow, so Shift+Enter shows as its symbols there
-    (the footer says it whole)."""
-    return dict(panel, take="⇧↵") if panel and panel.get("take") == "Shift+Enter" else panel
-
-
 def replay(vk, modifiers=()):
     """Press the key again for the app just after cd_AI commits what was composed, so one press of a
     shortcut or navigation key both commits and acts. A modifier that was down with it and is up by
@@ -302,7 +296,7 @@ class ClaudishTextService(TextService):
             self.setShowCandidates(False)
             self.setToast(spec, 30)
         else:
-            self.setPanel(drawn(spec))
+            self.setPanel(spec)
             self.setShowCandidates(True)
         return True
 
@@ -381,7 +375,7 @@ class ClaudishTextService(TextService):
         # TSF cursor offsets count UTF-16 code units.
         self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
         panel = self.state.panel()
-        self.setPanel(drawn(panel))
+        self.setPanel(panel)
         # The rows also go to TSF's candidate list, for apps that draw candidates themselves.
         self.setCandidateList([row["text"] for row in panel["rows"]] if panel else [])
         self.setShowCandidates(bool(panel))
@@ -479,7 +473,7 @@ class ClaudishTextService(TextService):
                 if self.state.done(revision):
                     self.setToast(blank(status=data["done"]), 3)  # a helper took the task: said briefly at the caret
             elif "error" in data:
-                self.state.fail(revision, data["error"])  # the panel says why: Enter retries
+                self.state.fail(revision, data["error"])  # the panel says why: Shift+Enter retries
 
     def onKeyDown(self, event):
         if event.keyCode == 0x7B and self.preview():
@@ -514,8 +508,8 @@ class ClaudishTextService(TextService):
                 replay(key, held(event))
             return True
         if key == 0x0D:
-            action = self.state.enter()  # Enter talks to the model; it never inserts its text
-            if action == "pass":  # nothing composed: the app's Enter, as it is (never replayed)
+            action = self.state.enter()  # the summon key talks to the model; it never inserts its text
+            if action == "pass":  # nothing composed: the app's key, as it is (never replayed)
                 return False
             if action == "choose":  # answer with the highlighted choice
                 chosen = self.state.answer_choice()
@@ -542,7 +536,7 @@ class ClaudishTextService(TextService):
             if action == "wait":  # still working, or the model's text: the panel lights Tab, which takes it
                 self.publish()
                 return True
-        # Choices are not numbered: digits are text in English, as Space is (↑/↓ and Enter choose).
+        # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Shift+Enter).
         if self.state.live and key != 0x77:  # F8 is handled below
             return self.live_key(event)
         if key == 0x77:  # F8 in instruct: send a picture of this window with the instruction.

@@ -63,9 +63,8 @@
       line.append(words);
       if (index === spec.on) {
         const take = el("span", "k-take");
-        const key = spec.take || "Enter";  // Tab takes a draft; Shift+Enter confirms a choice
-        // A narrow column: Shift+Enter as its symbols unless the platform names it (the footer says it whole).
-        take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys[key] || (key == "Shift+Enter" ? "⇧↵" : key)));  // lit: Enter was pressed on it
+        const key = spec.take || "Tab";  // Tab takes a draft or a choice
+        take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys[key] || key));  // lit: Enter was pressed on it
         line.append(take);
       }
       if (pick) line.addEventListener("mousedown", (event) => { event.preventDefault(); pick(index + 1); });
