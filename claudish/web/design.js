@@ -33,7 +33,7 @@ const STATES = [
   {id: "failed", title: "A failed request", note: "The panel says why; Shift+Enter sends it again, Esc brings your instruction back to the caret.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "terminal", title: "In a terminal", note: "Continue is quiet on a command line; an instruction offers commands.", before: "~/claudish $ ", comp: "undo my last commit but keep the changes", terminal: true},
   {id: "dropped", title: "Esc dropped something", note: "A drop or a clear says so briefly, with the key that brings it back.", before: "Hi Sam, ", toast: true},
-  {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: your instruction went in as you typed it (as a CJK preedit does) and the exchange was held. A pill says what waits; it takes no keys until Shift+Esc opens it.", before: "Hi Sam, decline the offsite politely", toast: true},
+  {id: "returned", title: "Back in the text box", note: "You switched windows mid-exchange: your instruction left with its exchange, which was held (its work goes on). A pill says what waits; it takes no keys until Shift+Esc brings it back.", before: "Hi Sam, ", toast: true},
   {id: "mode-compose", title: "A mode switch: compose", note: "A Shift tap: the mode, and where Shift goes next, briefly at the caret. The taskbar or menu bar shows it all along.", before: "Thanks for the review — I'll", toast: true},
   {id: "mode-continue", title: "A mode switch: continue", note: "And back: a neutral tile, so only compose wears the accent.", before: "Thanks for the review — I'll", toast: true},
 ];
