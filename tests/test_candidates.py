@@ -238,6 +238,29 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.enter(), "wait")  # Shift+Enter with nothing typed lights it too
         self.assertTrue(state.panel()["nudge"])
 
+    def test_words_typed_while_it_works_survive_a_question_and_the_end(self):
+        """Codex: a question, or the instruction finishing elsewhere, erased a follow-up being typed."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("summarize the thread")
+        state.submit()
+        for char in "also mention Friday":
+            state.insert(char)
+        state.ask(state.revision, {"id": "p", "text": "Send this task to claude?", "permission": True,
+                                   "choices": [{"label": "No"}, {"label": "Yes"}]}, "s")
+        shown = state.panel()
+        self.assertEqual((state.reply, shown["thread"][-1]), ("", {"label": "Waiting", "body": "also mention Friday"}))
+        self.assertEqual(shown["foot"][0], ("↑↓", "choose"))  # not "deny with reason": they are not an answer
+        state.move(1)
+        self.assertEqual(state.answer_choice(), ("s", "p", 0))
+        self.assertEqual(state.reply, "also mention Friday")  # back at the caret, for Shift+Enter
+        self.assertEqual(state.enter(), "submit")  # the follow-up, in the same conversation
+        state.submit()
+        for char in "and Monday":
+            state.insert(char)
+        self.assertTrue(state.done(state.revision))  # a helper took it: your words stay, unsent
+        self.assertEqual((state.text, state.sent, state.reply), ("and Monday", False, ""))
+
     def test_tab_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
         state.mode = "compose"

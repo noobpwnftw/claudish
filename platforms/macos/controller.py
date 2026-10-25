@@ -235,7 +235,10 @@ class ClaudishInputController(IMKInputController):
             elif "done" in data and self.state.done(revision):
                 client = self.client()  # a helper took the task: nothing to insert
                 if client is not None:
-                    unmark(client)
+                    if self.state.text:  # words you typed meanwhile: they stay, marked
+                        self.changed(client)
+                    else:
+                        unmark(client)
             elif "error" in data:
                 self.state.fail(revision, data["error"])
         self.check_ghost()

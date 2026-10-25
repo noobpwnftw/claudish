@@ -103,6 +103,9 @@ class Composition:
         # An answer you read and inserted with Tab: (session, question id, choice) for the adapter to
         # send, so the service records it (take_answering); the model is not asked again.
         self.answering = None
+        # Your next words, typed while it worked, when a question came: held aside (not an answer
+        # to a question you had not seen), back as the reply once you answer it.
+        self.waiting = ""
         # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
         # by the adapter like offline); the other one puts them in as typed.
         self.summon = "Shift+Enter"
@@ -120,7 +123,7 @@ class Composition:
         return not shift if self.summon == "Enter" else shift
 
     def change(self, text):
-        self.reply = ""
+        self.reply = self.waiting = ""
         self.answers = []
         self.editing = False
         self.highlight = 0
@@ -189,7 +192,8 @@ class Composition:
             # What the composition does not say (round 6): "You asked" only while a reply takes the
             # instruction's place at the caret; your latest answer once you answered.
             shown["thread"] = ([{"label": "You asked", "body": self.text}] if self.reply else []) + (
-                [{"label": "You answered", "body": self.answers[-1]}] if self.answers else [])
+                [{"label": "You answered", "body": self.answers[-1]}] if self.answers else []) + (
+                [{"label": "Waiting", "body": self.waiting}] if self.waiting else [])
         if question:
             choices = question.get("choices") or []
             label, body = question.get("label"), question.get("body")
@@ -447,7 +451,9 @@ class Composition:
             return False
         if revision != self.revision or not self.working:
             return False
-        self.change("")
+        # Words you typed meanwhile stay at the caret, a composition of their own (Shift+Enter
+        # sends them as the next instruction in this conversation).
+        self.change((self.reply.strip() + " " + self.waiting).strip() if self.waiting else self.reply.strip())
         return True
 
     def ask(self, revision, question, session):
@@ -459,6 +465,8 @@ class Composition:
         if revision != self.revision or not self.working:
             return False
         self.question = dict(question, session=session)
+        if self.reply.strip():  # your next words wait aside: they were not an answer to this
+            self.waiting = (self.waiting + " " + self.reply.strip()).strip()
         self.reply = ""
         self.highlight = 0
         self.selected = False
@@ -518,6 +526,7 @@ class Composition:
             return None
         label = question["choices"][index].get("label", "")
         self.question, self.status = None, ""
+        self.reply, self.waiting = self.waiting, ""  # your next words, back at the caret
         self.answers.append(label)
         return question["session"], question["id"], index
 
@@ -537,7 +546,8 @@ class Composition:
         question, words = self.question, self.reply.strip()
         if not question or not words:
             return None
-        self.question, self.reply, self.status = None, "", ""
+        self.question, self.status = None, ""
+        self.reply, self.waiting = self.waiting, ""  # your next words, back at the caret
         self.answers.append(words)
         return question["session"], question["id"], words
 
