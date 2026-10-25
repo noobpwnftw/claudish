@@ -196,6 +196,16 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
         self.assertEqual(result["text"], "git stash")
 
+    def test_a_choice_can_be_a_whole_draft(self):
+        """Owner: "draft 3 versions of hi and ask which" showed choices cut mid-word at 80 characters."""
+        draft = "Greetings! I am absolutely thrilled to be engaging with you today. Let us leverage this synergy."
+        model = Scripted(answer(calls=[("user__ask", {"question": "Which version?", "choices": [draft, "x" * 500]})]),
+                         answer(draft))
+        asked, result = self.drive(model, [0])
+        labels = [c["label"] for c in asked[0]["choices"]]
+        self.assertEqual(labels[0], draft)  # whole
+        self.assertEqual((len(labels[1]), labels[1][-1]), (400, "…"))  # a longer one says it was cut
+
     def test_an_unanswered_question_ends_the_instruction(self):
         """A model told "no answer" asks again: the instruction stops instead of holding its session."""
         again = answer(calls=[("user__ask", {"question": "Shall I?"})])

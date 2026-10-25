@@ -26,6 +26,14 @@ MODEL_SAYS = "The model says: "
 OWN_LABELS = {"allow", "deny", "allow for this conversation"}
 
 
+CHOICE_CHARS = 400  # a choice the model offers: a short answer, or a whole draft
+
+
+def shorten(text, limit):
+    """text, or its first limit characters ending in an ellipsis."""
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
 class Conversation:
     def __init__(self, key):
         self.key = key
@@ -252,9 +260,10 @@ class ModelDriver:
     def ask_user(self, session, arguments):
         """The model's own question, shown as is and marked as the model's."""
         from .screen import redact
-        labels = [str(c)[:80] for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
+        # A choice can be a whole draft (the panel wraps it); a longer one says it was cut.
+        labels = [shorten(str(c), CHOICE_CHARS) for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
         labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
-        asked = str(arguments.get("question") or "")[:200]
+        asked = shorten(str(arguments.get("question") or ""), 400)
         choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],
                                       label=MODEL_ASKS.rstrip(": "), body=asked)
         if words is not None:
