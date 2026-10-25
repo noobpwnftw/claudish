@@ -1,7 +1,7 @@
-"""Record docs/cd_AI.gif: the browser demo against a real model, "ok" with Tab and Tab, then an
-instruction with Shift+Enter, its drafts, ↓ and Tab.
+"""Record the browser demo as a GIF (dist/cd_AI-demo.gif) against a real model: "ok" with Tab and
+Tab, then an instruction with Shift+Enter, its drafts, ↓ and Tab.
 
-python scripts/record_demo.py --model-url http://127.0.0.1:18790 [--out docs/cd_AI.gif]
+python scripts/record_demo.py --model-url http://127.0.0.1:18790 [--out dist/cd_AI-demo.gif]
 
 It starts its own service (a scratch config folder, port 18901), takes timed screenshots of the
 demo's text box with Playwright's Chromium, and joins them into a GIF (run it with a Python that has
@@ -94,7 +94,7 @@ def gif(frames, out):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model-url", required=True, help="An OpenAI-compatible server")
-    parser.add_argument("--out", type=Path, default=ROOT / "docs" / "cd_AI.gif")
+    parser.add_argument("--out", type=Path, default=ROOT / "dist" / "cd_AI-demo.gif")
     parser.add_argument("--chromium", help="Chromium executable for Playwright")
     args = parser.parse_args()
     chromium = args.chromium or next(iter(sorted(glob.glob(os.path.expanduser(
@@ -113,6 +113,7 @@ def main():
                 except OSError:
                     time.sleep(0.25)
             frames = asyncio.run(capture(chromium, "http://127.0.0.1:%d/" % PORT, scratch))
+            args.out.parent.mkdir(parents=True, exist_ok=True)
             gif(frames, args.out)
         finally:
             service.terminate()
