@@ -27,7 +27,7 @@ CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-uns
        "img-src 'self' data:; base-uri 'none'; form-action 'none'")
 REPO = "https://github.com/noobpwnftw/claudish"
 FILES = ["index.html", "demo.css", "demo.js", "theme.js", "browser.js", "coi-sw.js", "favicon.png",
-         "kit.css", "kit.js", "design.html", "design.css", "design.js", "lab-states.js"]
+         "kit.css", "kit.js", "ai-tile.png", "design.html", "design.css", "design.js", "lab-states.js"]
 
 
 def build(out):
@@ -74,6 +74,7 @@ def build_site(out):
     shutil.copy(site / "site.js", out / "site.js")
     shutil.copy(site / "favicon.png", out / "favicon.png")
     shutil.copy(web / "kit.css", out / "kit.css")  # the hero draws the panel with the kit itself
+    shutil.copy(web / "ai-tile.png", out / "ai-tile.png")
     shutil.copy(web / "theme.js", out / "theme.js")
     for name in ("cd_AI.gif", "cd_AI-terminal.gif"):
         shutil.copy(ROOT / "docs" / name, out / name)

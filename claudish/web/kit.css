@@ -80,7 +80,7 @@
 .k-toast .k-hint{color:var(--k-muted)}  /* a toast is a footer: its verbs are muted, as in every panel */
 .k-tile{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;line-height:1}
 .k-tile.ai,.k-tile.cd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-.k-tile.ai svg{display:block}
+img.k-tile.ai{display:block;background:none}
 .k-tile.ai{background:#d97757;color:#fff}
 .k-tile.cd{background:color-mix(in srgb,var(--k-text) 12%,var(--k-surface));color:var(--k-text)}
 

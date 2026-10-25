@@ -4,8 +4,6 @@
 // input methods do on each platform (docs/design/design.md). Nodes, not HTML: the words come
 // from a model.
 (() => {
-  // The AI tile's letters, drawn: centred the same in every font and browser (a text "AI" sat high).
-  const AI_MARK = '<svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path d="M4 12.65 6.5 5.9 9 12.65M4.95 10.3h3.1M10.55 5.9h4.2M12.65 5.9v6.2M10.55 12.1h4.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="bevel"/></svg>';
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -27,10 +25,9 @@
     if (spec.tile === "warn") foot.append(el("span", "k-warn", "!"));  // a failure reads without colour
     else if (spec.tile === "cd") foot.append(el("span", "k-tile cd", "cd"));
     else {
-      const mark = el("span", "k-tile ai");
-      mark.setAttribute("role", "img");
-      mark.setAttribute("aria-label", "AI");
-      mark.innerHTML = AI_MARK;
+      const mark = el("img", "k-tile ai");  // the macOS panel's own tile, at 2x (ai-tile.png)
+      mark.src = "ai-tile.png";
+      mark.alt = "AI";
       foot.append(mark);
     }
     if (spec.status) {

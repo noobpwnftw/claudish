@@ -238,6 +238,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                       "/theme.js": ("theme.js", "text/javascript; charset=utf-8"),
                       "/kit.css": ("kit.css", "text/css; charset=utf-8"),
                       "/kit.js": ("kit.js", "text/javascript; charset=utf-8"),
+                      "/ai-tile.png": ("ai-tile.png", "image/png"),
                       "/design.html": ("design.html", "text/html; charset=utf-8"),
                       "/design.css": ("design.css", "text/css; charset=utf-8"),
                       "/design.js": ("design.js", "text/javascript; charset=utf-8"),
