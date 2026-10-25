@@ -15,11 +15,8 @@ if not os.path.exists(os.environ.get("SSL_CERT_FILE") or ""):
     import certifi
     os.environ["SSL_CERT_FILE"] = certifi.where()
 
-from AppKit import NSApplication
-from Foundation import NSBundle
-from InputMethodKit import IMKServer
-from PyObjCTools import AppHelper
-from controller import ClaudishInputController  # Registers the Objective-C controller class.
+# AppKit, InputMethodKit and the controller load in main(), for the input method only: the service
+# (`Claudish serve`, started at login) and the other commands do not wait on them (seconds at login).
 
 
 def command_line():
@@ -28,6 +25,7 @@ def command_line():
         return False
     if sys.argv[1] == "register":
         import sources
+        from Foundation import NSBundle
         bundle = NSBundle.mainBundle()
         identifier = str(bundle.bundleIdentifier())
         from controller import MODE_IDS
@@ -44,6 +42,11 @@ def command_line():
 def main():
     if command_line():
         return
+    from AppKit import NSApplication
+    from Foundation import NSBundle
+    from InputMethodKit import IMKServer
+    from PyObjCTools import AppHelper
+    from controller import ClaudishInputController  # noqa: F401 (registers the Objective-C controller class)
     NSApplication.sharedApplication()
     bundle = NSBundle.mainBundle()
     server = IMKServer.alloc().initWithName_bundleIdentifier_(
