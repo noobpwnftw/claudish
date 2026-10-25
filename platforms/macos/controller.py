@@ -201,6 +201,7 @@ class ClaudishInputController(IMKInputController):
         self.state.hints = self.worker.hints
         if self.state.offline != self.worker.offline:  # the service stopped or came back
             self.state.offline = self.worker.offline
+            trace("offline" if self.state.offline else "online")
             if self.state.text and not self.state.live:
                 self.show_panel()
         result = self.worker.poll()
