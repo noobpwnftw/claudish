@@ -28,7 +28,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "rewriting": {
   "thread": [],
@@ -50,7 +51,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "converted": {
   "thread": [],
@@ -76,7 +78,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "sent": {
   "thread": [],
@@ -98,7 +101,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "drafts": {
   "thread": [],
@@ -141,7 +145,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "nudged": {
   "thread": [],
@@ -184,7 +189,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": true
+  "nudge": true,
+  "column": false
  },
  "ask": {
   "thread": [],
@@ -219,7 +225,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": true
  },
  "reply": {
   "thread": [
@@ -259,7 +266,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": true,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": true
  },
  "answered": {
   "thread": [
@@ -286,7 +294,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "permission": {
   "thread": [],
@@ -308,6 +317,10 @@ window.LAB_STATES = {
    [
     "↑↓",
     "choose"
+   ],
+   [
+    "Tab",
+    "confirm"
    ]
   ],
   "tail": "or type why not",
@@ -317,7 +330,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": true
  },
  "handoff": {
   "thread": [],
@@ -339,6 +353,10 @@ window.LAB_STATES = {
    [
     "↑↓",
     "choose"
+   ],
+   [
+    "Tab",
+    "confirm"
    ]
   ],
   "tail": "or type why not",
@@ -348,7 +366,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": true
  },
  "answer": {
   "thread": [],
@@ -374,7 +393,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "progress": {
   "thread": [],
@@ -396,7 +416,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "failed": {
   "thread": [],
@@ -422,7 +443,8 @@ window.LAB_STATES = {
   "failed": "the model is offline",
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "terminal": {
   "thread": [],
@@ -461,7 +483,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "dropped": {
   "thread": [],
@@ -483,7 +506,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "returned": {
   "thread": [],
@@ -505,7 +529,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "mode-compose": {
   "thread": [],
@@ -527,7 +552,8 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  },
  "mode-continue": {
   "thread": [],
@@ -549,6 +575,7 @@ window.LAB_STATES = {
   "failed": null,
   "replying": false,
   "take": "Tab",
-  "nudge": false
+  "nudge": false,
+  "column": false
  }
 };

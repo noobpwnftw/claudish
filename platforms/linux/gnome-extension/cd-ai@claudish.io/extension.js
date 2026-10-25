@@ -141,7 +141,7 @@ export default class CdAiExtension extends Extension {
             box.add_child(head);
             head.get_children().forEach(child => fit(child, INNER));
         }
-        const takes = panel.on >= 0;
+        const takes = panel.on >= 0 || Boolean(panel.column);  // the key's column from the start: ↓ does not resize
         panel.rows.forEach((row, index) => {
             const on = index === panel.on;
             const line = new St.BoxLayout({style_class: on ? 'cd-row cd-on' : 'cd-row'});

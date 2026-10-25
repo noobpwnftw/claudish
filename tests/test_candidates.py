@@ -222,8 +222,14 @@ class ModeFeelTests(unittest.TestCase):
         state.submit()
         state.ask(state.revision, {"id": "p", "text": "Send this task to claude?", "permission": True,
                                    "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
+        before = state.panel()
         self.assertIsNone(state.keep())
         self.assertFalse(state.panel()["nudge"])  # nothing highlighted: nothing to light
+        import copy
+        probe = copy.deepcopy(state)
+        probe.move(1)
+        # Owner: the panel grew on ↓ (the key's column and "Tab confirm" appeared): both are there from the start.
+        self.assertEqual((before["column"], before["foot"]), (True, probe.panel()["foot"]))
         state.move(1)  # ↓: Deny
         self.assertIsNone(state.keep())
         self.assertTrue(state.panel()["nudge"])  # Enter lights the highlighted row's Tab

@@ -59,7 +59,7 @@ index 7829c72..60b7a5f 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -96,11 +105,79 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -96,11 +105,80 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	}
  	bool success = jsonValueOr<bool>(msg, "success", false);
  	if (success) {
@@ -97,6 +97,7 @@ index 7829c72..60b7a5f 100644
 +	spec.code = flag("code");
 +	spec.replying = flag("replying");
 +	spec.nudge = flag("nudge");
++	spec.column = flag("column");
 +	auto thread = value.find("thread");
 +	if (thread != value.end() && thread->is_array()) {
 +		for (const auto& turn : *thread) {

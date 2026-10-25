@@ -64,7 +64,7 @@ def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
                  "tail": None, "tile": "ai", "status": None, "busy": False, "failed": None,
-                 "replying": False, "take": "Tab", "nudge": False}, **shown)
+                 "replying": False, "take": "Tab", "nudge": False, "column": False}, **shown)
 
 
 class Composition:
@@ -204,7 +204,8 @@ class Composition:
             shown.update(label=label, body=body, code=bool(question.get("code")),
                          on=self.highlight if self.asks or self.selected else -1,
                          rows=[{"text": c.get("label", ""), "legend": c.get("legend") or None} for c in choices],
-                         foot=[("↑↓", "choose")] + ([("Tab", "confirm")] if not approval or self.selected else []),
+                         # The take column and the footer from the start, so ↓ does not resize the panel.
+                         foot=[("↑↓", "choose"), ("Tab", "confirm")], column=bool(choices),
                          tail="or type why not" if not self.asks else "or type a reply", nudge=self.nudge)
         elif self.working and not self.reply:
             status = " ".join((self.status or "").split())

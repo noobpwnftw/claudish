@@ -220,7 +220,7 @@ class Panel:
             after_turn = 4 if blocks else 0  # .k-turn + .k-head: the thread and the question apart
             blocks.append(("head", views, sum(v.fittingSize().height for v in views) + 2 * (len(views) - 1)
                            + 2 * ROW_Y + 1 + after_turn))
-        takes = spec["on"] >= 0  # every row keeps the column for the highlighted row's key
+        takes = spec["on"] >= 0 or bool(spec.get("column"))  # every row keeps the column for the key, from the start
         text_width = inner - (TAKE if takes else 0)
         replying = spec.get("replying")  # you are typing a reply at the caret: the choices fade
         for index, row in enumerate(spec["rows"]):

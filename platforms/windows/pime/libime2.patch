@@ -641,7 +641,7 @@ index 0000000..4349075
 +    }
 +    // The rows: the text (its legend muted); a list with a highlight keeps a trailing column on
 +    // every row for the key that takes the highlighted one, so every row wraps alike.
-+    const bool takes = spec.on >= 0 && spec.on < (int)spec.rows.size();
++    const bool takes = (spec.on >= 0 && spec.on < (int)spec.rows.size()) || (spec.column && !spec.rows.empty());
 +    const float textX = px(PAD) + px(ROW_X);
 +    const float textMax = inner - (takes ? px(TAKE) : 0);
 +    for (size_t i = 0; i < spec.rows.size(); ++i) {
@@ -1013,7 +1013,7 @@ new file mode 100644
 index 0000000..ae062af
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,170 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/visual.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1057,6 +1057,7 @@ index 0000000..ae062af
 +    std::wstring failed;  // why a request failed
 +    std::wstring take = L"Tab";  // the highlighted row's key: Tab takes a draft or a choice
 +    bool nudge = false;   // Enter on a draft: the highlighted row's key (take) is lit
++    bool column = false;  // the rows keep the key's column from the start (an approval before ↓)
 +
 +    bool empty() const {
 +        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
