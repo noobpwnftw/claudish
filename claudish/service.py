@@ -101,6 +101,8 @@ def windows_task(argv):
 
 
 def launchd_plist(argv):
+    """Interactive, as an app: the input method waits on this service from the first key, and a
+    login agent's default scheduling left it starting for 40 s while the login settled."""
     arguments = "\n".join("    <string>%s</string>" % escape(part) for part in argv)
     return """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -114,6 +116,7 @@ def launchd_plist(argv):
   <key>WorkingDirectory</key><string>%s</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ProcessType</key><string>Interactive</string>
 </dict>
 </plist>
 """ % (LABEL, arguments, escape(str(ROOT)))

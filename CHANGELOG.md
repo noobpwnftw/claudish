@@ -11,6 +11,8 @@
   with its icon in the menu bar ("AI", "cd"); macOS says the switch, so cd_AI shows no mode toast there.
 - In a terminal, Esc's drop shows no toast (Terminal.app does not give the input method Shift+Esc
   once nothing is marked).
+- macOS: the service answers sooner after login: it runs as an interactive job, and it starts
+  without loading the input method's AppKit.
 - macOS: no beep in Terminal when Enter keeps your words. The input menu is Settings… (a Shift tap
   switches modes), and it no longer shows dots.
 

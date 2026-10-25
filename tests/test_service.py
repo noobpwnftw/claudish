@@ -24,6 +24,7 @@ class ServiceDefinitionTests(unittest.TestCase):
         self.assertEqual(plist["ProgramArguments"], argv)
         self.assertTrue(plist["RunAtLoad"])
         self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})  # crashes restart; "already running" does not
+        self.assertEqual(plist["ProcessType"], "Interactive")  # the input method waits on it from the first key
 
     def test_an_installed_package_runs_its_module(self):
         """Without the checkout's scripts/ (the Windows installer's Python): `python -m claudish serve`."""
