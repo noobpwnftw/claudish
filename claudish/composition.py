@@ -45,6 +45,8 @@ def failure(error):
         return "the model is offline"
     if "timed out" in error or "timeout" in error:
         return "the model took too long"
+    if "did not reach" in error:
+        return "the answer did not reach cd_AI"
     return "the request failed"
 
 
@@ -106,6 +108,7 @@ class Composition:
         # Your next words, typed while it worked, when a question came: held aside (not an answer
         # to a question you had not seen), back as the reply once you answer it.
         self.waiting = ""
+        self.queued = []  # more questions the agent asked while one shows: each in turn
         # The key that sends your words to the model ("keys": {"summon"} in the config, copied here
         # by the adapter like offline); the other one puts them in as typed.
         self.summon = "Shift+Enter"
@@ -124,6 +127,7 @@ class Composition:
 
     def change(self, text):
         self.reply = self.waiting = ""
+        self.queued = []
         self.answers = []
         self.editing = False
         self.highlight = 0
@@ -464,6 +468,9 @@ class Composition:
             return False
         if revision != self.revision or not self.working:
             return False
+        if self.question and self.question.get("id") != question.get("id"):
+            self.queued.append(dict(question, session=session))  # one at a time: it shows once this one is answered
+            return True
         self.question = dict(question, session=session)
         if self.reply.strip():  # your next words wait aside: they were not an answer to this
             self.waiting = (self.waiting + " " + self.reply.strip()).strip()
@@ -512,6 +519,14 @@ class Composition:
         self.candidate = self.candidates[index]
         return "accept"
 
+    def next_question(self):
+        """After an answer: the next queued question shows, or your waiting words come back."""
+        if self.queued:
+            self.question = self.queued.pop(0)
+            self.highlight, self.selected = 0, False
+        else:
+            self.reply, self.waiting = self.waiting, ""  # your next words, back at the caret
+
     def take_answering(self):
         """The answer to send for an answer to read you inserted (see answering), once."""
         answering, self.answering = self.answering, None
@@ -526,7 +541,7 @@ class Composition:
             return None
         label = question["choices"][index].get("label", "")
         self.question, self.status = None, ""
-        self.reply, self.waiting = self.waiting, ""  # your next words, back at the caret
+        self.next_question()
         self.answers.append(label)
         return question["session"], question["id"], index
 
@@ -547,7 +562,8 @@ class Composition:
         if not question or not words:
             return None
         self.question, self.status = None, ""
-        self.reply, self.waiting = self.waiting, ""  # your next words, back at the caret
+        self.reply = ""
+        self.next_question()
         self.answers.append(words)
         return question["session"], question["id"], words
 

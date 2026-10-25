@@ -1,3 +1,4 @@
+import collections
 import json
 import threading
 import time
@@ -301,6 +302,30 @@ class SessionPollingTests(unittest.TestCase):
         self.assertEqual([c for c in calls if c.startswith("/sessions/k?")].__len__(), 3)
         self.assertEqual(calls[-1], "/sessions/k/cancel")
 
+
+    def test_an_answer_that_cannot_be_sent_fails_the_instruction(self):
+        """Codex: a failed send was swallowed after the panel had moved on; the service went on waiting."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.results, worker.revisions = collections.deque(), {"k": 7}
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path.endswith("/cancel"):
+                return {"ok": True}
+            raise OSError("refused")
+
+        class Now(threading.Thread):  # the send, run at once
+            def start(self):
+                self.run()
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"), \
+                patch.object(client.threading, "Thread", Now):
+            worker.answer("k", "q1", choice=1)
+        self.assertEqual(calls, ["/sessions/k/answer"] * 3 + ["/sessions/k/cancel"])
+        self.assertEqual(worker.results[-1][0], 7)
+        self.assertIn("did not reach", worker.results[-1][1]["error"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -152,10 +152,18 @@ class Suggestions:
         body.update({"text": text} if text is not None else {"choice": choice})
 
         def send():
-            try:
-                call(self.endpoint, "/sessions/%s/answer" % session, body, timeout=5)
-            except Exception:
-                pass  # the session reports its own failure
+            for attempt in range(3):
+                try:
+                    call(self.endpoint, "/sessions/%s/answer" % session, body, timeout=5)
+                    return
+                except Exception:
+                    time.sleep(0.5)
+            # The service never heard it and would wait for it: the session ends, and the
+            # instruction says so (Shift+Enter asks again).
+            self._cancel(session)
+            revision = getattr(self, "revisions", {}).get(session)
+            if revision is not None:
+                self.deliver(revision, {"error": "the answer did not reach cd_AI's service", "session": session})
         threading.Thread(target=send, daemon=True).start()
 
     def new_conversation(self):
@@ -208,6 +216,9 @@ class Suggestions:
                 return False
             raise
         key, after, missed = started["id"], 0, 0
+        if not hasattr(self, "revisions"):
+            self.revisions = {}
+        self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         while True:
             with self.condition:
                 if self.closed or self.pending is not None:  # edited, committed, or Esc: stop the agent

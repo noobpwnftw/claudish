@@ -275,6 +275,24 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.commit(True), "A quote is open.")
         self.assertEqual((state.text, state.sent), ("then fix it", False))  # the next composition, unsent
 
+    def test_a_second_question_waits_for_the_first(self):
+        """Codex: a second permission request replaced the first, which stayed pending on the server."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("tidy the repo")
+        state.submit()
+        first = {"id": "p1", "text": "Allow git.add?", "permission": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}
+        second = dict(first, id="p2", text="Allow git.commit?")
+        state.ask(state.revision, first, "s")
+        state.ask(state.revision, second, "s")
+        self.assertEqual(state.question["id"], "p1")  # one at a time
+        state.move(1)
+        self.assertEqual(state.answer_choice(), ("s", "p1", 0))
+        self.assertEqual((state.question["id"], state.selected), ("p2", False))  # the next, nothing highlighted
+        state.move(1)
+        self.assertEqual(state.answer_choice(), ("s", "p2", 0))
+        self.assertIsNone(state.question)
+
     def test_tab_takes_the_first_choice_of_a_question_but_never_approves(self):
         state = Composition()
         state.mode = "compose"
@@ -335,6 +353,7 @@ class ModeFeelTests(unittest.TestCase):
         asked = state.panel()  # no label sent: split from the text
         self.assertEqual((asked["label"], asked["body"], asked["on"], asked["tail"]),
                          ("The model asks", "Did you mean git status?", 0, "or type a reply"))
+        state.answer_choice()  # answered: the next question shows (they come one at a time)
         state.ask(state.revision, {"id": "p", "text": "Allow Bash?", "permission": True, "label": "Claude Code wants to run",
                                    "body": "git push", "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "s")
         approval = state.panel()  # nothing highlighted; typed words only refuse
