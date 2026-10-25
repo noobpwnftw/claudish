@@ -168,6 +168,10 @@ def claude_messages(messages):
     return system, out
 
 
+# Loading a routed profile (and starting its model process) happens once, whoever asks first.
+ROUTING = threading.Lock()
+
+
 class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
@@ -298,6 +302,10 @@ class Rewriter:
     def load(self, name, what):
         if name == getattr(self, "profile", None) or self.loader is None:
             return self
+        with ROUTING:  # two requests at once start one model process, not two
+            return self._load(name)
+
+    def _load(self, name):
         if name not in self.routed:
             other = self.loader(name)
             other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent

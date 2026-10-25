@@ -270,5 +270,53 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(([e["type"] for e in events], done), (["question", "result"], True))
 
 
+
+class AnswerTests(unittest.TestCase):
+    def test_the_same_answer_again_is_taken_once(self):
+        """Codex: an answer the service took, whose reply was lost, came again; the service said
+        "no such open question" and the client cancelled a working task."""
+        class Driver:
+            answers = []
+
+            def run(self, session, text):
+                pass
+
+            def answer(self, question, choice, text):
+                self.answers.append((question, choice, text))
+
+            def cancel(self):
+                pass
+        driver = Driver()
+        session = Session(driver)
+        session.emit("question", id="q1", text="Allow?", choices=[{"label": "Deny"}, {"label": "Allow"}])
+        session.answer("q1", choice=1)
+        session.answer("q1", choice=1)  # the retry: fine, and not run twice
+        self.assertEqual(driver.answers, [("q1", 1, None)])
+        with self.assertRaises(ValueError):
+            session.answer("q1", choice=0)  # a different answer to an answered question is refused
+
+
+class RoutingTests(unittest.TestCase):
+    def test_two_requests_at_once_load_a_profile_once(self):
+        """Codex: two requests for a routed profile at once started two backends; one leaked."""
+        import threading
+        import time
+        from claudish.model import Rewriter
+        started = []
+
+        def loader(name):
+            time.sleep(0.05)  # both requests are in here at once without the lock
+            other = Rewriter("rules")
+            other.start_model = lambda: started.append(name)
+            return other
+        main = Rewriter("rules")
+        main.profile, main.loader, main.routed = "main", loader, {}
+        threads = [threading.Thread(target=main.load, args=("small", "test")) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(started, ["small"])
+
 if __name__ == "__main__":
     unittest.main()
