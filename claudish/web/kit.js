@@ -4,6 +4,8 @@
 // input methods do on each platform (docs/design/design.md). Nodes, not HTML: the words come
 // from a model.
 (() => {
+  // The AI tile's letters, drawn: centred the same in every font and browser (a text "AI" sat high).
+  const AI_MARK = '<svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path d="M4 12.65 6.5 5.9 9 12.65M4.95 10.3h3.1M10.55 5.9h4.2M12.65 5.9v6.2M10.55 12.1h4.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="bevel"/></svg>';
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -23,7 +25,14 @@
   function footer(spec, keys) {
     const foot = el("div", "k-foot");
     if (spec.tile === "warn") foot.append(el("span", "k-warn", "!"));  // a failure reads without colour
-    else foot.append(el("span", "k-tile " + (spec.tile === "cd" ? "cd" : "ai"), spec.tile === "cd" ? "cd" : "AI"));
+    else if (spec.tile === "cd") foot.append(el("span", "k-tile cd", "cd"));
+    else {
+      const mark = el("span", "k-tile ai");
+      mark.setAttribute("role", "img");
+      mark.setAttribute("aria-label", "AI");
+      mark.innerHTML = AI_MARK;
+      foot.append(mark);
+    }
     if (spec.status) {
       const status = el("span", "k-status");
       if (spec.busy) status.append(el("span", "k-spin"));
