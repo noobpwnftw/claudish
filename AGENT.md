@@ -27,6 +27,9 @@ The work is the path from typing letters to composing to committing: as streamli
 it can be, keeping the vibes. A Shift tap is plain en_US typing: nothing happens, no extra compose
 or commit step, no placeholder input method to switch to. Continue suggests only when someone
 configures a model for it (local inference they can afford); by default it stays inactive.
+Tab on a selection only takes it into the composition, as if just typed; nothing else happens until
+the next key. Without Claudish that Tab would indent the text or replace it, so this adds no
+friction; to indent, leave compose (a hotkey collision, not a behaviour to design around).
 
 Not ours: a hotkey that summons an AI, a replacement for the Claude CLI or another agent, a chat
 window, rewriting a selection with a hotkey.
