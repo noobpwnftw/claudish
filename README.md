@@ -2,7 +2,7 @@
 
 English goes in. Em dashes come out.
 
-!["ok", Tab: the rewrite in cd_AI's panel, Tab again puts it in; then Shift+Enter for drafts, ↓ and Tab (macOS, TextEdit, Gemma 4 E4B)](docs/cd_AI.gif)
+!["ok", Tab: the rewrite in cd_AI's panel, Tab again puts it in; then "two ways to decline the offsite", Shift+Enter for two drafts, ↓, "shorter" and Shift+Enter, and Tab inserts the shorter second draft (macOS, TextEdit, Gemma 4 E4B)](docs/cd_AI.gif)
 
 An input method that puts a language model at the caret of every app, on Linux,
 Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
