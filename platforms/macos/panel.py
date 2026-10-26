@@ -348,6 +348,8 @@ class Panel:
             bar.setFrame_(NSMakeRect(2, 7, 3, h - 14))
             row.addSubview_(bar)
             take = key_label("Tab", bool(self.spec.get("nudge")))  # Tab takes a draft or a choice
+            if self.spec.get("replying"):  # a follow-up is typed about this draft: Tab takes nothing now
+                take.setHidden_(True)
             if self.spec.get("nudge"):  # the lit keycap: centred in the row, at its right edge
                 size = take.frame().size
                 take.setFrame_(NSMakeRect(width - 2 * PAD - ROW_X - size.width, (h - size.height) / 2, size.width, size.height))

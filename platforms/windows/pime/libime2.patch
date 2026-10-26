@@ -408,7 +408,7 @@ index 41e3a33..a2bff25 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..64edcf4
+index 0000000..ecfda16
 --- /dev/null
 +++ b/src/Panel.cpp
 @@ -0,0 +1,542 @@
@@ -763,7 +763,7 @@ index 0000000..64edcf4
 +        if (on) {  // a neutral fill, the system accent bar inside it, and the row's Tab
 +            fill(D2D1::RectF(px(PAD), top, width_ - px(PAD), top + h), px(ROW_RADIUS), colors.selection);
 +            fill(D2D1::RectF(px(PAD) + px(2), top + px(7), px(PAD) + px(5), top + h - px(7)), px(1.5f), colors.accent);
-+            if (take_) {
++            if (take_ && !spec_.replying) {  // replying: the draft in view, which Tab does not take now
 +                float w, th;
 +                measure(take_, &w, &th);
 +                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;

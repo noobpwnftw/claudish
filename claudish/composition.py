@@ -241,7 +241,9 @@ class Composition:
         if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
-            shown.update(on=-1, replying=True, tail=None, foot=[(self.summon, enter),
+            # Drafts keep the highlight: a follow-up is about the draft in view (Composition.about);
+            # Tab takes nothing while you type, so the row shows no key.
+            shown.update(on=self.highlight if shown["rows"] and not question else -1, replying=True, tail=None, foot=[(self.summon, enter),
                                                                  ("Esc", "cancel reply" if question else "cancel")])
         return shown
 

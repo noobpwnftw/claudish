@@ -652,6 +652,8 @@ class ModeFeelTests(unittest.TestCase):
         state.move(1)
         for char in "shorter":
             state.insert(char)
+        panel = state.panel()
+        self.assertEqual((panel["on"], panel["replying"]), (1, True))  # the draft in view stays highlighted
         self.assertEqual((state.enter(), state.text, state.about), ("submit", "shorter", "Alas, no."))
         state.submit()
         state.offer(state.revision, "No.")

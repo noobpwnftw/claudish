@@ -67,7 +67,7 @@
       const words = el("span", "k-text", row.text);
       if (row.legend) words.append(el("span", "k-legend", " — " + row.legend));
       line.append(words);
-      if (index === spec.on) {
+      if (index === spec.on && !spec.replying) {  // replying: the draft in view, which Tab does not take now
         const take = el("span", "k-take");
         // Tab takes a draft or a choice; lit: a key that does nothing here pointed at it
         take.append(el("span", "k-cap" + (spec.nudge ? " lit" : ""), keys.Tab || "Tab"));

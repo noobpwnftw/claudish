@@ -154,7 +154,8 @@ export default class CdAiExtension extends Extension {
             line.add_child(text);
             if (takes) {  // the trailing column: the key that takes the highlighted row
                 // Tab takes a draft or a choice; lit when a key that does nothing here pointed at it (panel.nudge)
-                const take = label(on ? 'Tab' : '', on ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
+                const cap = on && !panel.replying;  // replying: the draft in view, which Tab does not take now
+                const take = label(cap ? 'Tab' : '', cap ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
                 line.add_child(take);
             }
             box.add_child(line);
