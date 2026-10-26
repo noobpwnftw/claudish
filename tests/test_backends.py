@@ -60,9 +60,11 @@ class ClaudeBackendTests(unittest.TestCase):
         call = self.sdk.calls[0]
         self.assertEqual(call["model"], "claude-opus-5-5")
         rewrite = modes.defaults()["rewrite"]
+        from claudish import shapes
+        shaped = [dict(m, content=shapes.example(m["content"])) if m["role"] == "assistant" else m for m in rewrite["examples"]]
         self.assertEqual((call["system"], call["messages"]),
-                         (rewrite["system"], rewrite["examples"] + [{"role": "user", "content": "Ship it."}]))
-        self.assertEqual(call["output_config"], {"effort": "low"})
+                         (rewrite["system"] + "\n\n" + rewrite["box"]["shape"], shaped + [{"role": "user", "content": "Ship it."}]))
+        self.assertEqual(call["output_config"], {"effort": "low", "format": {"type": "json_schema", "schema": shapes.ANSWER}})
         self.assertEqual((call["fallbacks"], call["betas"]), ("default", ["server-side-fallback-2026-07-01"]))
         self.assertNotIn("temperature", call)
         self.assertEqual(self.sdk.options["max_retries"], 0)
@@ -187,14 +189,15 @@ class PromptTemplateTests(unittest.TestCase):
     def test_custom_template_reaches_both_backends(self):
         templates = modes.load(self.write({"modes": {"rewrite": {"system": "Be grand.",
                                                                  "examples": [["hi", "Greetings—hello."]]}}}))
-        turns = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Greetings—hello."}]
+        turns = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": '{"drafts": ["Greetings—hello."]}'}]
+        grand = "Be grand.\n\n" + modes.TEMPLATES["box"]["shape"]
         sdk = FakeSDK()
         with patch.dict("sys.modules", {"anthropic": sdk.module}):
             Rewriter("claude", templates=templates).rewrite("so")
-        self.assertEqual(sdk.calls[0]["system"], "Be grand.")
+        self.assertEqual(sdk.calls[0]["system"], grand)
         self.assertEqual(sdk.calls[0]["messages"][:2], turns)
         _, _, payload = EndpointBackendTests.call(self, Rewriter("openai", templates=templates))
-        self.assertEqual(payload["messages"][0], {"role": "system", "content": "Be grand."})
+        self.assertEqual(payload["messages"][0], {"role": "system", "content": grand})
 
     def test_malformed_templates_are_rejected(self):
         for data in [{"rewrite": {"system": "x"}}, {"modes": {"rewrite": {"system": " "}}},

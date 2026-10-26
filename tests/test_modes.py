@@ -30,10 +30,14 @@ class InPlaceTests(unittest.TestCase):
 
 
 class TidyTests(unittest.TestCase):
-    """What a model wraps around its answer is not the answer (OpenLess output_cleaning, #25)."""
+    """A plain answer (a backend without a schema) loses what a model wraps around it
+    (claudish/quirks.py; OpenLess output_cleaning, #25)."""
 
     def test_wrappings_go_and_the_answer_stays(self):
-        from claudish.modes import finish
+        from claudish.quirks import tidy
+
+        def finish(mode, text, output):
+            return tidy(text, output)
         answer = "Absolutely—let's align!"
         for wrapped in ("<think>The user wants slop.</think>\n" + answer, "```\n" + answer + "\n```", "Here's a rewrite:\n\n" + answer, "Sure! Here is the text:\n" + answer,
                         "“" + answer + "”", '"' + answer + '"'):
@@ -135,7 +139,7 @@ class ModeTests(unittest.TestCase):
     def test_a_profile_can_reword_the_box_too(self):
         rewriter = Rewriter(max_tokens=64, templates={"box": {"at_caret": "Write it for the caret."}})
         _, payload = self.call(rewriter, "decline politely", "instruct", before="Hi Sam,")
-        self.assertTrue(payload["messages"][0]["content"].endswith("Write it for the caret."))
+        self.assertIn("Write it for the caret.", payload["messages"][0]["content"])
         self.assertEqual(rewriter.modes["instruct"]["box"]["kinds"], modes.TEMPLATES["box"]["kinds"])
 
     def test_the_tone_is_corporate_slop_unless_a_profile_sets_another(self):
@@ -210,10 +214,12 @@ class ModeTests(unittest.TestCase):
         rewriter = Rewriter(max_tokens=64)
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
-        self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"])
+        # The answer's shape follows the mode's words (claudish/shapes.py).
+        self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shape"])
         self.assertEqual(payload["max_tokens"], 256)  # to the end of a sentence, in the tone
         _, payload = self.call(rewriter, "decline politely", "instruct")
-        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shown"], 2048))
+        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shown"]
+                          + "\n\n" + modes.TEMPLATES["box"]["shape"], 2048))
         _, payload = self.call(rewriter, "so", "rewrite")
         self.assertEqual(payload["max_tokens"], 1024)  # the tone's paragraph, past the profile's 64
         with self.assertRaisesRegex(ValueError, "unknown mode"):
@@ -231,7 +237,7 @@ class ModeTests(unittest.TestCase):
             self.assertEqual(rewriter.modes["instruct"]["max_tokens"], 900)  # only what the file names
             self.assertEqual(rewriter.modes["instruct"]["system"], modes.TEMPLATES["modes"]["instruct"]["system"])
             _, payload = self.call(rewriter, "autumn", "haiku")
-            self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), ("Answer in a haiku.", 60))
+            self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), ("Answer in a haiku." + "\n\n" + modes.TEMPLATES["box"]["shape"], 60))
             for words, message in [({"modes": {"haiku": {}}}, "needs a"), ({"modes": {"instruct": {"temperature": 1}}}, "takes only"),
                                    ({"modes": {"instruct": {"max_tokens": "9"}}}, "integer")]:
                 (root / "words.json").write_text(json.dumps(words))

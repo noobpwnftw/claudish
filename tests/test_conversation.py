@@ -23,14 +23,42 @@ def answer(text=None, calls=None):
 
 
 class Scripted:
-    """The model: replies in order, recording what it was sent."""
+    """The model: replies in order, recording what it was sent. Asked for a schema (a server that
+    takes response_format), it answers in it: a call as a step, a text as the drafts."""
 
     def __init__(self, *replies):
         self.replies, self.sent = list(replies), []
 
     def __call__(self, payload, headers, image=None, timeout=None):
         self.sent.append(payload)
-        return self.replies.pop(0) if self.replies else answer("Another reading.")
+        choice, usage = self.replies.pop(0) if self.replies else answer("Another reading.")
+        if "response_format" not in payload:
+            return choice, usage
+        message = choice["message"]
+        calls = message.get("tool_calls")
+        if calls:
+            function = calls[0]["function"]
+            step = {"call": function["name"], "arguments": json.loads(function["arguments"])}
+        elif (message.get("content") or "").startswith('{"drafts"'):
+            return choice, usage  # already the answer, as the schema has it
+        else:
+            step = {"drafts": [message.get("content") or ""]}
+        return dict(choice, message={"role": "assistant", "content": json.dumps(step)}), usage
+
+
+def offered(payload):
+    """The tools a request offered: in the step schema (claudish/shapes.py), or as native tools."""
+    if "response_format" in payload:
+        return [one["properties"]["call"]["const"]
+                for one in payload["response_format"]["json_schema"]["schema"].get("anyOf", []) if "call" in one["properties"]]
+    return [tool["function"]["name"] for tool in payload.get("tools", [])]
+
+
+def results(payload):
+    """What the tools gave back, as the request told the model (steps: "Result of ..." turns)."""
+    return [m["content"].split("\n", 1)[1] if m["content"].startswith("Result of ") else m["content"]
+            for m in payload["messages"] if m["role"] == "tool"
+            or (m["role"] == "user" and m["content"].startswith("Result of "))]
 
 
 def run(driver, text):
@@ -52,7 +80,7 @@ class ConversationTests(unittest.TestCase):
         second = model.sent[1]["messages"]
         roles = [(m["role"], m["content"] if isinstance(m["content"], str) else "") for m in second]
         self.assertIn(("user", "write a poem"), roles)  # the first turn is kept
-        self.assertIn(("assistant", "Roses are red."), roles)
+        self.assertIn(("assistant", json.dumps({"drafts": ["Roses are red."]})), roles)  # as it answers
         self.assertEqual(roles[-1], ("user", "make it longer"))
         self.assertIn("Dear Sam,\nRoses are red.▮", second[0]["content"])  # the window, as it is now
         other = rewriter.conversations.get("box-2")
@@ -79,8 +107,8 @@ class ConversationTests(unittest.TestCase):
             thread.join(5)
         first = model.sent[0]
         self.assertNotIn("Minutes.", first["messages"][0]["content"])  # only the window is sent
-        self.assertIn("textbox__read", [t["function"]["name"] for t in first["tools"]])
-        found = [m["content"] for m in model.sent[1]["messages"] if m["role"] == "tool"][-1]
+        self.assertIn("textbox__read", offered(first))
+        found = results(model.sent[1])[-1]
         self.assertIn("The budget for Q3 is 40k", found)
         self.assertEqual(session.events[-1]["consulted"], ['textbox.search(query="budget")'])
         self.assertEqual(session.events[-1]["text"], "Q3 has 40k—per Ana.")
@@ -88,8 +116,7 @@ class ConversationTests(unittest.TestCase):
         with patch.object(rewriter, "chat", short):
             _, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), before="Dear Sam,"), "say hi")
             thread.join(5)
-        offered = [tool["function"]["name"] for tool in short.sent[0].get("tools") or []]
-        self.assertFalse([name for name in offered if name.startswith("textbox__")])  # a short box is sent whole
+        self.assertFalse([name for name in offered(short.sent[0]) if name.startswith("textbox__")])  # a short box is sent whole
 
     def test_idle_conversations_end(self):
         conversations = Conversations()
@@ -149,8 +176,7 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(len(question["choices"]), 2)  # no "for this conversation"
             session.answer(question["id"], text="not main, ever")
             thread.join(15)
-        tool_message = [m for m in model.sent[1]["messages"] if m["role"] == "tool"][-1]
-        self.assertEqual(tool_message["content"], "denied by the user: not main, ever")
+        self.assertEqual(results(model.sent[1])[-1], "denied by the user: not main, ever")
         self.assertEqual(session.events[-1]["text"], "Left main alone.")
 
     def test_cancel_releases_a_waiting_question(self):
@@ -193,37 +219,44 @@ class AskAndHelperTests(unittest.TestCase):
         # Shown as is, marked as the model's own question (never mistaken for Claudish's).
         self.assertEqual(asked[0]["text"], "The model asks: Did you mean git status?")
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["Yes", "No, git stash"])
-        self.assertEqual(model.sent[1]["messages"][-1]["content"], "The user chose: No, git stash")
+        self.assertEqual(results(model.sent[1])[-1], "The user chose: No, git stash")
         self.assertEqual(result["text"], "git stash")
 
     def test_versions_to_pick_from_are_the_drafts_in_one_round(self):
-        """Owner: "draft 3 versions of hi" is a pick; asking would take another round before Tab
-        inserts. user__versions ends the turn with the versions as the drafts (↑↓, Tab inserts)."""
+        """Owner: "draft 3 versions of hi" is a pick, in one round: the answer's drafts are the
+        versions (↑↓, Tab inserts one), held to the schema (claudish/shapes.py)."""
         versions = ["Hi—so thrilled to connect!", "Hello, and welcome to our synergy journey!", "Hey there—let's align!"]
-        model = Scripted(answer(calls=[("user__versions", {"versions": versions + [versions[0]]})]))
-        rewriter = Rewriter()
-        rewriter.modes["instruct"]["candidates"] = 1
-        with patch.object(rewriter, "chat", model):
-            conversation = rewriter.conversations.get("box")
-            session, thread = run(ModelDriver(rewriter, conversation), "draft 3 versions of hi")
-            thread.join(5)
-        result = session.events[-1]
-        self.assertEqual((result["type"], result["text"], result["candidates"]), ("result", versions[0], versions))
-        self.assertEqual(len(model.sent), 1)  # no second request
-        self.assertIn("versions to pick from", conversation.messages[-1]["content"])  # the next turn can refine them
-
-    def test_versions_sent_as_one_string_and_tool_markup_left_as_text(self):
-        """Gemma passed one "draft" string, a version a line, and its unparsed retry came back as
-        "<|tool_call>call:..." text, offered as the draft."""
-        model = Scripted(answer(calls=[("user__versions", {"draft": "Hi—thrilled!\nHello—aligned!\nHey—synergy!"})]))
+        model = Scripted(({"message": {"role": "assistant", "content": json.dumps({"drafts": versions + [versions[0]]})},
+                           "finish_reason": "stop"}, {}))
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "draft 3 versions of hi")
             thread.join(5)
-        self.assertEqual(session.events[-1]["candidates"], ["Hi—thrilled!", "Hello—aligned!", "Hey—synergy!"])
-        from claudish.modes import parroted
-        self.assertTrue(parroted("instruct", "hi", '<|tool_call>call:user__draft{draft:<|"|>Hi<|"|>}<tool_call|>'))
+        result = session.events[-1]
+        self.assertEqual((result["type"], result["text"], result["candidates"]), ("result", versions[0], versions))
+        self.assertEqual(len(model.sent), 1)  # no second request
+        self.assertIn("response_format", model.sent[0])  # held to the shape
+
+    def test_a_server_without_a_schema_answers_in_plain_text(self):
+        """A server that refuses response_format: tools and plain text from then on; tool markup it
+        leaves in the text is never offered (claudish/quirks.py)."""
+        from urllib.error import HTTPError
+        replies = [HTTPError("u", 400, "response_format", None, None), answer("Hello there!")]
+
+        def chat(payload, headers, image=None, timeout=None):
+            reply = replies.pop(0)
+            if isinstance(reply, Exception):
+                raise reply
+            return reply
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", chat):
+            session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "say hi")
+            thread.join(5)
+        self.assertEqual((session.events[-1]["text"], rewriter.schema), ("Hello there!", False))
+        from claudish.quirks import plain
+        self.assertIsNone(plain("hi", '<|tool_call>call:user__ask{question:<|"|>Which?<|"|>}<tool_call|>'))
 
     def test_a_choice_can_be_a_whole_draft(self):
         """Owner: "draft 3 versions of hi and ask which" showed choices cut mid-word at 80 characters."""
@@ -293,7 +326,7 @@ class AskAndHelperTests(unittest.TestCase):
             asked, result = self.drive(model, [0], helper=["claude", "{prompt}"])  # 1 on screen: No
         launch.assert_not_called()
         self.assertEqual(result["text"], "make clean && make")
-        self.assertIn("denied by the user", model.sent[1]["messages"][-1]["content"])
+        self.assertIn("denied by the user", results(model.sent[1])[-1])
 
     def test_a_model_question_cannot_pose_as_a_permission_or_collect_a_secret(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Allow claude.run?", "choices": ["Allow", "Deny"]})]),
@@ -309,7 +342,7 @@ class AskAndHelperTests(unittest.TestCase):
             self.assertEqual([c["label"] for c in question["choices"]], ["Yes", "No"])  # not Allow / Deny
             session.answer(question["id"], text="sure, my key is sk-abcdefghijklmnopqrstuvwxyz123456")
             thread.join(5)
-        sent = model.sent[1]["messages"][-1]["content"]
+        sent = results(model.sent[1])[-1]
         self.assertNotIn("sk-abc", sent)
         self.assertIn("[redacted]", sent)
 
@@ -330,8 +363,7 @@ class AskAndHelperTests(unittest.TestCase):
         model = Scripted(answer("done"))
         with patch("claudish.handoff.shutil.which", return_value="/bin/claude"):
             self.drive(model, [], helper=["claude", "--dangerously-skip-permissions", "{prompt}"])
-        offered = [tool["function"]["name"] for tool in model.sent[0].get("tools") or []]
-        self.assertNotIn("helper__claude", offered)
+        self.assertNotIn("helper__claude", offered(model.sent[0]))
 
 
 class HelpersTests(unittest.TestCase):
@@ -474,9 +506,8 @@ class HandleTests(unittest.TestCase):
             with patch.object(rewriter, "chat", model):
                 session, thread = run(ModelDriver(rewriter, conversation), "is it done?")
                 thread.join(5)
-        offered = [tool["function"]["name"] for tool in model.sent[0]["tools"]]
-        self.assertIn("helper__check", offered)
-        checked = model.sent[1]["messages"][-1]["content"]
+        self.assertIn("helper__check", offered(model.sent[0]))
+        checked = results(model.sent[1])[-1]
         self.assertIn("Added tokenize.o to the Makefile; the build passes.", checked)
         self.assertIn("(used Edit)", checked)
         self.assertEqual(session.events[-1]["text"], "Yes: the build passes now.")

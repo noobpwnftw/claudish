@@ -71,21 +71,25 @@ class Claude:
         self.client = anthropic.Anthropic(timeout=10.0, max_retries=0, **({"api_key": saved} if saved else {}))
         self.model = model
 
-    def options(self):
-        """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), and
-        server-side refusal fallbacks where the API offers them."""
+    def options(self, shaped=False):
+        """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), the
+        answer's schema (shaped), and server-side refusal fallbacks where the API offers them."""
         options = {}
         if not self.model.startswith(("claude-3", "claude-haiku-4", "claude-sonnet-4-5",
                                       "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0")):
             options["output_config"] = {"effort": "low"}
+        if shaped:
+            from .shapes import ANSWER
+            options.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": ANSWER}
         if self.model in FALLBACK_MODELS:
             options.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
         return options
 
-    def converse(self, messages, tools=None, max_tokens=1024):
-        """One Messages API call for the tool loop: (an OpenAI-shaped reply, usage)."""
+    def converse(self, messages, tools=None, max_tokens=1024, shaped=False):
+        """One Messages API call for the tool loop: (an OpenAI-shaped reply, usage). shaped: the
+        answer's text is held to claudish/shapes.py's schema (tool calls stay the API's own)."""
         system, conversation = claude_messages(messages)
-        options = self.options()
+        options = self.options(shaped)
         if tools:
             options["tools"] = [{"name": tool["function"]["name"], "description": tool["function"].get("description", ""),
                                  "input_schema": tool["function"].get("parameters") or {"type": "object", "properties": {}}}
@@ -120,7 +124,7 @@ class Claude:
         return {"message": reply, "finish_reason": finish}, usage
 
     def rewrite(self, text, system, examples, image=None):
-        options = self.options()
+        options = self.options(shaped=True)
         try:
             response = self.client.beta.messages.create(
                 model=self.model, max_tokens=2048, system=system,
@@ -253,6 +257,7 @@ class Rewriter:
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
         self.takes = {}  # (mode, text) -> how many times it was asked: a repeat is another take
+        self.schema = True  # an OpenAI-compatible server takes response_format (False once it refused it)
         # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
         self.modes = invocation.defaults(templates, tone)
         for name, route in (modes or {}).items():  # which profile answers a mode
@@ -494,6 +499,12 @@ class Rewriter:
         else:
             framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
         said = box.material(framed, spec["box"])
+        shaped = self.shaped()
+        if shaped:  # the answer is {"drafts": [...]} (claudish/shapes.py): the examples answer so too
+            from . import shapes
+            examples = [dict(m, content=shapes.example(m["content"])) if m["role"] == "assistant" else m
+                        for m in examples]
+            prompt += "\n\n" + spec["box"]["shape"]
         history = list(conversation.messages) if conversation is not None else []
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
@@ -541,13 +552,18 @@ class Rewriter:
         finally:
             if serial:
                 self.lock.release()
+        from . import quirks, shapes
         candidates = []
         for output in outputs:
-            output = box.fit(mode, self.finish(mode, text, output))
-            if parroted(mode, text, output, examples):
-                continue
-            if output and output not in candidates:
-                candidates.append(output)
+            found = shapes.drafts(output)
+            if found is None:  # a plain answer (no schema on this backend): read through the quirks
+                found = [quirks.plain(text, output) or ""]
+            for draft in found:
+                draft = box.fit(mode, self.finish(mode, text, draft))
+                if parroted(mode, text, draft, examples):
+                    continue
+                if draft and draft not in candidates:
+                    candidates.append(draft)
         if not candidates:
             record["outcome"] = "nothing offered"
             raise RuntimeError("the model offered nothing for this %s" % mode)
@@ -563,6 +579,15 @@ class Rewriter:
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}
+
+    def shaped(self):
+        """Whether this backend is held to the answer's schema (claudish/shapes.py): an
+        OpenAI-compatible server until it refuses response_format, the Claude API, Claude Code."""
+        if self.backend in ("llama", "openai"):
+            return self.schema
+        if self.claude:
+            return True
+        return bool(self.warm and self.warm.shaped)
 
     def take(self, mode, said):
         """How many times this text was asked in this mode before: Esc then Tab on a rewrite asks
@@ -587,32 +612,51 @@ class Rewriter:
         max_tokens = spec["max_tokens"] or self.max_tokens
         usage = {}
 
+        from . import shapes
+        steps = [0]
+
         def ask(messages, offered, **sampling):
             nonlocal usage
             payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False}
             if self.local:
                 payload["cache_prompt"] = True  # llama.cpp's; a hosted API may refuse fields it does not know
             payload.update(sampling)
-            if offered:
-                payload["tools"] = offered
             if self.model:
                 payload["model"] = self.model
             if self.claude:
-                choice, used = self.claude.converse(messages, offered, max_tokens)
+                choice, used = self.claude.converse(messages, offered, max_tokens, shaped=True)
                 usage = usage or used
                 if choice.get("finish_reason") == "length":
                     raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
                 return choice["message"]
+            timeout = None if serial else max(self.timeout, TURN_TIMEOUT)
+            if self.schema:
+                # Held to the schema: a step is a call or the answer, and the history is told in steps.
+                told = shapes.with_tools(messages, offered, spec["box"]["steps"]) if offered else messages
+                shaped = dict(payload, messages=shapes.as_steps(told),
+                              response_format=shapes.step_format(offered) if offered else shapes.answer_format())
+                try:
+                    choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
+                except HTTPError as exc:
+                    if exc.code not in (400, 422, 501):
+                        raise
+                    self.schema = False  # a server without json_schema: tools and plain text from now on
+                else:
+                    usage = usage or used
+                    if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
+                        raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
+                    steps[0] += 1
+                    return shapes.as_message(choice["message"].get("content"), steps[0])
+            if offered:
+                payload["tools"] = offered
             try:
-                choice, used = self.chat(payload, self.request_headers(), box.image,
-                                         timeout=None if serial else max(self.timeout, TURN_TIMEOUT))
+                choice, used = self.chat(payload, self.request_headers(), box.image, timeout=timeout)
             except HTTPError:
                 if not offered:
                     raise
                 # A server without tool calls (an old llama.cpp without --jinja): answer without tools.
                 payload.pop("tools")
-                choice, used = self.chat(payload, self.request_headers(), box.image,
-                                         timeout=None if serial else max(self.timeout, TURN_TIMEOUT))
+                choice, used = self.chat(payload, self.request_headers(), box.image, timeout=timeout)
             usage = usage or used
             if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
                 raise RuntimeError("the answer ran past its length budget; use a shorter phrase")

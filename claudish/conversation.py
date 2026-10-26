@@ -154,24 +154,13 @@ class ModelDriver:
             "Ask the user a short question, shown as is with up to three choices, when the instruction is "
             "ambiguous or needs their decision (\"Did you mean git status?\"), or to offer actions to choose "
             "from, each choice an action. They pick a choice or type a reply; that is the result. The "
-            "question goes here, never in your text. For versions of the text to pick from, use "
-            "user__versions. Besides your draft, the user sees only this question, user__versions and "
-            "user__show.",
+            "question goes here, never in your text. Versions of the text to pick from are your answer's "
+            "drafts, not a question. Besides your answer, the user sees only this question and user__show.",
             {"type": "object", "properties": {
                 "question": {"type": "string"},
                 "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
              "required": ["question"]},
             lambda arguments: self.ask_user(session, arguments))}
-        tools["user__versions"] = (
-            "Offer two or three versions of the text when the instruction asks for several versions or "
-            "options (\"a few taglines\", \"two ways to say no\"): each a whole version, ready to insert. The "
-            "user picks one and it goes in; this is your answer and ends the instruction. Use it instead of "
-            "listing versions in your text. Do not call it when they want them all in one text (\"all in one "
-            "message\", \"as a list\"): write that one text.",
-            {"type": "object", "properties": {
-                "versions": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 3}},
-             "required": ["versions"]},
-            lambda arguments: self.offer(session, arguments, box))
         tools["user__show"] = (
             "Show the user an answer to read instead of text for the text box, only when they asked to understand "
             "something (\"what does this error mean?\", \"what is the amount due?\"): a few sentences at most. "
@@ -268,21 +257,6 @@ class ModelDriver:
         else:
             self.handed = "read and dismissed"
             self.settled = "I showed the user this answer, and they dismissed it: " + text
-        raise Finished(self.settled)
-
-    def offer(self, session, arguments, box):
-        """Versions to pick from: the drafts, as an instruction's are (↑↓, Tab inserts one), with no
-        second request; the conversation keeps them, so the next instruction can refine them."""
-        given = arguments.get("versions") or arguments.get("drafts")
-        if isinstance(given, str) or (not given and isinstance(arguments.get("draft"), str)):
-            given = given or arguments["draft"]  # one string (Gemma sends that): versions by blank lines, else by lines
-            given = given.split("\n\n") if "\n\n" in given.strip() else given.split("\n")
-        drafts = [box.fit("instruct", str(draft).strip()) for draft in (given or []) if str(draft).strip()][:3]
-        drafts = list(dict.fromkeys(draft for draft in drafts if draft))
-        if not drafts:
-            return 'Pass "drafts": a list of two or three whole versions.'
-        self.drafted = drafts
-        self.settled = "I offered the user these versions to pick from: " + " | ".join(drafts)
         raise Finished(self.settled)
 
     def ask_user(self, session, arguments):

@@ -4,7 +4,6 @@ The words for each mode are data, in claudish/templates.json; a profile's "templ
 same shape and replaces only what it names (docs/configuration.md#templates)."""
 import copy
 import json
-import re
 from pathlib import Path
 
 TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
@@ -102,36 +101,10 @@ def defaults(override=None, tone=None):
     return specs
 
 
-# Wrapping a model can put around its answer: reasoning, a fence, quotes, a line introducing it.
-THINKING = re.compile(r"^\s*<think\b[^>]*>.*?(</think>|$)\s*", re.S | re.I)
-FENCE = re.compile(r"^\s*```[\w-]*\n(.*?)\n```\s*$", re.S)
-INTRO = re.compile(r"^(here(?: is|'s| are)|sure[,!.]|certainly[,!.])[^\n]*:\s*\n+", re.I)
-QUOTES = ('""', "“”", "''", "‘’")
-
-
-def tidy(text, output):
-    """The answer without what a model wraps it in: a <think> block, a fence around all of it, a
-    first line introducing it ("Here's a rewrite:"), one pair of quotes around all of it (unless
-    your text was quoted)."""
-    output = THINKING.sub("", output, count=1)
-    fenced = FENCE.match(output)
-    if fenced:
-        output = fenced.group(1)
-    output = INTRO.sub("", output.strip(), count=1).strip()
-    if output.startswith("[[") and output.endswith("]]") and "[[" not in text:  # the part, as it was marked
-        output = output[2:-2].strip()
-    for pair in QUOTES:
-        if (len(output) > 2 and output[0] == pair[0] and output[-1] == pair[1] and pair[0] not in output[1:-1]
-                and not text.strip().startswith(pair[0])):
-            output = output[1:-1].strip()
-            break
-    return output
-
-
 def finish(mode, text, output):
-    """The candidate to offer for the model's output."""
+    """The candidate to offer for the model's output: continue's next words joined to your text."""
     if mode != "continue":
-        return tidy(text, output)
+        return output
     # Small models sometimes echo the text, or its last words, before continuing it.
     if output.startswith(text):
         output = output[len(text):]
@@ -148,17 +121,10 @@ def finish(mode, text, output):
     return text + joiner + output
 
 
-# A tool call the server did not parse, left in the reply as text (Gemma's "<|tool_call>call:...",
-# Qwen's "<tool_call>"): never a draft.
-TOOL_MARKUP = ("<|tool_call>", "<tool_call>", "<|tool_call|>")
-
-
 def parroted(mode, text, candidate, examples=()):
     """An answer that is not about what you typed: one of the template's own example answers
     (a small model given nonsense, "tttt", repeats its example), or, in continue, words already
-    in the text before the caret; or a tool call left as text. Offering those is noise from any model."""
-    if any(markup in candidate for markup in TOOL_MARKUP):
-        return True
+    in the text before the caret. Offering those is noise from any model."""
     answers = {m["content"].strip().lower() for m in examples if m.get("role") == "assistant"}
     if mode != "continue":
         asked = {m["content"].strip().lower() for m in examples if m.get("role") == "user"}

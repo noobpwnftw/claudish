@@ -15,6 +15,7 @@ import threading
 import time
 
 from .children import spawn
+from .shapes import ANSWER
 
 # The model's whole instruction is cd_AI's own prompt, sent as the message; this only keeps the
 # CLI from adding an agent's habits around it.
@@ -48,6 +49,7 @@ class Lines:
 class Warm:
     """What both share: a state, a lock (one request at a time), the CLI process, start and stop."""
     name = "the model"
+    shaped = False  # its answers are held to claudish/shapes.py's schema
 
     def __init__(self, command, model=None, cwd=None, restart_after=200):
         self.command, self.model, self.cwd = list(command), model, cwd
@@ -164,8 +166,10 @@ class Warm:
 
 
 class ClaudeCode(Warm):
-    """`claude -p --input-format stream-json`: one process per request, started before it is needed."""
+    """`claude -p --input-format stream-json`: one process per request, started before it is needed.
+    Its answers are held to the drafts schema (--json-schema; claudish/shapes.py)."""
     name = "Claude Code"
+    shaped = True
 
     def __init__(self, command, model="haiku", cwd=None, restart_after=200):
         super().__init__(command, model or "haiku", cwd, restart_after)
@@ -174,7 +178,8 @@ class ClaudeCode(Warm):
         return [self.binary()] + self.command[1:] + [
             "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model, "--tools", "", "--strict-mcp-config", "--no-session-persistence",
-            "--setting-sources", "", "--disable-slash-commands", "--system-prompt", NEUTRAL]
+            "--setting-sources", "", "--disable-slash-commands", "--system-prompt", NEUTRAL,
+            "--json-schema", json.dumps(ANSWER)]
 
     def exchange(self, prompt, timeout):
         self.check_running()
@@ -199,6 +204,8 @@ class ClaudeCode(Warm):
             if event.get("type") == "result":
                 if event.get("is_error"):
                     raise RuntimeError("Claude Code: %s" % (event.get("result") or event.get("subtype") or "failed"))
+                if isinstance(event.get("structured_output"), dict):  # the schema's answer, as data
+                    return json.dumps(event["structured_output"], ensure_ascii=False)
                 return (event.get("result") or "").strip()
 
     def ready(self):

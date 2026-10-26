@@ -49,6 +49,19 @@ a rewrite no tools, an instruction all the tools and the conversation. An agent 
 over stream-json) is the loop's other implementation: it gets the same request, and its
 permission prompts and its own questions become **ask**.
 
+## The answer's shape
+
+Every mode answers `{"drafts": [...]}`: one draft, or two or three versions when an instruction asks
+for several (`claudish/shapes.py`). A backend that takes a schema is held to it, and the answer is
+read as data: an OpenAI-compatible server through `response_format` (llama.cpp compiles it to a
+grammar), the Claude API through `output_config.format`, Claude Code through `--json-schema`. On an
+OpenAI-compatible server an instruction's tool calls are steps of the same schema, `{"call": tool,
+"arguments": {...}}`, each tool with its own argument schema, so the server enforces them where a
+model's native tool-call format may not be; the system prompt lists what each tool does
+(`box.steps`). A backend without a schema (a command, Codex, a server that refuses
+`response_format`) answers in plain text, read through `claudish/quirks.py`, the one place that
+knows how models wrap an answer.
+
 ## A conversation per text box
 
 A conversation belongs to a text box (IBus's input context, TSF's document, IMK's client), and each
