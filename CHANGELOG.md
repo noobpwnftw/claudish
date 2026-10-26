@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Tab on a selection, with nothing composed, makes it your words, as if you had just typed them:
+  then Tab rewrites them, Shift+Enter sends them, Enter keeps them.
+
 ## 0.2.0
 
 - Enter commits your words and stops there, as other input methods do; the next Enter is the app's.

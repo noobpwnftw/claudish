@@ -714,7 +714,9 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
-    def test_tab_in_rewrite_rewrites_a_selection_in_place(self):
+    def test_tab_on_a_selection_makes_it_your_words(self):
+        """Owner: Tab on a selection is a switch to compose: the selection becomes the composition,
+        as if just typed; then Tab rewrites it or Shift+Enter sends it."""
         client = TextClient("Dear Ana, this is important. Thanks.")
         client.chosen = (10, 18)  # "this is important."
         fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
@@ -723,17 +725,15 @@ class MacOSAdapterTests(unittest.TestCase):
             fresh.state.mode = "compose"
             tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
             self.assertTrue(fresh.handleEvent_client_(tab, client))
-            self.assertEqual((client.whole(), fresh.worker.sent), ("Dear Ana, this is important. Thanks.",
-                             ("this is important.", "Dear Ana, ", " Thanks.")))
+            self.assertEqual((fresh.state.text, client.marked_text(), fresh.worker.modes), ("this is important.", "this is important.", []))
+            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")  # in its place, marked
+            self.assertTrue(fresh.handleEvent_client_(tab, client))  # then Tab rewrites it
+            self.assertEqual((fresh.worker.modes[-1], fresh.worker.sent[0]), ("rewrite", "this is important."))
             fresh.worker.result = (fresh.state.revision, {"text": "This is of utmost significance."})
             fresh.pollSuggestions_(None)
-            # The selection stays as it was (your words, marked); the rewrite waits in the panel for Tab.
-            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
             self.assertEqual(self.module.PANEL.spec["body"], "This is of utmost significance.")
-            esc = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: 0, characters=lambda: "\x1b")
-            fresh.handleEvent_client_(esc, client)
-            fresh.handleEvent_client_(esc, client)  # your words, as they were
-            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")
+            self.assertTrue(fresh.handleEvent_client_(tab, client))  # Tab inserts it
+            self.assertEqual(client.whole(), "Dear Ana, This is of utmost significance. Thanks.")
         finally:
             fresh.inputControllerWillClose()
 

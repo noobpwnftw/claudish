@@ -231,10 +231,10 @@ class ClaudishEngine(IBus.Engine):
         return value[:cursor], value[cursor:]
 
     def take_selection(self):
-        """Rewrite with nothing composed: the app's selection becomes the composition (CJK input
-        methods call it reconversion). Nothing is deleted: input replaces a selection, as typing
-        does (Qt removes it as the composition starts, then would apply a deletion's offset from
-        the new caret). Returns (before, after) around it, or None when there is no selection."""
+        """Tab with nothing composed: the app's selection becomes the composition, as if you had just
+        typed it; then Tab rewrites it, Shift+Enter sends it. Nothing is deleted: input replaces a
+        selection, as typing does (Qt removes it as the composition starts, then would apply a
+        deletion's offset from the new caret). True when taken."""
         if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
             return None
         try:
@@ -246,8 +246,8 @@ class ClaudishEngine(IBus.Engine):
         start, end = min(cursor, anchor), max(cursor, anchor)
         if start == end or end - start > MAX_COMPOSITION:
             return None
-        self.composition.adopt(value[start:end])
-        return value[:start], value[end:]
+        self.composition.change(value[start:end])
+        return True
 
     def before_caret(self):
         return self.around_caret()[0][-MAX_COMPOSITION:]
@@ -370,9 +370,9 @@ class ClaudishEngine(IBus.Engine):
                 self.render()
             return action != "pass"
         if keyval == IBus.KEY_Tab:
-            around = None
-            if not self.composition.live and not self.composition.text:
-                around = self.take_selection()  # a selection: rewrite it in place
+            if not self.composition.live and not self.composition.text and self.take_selection():
+                self.render()  # a selection: your words now, as if typed
+                return True
             action = self.composition.tab()
             if action == "choose":
                 chosen = self.composition.answer_choice()
@@ -386,7 +386,7 @@ class ClaudishEngine(IBus.Engine):
                     self.suggestions.answer(*answering)
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
-                before, after = around or self.around_caret()  # where the rewrite goes
+                before, after = self.around_caret()  # where the rewrite goes
                 self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
                                           immediate=True, app=self.app, before=before[-1500:], after=after[:500],
                                           purpose=self.purpose)
@@ -412,9 +412,7 @@ class ClaudishEngine(IBus.Engine):
             toast = self.composition.dropped_toast() if action in ("clear", "drop") else None
             if toast and screen().shell:  # said, with the key that brings it back
                 screen().publish(None, "", toast)
-            if action == "keep":
-                self.finish()
-            elif action == "clear":
+            if action == "clear":
                 self.render()
             elif action in ("back", "drop"):
                 # A pending answer or agent turn is for the old revision: stop it.

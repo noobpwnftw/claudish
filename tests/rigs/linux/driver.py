@@ -100,9 +100,9 @@ def scenario(name, service):
         key("Tab")
         wait(lambda: state().get("qline") == "this is very " and state().get("preedit"),
              "selected text becomes composition")
-        key("Escape", "Escape")
+        key("Return")  # your words, as if typed: Enter keeps them
         wait(lambda: state().get("qline") == "this is very important" and not state().get("preedit"),
-             "Esc restores selected text")
+             "Enter keeps the selected text")
         return
 
     if name == "password":

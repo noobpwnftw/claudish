@@ -339,8 +339,8 @@ class ClaudishTextService(TextService):
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped or self.state.held)
-        rewriting = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: its rewrite
-        return event.isPrintableChar() or bool(self.state.text) or restoring or rewriting
+        taking = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: your words
+        return event.isPrintableChar() or bool(self.state.text) or restoring or taking
 
     def selection(self):
         """The app's selected text when nothing is composed (Claudish's PIME sends it), if it fits."""
@@ -537,9 +537,11 @@ class ClaudishTextService(TextService):
             return bool(self.state.text)
         if key == 0x09:
             if not self.state.text and self.selection():
-                # The selection becomes your words (reconversion): the composition takes its place,
-                # as typing does; Esc twice puts it back.
-                self.state.adopt(self.selection())
+                # The selection becomes your words, as if you had just typed them: the composition
+                # takes its place, as typing does; then Tab rewrites it, Shift+Enter sends it.
+                self.state.change(self.selection())
+                self.publish()
+                return True
             action = self.state.tab()
             if action == "choose":
                 chosen = self.state.answer_choice()
@@ -584,14 +586,13 @@ class ClaudishTextService(TextService):
             if action == "clear":  # the reply goes; the question stays
                 self.publish()
                 return True
-            if action != "keep":  # back: still composing; drop: nothing is inserted
-                if self.worker:
-                    self.worker.schedule(self.state.revision, "")  # stop a pending answer
-                if action == "drop":
-                    self.setCommitString("")
-                self.publish()
-                return True
-            self.setCommitString(self.state.commit())
+            # back: still composing; drop: nothing is inserted
+            if self.worker:
+                self.worker.schedule(self.state.revision, "")  # stop a pending answer
+            if action == "drop":
+                self.setCommitString("")
+            self.publish()
+            return True
         elif key == 0x08:
             self.state.backspace()
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):

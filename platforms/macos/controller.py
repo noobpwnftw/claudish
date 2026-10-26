@@ -394,9 +394,8 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def take_selection(self, client):
-        """Rewrite with nothing composed: the app's selection becomes the composition (CJK input
-        methods call it reconversion), replaced by marked text until you keep the rewrite or your
-        words."""
+        """Tab with nothing composed: the app's selection becomes the composition, as if you had just
+        typed it (marked in its place); then Tab rewrites it, Shift+Enter sends it. True when taken."""
         try:
             selected = client.selectedRange()
             location, length = (selected.location, selected.length) if hasattr(selected, "location") else selected
@@ -408,7 +407,7 @@ class ClaudishInputController(IMKInputController):
             return False
         if not text:
             return False
-        self.state.adopt(text)
+        self.state.change(text)
         units = len(text.encode("utf-16-le")) // 2
         client.setMarkedText_selectionRange_replacementRange_(marked(text), (units, 0), (location, length))
         return True
@@ -609,8 +608,9 @@ class ClaudishInputController(IMKInputController):
                 self.show_panel(client)
             return action != "pass"
         if key == 48:  # Tab
-            if not self.state.live and not self.state.text:
-                self.take_selection(client)  # a selection: rewrite it in place
+            if not self.state.live and not self.state.text and self.take_selection(client):
+                self.show_panel(client)  # a selection: your words now, as if typed
+                return True
             action = self.state.tab()
             if action == "choose":
                 chosen = self.state.answer_choice()
@@ -650,8 +650,6 @@ class ClaudishInputController(IMKInputController):
                 self.show_toast(self.state.dropped_toast(), client)
             if action == "clear":  # the reply goes; the question stays
                 self.changed(client)
-            elif action == "keep":
-                self.finish(client)
             elif action in ("back", "drop"):
                 if self.worker is not None:
                     self.worker.schedule(self.state.revision, "")  # stop a pending answer

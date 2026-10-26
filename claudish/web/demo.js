@@ -289,6 +289,11 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Tab") {
+    if (!state.text && selected()) {  // a selection: your words, as if you had just typed them
+      const [start, end] = selection();
+      const words = doc.text.slice(start, end);
+      if (words.length <= MAX) { removeSelection(); change(words); render(); return true; }
+    }
     if (!state.text) return false;
     if (state.reply) return true;  // a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
     // The first Tab asks for the rewrite, which shows in the panel as it arrives (your words stay);

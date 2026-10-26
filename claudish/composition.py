@@ -76,7 +76,6 @@ class Composition:
         self.look = False  # F8 with an instruction: send a picture of the focused window too
         self.taken = False  # continue: a suggestion was just taken; wait for the next key
         self.converted = False  # compose: a rewrite waits in the panel for Tab (your words stay)
-        self.adopted = False  # the composition is text taken from the app (a selection): never dropped
         self.quiet = False  # the field is not prose (a URL, an email address, a number): nothing unasked
         # A terminal: it may keep Esc from an input method when nothing is marked (Terminal.app), so a
         # drop says nothing there (Shift+Esc still restores where the key arrives).
@@ -138,7 +137,6 @@ class Composition:
         self.question, self.status = None, ""
         self.taken = False
         self.converted = False
-        self.adopted = False
         self.asked = None
         self.working = self.failed = False
         self.error = ""
@@ -357,19 +355,12 @@ class Composition:
         self.asked, self.working, self.failed = "rewrite", True, False
         return "request"
 
-    def adopt(self, text):
-        """The app's selection becomes the composition (reconversion): it left the app, so Esc puts
-        it back rather than dropping it."""
-        self.change(text)
-        self.adopted = True
-
     def escape(self):
         """Esc, one step back: "pass" (the app's); "clear" (a reply you were typing to an agent
         goes; its question stays); "back" (still composing: your words again instead of the
         rewrite, or your instruction again with its drafts closed and a pending answer dropped);
-        "keep" (a selection taken from the app goes back as it was); "dismiss" (an answer to read is
-        answered Dismiss, nothing inserted); or "drop" (what you typed goes, nothing is inserted: the
-        keeper key keeps it instead)."""
+        "dismiss" (an answer to read is answered Dismiss, nothing inserted); or "drop" (what you
+        typed goes, nothing is inserted: the keeper key keeps it instead)."""
         if not self.text:
             return "pass"
         if self.reading and not self.reply:
@@ -384,8 +375,6 @@ class Composition:
             self.converted, self.candidate, self.candidates = False, "", []
             self.editing = True
             return "back"
-        if self.adopted and not self.question:
-            return "keep"  # text taken from the app goes back, as it was
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)
         if (self.candidates and self.asked == "instruct") or self.working or self.failed or self.question:
