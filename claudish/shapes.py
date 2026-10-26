@@ -45,6 +45,14 @@ def example(answer):
     return json.dumps({"drafts": [answer]}, ensure_ascii=False)
 
 
+def as_answered(messages):
+    """Examples and earlier turns with their answers in the shape the model answers, so it answers
+    in kind: a plain assistant text becomes {"drafts": [text]}; tool calls stay as they are."""
+    return [dict(m, content=example(m.get("content") or ""))
+            if m.get("role") == "assistant" and not m.get("tool_calls") and drafts(m.get("content")) is None else m
+            for m in messages]
+
+
 def with_tools(messages, offered, words):
     """The system prompt with the offered tools and what each does, as a schema's names alone do
     not say (words: templates.json box.steps)."""
@@ -70,8 +78,6 @@ def as_steps(messages):
                     arguments = {}
                 out.append({"role": "assistant", "content": json.dumps({"call": function.get("name"),
                                                                         "arguments": arguments}, ensure_ascii=False)})
-        elif message.get("role") == "assistant" and drafts(message.get("content")) is None:
-            out.append(dict(message, content=example(message.get("content") or "")))  # an earlier answer, as answered
         elif message.get("role") == "tool":
             out.append({"role": "user", "content": "Result of %s:\n%s" % (names.get(message.get("tool_call_id"), "the call"),
                                                                          message.get("content") or "")})

@@ -71,7 +71,7 @@ class Toolbox:
         tools served by Claudish itself (the text box, questions to the user, helpers): read-only
         unless kind says "write", and then asked about like any write, in the words of question
         (a function of the arguments) when given. MCP servers need the SDK; local tools do not.
-        Returns (final text, consulted, messages with the tool calls and results appended)."""
+        Returns (the answer's content, consulted, messages with the tool calls and results appended)."""
         from contextlib import ExitStack
         consulted, kinds, callers, offered, questions = [], {}, {}, [], {}
         spent = 0.0  # model and tool time; waiting for your answer does not count

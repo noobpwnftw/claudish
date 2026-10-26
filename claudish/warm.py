@@ -306,7 +306,7 @@ class Codex(Warm):
         error = ((done[0].get("turn") or {}).get("error") or {})
         if error and not texts:
             raise RuntimeError("Codex: %s" % (error.get("message") or error))
-        return "\n".join(texts).strip()
+        return texts[-1].strip() if texts else ""  # the final message: an earlier one is commentary
 
     def ready(self):
         self.served += 1

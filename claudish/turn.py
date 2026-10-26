@@ -3,8 +3,8 @@
 Every model call gets the same three things: the text box (what it is, its app, the text around
 the caret, and what was observed on request), what the user did (the mode: a pause in continue,
 Tab or Shift+Enter in compose, with the conversation so far), and what is available (the configured
-tools). The model answers with one action: complete (continue), replace (rewrite), insert
-(instruct), or ask (a question, through a tool that needs the user).
+tools). The model answers with drafts (claudish/shapes.py) that complete (continue), replace
+(rewrite) or insert (instruct), or asks (a question, through a tool that needs the user).
 
 The box is described once, in the system prompt. Observations (a terminal's screen, the
 profile's context, the app's bindings) go in the turn, next to the user's words, fenced as

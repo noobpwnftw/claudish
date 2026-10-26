@@ -1,7 +1,7 @@
 """Conversations per text box, and the model driver that runs each instruction as a turn in one.
 
 Design: docs/design/architecture.md. A conversation belongs to a text box (the adapter sends an id per
-input context) and keeps the instructions, the drafts offered and taken, and the tool calls with
+input context) and keeps the instructions, the first draft of each answer, and the tool calls with
 their results; the text around the caret is sent fresh each turn. Conversations live only in memory
 and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
 (once per conversation if you allow it for the conversation), destructive tools ask every time.
@@ -116,7 +116,7 @@ class ModelDriver:
         self.conversation.textbox = Textbox(self.before, self.after)
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
-        tools_loop = rewriter.backend in ("llama", "openai", "claude")  # rules and command: one call per turn
+        tools_loop = rewriter.loops()
         self.handed = self.drafted = self.settled = None
         try:
             result = rewriter.answer(

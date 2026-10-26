@@ -23,10 +23,10 @@ class ShapeTests(unittest.TestCase):
         call = shapes.as_message(json.dumps({"call": "user__ask", "arguments": {"question": "Which?"}}), 3)
         function = call["tool_calls"][0]["function"]
         self.assertEqual((function["name"], json.loads(function["arguments"])), ("user__ask", {"question": "Which?"}))
-        history = shapes.as_steps([{"role": "system", "content": "s"}, {"role": "user", "content": "go"},
-                                   dict(call, role="assistant"),
-                                   {"role": "tool", "tool_call_id": "step-3", "content": "The user chose: A"},
-                                   {"role": "assistant", "content": "Done."}])
+        history = shapes.as_steps(shapes.as_answered([
+            {"role": "system", "content": "s"}, {"role": "user", "content": "go"}, dict(call, role="assistant"),
+            {"role": "tool", "tool_call_id": "step-3", "content": "The user chose: A"},
+            {"role": "assistant", "content": "Done."}]))
         self.assertEqual(json.loads(history[2]["content"]), {"call": "user__ask", "arguments": {"question": "Which?"}})
         self.assertEqual(history[3], {"role": "user", "content": "Result of user__ask:\nThe user chose: A"})
         self.assertEqual(json.loads(history[4]["content"]), {"drafts": ["Done."]})  # an earlier answer, as answered
@@ -44,6 +44,50 @@ class ShapeTests(unittest.TestCase):
                                  "Tools:")
         self.assertEqual(told[0]["content"], "Write.\n\nTools:\n- user__ask: Ask the user.")
         self.assertEqual(told[1], {"role": "user", "content": "go"})
+
+
+class ServerShapeTests(unittest.TestCase):
+    """A model server held to the schema, and one that refuses it."""
+
+    def answers(self, *replies):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        from claudish.model import Rewriter
+        rewriter, sent = Rewriter(max_tokens=64), []
+
+        def chat(payload, headers, image=None, timeout=None):
+            sent.append(payload)
+            reply = replies[min(len(sent), len(replies)) - 1]
+            if isinstance(reply, int):
+                raise HTTPError("u", reply, "no", {}, BytesIO(b""))
+            return {"message": {"content": reply}, "finish_reason": "stop"}, {}
+        rewriter.chat = chat
+        return rewriter, sent
+
+    def test_an_example_answer_given_back_is_not_offered(self):
+        from claudish.model import Rewriter
+        rewriter, _ = self.answers(shapes.example(Rewriter("rules").modes["instruct"]["examples"][1]["content"]))
+        with self.assertRaisesRegex(RuntimeError, "offered nothing"):
+            rewriter.rewrite("tttt", mode="instruct")  # nonsense in, the template's own example out
+
+    def test_several_drafts_take_one_reading(self):
+        rewriter, sent = self.answers('{"drafts": ["One.", "Two.", "Three."]}')
+        self.assertEqual(rewriter.rewrite("three ways to say thanks", mode="instruct")["candidates"],
+                         ["One.", "Two.", "Three."])
+        self.assertEqual(len(sent), 1)
+
+    def test_a_refused_schema_asks_the_turn_again_in_plain_text(self):
+        rewriter, sent = self.answers(400, "Hello there—synergy!")
+        self.assertEqual(rewriter.rewrite("hi")["text"], "Hello there—synergy!")
+        self.assertNotIn("response_format", sent[1])
+        self.assertNotIn('{"drafts"', json.dumps(sent[1]["messages"]))  # no shape left in the prompt
+        self.assertFalse(rewriter.schema)
+
+    def test_refused_plain_too_the_schema_stays(self):
+        rewriter, _ = self.answers(400, 400)
+        with self.assertRaises(Exception):
+            rewriter.rewrite("hi")
+        self.assertTrue(rewriter.schema)
 
 
 class AgentShapeTests(unittest.TestCase):

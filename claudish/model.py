@@ -124,6 +124,7 @@ class Claude:
         return {"message": reply, "finish_reason": finish}, usage
 
     def rewrite(self, text, system, examples, image=None):
+        """One request without tools: (the answer's content, usage)."""
         options = self.options(shaped=True)
         try:
             response = self.client.beta.messages.create(
@@ -190,6 +191,14 @@ def claude_messages(messages):
 ROUTING = threading.Lock()
 
 
+LOOPS = ("llama", "openai", "claude")  # the backends with tool calls and a conversation (Rewriter.loops)
+SCHEMA_REFUSED = (400, 422, 501)  # what a server without json_schema answers response_format with
+
+
+class Unshaped(Exception):
+    """A model server refused the answer's schema (response_format)."""
+
+
 class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
@@ -217,7 +226,7 @@ class Rewriter:
         rewriter.summon = settings.get("summon", "Shift+Enter")
         rewriter.hints = settings.get("hints", True)
         if settings.get("tools"):
-            if settings["backend"] not in ("llama", "openai", "claude"):
+            if settings["backend"] not in LOOPS:
                 raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
                                  "Claude); the %s backend cannot use them" % settings["backend"])
             from .tools import Toolbox
@@ -458,7 +467,8 @@ class Rewriter:
             with self.opener.open(req, timeout=timeout or self.timeout) as response:
                 data = json.load(response)
         except HTTPError as exc:
-            if image is not None and exc.code in (400, 500, 501):
+            refusal = "response_format" in payload and exc.code in SCHEMA_REFUSED  # asked again in plain text
+            if image is not None and exc.code in (400, 500, 501) and not refusal:
                 raise RuntimeError("this model server did not accept the window picture; it needs a vision "
                                    "model (llama.cpp: --mmproj)") from exc
             raise
@@ -486,7 +496,7 @@ class Rewriter:
         started = time.perf_counter()
         spec = self.modes[mode]
         local = local or {}
-        tools = mode == "instruct" and self.backend in ("llama", "openai", "claude") and bool(self.toolbox or local)
+        tools = mode == "instruct" and self.loops() and bool(self.toolbox or local)
         prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
         examples = spec["examples"] if box.prose or spec.get("custom") else []
         in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
@@ -499,13 +509,12 @@ class Rewriter:
         else:
             framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
         said = box.material(framed, spec["box"])
-        shaped = self.shaped()
-        if shaped:  # the answer is {"drafts": [...]} (claudish/shapes.py): the examples answer so too
-            from . import shapes
-            examples = [dict(m, content=shapes.example(m["content"])) if m["role"] == "assistant" else m
-                        for m in examples]
-            prompt += "\n\n" + spec["box"]["shape"]
         history = list(conversation.messages) if conversation is not None else []
+        sent = examples
+        if self.shaped():  # the answer is {"drafts": [...]} (claudish/shapes.py): earlier answers were so too
+            from . import shapes
+            sent, history = shapes.as_answered(examples), shapes.as_answered(history)
+            prompt += "\n\n" + spec["box"]["shape"]
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
         from .screen import redact
@@ -517,22 +526,23 @@ class Rewriter:
         if serial and not self.lock.acquire(blocking=False):
             record["outcome"] = "busy"
             raise RuntimeError("the model is busy; keep typing or retry")
+        refused = False
         try:
             if self.backend == "rules":
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
-                outputs = [self.run_command(one_message(prompt, examples, said))]
+                outputs = [self.run_command(one_message(prompt, sent, said))]
             elif self.warm:
-                outputs = [self.warm.ask(one_message(prompt, examples, said), self.timeout)]
+                outputs = [self.warm.ask(one_message(prompt, sent, said), self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
-                output, usage = self.claude.rewrite(said, prompt, examples, box.image)
+                output, usage = self.claude.rewrite(said, prompt, sent, box.image)
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost
             else:
                 # The loop: an OpenAI-compatible server, or Claude when there are tools or a
                 # conversation (one reading: alternatives would multiply the cost).
-                outputs, usage, new, called = self.ask_model(mode, prompt, examples, history, said, box,
+                outputs, usage, new, called = self.ask_model(mode, prompt, sent, history, said, box,
                                                              1 if self.claude else count,
                                                              tools, approve, progress, local, serial,
                                                              take=self.take(mode, said))
@@ -544,14 +554,23 @@ class Rewriter:
             inner = exc
             while getattr(inner, "exceptions", None):
                 inner = inner.exceptions[0]
-            # A tool that settled the turn (an answer chosen, a handoff) is how it ended, not a failure.
-            record["outcome"] = ("settled: %s" if isinstance(inner, Finished) else "failed: %s") % inner
-            if inner is not exc:
-                raise inner from exc
-            raise
+            if not isinstance(inner, Unshaped):
+                # A tool that settled the turn (an answer chosen, a handoff) is how it ended, not a failure.
+                record["outcome"] = ("settled: %s" if isinstance(inner, Finished) else "failed: %s") % inner
+                if inner is not exc:
+                    raise inner from exc
+                raise
+            record["outcome"] = "schema refused: asked again in plain text"
+            refused = True
         finally:
             if serial:
                 self.lock.release()
+        if refused:  # the turn again without the shape; refused plain too, the schema was not why
+            try:
+                return self.answer(mode, text, box, conversation, approve, progress, local, serial)
+            except Exception:
+                self.schema = True
+                raise
         from . import quirks, shapes
         candidates = []
         for output in outputs:
@@ -579,6 +598,11 @@ class Rewriter:
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}
+
+    def loops(self):
+        """Whether this backend runs the tool loop with the conversation's history; the others
+        (Claude Code, Codex, a command, rules) get one message per turn."""
+        return self.backend in LOOPS
 
     def shaped(self):
         """Whether this backend is held to the answer's schema (claudish/shapes.py): an
@@ -638,9 +662,10 @@ class Rewriter:
                 try:
                     choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
                 except HTTPError as exc:
-                    if exc.code not in (400, 422, 501):
+                    if exc.code not in SCHEMA_REFUSED:
                         raise
-                    self.schema = False  # a server without json_schema: tools and plain text from now on
+                    self.schema = False  # a server without json_schema: the turn again, in plain text
+                    raise Unshaped() from exc
                 else:
                     usage = usage or used
                     if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
@@ -673,6 +698,8 @@ class Rewriter:
         if not first:
             raise RuntimeError("model returned no text")
         outputs = [first]
+        if len(shapes.drafts(first) or ()) > 1:
+            count = 1  # the versions asked for are in the answer
         for index in range(1, count):  # a failed extra reading only shortens the list
             try:
                 more = (ask(with_tools, None, temperature=0.9, seed=index).get("content") or "").strip()
