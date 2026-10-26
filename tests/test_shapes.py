@@ -46,13 +46,29 @@ class ShapeTests(unittest.TestCase):
         self.assertEqual(told[1], {"role": "user", "content": "go"})
 
 
-class ClaudeCodeShapeTests(unittest.TestCase):
+class AgentShapeTests(unittest.TestCase):
     def test_claude_code_is_held_to_the_schema(self):
         from claudish.warm import ClaudeCode
         code = ClaudeCode(["claude"])
         argv = code.argv()
         self.assertEqual(json.loads(argv[argv.index("--json-schema") + 1]), shapes.ANSWER)
         self.assertTrue(code.shaped)
+
+    def test_a_codex_turn_is_held_to_the_schema(self):
+        from claudish.warm import Codex
+        codex, sent = Codex(["codex"]), {}
+
+        def call(method, params, deadline, collect=None):
+            sent[method] = params
+            if method == "turn/start":
+                collect({"method": "item/completed", "params": {"item": {"type": "agentMessage",
+                                                                         "text": '{"drafts": ["Hi!"]}'}}})
+                collect({"method": "turn/completed", "params": {"turn": {}}})
+            return {"thread": {"id": "t1"}}
+        codex.call = call
+        self.assertEqual(shapes.drafts(codex.exchange("hi", 5)), ["Hi!"])
+        self.assertEqual(sent["turn/start"]["outputSchema"], shapes.ANSWER)
+        self.assertTrue(codex.shaped)
 
 
 if __name__ == "__main__":

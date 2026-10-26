@@ -222,6 +222,7 @@ class ClaudeCode(Warm):
 class Codex(Warm):
     """`codex app-server`: one process; each request a new ephemeral, read-only thread."""
     name = "Codex"
+    shaped = True
     FEATURES_OFF = ("apps", "plugins", "multi_agent", "image_generation", "computer_use", "browser_use",
                     "shell_tool", "skill_search", "tool_suggest", "hooks")
 
@@ -299,7 +300,7 @@ class Codex(Warm):
             if message["method"] == "turn/completed":
                 done.append(message["params"])
         self.call("turn/start", {"threadId": thread_id, "input": [{"type": "text", "text": prompt}],
-                                 "effort": "low"}, deadline, collect)
+                                 "effort": "low", "outputSchema": ANSWER}, deadline, collect)
         while not done:
             self.read(deadline, collect)
         error = ((done[0].get("turn") or {}).get("error") or {})

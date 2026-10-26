@@ -3,8 +3,9 @@
 ## Unreleased
 
 - Every answer has a declared shape, `{"drafts": [...]}`, held to by the backends that take a schema
-  (model servers, the Claude API, Claude Code): read as data, never cleaned. On a model server an
-  instruction's tool calls are steps of the same schema. Claude Code now offers versions too.
+  (model servers, the Claude API, Claude Code, Codex): read as data, never cleaned. On a model server an
+  instruction's tool calls are steps of the same schema. Claude Code and Codex now offer versions
+  too.
 - Tab on a selection, with nothing composed, makes it your words, as if you had just typed them:
   then Tab rewrites them, Shift+Enter sends them, Enter keeps them.
 - A rewrite of words with text around them (a selection, or words typed mid-sentence) is written for

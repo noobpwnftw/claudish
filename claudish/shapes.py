@@ -1,7 +1,8 @@
 """The shape of what a model answers (docs/design/architecture.md, G69): every mode answers
 {"drafts": [text, ...]}, one draft, or two or three versions when an instruction asks for several.
 A backend that takes a schema is held to it (an OpenAI-compatible server's response_format, the
-Claude API's output_config, Claude Code's --json-schema), so the answer is read as data and never
+Claude API's output_config, Claude Code's --json-schema, a Codex turn's outputSchema), so the answer is
+read as data and never
 cleaned. On an OpenAI-compatible server an instruction's tool calls are steps of the same schema,
 {"call": tool, "arguments": {...}}, each tool with its own argument schema: the server enforces
 them, where a model's native tool-call format may not be. A backend without a schema answers in
