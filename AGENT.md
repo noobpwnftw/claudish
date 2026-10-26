@@ -16,6 +16,21 @@ slop or apologize for it. A change that makes the tool less polished, native or 
 one half; one that softens or hedges the slop weakens the other. Earn adoption with a product that
 works flawlessly and stays installed.
 
+## What we do and don't
+
+CJK input methods have perfected how a composing input method works: compose, choose, commit,
+Shift to switch. Claudish follows that habit and does not redefine it. What differs is English,
+which never had a composing input method, so judgment is ours there (how spaces are handled, for
+example), and no further.
+
+The work is the path from typing letters to composing to committing: as streamlined and smooth as
+it can be, keeping the vibes. A Shift tap is plain en_US typing: nothing happens, no extra compose
+or commit step, no placeholder input method to switch to. Continue suggests only when someone
+configures a model for it (local inference they can afford); by default it stays inactive.
+
+Not ours: a hotkey that summons an AI, a replacement for the Claude CLI or another agent, a chat
+window, rewriting a selection with a hotkey.
+
 ## Owner control
 
 - An owner instruction to stop, pause or hand back control wins: stop starting work and leave a
