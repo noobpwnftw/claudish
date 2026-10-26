@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claudish-ime"
-version = "0.2.0"
+version = "0.3.0"
 description = "cd_AI: a language-model input method for Linux, Windows and macOS"
 requires-python = ">=3.10"
 license = {text = "MIT"}

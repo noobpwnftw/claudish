@@ -58,7 +58,7 @@ another model API, and pick a tone. Use **Try a rewrite** in Settings, then type
 - **Linux** (IBus; fcitx5 is not supported yet), as your user:
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.2.0/scripts/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.3.0/scripts/install.sh | sh
   ```
 
   Then log out and back in, and add **English → Claudish** in **Settings → Keyboard → Input

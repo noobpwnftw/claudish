@@ -33,7 +33,7 @@ Every install includes cd_AI's command line, `claudish`: `claudish settings`, `c
 IBus only (fcitx5 is not supported yet). One line, as your user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.2.0/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.3.0/scripts/install.sh | sh
 ```
 
 It checks for git, Python 3 and the IBus bindings (and names the `apt install` line for any that
