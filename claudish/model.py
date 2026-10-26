@@ -435,6 +435,8 @@ class Rewriter:
         kind = "terminal" if screen else Box(app, purpose).kind
         driver = self.make_driver(app, conversation, before, after, look, purpose, screen)
         driver.draft = draft
+        if draft and self.session_command:  # an agent gets one message: the draft in view goes in it
+            text = self.modes["instruct"]["box"]["in_view"].format(draft=draft, text=text)
         return self.sessions.start(driver, text, one_line=kind == "terminal")
 
     def server_model(self, headers):
@@ -576,10 +578,13 @@ class Rewriter:
             if serial:
                 self.lock.release()
         if refused:  # the turn again without the shape; refused plain too, the schema was not why
+            if self.takes.get((mode, said)):
+                self.takes[(mode, said)] -= 1  # the same take, asked again: not another one
             try:
                 return self.answer(mode, text, box, conversation, approve, progress, local, serial)
-            except Exception:
-                self.schema = True
+            except HTTPError as exc:
+                if exc.code in SCHEMA_REFUSED:
+                    self.schema = True
                 raise
         from . import quirks, shapes
         candidates = []
@@ -672,7 +677,14 @@ class Rewriter:
                 shaped = dict(payload, messages=shapes.as_steps(told),
                               response_format=shapes.step_format(offered) if offered else shapes.answer_format())
                 try:
-                    choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
+                    try:
+                        choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
+                    except HTTPError as exc:
+                        if exc.code not in SCHEMA_REFUSED or not offered:
+                            raise
+                        # A tool's own argument schema the server cannot hold: any-object arguments.
+                        shaped["response_format"] = shapes.step_format(offered, loose=True)
+                        choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
                 except HTTPError as exc:
                     if exc.code not in SCHEMA_REFUSED:
                         raise

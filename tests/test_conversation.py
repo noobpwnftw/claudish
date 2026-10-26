@@ -243,7 +243,8 @@ class AskAndHelperTests(unittest.TestCase):
         """A server that refuses response_format: tools and plain text from then on; tool markup it
         leaves in the text is never offered (claudish/quirks.py)."""
         from urllib.error import HTTPError
-        replies = [HTTPError("u", 400, "response_format", None, None), answer("Hello there!")]
+        refused = HTTPError("u", 400, "response_format", None, None)
+        replies = [refused, refused, answer("Hello there!")]  # the step's schema, then with any-object arguments
 
         def chat(payload, headers, image=None, timeout=None):
             reply = replies.pop(0)

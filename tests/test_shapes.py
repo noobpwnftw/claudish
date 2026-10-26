@@ -97,6 +97,20 @@ class ServerShapeTests(unittest.TestCase):
         self.assertNotIn('{"drafts"', json.dumps(sent[1]["messages"]))  # no shape left in the prompt
         self.assertFalse(rewriter.schema)
 
+    def test_a_tool_schema_the_server_cannot_hold_keeps_the_answer_schema(self):
+        rewriter, sent = self.answers(400, '{"drafts": ["Hi—there."]}')
+        rewriter.answer("instruct", "say hi", rewriter.box("instruct"), local={
+            "x__tool": ("A tool.", {"type": "object", "properties": {"n": {"type": "integer", "minimum": 0}}},
+                        lambda arguments: "ok")})
+        self.assertTrue(rewriter.schema)
+        loose = sent[1]["response_format"]["json_schema"]["schema"]["anyOf"][0]["properties"]["arguments"]
+        self.assertEqual(loose, shapes.OBJECT)
+
+    def test_the_plain_retry_is_the_same_take(self):
+        rewriter, sent = self.answers(400, "Hello there—synergy!")
+        rewriter.rewrite("hi")
+        self.assertEqual(sent[1]["temperature"], 0)  # deterministic, as the first try was
+
     def test_refused_plain_too_the_schema_stays(self):
         rewriter, _ = self.answers(400, 400)
         with self.assertRaises(Exception):

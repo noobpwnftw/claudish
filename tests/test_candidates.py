@@ -701,6 +701,42 @@ class ModeFeelTests(unittest.TestCase):
         fresh.insert("!")
         self.assertEqual(fresh.text, "hi team!")
 
+    def test_a_follow_up_on_a_rewrite_review_round(self):
+        """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus
+        change with a follow-up typed, a retried follow-up's draft."""
+        def rewritten():
+            state = Composition()
+            state.mode = "compose"
+            for char in "hello":
+                state.insert(char)
+            state.arrow(-1)
+            state.arrow(-1)
+            state.tab()
+            state.offer(state.revision, "Greetings—truly.")
+            for char in "short":
+                state.insert(char)
+            return state
+        state = rewritten()
+        self.assertEqual((state.reply, state.cursor), ("short", 5))  # not "orths"
+        self.assertEqual(state.escape(), "clear")
+        self.assertIsNone(state.dropped_toast())  # the rewrite's panel stays
+        state = rewritten()
+        self.assertEqual(state.toggle(), "hello")  # a Shift tap keeps your words, not the follow-up
+        state = rewritten()
+        self.assertEqual((state.leave(), state.dropped), ("", "hello"))  # a focus change: Shift+Esc brings them
+        failed = Composition()
+        failed.mode = "compose"
+        failed.change("two ways")
+        failed.submit()
+        failed.offer(failed.revision, "A.", ["A.", "B."])
+        failed.move(1)
+        for char in "shorter":
+            failed.insert(char)
+        failed.enter()
+        failed.submit()
+        failed.fail(failed.revision, "timed out")
+        self.assertEqual((failed.enter(), failed.about), ("submit", "B."))  # the retry keeps its draft
+
     def test_a_follow_up_is_about_the_draft_in_view(self):
         state = Composition()
         state.mode = "compose"

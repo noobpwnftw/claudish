@@ -228,8 +228,8 @@ class ClaudishTextService(TextService):
     def onDeactivate(self):
         """Another input method takes over: an open exchange is held, as on a focus change, and
         parked with its worker for the next cd_AI instance in this app (pause, not stop)."""
-        keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.sent, self.state.held is not None))
-        if self.state.sent:
+        keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.for_model, self.state.held is not None))
+        if self.state.for_model:
             self.state.leave(getattr(self, "last_document", None))
         if self.worker:
             park(foreground(), self.state, self.worker)
@@ -265,7 +265,7 @@ class ClaudishTextService(TextService):
         self.adopt_parked()
         document = getattr(self, "document", None)
         if document and document != getattr(self, "last_document", None):
-            if self.state.sent:  # an instruction's exchange, left in the other text box: held for it
+            if self.state.for_model:  # an instruction's exchange, left in the other text box: held for it
                 self.state.leave(self.last_document)
             if getattr(self, "last_document", None) is not None and self.worker:
                 self.worker.new_conversation(end=self.state.held is None)  # a held exchange goes on
@@ -375,7 +375,7 @@ class ClaudishTextService(TextService):
         self.setGhost("")
         # A sent instruction is not text for the app: if the app ends the composition (a focus change),
         # Claudish's PIME clears it; words still being typed stay, as a CJK preedit does.
-        self.setClearOnEnd(self.state.sent)
+        self.setClearOnEnd(self.state.for_model)
         shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
         self.setCompositionString(shown)
         # TSF cursor offsets count UTF-16 code units; the cursor is where ← and → left it.
@@ -489,7 +489,7 @@ class ClaudishTextService(TextService):
             # Edge drop the composition), then press it again for the app: one press does both. A sent
             # instruction is not text for the app: it is cleared and its exchange held for Shift+Esc,
             # as a focus change does (and as on Linux and macOS).
-            if self.state.sent:
+            if self.state.for_model:
                 self.state.leave(getattr(self, "last_document", None))
                 self.publish()
             else:
@@ -600,7 +600,8 @@ class ClaudishTextService(TextService):
         elif key in (0x25, 0x27) and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
                 and self.state.arrow(-1 if key == 0x25 else 1):  # ← → move in what you type (Shift+← selects)
             pass
-        elif key == 0x2E and self.state.delete():  # forward delete, at the cursor
+        elif key == 0x2E and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
+                and self.state.delete():  # forward delete, at the cursor (Shift+Delete cuts)
             pass
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):
             self.setCommitString(chr(event.charCode))  # nothing composed: the space is the app's text
@@ -614,7 +615,11 @@ class ClaudishTextService(TextService):
             return True
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
-            self.setCommitString(self.state.commit())
+            # What is for the model never goes in: the exchange is held, as on a focus change.
+            if self.state.for_model:
+                self.state.leave(getattr(self, "last_document", None))
+            else:
+                self.setCommitString(self.state.commit())
             self.changed()
             replay(key, held(event))
             return True
@@ -642,7 +647,7 @@ class ClaudishTextService(TextService):
         super().onCompositionTerminated(forced)
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
-        if self.state.sent:
+        if self.state.for_model:
             # The app ended the composition while an exchange was open (a click, a focus change,
             # another input method): TSF keeps what it showed (your own words, as a CJK preedit),
             # and the exchange is held for this box, offered on return. Parked too: switching to

@@ -166,6 +166,12 @@ class Composition:
         return self.asked == "instruct" and bool(self.working or self.failed or self.question or self.candidate)
 
     @property
+    def for_model(self):
+        """What the composition shows is for the model, not the app: a sent instruction, or a
+        follow-up typed on a rewrite. A focus change never puts it in the app (leave)."""
+        return self.sent or bool(self.converted and self.reply)
+
+    @property
     def answered(self):
         """The model answered and is waiting on you: an instruction's exchange is open, or a rewrite
         shows in the panel. What you type now is about its answer (a reply, a follow-up), never more
@@ -330,7 +336,7 @@ class Composition:
         """After Esc discarded words: say so, briefly, with the key that brings them back (None with
         hints off, in a terminal, or when a reply was cleared: the question's panel stays and says
         what is left)."""
-        if not self.hints or self.terminal or self.sent:
+        if not self.hints or self.terminal or self.answered:
             return None
         return blank(status="dropped", foot=[("Shift+Esc", "restore")])
 
@@ -501,7 +507,8 @@ class Composition:
             if self.asked == "instruct":
                 self.nudged = self._pending()  # a reflexive Enter: Tab lights when they come
             return "wait"
-        self.about = ""
+        if not self.failed:  # a retry of a failed follow-up keeps its draft
+            self.about = ""
         return "submit"
 
     def keep(self):
@@ -698,6 +705,8 @@ class Composition:
             # take a choice must not type into the document, nor pick).
             if char == " " and not self.reply:
                 return True
+            if not self.reply:
+                self.back = 0  # a reply starts at its end, wherever the cursor was in your words
             if len(self.reply) < MAX_COMPOSITION:
                 at = len(self.reply) - self.back
                 self.reply = self.reply[:at] + char + self.reply[at:]
@@ -732,7 +741,7 @@ class Composition:
             return ""
         # A sent instruction's exchange is held, as on a focus change: back in compose its pill says
         # what waits (switched()), and Shift+Esc brings it back.
-        kept = self.leave(None) if self.sent else self.shown
+        kept = self.leave(None) if self.sent else self.text  # a follow-up on a rewrite is not your words
         self.mode = "continue"
         self.look = False  # change() keeps it with words in the composition
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context
@@ -820,6 +829,10 @@ class Composition:
             held = copy.copy(self)
             held.held = None
             self.held, self.held_app, self.held_at = held, app, time.monotonic()
+            self.change("")
+            return ""
+        if self.for_model:  # a follow-up typed on a rewrite: your words wait for Shift+Esc
+            self.dropped, self.dropped_reply = self.text, False
             self.change("")
             return ""
         words = self.text

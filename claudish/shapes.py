@@ -19,15 +19,16 @@ def answer_format():
     return {"type": "json_schema", "json_schema": {"name": "answer", "strict": True, "schema": ANSWER}}
 
 
-def step_format(offered):
+def step_format(offered, loose=False):
     """response_format for one step of the tool loop: a call to one of the offered tools (OpenAI
-    tool definitions), with its own arguments, or the answer."""
+    tool definitions), with its own arguments (loose: any object), or the answer."""
     calls = []
     for tool in offered:
         function = tool["function"]
         arguments = function.get("parameters") or {"type": "object", "properties": {}}
         calls.append({"type": "object", "properties": {"call": {"const": function["name"]},
-                                                       "arguments": arguments if usable(arguments) else OBJECT},
+                                                       "arguments": arguments if usable(arguments) and not loose
+                                                       else OBJECT},
                       "required": ["call", "arguments"], "additionalProperties": False})
     # Not strict: a tool's own schema may not meet a hosted API's strict rules (every property
     # required); a grammar (llama.cpp) holds it either way.

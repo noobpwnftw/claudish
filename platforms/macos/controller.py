@@ -511,7 +511,7 @@ class ClaudishInputController(IMKInputController):
             if client is not None:
                 unmark(client)
             return
-        if self.state.sent and not suggested:
+        if self.state.for_model and not suggested:
             # The app ends the composition (a click, a focus change): the instruction is not text
             # for the app; its exchange is held for this app, its work going on, offered when you
             # come back.
@@ -666,7 +666,7 @@ class ClaudishInputController(IMKInputController):
         if key in (123, 124) and plain and self.state.arrow(-1 if key == 123 else 1):  # ← → move in what you type
             self.changed(client)
             return True
-        if key == 117 and self.state.delete():  # forward delete, at the cursor
+        if key == 117 and plain and self.state.delete():  # forward delete, at the cursor
             self.changed(client)
             return True
         text = event.characters() or ""

@@ -212,7 +212,7 @@ class ClaudishEngine(IBus.Engine):
         """What IBus does with the preedit when focus leaves: words you are typing are committed, as
         a CJK input method's are; a sent instruction (or a reply to the model) is cleared, held with
         its exchange for Shift+Esc."""
-        return IBus.PreeditFocusMode.CLEAR if self.composition.sent else IBus.PreeditFocusMode.COMMIT
+        return IBus.PreeditFocusMode.CLEAR if self.composition.for_model else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.around_caret()[1] if self.composition.live else ""
@@ -300,7 +300,7 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             self.refresh_surrounding()
             return
-        if self.composition.sent and not suggested:
+        if self.composition.for_model and not suggested:
             # A shortcut or another key ends the composition: the instruction is not text for the
             # app; its exchange is held for this app, its work going on, as on a focus change.
             self.composition.leave(self.app)
@@ -433,7 +433,7 @@ class ClaudishEngine(IBus.Engine):
                 self.composition.arrow(-1 if keyval == IBus.KEY_Left else 1):
             self.changed()  # ← → move in what you type, as a CJK composition does
             return True
-        if keyval == IBus.KEY_Delete and self.composition.delete():  # forward delete, at the cursor
+        if keyval == IBus.KEY_Delete and plain and self.composition.delete():  # forward delete, at the cursor
             self.changed()
             return True
         name = IBus.keyval_name(keyval) or ""
@@ -549,7 +549,7 @@ class ClaudishEngine(IBus.Engine):
 
     def do_focus_out(self):
         trace("focus-out")
-        if self.composition.sent:  # an instruction's exchange: held for this app, its work going on
+        if self.composition.for_model:  # an instruction's exchange: held for this app, its work going on
             self.composition.leave(self.app)
             self.render()
             return
@@ -570,7 +570,7 @@ class ClaudishEngine(IBus.Engine):
 
     def do_reset(self):
         trace("reset")
-        if self.composition.sent:  # a click in the field: the exchange is held, as on a focus change
+        if self.composition.for_model:  # a click in the field: the exchange is held, as on a focus change
             self.composition.leave(self.app)
             self.render()
             return
