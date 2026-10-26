@@ -166,27 +166,34 @@ class Composition:
         return self.asked == "instruct" and bool(self.working or self.failed or self.question or self.candidate)
 
     @property
+    def answered(self):
+        """The model answered and is waiting on you: an instruction's exchange is open, or a rewrite
+        shows in the panel. What you type now is about its answer (a reply, a follow-up), never more
+        of your words: Esc goes back to them."""
+        return self.sent or self.converted
+
+    @property
     def shown(self):
         """What the composition shows: your own words, never the model's (a rewrite waits in the
         panel until Tab). A sent instruction stays the composition while its exchange is open, and
         a reply you type takes its place: as in a CJK input method, choices never show without a
         composition (owner, 2026-10-24: macOS apps pass an input method Return, Tab and the arrows
         only while there is marked text, and not reliably; so on every platform)."""
-        if self.sent:
+        if self.answered:
             return self.reply or self.text
         return self.text
 
     @property
     def cursor(self):
         """Where the cursor is in what the composition shows (← and → move it; at its end by default)."""
-        return len(self.shown) - (self.back if (self.reply or not self.sent) else 0)
+        return len(self.shown) - (self.back if (self.reply or not self.answered) else 0)
 
     def arrow(self, step):
         """← (-1) or → (1) in what you are typing, as a CJK input method moves in its composition:
         True when it is ours (nothing commits); False with nothing composed (the key is the app's).
         While an exchange is open with nothing typed, the key does nothing: it never leaves it."""
-        typed = self.reply if self.sent else self.text
-        if self.sent and not typed:
+        typed = self.reply if self.answered else self.text
+        if self.answered and not typed:
             return True
         if not typed or self.live:
             return False
@@ -195,14 +202,14 @@ class Composition:
 
     def delete(self):
         """Delete: the character after the cursor; True when it is ours (False: nothing composed)."""
-        typed = self.reply if self.sent else self.text
-        if self.sent and not typed:
-            return True  # an open exchange: nothing to delete, and the key never leaves it
+        typed = self.reply if self.answered else self.text
+        if self.answered and not typed:
+            return True  # an answer waits: nothing to delete, and the key never leaves it
         if not typed or self.live:
             return False
         if self.back:
             at = len(typed) - self.back
-            if self.sent:
+            if self.answered:
                 self.reply = typed[:at] + typed[at + 1:]
                 self.back -= 1
             else:
@@ -270,15 +277,17 @@ class Composition:
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
                          nudge=self.nudge)
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
-            # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied).
-            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")])
+            # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied);
+            # what you type is a follow-up about it.
+            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
+                         tail="or type to change it")
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what each Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
                              + ([("Esc", "drop")] if self.editing else [(self.keeper, "keep")]))
-        if self.sent and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
+        if self.answered and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
             # Drafts keep the highlight: a follow-up is about the draft in view (Composition.about);
@@ -414,7 +423,7 @@ class Composition:
             return "pass"
         if self.reading and not self.reply:
             return "dismiss"  # the adapter answers Dismiss; nothing is inserted
-        if self.sent and self.reply:
+        if self.answered and self.reply:
             self.dropped, self.dropped_reply = self.reply, True  # Shift+Esc brings it back
             self.reply = ""  # what you typed goes; the exchange stays open
             self.back = 0
@@ -447,7 +456,7 @@ class Composition:
             return self.reply or self.text
         if self.live or not self.dropped:
             return ""
-        if self.dropped_reply and self.sent and not self.reply:  # a reply you cleared, back at the caret
+        if self.dropped_reply and self.answered and not self.reply:  # a reply you cleared, back at the caret
             self.reply, self.dropped = self.dropped, ""
             self.back = 0
             return self.reply
@@ -468,7 +477,7 @@ class Composition:
                 return "reply"
             self.light_tab()
             return "wait"  # a choice, or an answer to read, is Tab's: the highlighted row lights Tab
-        if self.sent and self.reply.strip():
+        if self.answered and self.reply.strip():
             # Your next words, typed while it worked or with its drafts showing: a follow-up
             # instruction in the same conversation, about the draft in view (not in the text yet).
             drafts = self.candidates or ([self.candidate] if self.candidate else [])
@@ -674,8 +683,8 @@ class Composition:
 
     def insert(self, char):
         """Add a typed character; False when the adapter should commit first (the composition is
-        full). Typing on past a rewrite in the panel goes on with your words; the rewrite goes."""
-        if self.sent:
+        full). With an answer waiting (a rewrite in the panel too), it is a reply or a follow-up."""
+        if self.answered:
             # What you type now is a reply (or your next words): it takes the instruction's place
             # in the composition. A Space with nothing typed does nothing (an IME user's reflex to
             # take a choice must not type into the document, nor pick).
@@ -693,7 +702,7 @@ class Composition:
         return True
 
     def backspace(self):
-        if self.sent:  # with nothing typed, nothing goes: the instruction stays
+        if self.answered and (self.reply or self.sent):  # with nothing typed, nothing goes: the instruction stays
             at = len(self.reply) - self.back
             if at > 0:
                 self.reply = self.reply[:at - 1] + self.reply[at:]

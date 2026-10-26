@@ -69,7 +69,7 @@ window.LAB_STATES = {
     "dismiss"
    ]
   ],
-  "tail": null,
+  "tail": "or type to change it",
   "tile": "ai",
   "status": null,
   "busy": false,

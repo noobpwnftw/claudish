@@ -669,6 +669,32 @@ class ModeFeelTests(unittest.TestCase):
         self.assertTrue(waiting.arrow(-1) and waiting.arrow(1) and waiting.delete())
         self.assertEqual((waiting.text, waiting.sent, waiting.cursor), ("say hi", True, 6))
 
+    def test_typing_on_a_rewrite_is_a_follow_up_about_it(self):
+        """Owner: once the model answered, typing talks to it (as with drafts and answers); Esc goes
+        back to your words."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("hi team")
+        state.tab()
+        state.offer(state.revision, "Hello, valued team—synergy awaits.")
+        for char in "shorter":
+            state.insert(char)
+        panel = state.panel()
+        self.assertEqual((state.shown, state.text, panel["replying"], state.tab()), ("shorter", "hi team", True, "wait"))
+        self.assertEqual(state.escape(), "clear")  # the follow-up goes; the rewrite stays
+        self.assertTrue(state.converted)
+        for char in "shorter":
+            state.insert(char)
+        self.assertEqual((state.enter(), state.text, state.about), ("submit", "shorter", "Hello, valued team—synergy awaits."))
+        fresh = Composition()
+        fresh.mode = "compose"
+        fresh.change("hi team")
+        fresh.tab()
+        fresh.offer(fresh.revision, "Hello—team.")
+        self.assertEqual((fresh.escape(), fresh.shown, fresh.converted), ("back", "hi team", False))  # your words
+        fresh.insert("!")
+        self.assertEqual(fresh.text, "hi team!")
+
     def test_a_follow_up_is_about_the_draft_in_view(self):
         state = Composition()
         state.mode = "compose"

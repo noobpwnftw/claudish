@@ -24,6 +24,13 @@
 - Windows: Tab on a selection works (Claudish's PIME reads the selection for Tab's test); closing
   the keyboard keeps your words; a password field no longer turns cd_AI off in the next field.
 - A finished helper task is said at the caret on every platform.
+- Typing on a rewrite in the panel is a follow-up about it ("shorter", Shift+Enter), as with drafts;
+  Esc goes back to your words.
+- A follow-up is about the draft in view, which stays highlighted while you type it; it comes back
+  as the whole revised draft.
+- ← and → move within what you type, as in a CJK composition; Delete works there too.
+- Instructions see more of the text around the caret (6000 characters before, 2000 after).
+- A follow-up no longer gets stuck at working (its request could cancel itself).
 - The Settings tone applies to the profile in use, whatever its name.
 
 ## 0.2.0
