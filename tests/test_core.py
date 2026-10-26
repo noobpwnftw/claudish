@@ -348,6 +348,30 @@ class SessionPollingTests(unittest.TestCase):
         self.assertEqual(calls[-1], "/sessions/k/cancel")
         self.assertEqual(worker.results[-1], (1, {"error": "timed out", "session": "k"}))  # the instruction says so
 
+    def test_a_follow_ups_session_is_wanted_before_the_adapter_polls(self):
+        """Owner: a follow-up stuck at working. Its revision is new at Shift+Enter; the follower
+        looked before the adapter's poll updated wanted, and cancelled the session it had started."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
+        worker.wanted = {4}  # the adapter has not polled since the follow-up's revision, 5
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            return {"events": [{"seq": 0, "type": "result", "text": "Shorter."}], "done": True}
+        with patch.object(client, "call", call):
+            worker.session(5, "shorter", "app", draft="Long—very long.")
+            for _ in range(100):
+                if worker.results:
+                    break
+                time.sleep(0.01)
+        self.assertNotIn("/sessions/k/cancel", calls)
+        self.assertEqual(worker.results[0][0], 5)
+
     def test_a_held_exchanges_session_goes_on_and_a_late_answer_fails_it(self):
         """Owner: Shift on a question cancelled its session (a new request stopped it); the reply
         typed later went to the dead session, and the panel stayed at working."""

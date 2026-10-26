@@ -662,6 +662,12 @@ class ModeFeelTests(unittest.TestCase):
         state.insert("!")
         self.assertEqual((state.reply, state.cursor), ("shorte!r", 7))
         self.assertFalse(Composition().arrow(-1))  # nothing typed: the key is the app's
+        waiting = Composition()
+        waiting.mode = "compose"
+        waiting.change("say hi")
+        waiting.submit()  # working: ← → and Delete do nothing, and never leave the exchange
+        self.assertTrue(waiting.arrow(-1) and waiting.arrow(1) and waiting.delete())
+        self.assertEqual((waiting.text, waiting.sent, waiting.cursor), ("say hi", True, 6))
 
     def test_a_follow_up_is_about_the_draft_in_view(self):
         state = Composition()

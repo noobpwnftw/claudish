@@ -231,6 +231,12 @@ class Suggestions:
         if draft:
             body["draft"] = draft
         key = call(self.endpoint, "/sessions", body)["id"]
+        with self.condition:
+            # Wanted from the start: a follow-up's revision is new at Shift+Enter, and the adapter's
+            # next poll (Composition.follow) may come after the follower's first look, which would
+            # cancel the session it just started.
+            if self.wanted is not None:
+                self.wanted = set(self.wanted) | {revision}
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
             del self.revisions[old]

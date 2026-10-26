@@ -183,16 +183,21 @@ class Composition:
 
     def arrow(self, step):
         """← (-1) or → (1) in what you are typing, as a CJK input method moves in its composition:
-        True when it is ours (nothing commits); False with nothing to edit (the key is the app's)."""
+        True when it is ours (nothing commits); False with nothing composed (the key is the app's).
+        While an exchange is open with nothing typed, the key does nothing: it never leaves it."""
         typed = self.reply if self.sent else self.text
+        if self.sent and not typed:
+            return True
         if not typed or self.live:
             return False
         self.back = min(len(typed), max(0, self.back - step))
         return True
 
     def delete(self):
-        """Delete: the character after the cursor; True when it is ours (False: nothing to edit)."""
+        """Delete: the character after the cursor; True when it is ours (False: nothing composed)."""
         typed = self.reply if self.sent else self.text
+        if self.sent and not typed:
+            return True  # an open exchange: nothing to delete, and the key never leaves it
         if not typed or self.live:
             return False
         if self.back:
