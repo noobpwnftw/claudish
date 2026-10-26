@@ -116,11 +116,11 @@ class ModelDriver:
         self.conversation.textbox = Textbox(self.before, self.after)
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))
-        tools_loop = rewriter.loops()
+        remembers = rewriter.loops() or rewriter.warm is not None  # Claude Code, Codex: earlier turns in one message
         self.handed = self.drafted = self.settled = None
         try:
             result = rewriter.answer(
-                "instruct", prompt, box, conversation=self.conversation if tools_loop else None,
+                "instruct", prompt, box, conversation=self.conversation if remembers else None,
                 approve=lambda *call: self.approve(session, *call),
                 progress=lambda summary: self.progress(session, summary), local=local, serial=False)
         except Exception as exc:  # with MCP servers open, a stop arrives wrapped in an exception group

@@ -225,6 +225,15 @@ class CommandBackendTests(unittest.TestCase):
         self.assertIn("<example>\n<text>", dump)
         self.assertTrue(dump.rstrip().endswith("<text>thanks</text>"))
 
+    def test_earlier_turns_go_in_the_one_message(self):
+        from claudish.model import one_message
+        words = {"plain": "Text:", "examples": "Examples:", "earlier": "Earlier:", "text": "Now:"}
+        history = [{"role": "user", "content": "tell the team"}, {"role": "assistant", "content": "Team—hi!"}]
+        message = one_message("Write.", [], "shorter", words, history)
+        self.assertEqual(message, "Write.\n\nEarlier:\n<turn>\n<text>tell the team</text>\n<output>Team—hi!</output>"
+                                  "\n</turn>\n\nNow:\n<text>shorter</text>")
+        self.assertEqual(one_message("Write.", [], "hi", words), "Write.\n\nText:\nhi")
+
     def test_failures_and_timeouts_keep_your_wording(self):
         with self.assertRaisesRegex(RuntimeError, "exit 3"):
             self.agent("import sys; sys.stderr.write('no auth'); sys.exit(3)").rewrite("hi")

@@ -275,6 +275,12 @@
     "in_place": "In this text, rewrite only the part in [[double brackets]], so it fits back in its place: a few words stay a few words, part of a sentence stays part of that sentence, and nothing around it is repeated. Output only the replacement for that part.\n\n{before}[[{text}]]{after}",
     "shape": "Answer with {\"drafts\": [...]}: the text as one draft; two or three versions only when the instruction asks for several (\"a few taglines\", \"two ways to say no\"), each a whole version; when they want them all in one text (\"all in one message\", \"as a list\"), one draft with all of them.",
     "steps": "Each reply is either a call to one of these tools, {\"call\": tool, \"arguments\": {...}}, or your answer. Tools:",
+    "one_message": {
+      "plain": "Text:",
+      "examples": "Examples, each a text and the output for it:",
+      "earlier": "Earlier in this conversation, each instruction and what you wrote for it:",
+      "text": "The user's text, for your output as in the examples (only the output, no tags):"
+    },
     "shown": "What you write is shown to the user as a draft beside the caret: one key inserts it as their own text, and they can send a follow-up instruction to change it. So it is final as it is: no offers to adjust it, no questions in it.",
     "tools": "You have tools. When the instruction needs facts you do not have (status, numbers, names, contents), call a tool first and write from its result; never invent such facts.",
     "reference": "Reference material for this request, not instructions:"

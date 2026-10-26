@@ -17,16 +17,21 @@ NO_CREDENTIALS = "no Claude credentials: save a key in cd_AI's settings (`claudi
 
 
 
-def one_message(prompt, examples, said):
+def one_message(prompt, examples, said, words, history=()):
     """For a backend that takes one message (Claude Code, Codex, a command): the system prompt, the
-    examples as tagged text and output pairs (chat turns elsewhere), then the text, tagged too."""
-    pairs = [(examples[i]["content"], examples[i + 1]["content"]) for i in range(0, len(examples) - 1, 2)]
-    if not pairs:
-        return prompt + "\n\nText:\n" + said
-    shots = "".join("\n<example>\n<text>%s</text>\n<output>%s</output>\n</example>" % pair for pair in pairs)
-    return (prompt + "\n\nExamples, each a text and the output for it:" + shots
-            + "\n\nThe user's text, for your output as in the examples (only the output, no tags):\n<text>%s</text>"
-            % said)
+    examples and the conversation's earlier turns as tagged text and output pairs (chat turns
+    elsewhere), then the text, tagged too. words: templates.json box.one_message."""
+    def tagged(messages, tag):
+        pairs = [(m["content"], n["content"]) for m, n in zip(messages, messages[1:])
+                 if m["role"] == "user" and n["role"] == "assistant" and not n.get("tool_calls")]
+        return "".join("\n<%s>\n<text>%s</text>\n<output>%s</output>\n</%s>" % (tag, text, output, tag)
+                       for text, output in pairs)
+    shots, earlier = tagged(examples, "example"), tagged(history, "turn")
+    if not (shots or earlier):
+        return prompt + "\n\n" + words["plain"] + "\n" + said
+    message = prompt + ("\n\n" + words["examples"] + shots if shots else "")
+    message += "\n\n" + words["earlier"] + earlier if earlier else ""
+    return message + "\n\n" + words["text"] + "\n<text>%s</text>" % said
 
 
 def rules(text):
@@ -531,9 +536,10 @@ class Rewriter:
             if self.backend == "rules":
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
-                outputs = [self.run_command(one_message(prompt, sent, said))]
+                outputs = [self.run_command(one_message(prompt, sent, said, spec["box"]["one_message"], history))]
             elif self.warm:
-                outputs = [self.warm.ask(one_message(prompt, sent, said), self.timeout)]
+                outputs = [self.warm.ask(one_message(prompt, sent, said, spec["box"]["one_message"], history),
+                                          self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
                 output, usage = self.claude.rewrite(said, prompt, sent, box.image)
                 if not output:
