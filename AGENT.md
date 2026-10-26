@@ -58,7 +58,9 @@ window, rewriting a selection with a hotkey.
 
 ## Loop
 
-Read `AGENT_STATE.md` (now and next; a local, untracked file) and `ROADMAP.md`. Pick the highest-value unblocked task:
+It works and is useful; what is left is measured in how streamlined the way from typing to a
+committed text is, with slop as the designed demonstration. Read `AGENT_STATE.md` (now and next; a
+local, untracked file) and `ROADMAP.md`. Pick the highest-value unblocked task:
 correctness and data loss, then onboarding through a first accepted rewrite, native usability,
 rewrite quality and latency, then contributor experience. Make the smallest coherent change and
 check it. Commit, update the state, and go on.
