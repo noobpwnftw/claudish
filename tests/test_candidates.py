@@ -643,6 +643,22 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.escape(), state.text, state.working), ("back", "very good", False))
         self.assertFalse(state.offer(revision, "Late."))  # the stopped request's answer is ignored
 
+    def test_a_follow_up_is_about_the_draft_in_view(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("three ways to say no")
+        state.submit()
+        state.offer(state.revision, "No—respectfully.", ["No—respectfully.", "Alas, no.", "Not this time."])
+        state.move(1)
+        for char in "shorter":
+            state.insert(char)
+        self.assertEqual((state.enter(), state.text, state.about), ("submit", "shorter", "Alas, no."))
+        state.submit()
+        state.offer(state.revision, "No.")
+        for char in "warmer":
+            state.insert(char)
+        self.assertEqual((state.enter(), state.about), ("submit", ""))  # one draft: the conversation has it
+
     def test_rewrite_backspace_after_converting_is_your_words_again(self):
         state = Composition()
         state.mode = "compose"

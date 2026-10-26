@@ -429,11 +429,13 @@ class Rewriter:
         return ["--disallowedTools", ",".join(denied)] if denied else []
 
     def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None,
-                      screen=None):
+                      screen=None, draft=None):
+        """draft: a follow-up's draft, the one in view among several."""
         from .turn import Box
         kind = "terminal" if screen else Box(app, purpose).kind
-        return self.sessions.start(self.make_driver(app, conversation, before, after, look, purpose, screen), text,
-                                   one_line=kind == "terminal")
+        driver = self.make_driver(app, conversation, before, after, look, purpose, screen)
+        driver.draft = draft
+        return self.sessions.start(driver, text, one_line=kind == "terminal")
 
     def server_model(self, headers):
         """A profile without "model": the server's only model (Ollama, LM Studio and hosted APIs
@@ -513,6 +515,8 @@ class Rewriter:
             framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
         else:
             framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
+        if box.draft:  # a follow-up about one of several drafts: which one
+            framed = spec["box"]["in_view"].format(draft=box.draft, text=framed)
         said = box.material(framed, spec["box"])
         history = list(conversation.messages) if conversation is not None else []
         sent = examples
@@ -597,8 +601,10 @@ class Rewriter:
         if conversation is not None:
             # The conversation keeps this turn: the instruction as typed (without what was observed),
             # the tool calls and results, and the first draft.
+            from . import shapes
+            answered = candidates[0] if len(candidates) == 1 else shapes.answered(candidates)  # every draft offered
             conversation.remember([{"role": "user", "content": text}] + new
-                                  + [{"role": "assistant", "content": candidates[0]}])
+                                  + [{"role": "assistant", "content": answered}])
         return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
                 "profile": self.profile,
                 "consulted": consulted,

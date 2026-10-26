@@ -367,7 +367,7 @@ class ClaudishEngine(IBus.Engine):
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
                                           "instruct", immediate=True, app=self.app,
                                           look=self.composition.look, before=before[-8000:], after=after[:8000],
-                                          purpose=self.purpose)
+                                          purpose=self.purpose, draft=self.composition.about)
                 self.render()
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.render()

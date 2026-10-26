@@ -33,6 +33,7 @@ class Box:
         self.observations = []  # (name, text): material observed on request, fenced in the turn
         self.image = None  # a picture of the window (F8), PNG bytes
         self.consulted = []  # what was read, reported in the service's result (/suggest)
+        self.draft = None  # a follow-up's draft: the one in view among several
 
     @property
     def prose(self):

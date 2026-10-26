@@ -42,7 +42,12 @@ def usable(schema):
 
 def example(answer):
     """An example's answer, in the shape the model answers."""
-    return json.dumps({"drafts": [answer]}, ensure_ascii=False)
+    return answered([answer])
+
+
+def answered(drafts):
+    """An answer of these drafts, as the model gave it."""
+    return json.dumps({"drafts": list(drafts)}, ensure_ascii=False)
 
 
 def as_answered(messages):

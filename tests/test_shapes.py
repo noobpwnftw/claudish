@@ -76,6 +76,20 @@ class ServerShapeTests(unittest.TestCase):
                          ["One.", "Two.", "Three."])
         self.assertEqual(len(sent), 1)
 
+    def test_a_follow_up_names_the_draft_in_view_and_every_draft_is_remembered(self):
+        from claudish.conversation import Conversation
+        rewriter, sent = self.answers('{"drafts": ["One—yes.", "Two—indeed."]}', '{"drafts": ["Two."]}')
+        conversation = Conversation("box")
+        rewriter.answer("instruct", "two ways to agree", rewriter.box("instruct"), conversation=conversation)
+        self.assertEqual(shapes.drafts(conversation.messages[1]["content"]), ["One—yes.", "Two—indeed."])
+        box = rewriter.box("instruct")
+        box.draft = "Two—indeed."
+        rewriter.answer("instruct", "shorter", box, conversation=conversation)
+        turn = sent[-1]["messages"][-1]["content"]
+        self.assertIn("Two—indeed.", turn)
+        self.assertTrue(turn.rstrip().endswith("shorter"))
+        self.assertEqual(conversation.messages[2], {"role": "user", "content": "shorter"})  # as typed
+
     def test_a_refused_schema_asks_the_turn_again_in_plain_text(self):
         rewriter, sent = self.answers(400, "Hello there—synergy!")
         self.assertEqual(rewriter.rewrite("hi")["text"], "Hello there—synergy!")

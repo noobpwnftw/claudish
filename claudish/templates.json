@@ -275,6 +275,7 @@
     "in_place": "In this text, rewrite only the part in [[double brackets]], so it fits back in its place: a few words stay a few words, part of a sentence stays part of that sentence, and nothing around it is repeated. Output only the replacement for that part.\n\n{before}[[{text}]]{after}",
     "shape": "Answer with {\"drafts\": [...]}: the text as one draft; two or three versions only when the instruction asks for several (\"a few taglines\", \"two ways to say no\"), each a whole version; when they want them all in one text (\"all in one message\", \"as a list\"), one draft with all of them.",
     "steps": "Each reply is either a call to one of these tools, {\"call\": tool, \"arguments\": {...}}, or your answer. Tools:",
+    "in_view": "About this one of the drafts you wrote, the one the user has in view:\n{draft}\n\nTheir instruction: {text}",
     "one_message": {
       "plain": "Text:",
       "examples": "Examples, each a text and the output for it:",

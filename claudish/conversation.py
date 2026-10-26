@@ -106,6 +106,7 @@ class ModelDriver:
         self.handed = None  # what took the task over (a helper), when one did
         self.drafted = None  # drafts a tool chose: versions offered, an answer you inserted, or a helper's command line
         self.settled = None  # what a settling tool did, for this conversation's next turn
+        self.draft = None  # a follow-up's draft: the one in view among several (start_session sets it)
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every
@@ -113,6 +114,7 @@ class ModelDriver:
         to the user, a helper) and their questions asked through the session."""
         rewriter = self.rewriter
         box = rewriter.box("instruct", self.app, self.purpose, self.before, self.after, self.look, self.screen)
+        box.draft = self.draft
         self.conversation.textbox = Textbox(self.before, self.after)
         local = dict(self.conversation.textbox.tools() if box.clipped() else {})
         local.update(self.own_tools(session, box))

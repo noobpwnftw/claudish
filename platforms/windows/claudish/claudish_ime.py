@@ -523,7 +523,7 @@ class ClaudishTextService(TextService):
                     before, after = self.around()  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
                                          app=focused_app(), look=self.state.look, before=before, after=after,
-                                         purpose=self.field())
+                                         purpose=self.field(), draft=self.state.about)
                     self.await_result(60)
                 self.publish()
                 return True

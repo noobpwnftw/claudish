@@ -164,8 +164,9 @@ class Worker:
         self.answered_text = (session, question, text)
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
-                 purpose=None):
+                 purpose=None, draft=""):
         self.result = None
+        self.draft = draft
         self.modes.append(mode)
         self.sent = (text, before, after)
         self.app = app

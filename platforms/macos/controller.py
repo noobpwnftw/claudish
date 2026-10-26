@@ -601,7 +601,8 @@ class ClaudishInputController(IMKInputController):
                 if self.worker is not None:
                     before, after = self.around_caret(client)  # the text box, for this turn of its conversation
                     self.worker.schedule(self.state.revision, self.state.text, "instruct", immediate=True,
-                                         app=self.app(client), look=self.state.look, before=before, after=after)
+                                         app=self.app(client), look=self.state.look, before=before, after=after,
+                                         draft=self.state.about)
                 self.changed(client)  # your instruction stays marked while its exchange is open
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.show_panel(client)

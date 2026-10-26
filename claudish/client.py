@@ -144,9 +144,10 @@ class Suggestions:
                 return
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
-                 purpose=None):
+                 purpose=None, draft=""):
+        """draft: a follow-up's draft, the one in view among several (Composition.about)."""
         with self.condition:
-            self.pending = (revision, text, mode, app, look, immediate, before, after, purpose,
+            self.pending = (revision, text, mode, app, look, immediate, before, after, purpose, draft,
                             time.monotonic() + (0 if immediate else self.debounce))
             # A newer request makes earlier suggestions stale; an agent session's events stay.
             kept = [result for result in self.results if "session" in result[1]]
@@ -219,7 +220,7 @@ class Suggestions:
                 return True
             return False
 
-    def session(self, revision, text, app, look=False, before="", after="", purpose=None):
+    def session(self, revision, text, app, look=False, before="", after="", purpose=None, draft=""):
         """Run an instruction as a turn in this text box's conversation (an HTTPError says why the
         service refused it)."""
         body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
@@ -227,6 +228,8 @@ class Suggestions:
             body["purpose"] = purpose
         if app:
             body["app"] = app
+        if draft:
+            body["draft"] = draft
         key = call(self.endpoint, "/sessions", body)["id"]
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
@@ -289,7 +292,7 @@ class Suggestions:
                     self.condition.wait()
                 if self.closed:
                     return
-                revision, text, mode, app, look, immediate, before, after, purpose, due = self.pending
+                revision, text, mode, app, look, immediate, before, after, purpose, draft, due = self.pending
                 remaining = due - time.monotonic()
                 if remaining > 0:
                     self.condition.wait(remaining)
@@ -300,7 +303,7 @@ class Suggestions:
             try:
                 # A sent instruction runs as a turn of this text box's conversation (a session).
                 if mode == "instruct" and immediate:
-                    self.session(revision, text, app, look, before, after, purpose)
+                    self.session(revision, text, app, look, before, after, purpose, draft)
                     continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,
                                  purpose=purpose)

@@ -165,10 +165,13 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                                                      % TEXTBOX_LIMIT})
                 if not isinstance(look, bool):
                     return self.reply(400, {"error": "look is a boolean"})
+                draft = data.get("draft") or None
+                if draft is not None and not (isinstance(draft, str) and len(draft) <= TEXTBOX_LIMIT):
+                    return self.reply(400, {"error": "draft is the draft in view, a string"})
                 try:
                     purpose = checked_purpose(data.get("purpose"))
                     session = rewriter.route(app, "instruct").start_session(text, app, conversation, before, after,
-                                                                            look, purpose)
+                                                                            look, purpose, draft=draft)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
                 except RuntimeError as exc:
