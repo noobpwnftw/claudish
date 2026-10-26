@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="cd_AI: an English input method for every app. Type a few plain words, press Tab, and they come back as corporate prose. English goes in. Em dashes come out.">
+  <meta name="description" content="cd_AI: an input method that puts a language model at the caret, in every app. If you can type there, you can use AI there.">
   <title>cd_AI — Claudish</title>
   <link rel="icon" href="favicon.png">
   <script src="theme.js"></script>
@@ -26,9 +26,10 @@
     <main>
       <section class="hero" aria-labelledby="title">
         <div class="hero-text">
-          <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN ENGLISH INPUT METHOD</div>
-          <h1 id="title">English goes in.<br>Em dashes <em>come out.</em></h1>
+          <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
+          <h1 id="title">If you can type there,<br>you can use AI <em>there.</em></h1>
           <p class="lede">cd_AI is an input method for Linux, Windows, and macOS. Switch to it like any keyboard language, type a few plain words, and press Tab: they come back as the prose the internet now runs on, or in another tone.</p>
+          <p class="lede joke">English goes in. Em dashes come out.</p>
           <div class="actions">
             <a class="button primary" href="demo/">Try it in your browser</a>
             <a class="button" href="#install">Download</a>
@@ -68,7 +69,7 @@
         <h2 id="layers">Compose, or <span class="nobr">continue<span class="dash">—</span></span>Shift switches.</h2>
         <div class="cards">
           <article class="card"><div class="card-body"><h3>Rewrite</h3><p>Type a few words and press Tab: the rewrite appears in the panel. Tab again inserts it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">can't make it tonight, sorry</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">Regrettably, I must convey that I won't be able to make it tonight—my current bandwidth is fully allocated to high-priority deliverables, but I look forward to connecting when our schedules realign!</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
-          <article class="card"><div class="card-body"><h3>Ask</h3><p>Type what you want and press Shift+Enter: the draft waits in the panel, and Tab takes it. Ask for versions, and ↑↓ picks one.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">three ways to decline the meeting</span></div><div class="io"><span class="io-label">draft 1</span><span class="io-result">I genuinely appreciate you carving out time to connect with me; however, at this juncture, I am unable to make the proposed meeting time work.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div><div class="io"><span class="io-label">draft 2</span><span class="io-result">I sincerely appreciate you extending this invitation to connect—it sounds like a truly valuable discussion! Regrettably, due to prior commitments that require my full focus, I won't be able to make the scheduled time.</span></div></div></article>
+          <article class="card"><div class="card-body"><h3>Ask</h3><p>Type what you want and press Shift+Enter: drafts wait in the panel, ↑↓ picks one, and Tab takes it.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">three ways to decline the meeting</span></div><div class="io"><span class="io-label">draft 1</span><span class="io-result">I genuinely appreciate you carving out time to connect with me; however, at this juncture, I am unable to make the proposed meeting time work.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div><div class="io"><span class="io-label">draft 2</span><span class="io-result">I sincerely appreciate you extending this invitation to connect—it sounds like a truly valuable discussion! Regrettably, due to prior commitments that require my full focus, I won't be able to make the scheduled time.</span></div></div></article>
           <article class="card"><div class="card-body"><h3>Continue</h3><p>A Shift tap, and your keys go straight in.</p></div><div class="card-io"><div class="io"><span class="io-label">you type</span><span class="io-typed">Thanks for the review on</span></div><div class="io"><span class="io-label">cd_AI</span><span class="io-result">…the parser change.</span></div><div class="io io-take"><kbd class="io-key">Tab</kbd></div></div></article>
         </div>
       </section>
@@ -76,7 +77,7 @@
       <section class="section" aria-labelledby="tones">
         <div class="eyebrow">02 / FIVE TONES</div>
         <h2 id="tones">Same message. Different personality.</h2>
-        <p class="body">Pick one in Settings, or describe your own.</p>
+        <p class="body">Pick one in the profile, or write one.</p>
         <article class="card tones"><div class="card-io">
           <div class="io"><span class="io-label">you type</span><span class="io-typed">pump 3 trippd agian, no injurys</span></div>
           <div class="io"><span class="io-label">corporate</span><span class="io-result">Heads up to the team: Pump 3 tripped again, but the critical takeaway is that we are maintaining a zero-injury environment—a testament to our unwavering commitment to safety protocols!</span></div>
@@ -111,6 +112,7 @@
           <li><b>Backends.</b> A Claude subscription through Claude Code, a ChatGPT subscription through Codex, Claude with an API key, or any OpenAI-compatible server.</li>
           <li><b>Or local.</b> <code>setup --profile local</code> downloads llama.cpp and Gemma 4 E4B (4.9 GB).</li>
           <li><b>Context.</b> Files, commands, and MCP servers, per app.</li>
+          <li><b>Tools and agents.</b> An instruction may call your MCP tools, ask you a question, or hand the task to Claude Code or another agent.</li>
         </ul>
       </section>
 
@@ -125,8 +127,22 @@
           <li><div class="oneline"><code id="linux-line">curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.2.0/scripts/install.sh | sh</code><button class="copy" type="button" data-copy="linux-line">Copy</button></div>
             <span>Linux (IBus). Then log out and back in, and add English → Claudish in your input sources.</span></li>
         </ul>
-        <p class="body small">Each ends in cd_AI's settings: add an <a href="https://console.anthropic.com/settings/keys">Anthropic API key</a>, pick Claude Code for a Claude subscription or Codex for a ChatGPT subscription (<a href="https://docs.claude.com/en/docs/claude-code/setup">Claude Code</a> or <a href="https://developers.openai.com/codex/cli">Codex</a> installed and logged in), or give another model API. Pick a tone and use Try a rewrite; then type ok in an app, Tab to preview, Tab again to insert.</p>
-        <h3 class="by-hand">From a source checkout</h3>
+        <p class="body small">Each ends in cd_AI's settings: add an <a href="https://console.anthropic.com/settings/keys">Anthropic API key</a>, pick Claude Code for a Claude subscription or Codex for a ChatGPT subscription, or give another model API. Pick a tone and use Try a rewrite; then type ok in an app, Tab to preview, Tab again to insert.</p>
+        <h3 class="by-hand">A development checkout, with a coding agent</h3>
+        <p class="body">For working on cd_AI: paste this into Claude Code (or any coding agent). Every install route is in <a href="https://github.com/noobpwnftw/claudish/blob/main/docs/install.md">docs/install.md</a>.</p>
+        <div class="prompt">
+          <div class="prompt-bar"><span>PROMPT</span><button id="copy-prompt" class="copy" type="button">Copy</button></div>
+          <pre id="prompt-text">Install Claudish (cd_AI), an input method that puts a language model at the caret, on this computer.
+
+1. Check that Python 3.10 or newer and git are installed. If not, tell me how to install them and stop. On macOS, clone the repository (step 2), run `python3 platforms/macos/build.py` and `python3 platforms/macos/package.py` there, and open `dist/macos/cd_AI.pkg`. The installer opens cd_AI's settings; continue at step 5, then log out and back in.
+2. Clone https://github.com/noobpwnftw/claudish into ~/claudish (or pull it if it is already there) and work in that folder. Use python3 on Linux and macOS, python on Windows.
+3. Create a virtual environment there and install it with the Claude SDK: `python -m venv .venv`, then `.venv/bin/python -m pip install -e ".[claude]"` (`.venv\Scripts\python` on Windows). Use that venv's Python for every `python -m claudish` command below.
+4. Run `python -m claudish setup --yes`. It writes a config, registers the input method (on Linux; on Windows the input method comes from cd_AI-setup.exe, see docs/install.md), and starts cd_AI at login.
+5. Run `python -m claudish settings` if the installer has not opened it. Help me pick my existing model: Claude Code for a Claude subscription, Codex for a ChatGPT subscription, Claude with an API key, or another model API. If a subscription command is missing or not logged in, help install it and log in. Use Try a rewrite in Settings to check that my chosen model answers. Let me enter any key in Settings myself.
+6. Run `python -m claudish doctor` and follow its fixes until every check passes, or explain what is left.
+7. Finish by telling me how to start: on Linux, log out and back in and add "English → Claudish" in my input sources; on Windows, run cd_AI-setup.exe (docs/install.md), restart, and pick Claudish with Win+Space. Then the keys: cd_AI starts in compose, where Tab asks for a rewrite (Tab again puts it in), Shift+Enter sends my words as an instruction, Enter keeps them as typed, and Esc steps back; tapping Shift switches to continue, where keys go straight in.</pre>
+        </div>
+        <h3 class="by-hand">Or by hand</h3>
         <pre class="commands">git clone https://github.com/noobpwnftw/claudish
 cd claudish
 python3 -m venv .venv
