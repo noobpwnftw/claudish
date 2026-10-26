@@ -145,7 +145,7 @@ class Suggestions:
 
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
                  purpose=None, draft=""):
-        """draft: a follow-up's draft, the one in view among several (Composition.about)."""
+        """draft: a follow-up's draft, the one in view and not yet in the text (Composition.about)."""
         with self.condition:
             self.pending = (revision, text, mode, app, look, immediate, before, after, purpose, draft,
                             time.monotonic() + (0 if immediate else self.debounce))

@@ -106,7 +106,7 @@ class ModelDriver:
         self.handed = None  # what took the task over (a helper), when one did
         self.drafted = None  # drafts a tool chose: versions offered, an answer you inserted, or a helper's command line
         self.settled = None  # what a settling tool did, for this conversation's next turn
-        self.draft = None  # a follow-up's draft: the one in view among several (start_session sets it)
+        self.draft = None  # a follow-up's draft: the one in view, not yet in the text (start_session sets it)
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every

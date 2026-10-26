@@ -657,7 +657,10 @@ class ModeFeelTests(unittest.TestCase):
         state.offer(state.revision, "No.")
         for char in "warmer":
             state.insert(char)
-        self.assertEqual((state.enter(), state.about), ("submit", ""))  # one draft: the conversation has it
+        self.assertEqual((state.enter(), state.about), ("submit", "No."))  # one draft: in view all the same
+        state.submit()
+        state.offer(state.revision, "No—kindly.")
+
 
     def test_rewrite_backspace_after_converting_is_your_words_again(self):
         state = Composition()

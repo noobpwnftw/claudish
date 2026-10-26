@@ -430,7 +430,7 @@ class Rewriter:
 
     def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None,
                       screen=None, draft=None):
-        """draft: a follow-up's draft, the one in view among several."""
+        """draft: a follow-up's draft, the one in view and not yet in the text."""
         from .turn import Box
         kind = "terminal" if screen else Box(app, purpose).kind
         driver = self.make_driver(app, conversation, before, after, look, purpose, screen)
@@ -515,7 +515,7 @@ class Rewriter:
             framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
         else:
             framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
-        if box.draft:  # a follow-up about one of several drafts: which one
+        if box.draft:  # a follow-up about the draft in view, not yet in the text
             framed = spec["box"]["in_view"].format(draft=box.draft, text=framed)
         said = box.material(framed, spec["box"])
         history = list(conversation.messages) if conversation is not None else []

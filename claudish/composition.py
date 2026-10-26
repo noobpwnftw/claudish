@@ -89,7 +89,7 @@ class Composition:
         self.dropped_reply = False
         self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
         self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes it: a draft or a choice)
-        self.about = ""  # a follow-up's draft: the one highlighted among several when it was sent
+        self.about = ""  # a follow-up's draft: the one in view (highlighted) when it was sent, not yet inserted
         self.held = None  # a sent instruction's exchange, held when focus left the text box
         self.held_app, self.held_at = None, 0.0
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Tab answer it
@@ -426,9 +426,9 @@ class Composition:
             return "wait"  # a choice, or an answer to read, is Tab's: the highlighted row lights Tab
         if self.sent and self.reply.strip():
             # Your next words, typed while it worked or with its drafts showing: a follow-up
-            # instruction in the same conversation, about the draft in view when there are several.
-            several = len(self.candidates) > 1 and 0 <= self.highlight < len(self.candidates)
-            self.about = self.candidates[self.highlight] if several else ""
+            # instruction in the same conversation, about the draft in view (not in the text yet).
+            drafts = self.candidates or ([self.candidate] if self.candidate else [])
+            self.about = drafts[self.highlight] if 0 <= self.highlight < len(drafts) else ""
             self.change(self.reply.strip())
             return "submit"
         if self.asked == "instruct" and self.candidate:
