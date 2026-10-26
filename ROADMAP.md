@@ -27,6 +27,7 @@ experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The a
 | G50 | Continue's Tab in macOS Terminal: follow the platform's input-method behavior; keep the limitation documented until verified |
 | G60 | fcitx5 on Linux |
 | G30 | `claudish update`, keeping the previous version to roll back to |
+| G69 | Structured output: each mode asks for a declared shape (a rewrite, versions, a part's replacement) and reads it back as data, through each backend's own schema support; the model-specific clean-up and parsing go, and the quirks that remain live in one declared place |
 
 ## Later or on demand
 
