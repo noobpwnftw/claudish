@@ -265,11 +265,12 @@ class ClaudishTextService(TextService):
         self.adopt_parked()
         document = getattr(self, "document", None)
         if document and document != getattr(self, "last_document", None):
-            if getattr(self, "last_document", None) is not None and self.worker:
-                self.worker.new_conversation()
             if self.state.sent:  # an instruction's exchange, left in the other text box: held for it
                 self.state.leave(self.last_document)
+            if getattr(self, "last_document", None) is not None and self.worker:
+                self.worker.new_conversation(end=self.state.held is None)  # a held exchange goes on
             self.last_document = document
+            self.known_scopes = None  # another text box: its own scopes (a password field's stay behind)
             pill = self.state.returned(document)  # back where one was held: a pill, taking no keys
             if pill:
                 self.setToast(pill, 3)
@@ -653,6 +654,7 @@ class ClaudishTextService(TextService):
         held for this text box says so at once, rather than at the next key."""
         keylog("onSetFocus", getattr(self, "document", None))
         self.follow_document()
+        self.field()  # this request carries the field's scopes: a key in a password field is not ours
         self.poll_results()  # what came while the app was in the background: the pill says it
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
@@ -661,6 +663,8 @@ class ClaudishTextService(TextService):
     def onKeyboardStatusChanged(self, opened):
         super().onKeyboardStatusChanged(opened)
         self.keyboardOpen = opened
-        if not opened:
-            self.state.change("")
+        if not opened:  # as a focus change: your words go in, an open exchange is held
+            words = self.state.leave(getattr(self, "last_document", None))
+            if words:
+                self.setCommitString(words)
             self.changed()

@@ -509,16 +509,13 @@ class ClaudishInputController(IMKInputController):
                 unmark(client)
             return
         if self.state.sent and not suggested:
-            # The app ends the composition (a click, a focus change): what it shows (your
-            # instruction, or a reply) goes in, as a CJK preedit does, and the exchange is held for
-            # this app, its work going on, offered when you come back.
-            words = self.state.leave(self.app(client))
+            # The app ends the composition (a click, a focus change): the instruction is not text
+            # for the app; its exchange is held for this app, its work going on, offered when you
+            # come back.
+            self.state.leave(self.app(client))
             self.hide_panel()
             if client is not None:
-                if words:
-                    client.insertText_replacementRange_(words, (NSNotFound, 0))
-                else:
-                    unmark(client)
+                unmark(client)
             return
         # Your own words, never the model's unless you asked for them (a rewrite waits for Tab).
         text = self.state.commit(suggested)

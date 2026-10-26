@@ -189,12 +189,14 @@ class ClaudishEngine(IBus.Engine):
         text = state.shown  # your words (a rewrite waits in the panel), or a reply once sent
         self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
                                           self.focus_mode())
-        # IBus's own popup (without the extension): the rows as a list (IBus numbers them), the rest as one line.
+        # IBus's own popup (without the extension): the rows as a list, the rest as one line. No
+        # numbers: digits are text here, they pick nothing (as on Windows).
         if panel and panel["rows"]:
             table = IBus.LookupTable.new(9, 0, True, False)
-            for row in panel["rows"]:
+            for index, row in enumerate(panel["rows"]):
                 table.append_candidate(IBus.Text.new_from_string(
                     row["text"] + (" — " + row["legend"] if row.get("legend") else "")))
+                table.set_label(index, IBus.Text.new_from_string(""))
             table.set_cursor_visible(panel["on"] >= 0)  # an approval highlights nothing until ↓; then Tab takes it
             self.update_lookup_table(table, True)
         else:
@@ -295,12 +297,10 @@ class ClaudishEngine(IBus.Engine):
             self.refresh_surrounding()
             return
         if self.composition.sent and not suggested:
-            # A shortcut or another key ends the composition: what it shows goes in, and the
-            # exchange is held for this app, its work going on, as on a focus change (and on macOS).
-            words = self.composition.leave(self.app)
+            # A shortcut or another key ends the composition: the instruction is not text for the
+            # app; its exchange is held for this app, its work going on, as on a focus change.
+            self.composition.leave(self.app)
             self.render()
-            if words:
-                self.commit_text(IBus.Text.new_from_string(words))
             return
         text = self.composition.commit(suggested)
         if text:
@@ -320,7 +320,6 @@ class ClaudishEngine(IBus.Engine):
         if not state & IBus.ModifierType.RELEASE_MASK:
             self.shift.other()
             screen().end_toast()
-        if not state & IBus.ModifierType.RELEASE_MASK:
             name = IBus.keyval_name(keyval) or ""
             trace("key", name if len(name) > 1 else "char", self.composition.mode,
                   "ghost" if self.composition.ghost else "no-ghost", "rev", self.composition.revision)
@@ -477,8 +476,8 @@ class ClaudishEngine(IBus.Engine):
         self.show_mode()
         spec, lasting = self.composition.switched()
         if not (self.composition.hints or lasting):
-            pass
-        elif screen().shell:  # the mode switch briefly at the caret, or the held exchange's pill
+            return
+        if screen().shell:  # the mode switch briefly at the caret, or the held exchange's pill
             screen().publish(self.drawn, "", spec)
         elif not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
             self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
@@ -527,7 +526,7 @@ class ClaudishEngine(IBus.Engine):
         # One conversation per text box (its input context), as on Windows: earlier instructions,
         # context and approvals stay with the box they were made in.
         if getattr(self, "context", None) not in (None, object_path):
-            self.suggestions.new_conversation()
+            self.suggestions.new_conversation(end=self.composition.held is None)  # a held exchange goes on
         self.context = object_path
         self.update_quiet()
         self.refresh_surrounding()

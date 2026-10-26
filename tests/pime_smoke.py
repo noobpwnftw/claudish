@@ -269,7 +269,10 @@ def main():
             assert not service.state.text and replayed == before + [(ord("C"), [0x11])], replayed
             service.state.held = None
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False
-            service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
+            for char in "ok":
+                key(ord(char.upper()), ord(char))
+            reply = service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
+            assert reply.get("commitString") == "ok" and not service.state.text, reply  # your words go in
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
             # Requests carry the text around the caret, and an answer shows when it arrives.
             service.state.mode = "compose"

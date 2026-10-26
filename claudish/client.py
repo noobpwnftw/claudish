@@ -185,11 +185,13 @@ class Suggestions:
                 self.deliver(revision, {"error": error, "session": session}, always=True)
         threading.Thread(target=send, daemon=True).start()
 
-    def new_conversation(self):
+    def new_conversation(self, end=True):
         """Another text box behind the same input method instance (Windows runs one per app thread):
-        end this conversation and start a fresh one."""
+        a fresh conversation, the old one ended unless an exchange held from it goes on (end=False:
+        the service ends it after its idle period)."""
         old, self.conversation = self.conversation, "%032x" % random.getrandbits(128)
-        threading.Thread(target=lambda: self._end(old), daemon=True).start()
+        if end:
+            threading.Thread(target=lambda: self._end(old), daemon=True).start()
 
     def _end(self, conversation):
         try:
