@@ -104,7 +104,7 @@ stopped, and switching input methods. On macOS, install the package and log out 
 ### Linux Docker rig
 
 Build the Ubuntu 24.04 desktop image once, then run individual typing scenarios. Each check
-starts Xvfb, the real IBus engine and service, and a GTK application; it exits within five
+starts Xvfb, the real IBus engine and service, and a GTK or Qt application; it exits within five
 seconds. The `rules` backend supplies the rewrite so these checks do not need a model server.
 
 ```sh
@@ -114,11 +114,12 @@ sh tests/rigs/linux/run.sh check bypass
 sh tests/rigs/linux/run.sh check password
 sh tests/rigs/linux/run.sh check focus
 sh tests/rigs/linux/run.sh check offline
+sh tests/rigs/linux/run.sh check qt-selection
 ```
 
 The checks cover Tab accepting a rewrite, Enter keeping the original words, password
-typing, a focus change during composition, and keeping words when the service stops. The rig
-does not check a desktop panel, Wayland, or model quality.
+typing, a focus change during composition, keeping words when the service stops, and restoring
+a Qt selection with Esc. The rig does not check a desktop panel, Wayland, or model quality.
 
 ## Debugging on macOS
 

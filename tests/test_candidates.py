@@ -248,6 +248,17 @@ class ModeFeelTests(unittest.TestCase):
         state.offer(state.revision, "Hello.")
         self.assertEqual(state.toggle(), "hi")  # your words: a rewrite in the panel goes in only with Tab
 
+    def test_a_selection_taken_from_the_app_is_never_dropped(self):
+        state = Composition()
+        state.mode = "compose"
+        state.adopt("their words")
+        state.tab()
+        state.offer(state.revision, "Their considered words.")
+        self.assertEqual(state.escape(), "back")  # your words again
+        self.assertEqual(state.escape(), "keep")  # and back into the app, as they were
+        state.adopt("their words")
+        self.assertEqual(state.escape(), "keep")  # even before any rewrite
+
     def test_the_keeper_keeps_it_as_it_is_and_stays_in_compose(self):
         state = Composition()
         state.mode = "compose"

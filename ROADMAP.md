@@ -32,7 +32,7 @@ experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The a
 
 A small purpose-trained model for continue (G21, after G53 found nothing under 1B usable), then the
 continue measurements and workarounds that depend on it (G48, G32, G49); a demo share card (G57);
-tone and templates directly on a binding (G59).
+tone and templates directly on a binding (G59); selected text back into the buffer (G46).
 
 Not planned: rewriting a selection with a hotkey. That is the ground of selection tools (Grammarly,
 ClipSlop, AI Shortcuts and others); cd_AI works on what you compose at the caret, and either can run
