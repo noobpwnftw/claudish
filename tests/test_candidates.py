@@ -709,12 +709,14 @@ class ContinueTests(unittest.TestCase):
 class RewriterTests(unittest.TestCase):
     def test_rules_offer_three_readings_of_an_instruction_and_one_rewrite(self):
         rewriter = Rewriter("rules")
+        rewriter.modes["instruct"]["candidates"] = 3  # a template asking for three readings
         self.assertEqual(rewriter.rewrite("say hi", mode="instruct")["candidates"],
                          ["As requested—say hi.", "Certainly—as requested—say hi.", "Of course—as requested—say hi."])
         self.assertEqual(len(rewriter.rewrite("very good")["candidates"]), 1)
 
     def test_first_reading_is_deterministic_and_the_rest_sampled(self):
         rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 3  # a template asking for three readings
         with patch.object(rewriter, "opener") as opener:
             opener.open.side_effect = [reply("Hello."), reply("Hello."), reply("Hi there.")]
             result = rewriter.rewrite("say hi", mode="instruct")
@@ -726,6 +728,7 @@ class RewriterTests(unittest.TestCase):
 
     def test_a_failed_extra_sample_only_shortens_the_list(self):
         rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 3  # a template asking for three readings
         with patch.object(rewriter, "opener") as opener:
             opener.open.side_effect = [reply("Hello."), OSError("busy"), reply("Hey.")]
             self.assertEqual(rewriter.rewrite("say hi", mode="instruct")["candidates"], ["Hello.", "Hey."])

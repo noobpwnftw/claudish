@@ -88,6 +88,7 @@ class ConversationTests(unittest.TestCase):
 
     def test_readings_are_sampled_after_the_loop(self):
         rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 3  # a template asking for three readings
         model = Scripted(answer("One."), answer("Two."), answer("One."))
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "say hi")

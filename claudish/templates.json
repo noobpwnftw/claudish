@@ -87,7 +87,7 @@
         ]
       ],
       "max_tokens": 2048,
-      "candidates": 3
+      "candidates": 1
     }
   },
   "tones": {
