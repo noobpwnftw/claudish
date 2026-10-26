@@ -669,6 +669,12 @@ class ModeFeelTests(unittest.TestCase):
         self.assertTrue(waiting.arrow(-1) and waiting.arrow(1) and waiting.delete())
         self.assertEqual((waiting.text, waiting.sent, waiting.cursor), ("say hi", True, 6))
 
+    def test_tab_takes_only_a_one_line_selection_you_could_have_typed(self):
+        from claudish.composition import MAX_COMPOSITION
+        self.assertTrue(Composition.selectable("thanks for the help"))
+        for refused in ("", "   ", "first line\nsecond line", "a\r\nb", "x" * (MAX_COMPOSITION + 1)):
+            self.assertFalse(Composition.selectable(refused), repr(refused[:20]))
+
     def test_typing_on_a_rewrite_is_a_follow_up_about_it(self):
         """Owner: once the model answered, typing talks to it (as with drafts and answers); Esc goes
         back to your words."""

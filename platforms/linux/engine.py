@@ -250,7 +250,7 @@ class ClaudishEngine(IBus.Engine):
         value = text.get_text() if text else ""
         trace("selection", "cursor", cursor, "anchor", anchor, "length", len(value))
         start, end = min(cursor, anchor), max(cursor, anchor)
-        if start == end or end - start > MAX_COMPOSITION:
+        if not self.composition.selectable(value[start:end]):  # long or multi-line: Tab is the app's
             return None
         self.composition.change(value[start:end])
         return True

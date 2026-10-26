@@ -296,6 +296,14 @@ class Composition:
                                                                  ("Esc", "cancel reply" if question else "cancel")])
         return shown
 
+    @staticmethod
+    def selectable(text):
+        """A selection Tab can take as your words: one line you could have typed (at most
+        MAX_COMPOSITION characters, not blank). A longer or multi-line one is not a composition:
+        Tab is the app's."""
+        lines = (text or "").splitlines()
+        return len(lines) == 1 and bool(lines[0].strip()) and len(text) <= MAX_COMPOSITION
+
     def field(self, purpose=None, terminal=False):
         """Where the caret is, as the adapter knows it: a field's purpose (url, email, number...) and
         whether it is a terminal. Neither is prose: nothing is asked unasked."""

@@ -346,7 +346,7 @@ class ClaudishTextService(TextService):
     def selection(self):
         """The app's selected text when nothing is composed (Claudish's PIME sends it), if it fits."""
         selected = getattr(self, "textSelected", None) or ""
-        return selected if not self.state.text and not self.state.live and len(selected) <= MAX_COMPOSITION else ""
+        return selected if not self.state.text and not self.state.live and self.state.selectable(selected) else ""
 
     def drop_live(self):
         self.state.change("")

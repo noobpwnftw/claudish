@@ -407,7 +407,7 @@ class ClaudishInputController(IMKInputController):
             text = str(found.string()) if found is not None else ""
         except Exception:
             return False
-        if not text:
+        if not self.state.selectable(text):  # long or multi-line: Tab is the app's
             return False
         self.state.change(text)
         units = len(text.encode("utf-16-le")) // 2
