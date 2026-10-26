@@ -15,7 +15,7 @@ Typing in detail, the browser demos, and terminals.
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; typing asks to change it (a follow-up, sent with Shift+Enter); Esc goes back to your words, and Tab after Esc asks for another take. With drafts: insert the highlighted one. With a question: answer with the highlighted choice (Allow and Deny too). With an answer to read: insert it (Esc dismisses it). |
 | Shift+Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the draft; Tab inserts it. Asked for several versions ("three ways to decline the meeting"), the model offers them as drafts to pick from (up to three, the first highlighted), unless you ask for all of them in one text. With nothing composed, Shift+Enter is the app's (a newline in most chat boxes) |
 | ↑ ↓ | Move the highlight through the drafts or a question's choices, no wrap; Tab takes the highlighted one. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on Deny, and Tab takes a choice once one is highlighted |
-| Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Shift+Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Shift+Enter sends them as a follow-up in the same conversation). The choices fade while you type. A question that comes meanwhile shows your next words as Waiting; they come back once you answer it |
+| Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Shift+Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts or a rewrite show (Shift+Enter sends them as a follow-up in the same conversation, about the highlighted draft, which stays highlighted). The choices fade while you type. A question that comes meanwhile shows your next words as Waiting; they come back once you answer it |
 | Enter (compose) | Keep what you composed as it is, as other input methods commit the typed letters with Enter; the next Enter is the app's. Once the model is asked, Enter lights the Tab of the highlighted row. `"keys"` in the config swaps Enter and Shift+Enter |
 | Esc | One step back: what you typed after sending → edit (the instruction back at the caret, to change and send again) → dropped. While it works, Esc stops it. A drop says so: "dropped · Shift+Esc restore" |
 | Shift+Esc | Bring back what Esc dropped (an instruction, or a reply), or an exchange you left by switching windows |
@@ -35,8 +35,10 @@ different input method for each app window"; macOS, System Settings → Keyboard
 Text Input → Edit… → "Automatically switch to a document's input source"; GNOME Tweaks →
 Keyboard → "Switch input sources individually for each window".
 
-A composition is edited at its end. Navigation keys and Ctrl/Alt/Win shortcuts pressed while
-composing commit your words first, then act.
+A composition is edited at its cursor: ← and → move it, and typing, Backspace and Delete work
+there. Other navigation keys (↑↓ with nothing to choose, Home, Page Up), Shift+← and Ctrl/Alt/Win
+shortcuts pressed while composing commit your words first, then act. While an answer is waiting,
+← and → move only in a reply you type.
 Characters typed with AltGr (Ctrl+Alt) stay in the composition.
 
 Every platform shows an answer as it arrives. The composition is limited to 512

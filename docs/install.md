@@ -127,8 +127,9 @@ open dist/macos/cd_AI.pkg
 For development, `build.py --install` copies only the bundle; then add it by hand in **System
 Settings → Keyboard → Text Input → Edit → +** (under English), and log out and in after each update.
 
-The keys are the same as on the other platforms ([Typing](using.md#typing)). Navigation keys and
-Command or Control shortcuts commit the current wording and go to the app. Characters typed with
+The keys are the same as on the other platforms ([Typing](using.md#typing)). ← and → move within
+the composition; other navigation keys, Option+← and Command or Control shortcuts commit the current
+wording and go to the app. Characters typed with
 Option, such as — and €, stay in the composition.
 
 **Uninstall:**

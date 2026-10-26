@@ -46,7 +46,10 @@ cd_AI ships no model: compose uses the profile's model (Claude by default). With
 
 The keys, each in full: [using.md](../using.md#typing). In short: Tab takes what the model offers
 (a rewrite waits in the panel first), Shift+Enter talks to the model, Enter keeps your words as
-typed, ↑ ↓ move the highlight, Esc steps back, Shift+Esc brings back, F8 adds a picture.
+typed, ↑ ↓ move the highlight, ← → move in what you type, Esc steps back, Shift+Esc brings back, F8
+adds a picture. Once the model answered (a rewrite, drafts, an answer to read, a question), what you
+type is about its answer: a follow-up or a reply, about the draft in view; Esc goes back to your
+words. Each panel says what typing does.
 
 Shift+Enter asks and Enter keeps by default (owner, 2026-10-25, after a poll: Enter is the key
 people send and confirm with); `"keys"` swaps them.
