@@ -134,7 +134,7 @@ window.LAB_STATES = {
     "edit"
    ]
   ],
-  "tail": null,
+  "tail": "or type to change it",
   "tile": "ai",
   "status": null,
   "busy": false,
@@ -177,7 +177,7 @@ window.LAB_STATES = {
     "edit"
    ]
   ],
-  "tail": null,
+  "tail": "or type to change it",
   "tile": "ai",
   "status": null,
   "busy": false,
@@ -462,7 +462,7 @@ window.LAB_STATES = {
     "edit"
    ]
   ],
-  "tail": null,
+  "tail": "or type to change it",
   "tile": "ai",
   "status": null,
   "busy": false,

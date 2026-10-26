@@ -275,7 +275,7 @@ class Composition:
             readings = self.candidates
             shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
-                         nudge=self.nudge)
+                         tail="or type to change it", nudge=self.nudge)  # a follow-up about the highlighted one
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied);
             # what you type is a follow-up about it.

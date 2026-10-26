@@ -701,6 +701,7 @@ class ModeFeelTests(unittest.TestCase):
         state.change("three ways to say no")
         state.submit()
         state.offer(state.revision, "No—respectfully.", ["No—respectfully.", "Alas, no.", "Not this time."])
+        self.assertEqual(state.panel()["tail"], "or type to change it")  # what typing does, said
         state.move(1)
         for char in "shorter":
             state.insert(char)
