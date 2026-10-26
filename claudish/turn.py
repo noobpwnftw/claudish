@@ -15,7 +15,10 @@ Claudish tone and its prose examples apply only to prose boxes.
 from .modes import TEMPLATES
 from .screen import is_terminal
 
-WINDOW_BEFORE, WINDOW_AFTER = 1500, 500
+# The text around the caret a model sees: (before, after). An instruction is about the text (a
+# reply to a message far above the caret); a rewrite and continue only need where they go.
+WINDOWS = {"instruct": (6000, 2000)}
+WINDOW = (1500, 500)
 
 # Free-form text needs no description of its kind. The box's words (what each kind is, what it
 # means, the at-caret and tools guides) are in claudish/templates.json, "box".
@@ -44,9 +47,10 @@ class Box:
             self.observations.append((name, text.strip()))
             self.consulted.append(consulted or name)
 
-    def clipped(self):
+    def clipped(self, mode="instruct"):
         """Whether the text box is longer than the window around the caret."""
-        return len(self.before) > WINDOW_BEFORE or len(self.after) > WINDOW_AFTER
+        before, after = WINDOWS.get(mode, WINDOW)
+        return len(self.before) > before or len(self.after) > after
 
     def describe(self, mode, retrieval=False, words=WORDS):
         """The text box, for the system prompt: its kind and app, what the kind means, and the text
@@ -62,14 +66,15 @@ class Box:
         before = "" if mode == "continue" else self.before
         if before or self.after:
             more = ""
-            if self.clipped() and retrieval:
+            if self.clipped(mode) and retrieval:
                 more = ("\nThe text box has %d characters; this is the part around the caret, at %d. "
                         "Read or search the rest with the textbox tools."
                         % (len(self.before) + len(self.after), len(self.before)))
-            head = "…" if len(before) > WINDOW_BEFORE else ""
-            tail = "…" if len(self.after) > WINDOW_AFTER else ""
+            width, after = WINDOWS.get(mode, WINDOW)
+            head = "…" if len(before) > width else ""
+            tail = "…" if len(self.after) > after else ""
             parts.append("<context name=\"the text box around the caret (▮)\">\n%s%s▮%s%s\n</context>%s" % (
-                head, before[-WINDOW_BEFORE:], self.after[:WINDOW_AFTER], tail, more))
+                head, before[-width:], self.after[:after], tail, more))
             if mode == "instruct":
                 parts.append(words["at_caret"])
         return "".join("\n\n" + part for part in parts)

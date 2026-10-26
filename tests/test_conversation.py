@@ -100,7 +100,7 @@ class ConversationTests(unittest.TestCase):
     def test_a_long_text_box_is_searched_not_sent(self):
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
-        before = "Minutes. The budget for Q3 is 40k, agreed by Ana.\n" + "Filler line.\n" * 400
+        before = "Minutes. The budget for Q3 is 40k, agreed by Ana.\n" + "Filler line.\n" * 1000
         model = Scripted(answer(calls=[("textbox__search", {"query": "budget"})]), answer("Q3 has 40k—per Ana."))
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box"), before=before),
