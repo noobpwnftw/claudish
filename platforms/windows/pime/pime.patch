@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..6e647b3 100644
+index 7829c72..1ce78f1 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -325,7 +325,27 @@ index 7829c72..6e647b3 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -458,6 +668,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -442,6 +652,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+ 
+ 	json req = createRpcRequest("filterKeyDown");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	// Claudish: Tab with nothing composed takes the app's selection as your words, so the test
++	// needs the selection (and the field's kind): read in a synchronous read-only edit session, as
++	// the key's own session is (TextService::OnKeyDown).
++	if (keyEvent.keyCode() == VK_TAB && !textService_->isComposing()) {
++		auto context = textService_->currentContext();
++		if (context) {
++			auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, &req](Ime::EditSession* session, TfEditCookie) {
++				addSurroundingText(req, session);
++			});
++			HRESULT result;
++			context->RequestEditSession(textService_->clientId(), session, TF_ES_SYNC | TF_ES_READ, &result);
++		}
++	}
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+@@ -458,6 +681,7 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -333,7 +353,7 @@ index 7829c72..6e647b3 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +701,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +714,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -341,7 +361,7 @@ index 7829c72..6e647b3 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +741,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +754,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -370,7 +390,7 @@ index 7829c72..6e647b3 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1031,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1044,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
