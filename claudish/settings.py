@@ -76,6 +76,8 @@ def state(path=None):
     entry = profiles.get(name) or {}
     choice = dict({profile: c for c, profile in CHOICES.items()}, local="local").get(name, "other")
     server = profiles.get("ollama") or config.STARTER["profiles"]["ollama"]
+    url = server.get("model_url", "")
+    models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
     tone = entry.get("tone") or "corporate"
     return {
         "profile": name, "choice": choice,
@@ -89,8 +91,8 @@ def state(path=None):
         "config": str(path or config.default_path()),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
         # connection on this computer answers at once).
-        "server_problem": check_server(server.get("model_url", ""), server.get("model")) if choice == "server" else None,
-        "server_models": listed(server.get("model_url", "")) if choice == "server" else [],
+        "server_problem": server_problem(url, models, server.get("model")) if choice == "server" else None,
+        "server_models": models if isinstance(models, list) else [],
         "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
         "codex": None if codex() else NO_CODEX,
         "command": (entry.get("command") or [None])[0] if choice in ("claude-code", "codex") else None,
@@ -148,7 +150,11 @@ def listed(url, key=None):
 
 def check_server(url, model=None, key=None):
     """None when the server answers at url and has the model (or names none), else why not."""
-    models = server_models(url, key)
+    return server_problem(url, server_models(url, key), model, key)
+
+
+def server_problem(url, models, model=None, key=None):
+    """check_server for a listing already asked for (server_models)."""
     if models is None:
         return "nothing answers at %s" % url
     if models == UNAUTHORIZED:
@@ -176,7 +182,6 @@ def apply(changes, path=None):
         problem = check_key(key.strip())
         if problem:
             raise ValueError(problem)
-        keys.store(key.strip())
     if "server" in changes:
         server = changes["server"]
         url, model, server_key = (server.get("url", ""), server.get("model", ""), server.get("key") or None) \
@@ -225,7 +230,7 @@ def apply(changes, path=None):
         tone = changes["tone"]
         if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
             raise ValueError("a tone is a name or a few words")
-        config.set_tone(profiles, tone, MANAGED)
+        config.set_tone(profiles, tone, MANAGED + (data.get("profile"),))
     if "summon" in changes:  # which key asks the model; the other keeps your words
         if changes["summon"] not in config.SUMMON_KEYS:
             raise ValueError("the key that asks is Shift+Enter or Enter")
@@ -238,6 +243,8 @@ def apply(changes, path=None):
         data.pop("hints", None)
         if not changes["hints"]:
             data["hints"] = False
+    if "key" in changes:  # saved once everything else is accepted
+        keys.store(changes["key"].strip())
     if "key" in changes and "choice" not in changes and not path.is_file():
         # The page already shows Claude chosen: with no config yet, the key makes it so.
         profiles.setdefault("claude", dict(config.STARTER["profiles"]["claude"]))

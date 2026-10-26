@@ -218,26 +218,19 @@ class Suggestions:
             return False
 
     def session(self, revision, text, app, look=False, before="", after="", purpose=None):
-        """Run an instruction as a turn in this text box's conversation; False if the service
-        refused it (400: input it does not take), so the plain request says why."""
+        """Run an instruction as a turn in this text box's conversation (an HTTPError says why the
+        service refused it)."""
         body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
         if purpose:
             body["purpose"] = purpose
         if app:
             body["app"] = app
-        try:
-            started = call(self.endpoint, "/sessions", body)
-        except HTTPError as exc:
-            if exc.code == 400:  # input the service does not take: the plain request reports it
-                return False
-            raise
-        key = started["id"]
+        key = call(self.endpoint, "/sessions", body)["id"]
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
             del self.revisions[old]
         # Followed beside the requests: a held exchange's agent goes on while continue suggests.
         threading.Thread(target=self._follow_session, args=(revision, key), daemon=True).start()
-        return True
 
     def _follow_session(self, revision, key):
         try:
@@ -304,7 +297,8 @@ class Suggestions:
                 continue  # continue asks by itself at every pause, so not for a word or two; Tab asks for anything
             try:
                 # A sent instruction runs as a turn of this text box's conversation (a session).
-                if mode == "instruct" and immediate and self.session(revision, text, app, look, before, after, purpose):
+                if mode == "instruct" and immediate:
+                    self.session(revision, text, app, look, before, after, purpose)
                     continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,
                                  purpose=purpose)

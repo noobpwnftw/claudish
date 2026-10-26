@@ -54,6 +54,14 @@ class SettingsTests(Home):
         settings.apply({"tone": "corporate"})
         self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
 
+    def test_a_tone_reaches_the_profile_in_use_whatever_its_name(self):
+        settings.apply({"tone": "corporate"})  # the starter config
+        data = self.written()
+        data["profile"] = "agent"
+        self.path.write_text(json.dumps(data))
+        self.assertEqual(settings.apply({"tone": "bard"})["tone"], "bard")
+        self.assertEqual(self.written()["profiles"]["agent"]["tone"], "bard")
+
     def test_the_key_that_asks_is_saved_beside_the_profile(self):
         self.assertEqual(settings.apply({"tone": "corporate"})["summon"], "Shift+Enter")
         self.assertEqual(settings.apply({"summon": "Enter"})["summon"], "Enter")

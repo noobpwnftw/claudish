@@ -389,6 +389,7 @@ class Composition:
         """Shift+Esc with nothing composed: the exchange a focus change held, back as it was; else
         what Esc dropped (an instruction to edit, or a reply); "" when there is none (the key is the
         app's)."""
+        self.expire()
         if self.held is not None and not self.text and not self.live:
             held, self.held = self.held, None  # the exchange you left, back as it was
             # The exchange comes back; this field and the service's state stay as they are now.
@@ -450,6 +451,7 @@ class Composition:
 
     def submit(self):
         self.asked, self.working, self.failed = "instruct", True, False
+        self.converted, self.candidate, self.candidates = False, "", []  # a rewrite earlier is not this answer
         self.nudged = None
 
     def follow(self, worker):
@@ -457,6 +459,7 @@ class Composition:
         whether it answers. True when that changed (offline or back)."""
         self.summon, self.hints = worker.summon, worker.hints
         # What the worker's agent sessions are for: the exchange on screen and a held one.
+        self.expire()
         worker.wanted = {self.revision} | ({self.held.revision} if self.held is not None else set())
         changed, self.offline = self.offline != worker.offline, worker.offline
         return changed
@@ -634,7 +637,7 @@ class Composition:
         if self.sent:
             self.reply = self.reply[:-1]  # with nothing typed, nothing goes: the instruction stays
             return
-        if self.converted:  # the rewrite goes; your words stay
+        if self.converted:  # the rewrite is hidden; your words stay, and Tab shows it again
             self.converted = False
             return
         self.change(self.text[:-1])
@@ -754,13 +757,17 @@ class Composition:
         pill = self.held_pill() if self.mode == "compose" else None
         return (pill, True) if pill else (self.toast(), False)
 
+    def expire(self):
+        """A held exchange older than HELD_SECONDS goes (its agent session with it); True if it went."""
+        if self.held is not None and time.monotonic() - self.held_at > HELD_SECONDS:
+            self.held = None
+            return True
+        return False
+
     def held_pill(self):
         """The held exchange's pill, or None (in continue Shift+Esc cannot open it; your words come first)."""
         held = self.held
-        if held is None or self.live or self.text:
-            return None
-        if time.monotonic() - self.held_at > HELD_SECONDS:
-            self.held = None
+        if held is None or self.live or self.text or self.expire():
             return None
         status = ("the model asks" if held.question else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else

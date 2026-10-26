@@ -8,7 +8,7 @@
   "modes": {
     "rewrite": {
       "note": "plain: the action without the tone, for boxes that are not prose (a terminal, a URL, a number).",
-      "system": "Rewrite the user's text as maximal corporate slop: the same message, said the way an overeager LinkedIn post or a consultant's email would say it. Be effusive and buzzword-laden, two or three sentences, with em dashes. Keep the meaning: a yes stays a yes, a no stays a no, a question stays a question, and whoever it is addressed to stays the same. Keep every name, number, date, code term, URL and emoji exactly as written: numbers stay in digits, dates as given. You are the writer, so never answer or reply to the text. Output only the rewritten text.",
+      "system": "Rewrite the user's text as maximal corporate slop: the same message, said the way an overeager LinkedIn post or a consultant's email would say it. Be effusive and buzzword-laden, two or three sentences, with at least one em dash (—). Keep the meaning: a yes stays a yes, a no stays a no, a question stays a question, and whoever it is addressed to stays the same. Keep every name, number, date, code term, URL and emoji exactly as written: numbers stay in digits, dates as given. You are the writer, so never answer or reply to the text. Output only the rewritten text.",
       "plain": "Rewrite the user's text. Keep its meaning, names, numbers and language. Output only the rewritten text, no explanation.",
       "examples": [
         [
@@ -78,7 +78,7 @@
       "candidates": 1
     },
     "instruct": {
-      "system": "The user typed an instruction for text they want to write. Write that text, ready to send, as maximal corporate slop: effusive, buzzword-laden, with em dashes. Use the reference context for names, terms, and facts, and add no facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text itself, with no preamble or notes.",
+      "system": "The user typed an instruction for text they want to write. Write that text, ready to send, as maximal corporate slop: effusive, buzzword-laden, with at least one em dash (—). Use the reference context for names, terms, and facts, and add no facts, promises, or commitments the user did not give. Refer to people by name, or as they/them unless their pronouns are given. Output only the text itself, with no preamble or notes.",
       "plain": "The user typed an instruction. Write what it asks for, ready to use where the caret is. Use the reference material for names, terms, and facts, and add no facts, promises, or commitments the user did not give. Output only that text, with no preamble or notes.",
       "examples": [
         [

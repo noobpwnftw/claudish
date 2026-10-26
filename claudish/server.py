@@ -314,6 +314,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                             path.unlink(missing_ok=True)
                         else:
                             path.write_bytes(before)
+                        stamps[0] = stamp()  # put back as the service runs it: nothing to take up
                         return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
                 return self.reply(200, dict(shown, service=self.health()))
 
@@ -372,8 +373,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 if not isinstance(look, bool) or (look and mode != "instruct"):
                     raise ValueError("look is a boolean, for instruct only")
                 purpose = checked_purpose(data.get("purpose"))
-            except (ValueError, UnicodeError):
-                return self.reply(400, {"error": "invalid text request"})
+            except (ValueError, UnicodeError) as exc:
+                return self.reply(400, {"error": str(exc)})
             trusted = self.trusted()
             if not trusted and (app or look or before or after or purpose):
                 # What is around the caret, the app (which can mean reading a terminal) and window

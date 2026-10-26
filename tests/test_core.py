@@ -26,6 +26,28 @@ class CompositionTests(unittest.TestCase):
         state.offer(state.revision, "A nuanced perspective.")
         self.assertEqual(state.commit(True), "A nuanced perspective.")
 
+    def test_a_rewrite_backspaced_away_is_never_an_instructions_draft(self):
+        state = Composition()
+        for char in "hi team":
+            state.insert(char)
+        self.assertEqual(state.tab(), "request")
+        state.offer(state.revision, "Hello, valued team—synergy awaits.")
+        self.assertTrue(state.converted)  # shown in the panel
+        state.backspace()  # the rewrite is hidden; your words stay
+        state.submit()  # Shift+Enter while a rewrite waited: the instruction's answer is pending
+        self.assertEqual(state.tab(), "wait")
+
+    def test_a_held_exchange_expires_without_being_drawn(self):
+        from claudish import composition
+        state = Composition()
+        state.held, state.held_at = Composition(), 0.0
+        state.held.revision = 7
+        worker = type("W", (), {"summon": "Shift+Enter", "hints": True, "offline": False, "wanted": set()})()
+        with patch.object(composition.time, "monotonic", return_value=composition.HELD_SECONDS + 1):
+            state.follow(worker)
+        self.assertIsNone(state.held)
+        self.assertEqual(worker.wanted, {state.revision})  # its agent session is let go
+
     def test_what_a_new_claude_key_meets_is_said_plainly(self):
         from claudish.composition import failure
         said = {
@@ -321,7 +343,7 @@ class SessionPollingTests(unittest.TestCase):
                 self.target(*self.args)
         with patch.object(client, "call", call), patch.object(client.time, "sleep"), \
                 patch.object(client.threading, "Thread", Now):
-            self.assertTrue(worker.session(1, "fix it", "app"))
+            worker.session(1, "fix it", "app")
         self.assertEqual([c for c in calls if c.startswith("/sessions/k?")].__len__(), 3)
         self.assertEqual(calls[-1], "/sessions/k/cancel")
         self.assertEqual(worker.results[-1], (1, {"error": "timed out", "session": "k"}))  # the instruction says so
