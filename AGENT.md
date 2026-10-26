@@ -31,6 +31,19 @@ Tab on a selection only takes it into the composition, as if just typed; nothing
 the next key. Without Claudish that Tab would indent the text or replace it, so this adds no
 friction; to indent, leave compose (a hotkey collision, not a behaviour to design around).
 
+The days of a user:
+- Day 0: the laugh. Install, first rewrite, em dashes.
+- Days 1 and 2: the laugh wears off, and they live with a CJK-style composing input method in
+  English, with every quirk that may touch them. This is where the composing basics must be
+  flawless.
+- Day 3: they find the instruction key (a small multi-turn conversation per text box, aware of the
+  text around the caret) and decide whether its friction is worth keeping. This is the elaborate
+  engineering: without a model these are useless to an input method, so there is no prior art to
+  copy, and it has to be perfected here.
+
+Some will uninstall whatever we do. We care about the ones who stay: their experience, within this
+scope, is polished absolutely.
+
 Not ours: a hotkey that summons an AI, a replacement for the Claude CLI or another agent, a chat
 window, rewriting a selection with a hotkey.
 
@@ -50,7 +63,7 @@ correctness and data loss, then onboarding through a first accepted rewrite, nat
 rewrite quality and latency, then contributor experience. Make the smallest coherent change and
 check it. Commit, update the state, and go on.
 
-The product is a slop keyboard people can install and use. Prove progress with actual installs,
+The product is an input method people install, use and keep. Prove progress with actual installs,
 typing, recordings and reproducible checks. Keep the README, settings and install instructions
 consistent with the working product. Record remaining gaps with a concrete next action; do the
 unblocked preparation without waiting for the owner. Keep the shared instructions here;
