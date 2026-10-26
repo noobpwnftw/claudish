@@ -153,8 +153,12 @@ class ClaudishEngine(IBus.Engine):
         if result:
             revision, data = result
             trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
-            if self.composition.receive(revision, data):  # a draft, a question, progress; done: nothing to insert
+            kind = self.composition.receive(revision, data)
+            if kind:  # a draft, a question, progress; done: nothing to insert
                 self.render()
+            toast = self.composition.done_toast(data["done"]) if kind == "done" else None
+            if toast and screen().shell:
+                screen().publish(self.drawn, "", toast)
         if not self.composition.live and self.composition.panel() != self.drawn:
             self.render()  # the pause before compose's keys, or anything else the description shows
         return True

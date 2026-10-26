@@ -4,7 +4,7 @@ import json
 import os
 import time
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, blank
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -466,8 +466,9 @@ class ClaudishTextService(TextService):
             self.state.follow(self.worker)  # the config's keys, and whether the service answers
         result = self.worker.poll() if self.worker else None
         kind = self.state.receive(*result) if result else None
-        if kind == "done" and self.state.hints:
-            self.setToast(blank(status=result[1]["done"]), 3)  # a helper took the task: said briefly at the caret
+        toast = self.state.done_toast(result[1]["done"]) if kind == "done" else None
+        if toast:
+            self.setToast(toast, 3)
         return kind
 
     def onKeyDown(self, event):

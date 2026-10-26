@@ -541,8 +541,13 @@ class ModeFeelTests(unittest.TestCase):
         state.insert("o")
         state.insert("k")
         self.assertEqual(state.escape(), "clear")
-        self.assertEqual(state.dropped_toast()["foot"], [("Shift+Esc", "restore")])
+        self.assertIsNone(state.dropped_toast())  # the question's panel stays: no toast over it
         self.assertEqual((state.restore(), state.shown), ("ok", "ok"))  # the reply, back at the caret
+        fresh = Composition()
+        fresh.mode = "compose"
+        fresh.change("say hi")
+        self.assertEqual(fresh.escape(), "drop")
+        self.assertEqual(fresh.dropped_toast()["foot"], [("Shift+Esc", "restore")])
 
     def test_after_sending_the_keys_follow_one_ladder(self):
         """docs/design/design.md: ↑/↓ move the highlight (digits are text); Esc cancels what you

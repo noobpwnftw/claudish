@@ -268,10 +268,16 @@ class Composition:
 
     def dropped_toast(self):
         """After Esc discarded words: say so, briefly, with the key that brings them back (None with
-        hints off, or in a terminal)."""
-        if not self.hints or self.terminal:
+        hints off, in a terminal, or when a reply was cleared: the question's panel stays and says
+        what is left)."""
+        if not self.hints or self.terminal or self.sent:
             return None
         return blank(status="dropped", foot=[("Shift+Esc", "restore")])
+
+    def done_toast(self, said):
+        """A helper took the task ("opened in a new window"): said briefly at the caret (None with
+        hints off)."""
+        return blank(status=said) if self.hints and said else None
 
     def hint(self):
         """The panel as one line of plain words, for a window that can only show text (IBus's
