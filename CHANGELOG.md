@@ -11,6 +11,20 @@
 - A rewrite of words with text around them (a selection, or words typed mid-sentence) is written for
   their place: the model sees them marked in the text and replaces only that part, with examples
   of parts (`rewrite.parts` in the templates).
+- Follow-ups ("now make it shorter") work with Claude Code and Codex: the conversation's earlier
+  turns go in their message.
+- An instruction gives one draft on every backend; versions when you ask for them.
+- Rewrites and instructions ask for at least one em dash: Claude Code now adds one in 75 of the 80
+  benchmark cases, up from 60.
+- A model server without JSON schemas gets the turn again in plain text, rather than showing the
+  raw answer once.
+- Shift+Enter right after a rewrite never offers that rewrite as the instruction's draft.
+- An exchange held for another text box keeps its agent running when you switch boxes (Linux,
+  Windows), and expires after 10 minutes even if its pill is never shown.
+- Windows: Tab on a selection works (Claudish's PIME reads the selection for Tab's test); closing
+  the keyboard keeps your words; a password field no longer turns cd_AI off in the next field.
+- A finished helper task is said at the caret on every platform.
+- The Settings tone applies to the profile in use, whatever its name.
 
 ## 0.2.0
 
