@@ -83,6 +83,7 @@ class Composition:
         self.inside = False  # text follows the caret on its line: continue waits for the end of a line
         self.question = None  # an agent session's open question: {"id", "text", "label", "body", "choices", "permission", "code", "read", "insert", "session"}
         self.reply = ""  # what you type while an instruction's exchange is open: a reply, or your next words
+        self.back = 0  # characters after the cursor in what you type: ← → move it
         self.answers = []  # your answers in this exchange, for the panel's thread ("You answered")
         self.editing = False  # the instruction came back to the caret (Esc edit): the next Esc drops it
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
@@ -127,6 +128,7 @@ class Composition:
         return not shift if self.summon == "Enter" else shift
 
     def change(self, text):
+        self.back = 0  # characters after the cursor in what you type (your words, or a reply): ← → move it
         self.reply = self.waiting = ""
         self.queued = []
         self.answers = []
@@ -173,6 +175,39 @@ class Composition:
         if self.sent:
             return self.reply or self.text
         return self.text
+
+    @property
+    def cursor(self):
+        """Where the cursor is in what the composition shows (← and → move it; at its end by default)."""
+        return len(self.shown) - (self.back if (self.reply or not self.sent) else 0)
+
+    def arrow(self, step):
+        """← (-1) or → (1) in what you are typing, as a CJK input method moves in its composition:
+        True when it is ours (nothing commits); False with nothing to edit (the key is the app's)."""
+        typed = self.reply if self.sent else self.text
+        if not typed or self.live:
+            return False
+        self.back = min(len(typed), max(0, self.back - step))
+        return True
+
+    def delete(self):
+        """Delete: the character after the cursor; True when it is ours (False: nothing to edit)."""
+        typed = self.reply if self.sent else self.text
+        if not typed or self.live:
+            return False
+        if self.back:
+            at = len(typed) - self.back
+            if self.sent:
+                self.reply = typed[:at] + typed[at + 1:]
+                self.back -= 1
+            else:
+                self.edit(typed[:at] + typed[at + 1:], self.back - 1)
+        return True
+
+    def edit(self, text, back):
+        """Your words changed at the cursor: a new composition, the cursor kept where it was."""
+        self.change(text)
+        self.back = back
 
     def panel(self):
         """What the panel next to the caret shows, the same for every adapter and the demo
@@ -377,6 +412,7 @@ class Composition:
         if self.sent and self.reply:
             self.dropped, self.dropped_reply = self.reply, True  # Shift+Esc brings it back
             self.reply = ""  # what you typed goes; the exchange stays open
+            self.back = 0
             return "clear"
         if self.converted:
             # Your words again, the rewrite forgotten: Tab asks for another take. The next Esc drops
@@ -408,6 +444,7 @@ class Composition:
             return ""
         if self.dropped_reply and self.sent and not self.reply:  # a reply you cleared, back at the caret
             self.reply, self.dropped = self.dropped, ""
+            self.back = 0
             return self.reply
         if self.text:
             return ""
@@ -462,6 +499,7 @@ class Composition:
         return kept
 
     def submit(self):
+        self.back = 0  # your next words, a reply, start at the end
         self.asked, self.working, self.failed = "instruct", True, False
         self.converted, self.candidate, self.candidates = False, "", []  # a rewrite earlier is not this answer
         self.nudged = None
@@ -535,6 +573,7 @@ class Composition:
         if self.reply.strip():  # your next words wait aside: they were not an answer to this
             self.waiting = (self.waiting + " " + self.reply.strip()).strip()
         self.reply = ""
+        self.back = 0
         self.highlight = 0
         self.selected = False
         return True
@@ -623,6 +662,7 @@ class Composition:
             return None
         self.question, self.status = None, ""
         self.reply = ""
+        self.back = 0
         self.next_question()
         self.answers.append(words)
         return question["session"], question["id"], words
@@ -637,22 +677,28 @@ class Composition:
             if char == " " and not self.reply:
                 return True
             if len(self.reply) < MAX_COMPOSITION:
-                self.reply += char
+                at = len(self.reply) - self.back
+                self.reply = self.reply[:at] + char + self.reply[at:]
             return True
         if len(self.text) >= MAX_COMPOSITION:
             return False
         # A rewrite showing in the panel: typing on goes on with your words (the rewrite goes).
-        self.change(self.text + char)  # as typed: em dashes come from the model, never from a key
+        at = len(self.text) - self.back  # as typed: em dashes come from the model, never from a key
+        self.edit(self.text[:at] + char + self.text[at:], self.back)
         return True
 
     def backspace(self):
-        if self.sent:
-            self.reply = self.reply[:-1]  # with nothing typed, nothing goes: the instruction stays
+        if self.sent:  # with nothing typed, nothing goes: the instruction stays
+            at = len(self.reply) - self.back
+            if at > 0:
+                self.reply = self.reply[:at - 1] + self.reply[at:]
             return
         if self.converted:  # the rewrite is hidden; your words stay, and Tab shows it again
             self.converted = False
             return
-        self.change(self.text[:-1])
+        at = len(self.text) - self.back
+        if at > 0:
+            self.edit(self.text[:at - 1] + self.text[at:], self.back)
 
     def toggle(self):
         """A Shift tap, or a pick from the mode menu: switch mode. Leaving compose keeps what you

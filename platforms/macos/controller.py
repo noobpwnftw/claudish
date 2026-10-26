@@ -459,10 +459,11 @@ class ClaudishInputController(IMKInputController):
             return
         OVERLAY.hide()
         shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
-        # Cocoa ranges count UTF-16 code units, rather than Python code points.
-        length = len(shown.encode("utf-16-le")) // 2
+        # Cocoa ranges count UTF-16 code units, rather than Python code points; the cursor is where
+        # ← and → left it (the end by default).
+        cursor = len(shown[:self.state.cursor].encode("utf-16-le")) // 2
         if shown:
-            client.setMarkedText_selectionRange_replacementRange_(marked(shown), (length, 0), (NSNotFound, 0))
+            client.setMarkedText_selectionRange_replacementRange_(marked(shown), (cursor, 0), (NSNotFound, 0))
         else:  # empty marked text would leave a terminal composing: the next Return beeps
             unmark(client)
         self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
@@ -659,6 +660,13 @@ class ClaudishInputController(IMKInputController):
             if not self.state.text:
                 return False
             self.state.backspace()
+            self.changed(client)
+            return True
+        plain = not flags & (NSEventModifierFlagOption | NSEventModifierFlagShift)  # Option+← and Shift+← navigate
+        if key in (123, 124) and plain and self.state.arrow(-1 if key == 123 else 1):  # ← → move in what you type
+            self.changed(client)
+            return True
+        if key == 117 and self.state.delete():  # forward delete, at the cursor
             self.changed(client)
             return True
         text = event.characters() or ""

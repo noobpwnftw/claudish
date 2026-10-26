@@ -643,6 +643,26 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual((state.escape(), state.text, state.working), ("back", "very good", False))
         self.assertFalse(state.offer(revision, "Late."))  # the stopped request's answer is ignored
 
+    def test_arrows_move_in_what_you_type_and_edits_land_at_the_cursor(self):
+        state = Composition()
+        state.mode = "compose"
+        for char in "thanks team":
+            state.insert(char)
+        self.assertTrue(all(state.arrow(-1) for _ in range(20)))  # past the start: stays at it
+        state.insert("A")
+        self.assertEqual((state.text, state.cursor), ("Athanks team", 1))
+        state.arrow(1)
+        state.backspace()
+        state.delete()
+        self.assertEqual((state.text, state.cursor), ("Aanks team", 1))  # the t before, the h after
+        state.submit()  # sent: your next words start at the end
+        for char in "shorter":
+            state.insert(char)
+        state.arrow(-1)
+        state.insert("!")
+        self.assertEqual((state.reply, state.cursor), ("shorte!r", 7))
+        self.assertFalse(Composition().arrow(-1))  # nothing typed: the key is the app's
+
     def test_a_follow_up_is_about_the_draft_in_view(self):
         state = Composition()
         state.mode = "compose"

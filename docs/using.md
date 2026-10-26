@@ -23,6 +23,7 @@ Typing in detail, the browser demos, and terminals.
 | F8 (compose) | Also send a picture of the focused window with this instruction (see [Window pictures](configuration.md#window-pictures)) |
 | Tab with a selection (compose) | With nothing composed, the selected text becomes your words, as if you had just typed them: then Tab rewrites them, Shift+Enter sends them, Enter keeps them. macOS, Windows, Qt apps on Linux, and the demo (GTK apps do not report selections to input methods) |
 | Backspace | Edit the composition; with a rewrite showing, the first Backspace closes it |
+| ← → | Move within what you are typing (your words, or a reply), as in a CJK composition; typing, Backspace and Delete work there. With nothing to edit, the app's |
 
 Settings → Panel → "Only what is pending" (`"hints": false`) hides the keys while you compose and
 the toasts; the model at work, drafts, rewrites, questions and errors still show.

@@ -378,8 +378,8 @@ class ClaudishTextService(TextService):
         self.setClearOnEnd(self.state.sent)
         shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
         self.setCompositionString(shown)
-        # TSF cursor offsets count UTF-16 code units.
-        self.setCompositionCursor(len(shown.encode("utf-16-le")) // 2)
+        # TSF cursor offsets count UTF-16 code units; the cursor is where ← and → left it.
+        self.setCompositionCursor(len(shown[:self.state.cursor].encode("utf-16-le")) // 2)
         panel = self.state.panel()
         self.setPanel(panel)
         # The rows also go to TSF's candidate list, for apps that draw candidates themselves.
@@ -597,6 +597,11 @@ class ClaudishTextService(TextService):
             return True
         elif key == 0x08:
             self.state.backspace()
+        elif key in (0x25, 0x27) and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
+                and self.state.arrow(-1 if key == 0x25 else 1):  # ← → move in what you type (Shift+← selects)
+            pass
+        elif key == 0x2E and self.state.delete():  # forward delete, at the cursor
+            pass
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):
             self.setCommitString(chr(event.charCode))  # nothing composed: the space is the app's text
         elif event.isPrintableChar():

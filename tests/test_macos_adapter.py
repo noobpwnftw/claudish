@@ -364,8 +364,19 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.key(8, "c", self.module.NSEventModifierFlagCommand))
         self.assertEqual(self.client.commits, ["original"])
         self.type_text("next")
-        self.assertFalse(self.key(123, "\uf702"))
+        self.assertFalse(self.key(125, "\uf701"))  # ↓ with nothing to choose: navigation
         self.assertEqual(self.client.commits[-1], "next")
+
+    def test_arrows_move_in_the_composition_and_edits_land_there(self):
+        """Owner: ← and → in compose edit mid-word, as a CJK composition does, instead of committing."""
+        self.type_text("thanks team")
+        for _ in range(5):
+            self.assertTrue(self.key(123, "\uf702"))  # ←
+        self.type_text(" all")
+        self.assertTrue(self.key(117, "\uf728"))  # forward delete: the space before "team"
+        self.assertTrue(self.key(124, "\uf703"))  # →
+        self.assertEqual((self.client.marked, self.controller.state.cursor), ("thanks allteam", 11))
+        self.assertFalse(self.client.commits)
 
     def test_option_characters_stay_in_composition(self):
         option = 1 << 19  # NSEventModifierFlagOption

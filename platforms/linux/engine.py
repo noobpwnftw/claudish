@@ -171,7 +171,7 @@ class ClaudishEngine(IBus.Engine):
             # cd_AI's GNOME Shell extension draws the panel and the suggestion (the design lab's
             # GNOME mock); IBus keeps only the composition, as the platform's plain preedit.
             text = "" if state.live else state.shown
-            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
+            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.cursor if text else 0, bool(text),
                                               self.focus_mode())
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)
@@ -191,7 +191,7 @@ class ClaudishEngine(IBus.Engine):
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
         text = state.shown  # your words (a rewrite waits in the panel), or a reply once sent
-        self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), len(text), bool(text),
+        self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.cursor if text else 0, bool(text),
                                           self.focus_mode())
         # IBus's own popup (without the extension): the rows as a list, the rest as one line. No
         # numbers: digits are text here, they pick nothing (as on Windows).
@@ -426,6 +426,14 @@ class ClaudishEngine(IBus.Engine):
             if not self.composition.text:
                 return False
             self.composition.backspace()
+            self.changed()
+            return True
+        plain = not state & (IBus.ModifierType.SHIFT_MASK | IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK)
+        if keyval in (IBus.KEY_Left, IBus.KEY_Right) and plain and \
+                self.composition.arrow(-1 if keyval == IBus.KEY_Left else 1):
+            self.changed()  # ← → move in what you type, as a CJK composition does
+            return True
+        if keyval == IBus.KEY_Delete and self.composition.delete():  # forward delete, at the cursor
             self.changed()
             return True
         name = IBus.keyval_name(keyval) or ""
