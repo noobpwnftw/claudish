@@ -484,7 +484,13 @@ class Rewriter:
         tools = mode == "instruct" and self.backend in ("llama", "openai", "claude") and bool(self.toolbox or local)
         prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
         examples = spec["examples"] if box.prose or spec.get("custom") else []
-        said = box.material(spec["frame"].replace("{text}", text) if spec.get("frame") else text, spec["box"])
+        if mode == "rewrite" and box.prose and (box.before.strip() or box.after.strip()):
+            # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
+            # turn shows them in their place, and the rewrite is only that part.
+            framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
+        else:
+            framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
+        said = box.material(framed, spec["box"])
         history = list(conversation.messages) if conversation is not None else []
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []

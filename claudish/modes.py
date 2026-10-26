@@ -112,6 +112,8 @@ def tidy(text, output):
     if fenced:
         output = fenced.group(1)
     output = INTRO.sub("", output.strip(), count=1).strip()
+    if output.startswith("[[") and output.endswith("]]") and "[[" not in text:  # the part, as it was marked
+        output = output[2:-2].strip()
     for pair in QUOTES:
         if (len(output) > 2 and output[0] == pair[0] and output[-1] == pair[1] and pair[0] not in output[1:-1]
                 and not text.strip().startswith(pair[0])):

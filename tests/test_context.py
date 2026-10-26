@@ -86,7 +86,8 @@ class ContextTests(unittest.TestCase):
         self.assertIn("Dear Zoë,▮", system)  # the text box is described in the system prompt
         # What was observed goes next to the user's words, fenced as material.
         self.assertIn("Fjordline: the ferry company.", turn)
-        self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nok"))
+        # Then the words, in their place in the box's text (a rewrite of a part).
+        self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nDear Zoë,[[ok]]"))
 
     def test_service_validates_caret_text(self):
         with serving(Rewriter("rules")) as server:

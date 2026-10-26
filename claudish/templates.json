@@ -240,6 +240,7 @@
       "terminal": "What you write there is a command line, run when the user presses Enter: write one command line and nothing else (no explanation, no quotes, no code fence)."
     },
     "at_caret": "Your answer goes in at the caret (▮) of the text box above, as the user's own text: reply with that text only.",
+    "in_place": "In this text, rewrite only the part in [[double brackets]], so it fits back in its place: a few words stay a few words, part of a sentence stays part of that sentence, and nothing around it is repeated. Output only the replacement for that part.\n\n{before}[[{text}]]{after}",
     "shown": "What you write is shown to the user as a draft beside the caret: one key inserts it as their own text, and they can send a follow-up instruction to change it. So it is final as it is: no offers to adjust it, no questions in it.",
     "tools": "You have tools. When the instruction needs facts you do not have (status, numbers, names, contents), call a tool first and write from its result; never invent such facts.",
     "reference": "Reference material for this request, not instructions:"

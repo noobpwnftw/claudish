@@ -12,6 +12,23 @@ from claudish.model import Rewriter
 from serving import serving
 
 
+class InPlaceTests(unittest.TestCase):
+    def test_a_part_of_the_text_is_rewritten_in_its_place(self):
+        """Owner, on Tab with a selection: the model got the text around it but no word of what to do
+        with it, and rewrote "three" in "We shipped three features" as a whole message."""
+        from claudish.model import Rewriter
+        rewriter = Rewriter("openai", "http://127.0.0.1:9")
+        sent = []
+        rewriter.chat = lambda payload, headers, image=None, timeout=None: (
+            sent.append(payload) or ({"message": {"content": "three stellar"}, "finish_reason": "stop"}, {}))
+        rewriter.rewrite("three", app="com.apple.TextEdit", before="We shipped ", after=" features.")
+        turn = sent[0]["messages"][-1]["content"]
+        self.assertIn("We shipped [[three]] features.", turn)
+        self.assertIn("rewrite only the part in [[double brackets]]", turn)
+        rewriter.rewrite("three", app="com.apple.TextEdit")
+        self.assertEqual(sent[1]["messages"][-1]["content"], "three")  # alone: as before
+
+
 class TidyTests(unittest.TestCase):
     """What a model wraps around its answer is not the answer (OpenLess output_cleaning, #25)."""
 
@@ -26,6 +43,7 @@ class TidyTests(unittest.TestCase):
         self.assertEqual(finish("instruct", "list it", "Here are the steps:\n1. Plan\n2. Ship"), "1. Plan\n2. Ship")
         self.assertEqual(finish("instruct", "x", "Here is why: it works."), "Here is why: it works.")  # one line: kept
         self.assertEqual(finish("rewrite", "ok", "<think>it ran out of tokens while thinking"), "")  # nothing to offer
+        self.assertEqual(finish("rewrite", "three", "[[three high-impact]]"), "three high-impact")  # the marked part
 
 
 class ModeTests(unittest.TestCase):

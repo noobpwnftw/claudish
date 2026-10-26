@@ -4,6 +4,8 @@
 
 - Tab on a selection, with nothing composed, makes it your words, as if you had just typed them:
   then Tab rewrites them, Shift+Enter sends them, Enter keeps them.
+- A rewrite of words with text around them (a selection, or words typed mid-sentence) is written for
+  their place: the model sees them marked in the text and replaces only that part.
 
 ## 0.2.0
 

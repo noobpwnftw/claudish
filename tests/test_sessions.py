@@ -208,7 +208,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual((item["mode"], item["app"], item["backend"], item["outcome"]),
                          ("rewrite", "thunderbird", "rules", "answered"))
         self.assertIn("Dear Ana, ▮", item["system"])
-        self.assertEqual(item["turn"], "very important")
+        self.assertTrue(item["turn"].endswith("Dear Ana, [[very important]]"))  # the words in their place
         self.assertEqual(item["candidates"], ["particularly crucial"])
         self.assertEqual(self.call("/recent/clear", {})[0], 200)
         self.assertEqual(self.call("/recent")[1]["recent"], [])
