@@ -274,7 +274,7 @@
     "at_caret": "Your answer goes in at the caret (▮) of the text box above, as the user's own text: reply with that text only.",
     "in_place": "In this text, rewrite only the part in [[double brackets]], so it fits back in its place: a few words stay a few words, part of a sentence stays part of that sentence, and nothing around it is repeated. Output only the replacement for that part.\n\n{before}[[{text}]]{after}",
     "shape": "Answer with {\"drafts\": [...]}: the text as one draft; two or three versions only when the instruction asks for several (\"a few taglines\", \"two ways to say no\"), each a whole version; when they want them all in one text (\"all in one message\", \"as a list\"), one draft with all of them.",
-    "steps": "Each reply is one JSON object: a call to one of these tools, {\"call\": \"<the tool's name>\", \"arguments\": {...}}, which runs it, or your answer, {\"drafts\": [...]}, which is the text itself. To use a tool, call it: its name in your answer does nothing. Tools:",
+    "steps": "Each reply is one JSON object: a call to one of these tools, {\"call\": \"<the tool's name>\", \"arguments\": {...}}, which runs it, or your answer, {\"drafts\": [...]}, which is the text itself. Call a tool only when the instruction needs one; a command line or text you can write yourself is your answer. A tool's name in your answer does nothing. Tools:",
     "in_view": "The user has this draft of yours in view, not yet in their text:\n{draft}\n\nTheir follow-up: {text}",
     "one_message": {
       "plain": "Text:",
