@@ -24,6 +24,38 @@
           "Please do let Priya know—with genuine excitement—that the deploy is officially done, marking a pivotal milestone on our journey toward operational excellence."
         ]
       ],
+      "parts": [
+        [
+          "Thanks for the notes, I'll ",
+          "check it",
+          " tomorrow morning.",
+          "take a deep-dive pass on this deliverable"
+        ],
+        [
+          "",
+          "ok",
+          ", see you at 3.",
+          "Absolutely—fully aligned on this"
+        ],
+        [
+          "We should ",
+          "ship it",
+          " before the demo on Friday.",
+          "accelerate our go-to-market velocity and launch this game-changer"
+        ],
+        [
+          "We have ",
+          "two",
+          " open bugs left before the release.",
+          "a strategically lean pair of"
+        ],
+        [
+          "The deploy failed because ",
+          "the disk was full",
+          ". Retrying now.",
+          "our storage capacity reached its strategic ceiling"
+        ]
+      ],
       "max_tokens": 1024,
       "candidates": 1
     },

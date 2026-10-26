@@ -415,7 +415,9 @@ The templates are in
 prompt, the `plain` one for boxes that are not prose (a terminal, a URL, a
 number), `examples` as `[input, answer]` pairs, a `frame` around your text
 (`{text}`), `max_tokens` and `candidates` (how many readings to offer, 1 to 5);
-the tones; and the wording about the text box (`box`). A templates file has the
+for `rewrite`, `parts`: examples for words inside a text (a selection, or words typed
+mid-sentence) as `[before, part, after, replacement]`, used when such words are rewritten in
+their place (`box.in_place`); the tones; and the wording about the text box (`box`). A templates file has the
 same shape and names only what it changes, mode by mode and key by key:
 
 ```json

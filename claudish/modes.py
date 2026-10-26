@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
-MODE_KEYS = {"system", "plain", "frame", "examples", "max_tokens", "candidates", "note"}
+MODE_KEYS = {"system", "plain", "frame", "examples", "parts", "max_tokens", "candidates", "note"}
 SECTIONS = {"about", "modes", "tones", "box"}
 
 
@@ -39,6 +39,9 @@ def check_mode(where, name, mode, known):
     if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
                for pair in mode.get("examples", [])):
         raise ValueError("%s: mode %r examples must be [input, answer] string pairs" % (where, name))
+    if not all(isinstance(part, list) and len(part) == 4 and all(isinstance(s, str) for s in part)
+               for part in mode.get("parts", [])):
+        raise ValueError("%s: mode %r parts must be [before, part, after, replacement] strings" % (where, name))
     for key, low, high in (("max_tokens", 1, None), ("candidates", 1, 5)):
         value = mode.get(key)
         if value is not None and not (isinstance(value, int) and not isinstance(value, bool) and value >= low
@@ -79,17 +82,20 @@ def defaults(override=None, tone=None):
     own = (override or {}).get("modes") or {}
     specs = {}
     for name, mode in words["modes"].items():
-        system, examples = mode["system"], mode.get("examples", [])
+        system, examples, parts = mode["system"], mode.get("examples", []), mode.get("parts", [])
         custom = "system" in (own.get(name) or {})
         named = words["tones"]["named"]
         if tone and not custom and tone in named:
             wording = (named[tone].get("modes") or {}).get(name)
             if wording:
-                system, examples = wording["system"], wording.get("examples", [])
+                system, examples, parts = wording["system"], wording.get("examples", []), wording.get("parts", [])
         elif tone and not custom and name in words["tones"]["tone"]:
-            system, examples = words["tones"]["tone"][name].replace("{tone}", tone), []
+            system, examples, parts = words["tones"]["tone"][name].replace("{tone}", tone), [], []
         specs[name] = {"system": system, "plain": mode.get("plain") or system,
                        "examples": messages(examples, mode.get("frame")), "max_tokens": mode.get("max_tokens"),
+                       # A part of a text, rewritten in its place: [before, part, after, replacement].
+                       "parts": messages([(words["box"]["in_place"].format(before=b, text=p, after=a), out)
+                                          for b, p, a, out in parts]),
                        "candidates": mode.get("candidates") or 1, "custom": custom, "box": words["box"]}
         if mode.get("frame"):
             specs[name]["frame"] = mode["frame"]

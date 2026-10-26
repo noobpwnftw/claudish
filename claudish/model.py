@@ -484,7 +484,10 @@ class Rewriter:
         tools = mode == "instruct" and self.backend in ("llama", "openai", "claude") and bool(self.toolbox or local)
         prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
         examples = spec["examples"] if box.prose or spec.get("custom") else []
-        if mode == "rewrite" and box.prose and (box.before.strip() or box.after.strip()):
+        in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
+        if in_place:  # a part of the text: the examples are parts too (none: the instruction alone)
+            examples = spec.get("parts") or []
+        if in_place:
             # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
             # turn shows them in their place, and the rewrite is only that part.
             framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
