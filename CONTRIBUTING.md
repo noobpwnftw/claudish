@@ -17,42 +17,12 @@ Python 3.10 or newer. Without the `[claude,mcp]` extras the tests that need thos
 and check.py says so. The settings page check needs Playwright with Chromium
 (`--browser-python` names a Python that has it).
 
-## How a keystroke becomes a candidate
+## Where things live
 
-```
-app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service ──▶ backend
-       IBus / TSF / IMK     platforms/*   client.py       server.py    model.py
-                            composition.py                  context.py   (llama.cpp, any OpenAI-
-                                                            modes.py      compatible server, Claude)
-```
-
-- **`claudish/composition.py`** holds the typed text, the candidate, the
-  revision counter, and the mode. Every edit bumps the revision; a model result
-  for an older revision is dropped. All three adapters share this file, and it
-  also runs inside PIME's own Python on Windows (3.12), with no third-party packages.
-- **`claudish/client.py`** is one background worker per adapter. It debounces
-  (180 ms), coalesces, and never blocks an input event.
-- **`claudish/server.py`** is the loopback HTTP service: `/suggest` and `/health`,
-  plus the browser demo in `claudish/web/`.
-- **`claudish/model.py`** has the `Rewriter` and its backends. **`templates.json`** holds the
-  prompts; **`modes.py`** loads them into the invocation modes (rewrite, continue, instruct); **`context.py`** holds the context providers (file, command, MCP,
-  caret text); **`config.py`** loads profiles.
-- **`claudish/screen.py`** reads a focused terminal through the accessibility APIs;
-  **`capture.py`** takes the window picture F8 asks for.
-- **Instructions and agents:** **`turn.py`** answers one instruction (tools in **`tools.py`**),
-  **`conversation.py`** keeps a text box's turns, **`sessions.py`** and **`agent.py`** run an agent
-  CLI (Claude Code) as a session, and **`textbox.py`**/**`textbox_mcp.py`** give it the text box.
-- **Setup and settings:** **`setup.py`** (`claudish setup`), **`doctor.py`**, **`service.py`** (the
-  login service), **`settings.py`** and **`keys.py`** (the settings page and where keys are kept),
-  **`mcp_setup.py`**.
-- **`platforms/linux/engine.py`** (IBus), **`platforms/windows/claudish/`**
-  (PIME/TSF), and **`platforms/macos/controller.py`** (InputMethodKit) translate
-  key events. Keep them thin: logic shared by all three belongs in
-  `composition.py`.
-
-The guarantees every change must keep: typed text is never lost; a candidate is
-only offered, and accepted explicitly (Tab); a stale result never replaces newer
-text; a failure leaves your wording available; and password fields are bypassed.
+The source inventory, by area, is in [docs/development.md](docs/development.md#implementation).
+Every change keeps these: a candidate is only offered, and accepted explicitly (Tab); a stale
+result never replaces newer text; a failure leaves your wording available; and password fields
+are bypassed.
 
 ## Checks
 

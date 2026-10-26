@@ -9,11 +9,11 @@ Typing in detail, the browser demos, and terminals.
 | Type | Continue: straight into the app. Compose: your words gather as the composition (underlined) |
 | Pause after a word | Continue only: ask for the rest of the sentence. In compose a rewrite is asked for with Tab and an instruction with Shift+Enter |
 | Shift (tap) | Switch mode: continue ↔ compose, as Shift switches English and pinyin. A tap is Shift alone, released within half a second, after a pause: Shift with another key (a capital, Shift+Enter), held (Shift+click), or pressed right after another key (rolled typing) is not one. Leaving compose keeps your words as typed. On Linux and Windows a brief pill at the caret says the mode and where Shift goes next; on macOS the system announces the input mode. GNOME's top bar, Windows' taskbar, and the macOS menu bar show it all along |
-| Continue mode | Typing goes straight into the app (the model sees it as context); at the end of a line, the rest of the sentence appears after the caret in gray. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
+| Continue mode | Typing goes straight into the app (the model sees it as context). With a local model, or a profile that routes continue to one, the rest of the sentence appears after the caret in gray at the end of a line. On Claude, Claude Code and Codex, continue is plain typing, as Shift to English is in a Chinese input method. Tab takes it, Esc dismisses it, typing ignores it. Tab, Enter, Backspace, and arrows are the app's when nothing is offered |
 | Starting a composition (compose) | Only a letter or a digit starts one: a space or punctuation typed with nothing composed goes straight into the app. While composing, Space is text |
 | Compose keys | The panel at the caret says them from the first key: Tab rewrite · Shift+Enter ask · Enter keep |
 | Tab (compose) | Tab takes the model's text. With your words: ask for a rewrite; it shows in the panel ("Rewrite") while your words stay in your text; Tab again puts it in; Esc or typing on keeps your words, and Tab after Esc asks for another take. With drafts: insert the highlighted one. With a question: answer with the highlighted choice (Allow and Deny too). With an answer to read: insert it (Esc dismisses it). |
-| Shift+Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the drafts (the first highlighted); Tab inserts the highlighted one. Asked for several versions ("three taglines"), the model offers them as the drafts to pick from, unless you ask for all of them in one text. With nothing composed, Shift+Enter is the app's (a newline in most chat boxes) |
+| Shift+Enter (compose) | Send what you composed as an instruction. It stays underlined at the caret while the model works (a reply you type takes its place); the panel shows what is happening, then the draft; Tab inserts it. Asked for several versions ("three ways to decline the meeting"), the model offers them as drafts to pick from (up to three, the first highlighted), unless you ask for all of them in one text. With nothing composed, Shift+Enter is the app's (a newline in most chat boxes) |
 | ↑ ↓ | Move the highlight through the drafts or a question's choices, no wrap; Tab takes the highlighted one. Choices are not numbered: digits are text, and with drafts showing Space does nothing (↑↓ and Tab choose). An approval starts with nothing highlighted; the first ↓ lands on Deny, and Tab takes a choice once one is highlighted |
 | Typing after you send | What you type goes in at the caret, as a composition: a reply when the model asks (Shift+Enter sends it; in an approval, "deny with reason"), or your next words while it works or its drafts show (Shift+Enter sends them as a follow-up in the same conversation). The choices fade while you type. A question that comes meanwhile shows your next words as Waiting; they come back once you answer it |
 | Enter (compose) | Keep what you composed as it is, as other input methods commit the typed letters with Enter; the next Enter is the app's. Once the model is asked, Enter lights the Tab of the highlighted row. `"keys"` in the config swaps Enter and Shift+Enter |
@@ -49,8 +49,8 @@ With cd_AI's service running (`claudish service status`), open **http://127.0.0.
 input method, drawn in the page: one editor with an input-source badge, the
 composition at the caret, and the panel, drawn with the same kit as the design lab
 (`/design.html`) and the desktop adapters. It opens in compose (Tab
-offers a rewrite, Shift+Enter sends it as an instruction and offers drafts to choose
-with ↑↓ and take with Tab, Enter keeps your words; on a phone, tap the key strip); a Shift tap or the badge switches to continue (keys go straight in;
+offers a rewrite, Shift+Enter sends it as an instruction and offers a draft (versions,
+when asked for, to choose with ↑↓) to take with Tab, Enter keeps your words; on a phone, tap the key strip); a Shift tap or the badge switches to continue (keys go straight in;
 pause after a word and the rest waits in gray; Tab takes it). The installed input method starts in compose too. A key strip lights the keys as you use them, and each sample
 types itself in its own mode. No input method installation is needed. The theme
 toggle follows the system by default.
@@ -110,21 +110,6 @@ Esc only while there is marked text. An instruction stays marked while its draft
 so they work there; continue's suggestion is not marked text, so Tab completes in the
 shell instead of taking it, and after Esc drops your words Shift+Esc goes to the shell. In a
 terminal a drop shows no toast.
-
-On [`benchmarks/eval/fix_cases.json`](../benchmarks/eval/fix_cases.json), 30
-cases (23 need a fix, 7 are legitimate commands that failed for environmental
-reasons and should be left alone), "fix" at a terminal showing the failed
-command:
-
-| Model / Q4_K_M | Fixed | Wrong | Left alone | Harmful | Median |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Qwen3 30B-A3B Instruct 2507 | 20 / 23 | 3 | 3 / 7 | 4 | 1.0 s |
-| Qwen2.5 1.5B Instruct | 7 / 23 | 16 | 6 / 7 | 1 | 0.4 s |
-
-The cases carry no error output for the legitimate commands, so a model sees
-only the command and guesses; on a real screen it sees what went wrong.
-Reproduce with `python benchmarks/evaluate_terminal.py --label NAME` against a
-model server (measured on a DGX Spark's CPU, llama.cpp b11822).
 
 ## Talking to a coding agent in its own chat box
 

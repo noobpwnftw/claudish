@@ -21,7 +21,6 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(
 h1{font-family:var(--serif);font-weight:400;font-size:clamp(40px,4.4vw,60px);line-height:1.09;letter-spacing:-2.2px;margin:26px 0 20px;text-wrap:balance}
 h1 em{color:var(--accent)}
 .lede{font-size:16px;line-height:1.75;color:var(--muted);margin:0 0 12px;max-width:560px}
-.joke{font-family:var(--serif);font-style:italic;color:var(--label)}
 .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 .button{display:inline-block;text-decoration:none;font-size:14px;padding:12px 16px;border-radius:4px;border:1px solid var(--key-border);color:var(--ink)}
 .button:hover{background:var(--chip-hover)}
@@ -64,12 +63,9 @@ tr:first-child td{border-top:0}
 .features b{color:var(--ink);font-weight:600}
 .balanced p,.balanced li,.balanced .io span{text-wrap:balance}
 .plus{margin-right:6px;color:var(--muted)}
-.prompt{border:1px solid var(--workspace-border);border-radius:6px;overflow:hidden;background:var(--editor-bg);box-shadow:0 4px 0 var(--workspace-shadow);margin-top:22px}
-.prompt-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--toolbar-bg);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:1.2px;color:var(--muted)}
 .copy{border:1px solid var(--key-border);background:transparent;color:var(--label);border-radius:3px;padding:6px 12px;font-size:12px;cursor:pointer}
 .copy:hover{background:var(--chip-hover)}
 pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:13px;line-height:1.7}
-.prompt pre{padding:18px 20px;color:var(--output-text);overflow-wrap:break-word}
 .by-hand{margin-top:34px}
 .downloads{list-style:none;padding:0;margin:22px 0 14px;display:grid;gap:16px}.downloads li{display:grid;gap:6px;justify-items:start}.downloads span{font-size:14px;color:var(--muted);text-wrap:pretty}.downloads code{font-size:12.5px;white-space:pre;overflow-x:auto;min-width:0;flex:1;border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--editor-bg)}
 .commands{border:1px solid var(--line);border-radius:6px;padding:16px 20px;background:var(--editor-bg);white-space:pre;overflow-wrap:normal;overflow-x:auto}

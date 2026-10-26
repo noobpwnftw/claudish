@@ -30,7 +30,7 @@ class StaticDemoBuildTests(unittest.TestCase):
 
 
 class SiteBuildTests(unittest.TestCase):
-    def test_home_page_links_the_demo_and_its_install_prompt_is_real(self):
+    def test_home_page_links_the_demo_and_its_recordings(self):
         import re
         import subprocess
         with tempfile.TemporaryDirectory() as directory:
@@ -47,16 +47,6 @@ class SiteBuildTests(unittest.TestCase):
         for name in ("cd_AI.gif", "cd_AI-terminal.gif"):
             self.assertIn('src="%s"' % name, page)
             self.assertTrue(recordings[name], name)
-        prompt = re.search(r'<pre id="prompt-text">(.*?)</pre>', page, re.S).group(1)
-        self.assertIn("tapping Shift switches to continue", prompt)  # it ends on the keys
-        # Every command the prompt tells an agent to run must exist.
-        for command in re.findall(r"`python -m claudish ([^`]+)`", prompt):
-            words = command.split()
-            usage = subprocess.run([sys.executable, "-m", "claudish", words[0], "--help"], cwd=str(ROOT),
-                                   capture_output=True, text=True)
-            self.assertEqual(usage.returncode, 0, command)
-            for flag in (w for w in words[1:] if w.startswith("--")):
-                self.assertIn(flag, usage.stdout, command)
 
 
 if __name__ == "__main__":

@@ -88,8 +88,11 @@ The settings page's **Claude Code** and **Codex** choices use a Claude or a Chat
 through its own command line. cd_AI keeps that model process running beside the service, as it does
 the local model: it starts and warms up with the service, is restarted if it ends, and stops with
 the service. `/health` and `claudish doctor` give its state (`starting`, `warm`, `restarting`, or
-why it failed). Each rewrite is its own conversation, with cd_AI's template as the whole
-instruction. The choice writes the command's full path (a login service may not have your shell's
+why it failed). Each request is its own conversation, with cd_AI's template as the whole
+instruction; an instruction's earlier turns in the same text box go into that one message, so
+follow-ups work. F8 pictures, tools and helpers need the Claude API or a model server.
+Install [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) or
+[Codex](https://developers.openai.com/codex/cli) and log in to it before picking it. The choice writes the command's full path (a login service may not have your shell's
 PATH); `model` is optional:
 
 ```json
@@ -100,8 +103,7 @@ PATH); `model` is optional:
 Claude Code runs `claude -p` in stream-json mode with no tools, MCP servers or settings, one process
 per request, the next one started ahead of time. Codex runs one `codex app-server` with a new
 read-only, ephemeral thread per request at low effort; a model the account does not offer falls
-back to Codex's default. Measured on a DGX Spark with the default tone, from Tab to the rewrite:
-about 2 s for either (each CLI started per request: about 4 s for Claude Code, 5 s for Codex).
+back to Codex's default.
 
 ### An agent CLI as the backend
 
@@ -125,10 +127,6 @@ Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
 `llm`, or a script. Tool permissions are the CLI's
 own; for example, Claude Code's `--allowedTools` in the command list. Agents are
 slow, so the profile's `timeout` applies (`/health` reports it).
-
-Measured on a DGX Spark (GB10) with Claude Code 2.1.306: an instruct request ("thank
-Priya for fixing the flaky CI job, it saved the release") returned a finished,
-em-dashed thank-you note in 4.5 s.
 
 ### Profiles
 
@@ -165,7 +163,8 @@ lists it in "consulted". F8 applies to that one instruction.
   `"look_command"` to a program that writes a PNG of the focused window to stdout: on macOS a
   `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
   Wayland lets no program capture a window without asking, so F8 has no picture there.
-- **Backends:** `claude` and any OpenAI-compatible server with a vision model.
+- **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
+  Codex get no picture.
   For llama.cpp, start a vision model with its projector, for example
   [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
   `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj
@@ -404,7 +403,7 @@ Every request names a mode:
 | `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
 
 At the caret, compose's Tab asks for `rewrite`, its Shift+Enter (or Enter, [Keys](#keys)) sends `instruct`, and continue mode
-(a Shift tap) asks for `continue`. Adapters send `"mode"` in `/suggest`, and
+(a Shift tap) asks for `continue` ([all the keys](using.md#typing)). Adapters send `"mode"` in `/suggest`, and
 `/health` lists the modes. A profile's templates can change any mode, or add one
 of its own; its `"modes"` says only which profile answers a mode (above).
 
@@ -414,7 +413,9 @@ The templates are in
 [`claudish/templates.json`](../claudish/templates.json): each mode's `system`
 prompt, the `plain` one for boxes that are not prose (a terminal, a URL, a
 number), `examples` as `[input, answer]` pairs, a `frame` around your text
-(`{text}`), `max_tokens` and `candidates` (how many readings to offer, 1 to 5);
+(`{text}`), `max_tokens` and `candidates` (how many readings to sample, 1 to 5, default 1; model
+servers and `rules` only: on every backend, versions come as the answer's drafts, up to three, when
+an instruction asks for them);
 for `rewrite`, `parts`: examples for words inside a text (a selection, or words typed
 mid-sentence) as `[before, part, after, replacement]`, used when such words are rewritten in
 their place (`box.in_place`); the tones; and the wording about the text box (`box`). A templates file has the

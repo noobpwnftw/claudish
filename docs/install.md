@@ -152,7 +152,8 @@ a variable you `export` in a terminal does not reach a service started at login.
 **Another model API:** the same settings page takes any OpenAI-compatible address (OpenAI,
 OpenRouter, Groq, Ollama, LM Studio, llama.cpp) and a key if it needs one. `claudish init` writes
 `~/.config/claudish/config.json` with profiles to start from: `claude` (the default), `ollama` (any
-OpenAI-compatible server), `local` (below), and `agent` (an agent CLI such as `claude -p`); see
+OpenAI-compatible server), `local` (below), `claude-code` and `codex` (the subscriptions), and
+`agent` (an agent CLI such as `claude -p`); see
 [configuration](configuration.md). With no model at all, compose says "no model is set up".
 
 **A local model:** `claudish setup --profile local` downloads a pinned
@@ -160,7 +161,8 @@ OpenAI-compatible server), `local` (below), and `agent` (an agent CLI such as `c
 Apple silicon, `--variant vulkan` for most GPUs on Linux and Windows) and Gemma 4 E4B (Apache-2.0,
 QAT Q4_0, 4.9 GB; [why this model](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)),
 and runs both at login. Continue (a Shift tap) suggests the rest of a sentence only with a local
-model, or with a model a profile routes to it ([configuration](configuration.md#modes)).
+model, or with a model a profile routes to it ([configuration](configuration.md#modes)); on
+Claude, Claude Code and Codex it is plain typing.
 
 ## The service
 

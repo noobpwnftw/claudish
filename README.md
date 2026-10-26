@@ -21,18 +21,15 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 | | You type | cd_AI |
 | --- | --- | --- |
 | **compose** (where it starts), then Tab | `this is important` | a rewrite in cd_AI's panel, waiting; Tab again puts it in |
-| **compose**, then Shift+Enter | `decline the meeting politely` | drafts to choose from (↑↓, Tab) |
-| **continue** | `Thanks for the review on ` | with a model set up for it (a local one), the rest of the sentence in gray; Tab takes it |
+| **compose**, then Shift+Enter | `three ways to decline the meeting` | the drafts to choose from (↑↓, Tab) |
+| **continue** | `Thanks for the review on ` | with a local model, the rest of the sentence in gray; Tab takes it. On Claude, Claude Code and Codex, plain typing |
 
 Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/using.md).
 
-In a terminal, a handoff is a command draft: Tab puts it at the prompt; Enter runs it in that folder.
-
-![Shift+Enter drafts a git command, then hands the failing invoice test to Claude Code on a session with a handoff note; it fixes the rounding (macOS, Terminal, Gemma 4 E4B)](docs/cd_AI-terminal.gif)
-
-cd_AI ships no model. Claude is the default; any OpenAI-compatible server or an agent CLI
-works too, and `claudish setup --profile local` downloads Gemma 4 E4B. Continue needs a local
-model, or a profile routed to one. Context: files, commands and MCP servers, per app.
+cd_AI ships no model. Claude is the default; Claude Code, Codex, any OpenAI-compatible server or
+an agent CLI work too, and [`claudish setup --profile local`](docs/install.md#the-claudish-command)
+downloads Gemma 4 E4B; continue suggests with it, or with a model a profile routes continue to.
+Context: files, commands and MCP servers, per app.
 
 ## Tones and templates
 
@@ -45,8 +42,10 @@ The templates are in one file: `claudish templates` prints it, and `claudish ini
 
 Download from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest). Each
 installer ends in cd_AI's settings: paste an [Anthropic API key](https://console.anthropic.com/settings/keys),
-pick **Claude Code** for a Claude subscription or **Codex** for a ChatGPT subscription, or give
-the address of another model API, and pick a tone. Use **Try a rewrite** in Settings, then type
+pick **Claude Code** for a Claude subscription or **Codex** for a ChatGPT subscription (install
+[Claude Code](https://docs.claude.com/en/docs/claude-code/setup) or
+[Codex](https://developers.openai.com/codex/cli) and log in to it first), or give the address of
+another model API, and pick a tone. Use **Try a rewrite** in Settings, then type
 `ok` in an app: Tab previews the rewrite; Tab again inserts it.
 
 - **macOS** (Apple silicon): **cd_AI.pkg**. It is not signed by Apple, so macOS blocks it the first
@@ -73,14 +72,18 @@ source: [docs/install.md](docs/install.md).
 
 | Key | Does |
 | --- | --- |
-| Shift (tap) | switch: continue ↔ compose |
-| Tab | take what the model offers: continue's suggestion, a rewrite (shown first; Tab again puts it in), the highlighted draft or choice (Allow and Deny too), an answer to read (with nothing offered, Tab is the app's) |
-| Shift+Enter | compose: send it as an instruction (it stays underlined while the model works), a follow-up, or a reply |
-| Enter | compose: keep your words as they are (the next Enter is the app's); once the model is asked, it does nothing (with nothing composed, it is the app's) |
-| ↑ ↓ | choose a draft or an answer, Tab takes it (Allow and Deny too); choices are not numbered: digits are text, and Space does nothing while drafts show |
-| F8 | with an instruction: also send a picture of this window |
-| Esc | one step back: what you typed, then edit (your instruction back at the caret), then drop |
-| Shift+Esc | bring back what Esc dropped, or the exchange you left when you switched windows |
+| Shift (tap) | switch: compose ↔ continue |
+| Tab | take what the model offers: a rewrite (shown first; Tab again puts it in), the highlighted draft, continue's suggestion |
+| Shift+Enter | compose: send your words as an instruction, a follow-up, or a reply |
+| Enter | compose: keep your words as they are |
+| Esc | one step back: what you typed, then edit, then drop |
+
+All the keys: [docs/using.md](docs/using.md#typing). F8 pictures, tools and handoffs need the Claude
+API or a model server, and handoffs a `"helper"` in the profile
+([configuration](docs/configuration.md#helpers-handing-a-task-over)). In a terminal, a handoff is a
+command draft: Tab puts it at the prompt; Enter runs it in that folder.
+
+![Shift+Enter drafts a git command, then hands the failing invoice test to Claude Code on a session with a handoff note; it fixes the rounding (macOS, Terminal, Gemma 4 E4B)](docs/cd_AI-terminal.gif)
 
 ## Status
 

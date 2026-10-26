@@ -5,21 +5,8 @@ How Claudish is built and tested. See also [CONTRIBUTING](../CONTRIBUTING.md) an
 ## Testing
 
 `python scripts/check.py` is the merge gate (unit tests, the IBus and PIME smokes, the settings
-page in Chromium; each step under 5 s). Installs are checked on each OS:
-
-- **macOS:** macOS 26 on Apple silicon, in a UTM VM: the package installs, and after a logout "ok"
-  + Tab rewrites in TextEdit; cd_AI stays enabled and its service comes back after a restart; the
-  offline panel. Earlier, 12 typing scenarios; event-routing tests with Cocoa test doubles.
-- **Windows:** Windows 11 ARM64 in a KVM VM: install, restart, update over it, restart; "ok" + Tab
-  rewrites in Notepad each time, and cd_AI installs beside PIME's Chewing. Earlier, classic Notepad
-  15/15, Edge 14/14 (a shortcut right after a cleared field could lose the composed word), Windows
-  Terminal and the classic console 4/4. x64 hardware is untested.
-- **Linux:** the one-line installer in a clean Ubuntu 24.04 container. The Docker rig below checks
-  real IBus typing with GTK and Qt on X11 (2026-10-25). GNOME Shell 46 on Wayland was checked before
-  2026-10-24; KDE is not yet tested. On GNOME, a composition left in a field when you click another
-  one lands in the field you clicked: GNOME commits it after GTK has moved focus, as for every
-  input method.
-- **Browser demo:** tested with real inference in Chromium.
+page in Chromium; each step under 5 s). Installs and real typing are checked by hand on each OS
+([Verify](#verify)).
 
 ## Implementation
 
@@ -31,7 +18,8 @@ packages supply their native dependencies. The source inventory:
 | --- | --- | --- |
 | Typing state | `claudish/composition.py` | Composition, revisions, candidates, acceptance, focus and the held exchange |
 | Delivery | `claudish/client.py`, `server.py` | Coalescing background worker, loopback requests, settings and session events |
-| Models | `claudish/model.py`, `warm.py`, `children.py` | API/command/rules backends, subscription CLI lifecycle and child processes |
+| Models | `claudish/model.py`, `warm.py`, `children.py` | API/command/rules backends; `warm.py` keeps Claude Code and Codex running beside the service; child processes |
+| Answers | `claudish/shapes.py`, `quirks.py` | The answer's shape (`{"drafts": [...]}`) and its schema per backend; the quirks of plain-text answers from backends without a schema |
 | Wording | `claudish/templates.json`, `modes.py`, `turn.py` | Tone, prompts, examples, field context and output handling |
 | Instructions | `claudish/conversation.py`, `sessions.py`, `agent.py`, `handoff.py` | Turns, tools, questions, helper handoffs and CLI sessions |
 | Context | `claudish/context.py`, `tools.py`, `textbox*.py`, `screen.py`, `capture.py` | Providers/tools, surrounding text, terminal text and F8 pictures |
@@ -43,20 +31,22 @@ packages supply their native dependencies. The source inventory:
 | Evidence | `tests/`, `benchmarks/`, `docs/cd_AI*.gif` | Regression checks, typing rig, measured model outputs and VM recordings |
 | Maintenance | `AGENT.md`, `AGENTS.md`, `CLAUDE.md`, `ROADMAP.md` | Shared instructions, agent entry points and the ordered queue |
 
-All three adapters use the same composition state. Input events do not wait for inference, and
-every edit invalidates the previous candidate. Generated `claudish/web/lab-states.js` comes from
+```
+app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service ──▶ backend
+       IBus / TSF / IMK     platforms/*   client.py       server.py    model.py
+                            composition.py
+```
+
+All three adapters use the same composition state (`composition.py`, which also runs inside
+PIME's own Python on Windows, 3.12, with no third-party packages); keep the adapters thin. Input
+events do not wait for inference: `client.py` is one background worker per adapter that debounces
+(180 ms) and coalesces, and every edit bumps a revision, so a result for an older one is dropped. Generated `claudish/web/lab-states.js` comes from
 `scripts/lab_states.py`, which drives that same state; edit its generator rather than its output.
 
 `docs/research/` records earlier design reviews; `benchmarks/` records model runs with their
 conditions. Neither is a current release certification. `models/`, `.tools/`, `dist/`, local VM
 helpers and `AGENT_STATE.md` are working material outside Git. Keep that material available for
 the rigs; it is not part of the shipped source.
-
-## Next checks
-
-The merge gate runs the unit tests, both adapter smokes, the settings page in a browser, and a
-syntax check of the GNOME extension. Still open: Windows x64, browser-download installs (Safari,
-Edge), and a funded Anthropic API key and its failure states on both packages.
 
 ## Build the tested CUDA backend
 
@@ -76,7 +66,7 @@ llama.cpp and PIME retain their own licenses. Their source and weights are depen
 
 ## Verify
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for the architecture and how to report bugs.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for what to pick up and how to report bugs.
 
 ```sh
 python scripts/check.py   # tests, compile, IBus and PIME smokes, the settings page: about six seconds
@@ -136,8 +126,7 @@ are in `~/Library/Logs/DiagnosticReports/Claudish-*.ips`.
 `python scripts/build_static_demo.py --site` writes the home page (`site/`) with the static demo in
 `demo/`. `python scripts/build_static_demo.py` alone writes the demo to `dist/demo/`. The static demo's
 service worker (`claudish/web/coi-sw.js`) supplies the cross-origin isolation headers a static host
-cannot set, so wllama's multi-threaded build runs: on a DGX Spark's CPU in headless Chromium, a
-rewrite takes about 1 s (9 s single-threaded).
+cannot set, so wllama's multi-threaded build runs.
 
 On Windows, cd_AI's PIME
 ([platforms/windows/pime](../platforms/windows/pime/README.md)) calls the input method back when an
