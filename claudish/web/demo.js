@@ -291,8 +291,8 @@ function key(name, shift = false) {
   if (name === "Tab") {
     if (!state.text && selected()) {  // a selection: your words, as if you had just typed them
       const [start, end] = selection();
-      const words = doc.text.slice(start, end);
-      if (words.length <= MAX) { removeSelection(); change(words); render(); return true; }
+      const words = doc.text.slice(start, end);  // one line you could have typed (composition.py's selectable)
+      if (words.length <= MAX && words.trim() && !/[\n\r\v\f\u0085\u2028\u2029]/.test(words)) { removeSelection(); change(words); render(); return true; }
     }
     if (!state.text) return false;
     if (state.reply) return true;  // a reply you are typing: Shift+Enter sends it, and Tab takes nothing over it
@@ -538,26 +538,14 @@ function clip(event, cut) {
 }
 sink.addEventListener("copy", (event) => clip(event, false));
 sink.addEventListener("cut", (event) => clip(event, true));
+// A paste is the app's, as with any input method: your words go in first, then the pasted text as
+// is. To compose it, select it and press Tab.
 function paste(text) {
   stopTyping();
-  if (sent() && text && (state.reply + text).length <= MAX) {  // a reply: the exchange stays open
-    state.reply += text;
-    render();
-    return;
-  }
-  if (!live() && text && (state.text + text).length <= MAX) {
-    // Compose: pasted words join the composition, to be rewritten (Tab), sent (Shift+Enter) or
-    // kept (Enter) like typed ones. The installed input method's counterpart is a selection.
-    if (selected() && !state.text) removeSelection();
-    change(state.text + text);  // a rewrite showing goes; your words go on
-    changed();
-    return;
-  }
-  if (composing()) commit(state.text);
+  settle();
   commit(text.slice(0, 5000));
   change(live() ? context() : "");
   changed();
-  if (!live() && text) setStatus(`Pasted as is: ${MAX} characters is the most ${state.mode} takes at once.`);
 }
 sink.addEventListener("paste", (event) => {
   event.preventDefault();
