@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+- Windows: cd_AI's PIME is rebased on PIME 2.0.0-beta4. Its launcher drops requests left from
+  before a backend restart and passes a closing text box on to the backend; the input method runs
+  on PIME's Python 3.15.
+- Windows: an update removes the files the previous version had and this one does not; the
+  installer no longer carries leftover copies of replaced DLLs.
+- The browser demo: a paste goes in as is, as in any app; Tab on a one-line selection composes it.
+
 ## 0.3.0
 
 - Once the model answered (a rewrite, drafts, an answer to read, a question), what you type is about
