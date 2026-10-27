@@ -24,13 +24,12 @@ foreach ($arch in 'Win32', 'x64', 'ARM64') {
   "built $arch"
 }
 # The launcher: x86 (it runs on every Windows, as PIME's does), the C runtime linked in (no
-# Visual C++ runtime to install).
+# Visual C++ runtime to install: PIMELauncher/.cargo/config.toml).
 $cargo = "$env:USERPROFILE\.cargo\bin\cargo.exe"
 if (-not (Test-Path $cargo)) {
   cmd /c "`"$source\PIMELauncher\rustup-init.exe`" -y --profile minimal > `"$source\rustup.log`" 2>&1"
 }
 cmd /c "`"$env:USERPROFILE\.cargo\bin\rustup.exe`" target add i686-pc-windows-msvc > `"$source\rustup-target.log`" 2>&1"
-$env:RUSTFLAGS = '-C target-feature=+crt-static'
 Push-Location "$source\PIMELauncher"
 cmd /c "`"$cargo`" build --release --target i686-pc-windows-msvc > `"$source\cargo.log`" 2>&1"
 $failed = $LASTEXITCODE

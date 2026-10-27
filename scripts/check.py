@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-PIME_URL = ("https://raw.githubusercontent.com/EasyIME/PIME/e0ddf2ffc180837c2e9f8be363de4455c7532962/"
+PIME_URL = ("https://raw.githubusercontent.com/EasyIME/PIME/3697f88ae042f60608c003716750c957f5ed5c4c/"
             "python/textService.py")
 PIME_SHA256 = "c84fc2e9e79824d0d7692c895ba385287f6e29a3e5ba8cc25945b913694026ce"
 results = []

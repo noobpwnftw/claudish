@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 7829c72..1ce78f1 100644
+index 0c7a8d5..c683198 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -493,10 +493,10 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 28d8286..53bbb7e 100644
+index 286246a..910b8c4 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
-@@ -94,6 +94,21 @@ void TextService::onDeactivate() {
+@@ -96,6 +96,21 @@ void TextService::onDeactivate() {
  void TextService::onFocus() {
  }
  
@@ -518,7 +518,7 @@ index 28d8286..53bbb7e 100644
  // virtual
  bool TextService::filterKeyDown(Ime::KeyEvent& keyEvent) {
  	// if (keyEvent.isKeyToggled(VK_CAPITAL))
-@@ -268,6 +283,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -270,6 +285,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	candidateWindow_->setUseCursor(candUseCursor_);
  	candidateWindow_->setCandPerRow(candPerRow_);
@@ -528,7 +528,7 @@ index 28d8286..53bbb7e 100644
  
  	// the items in the candidate list should not exist the
  	// number of available keys used to select them.
-@@ -280,9 +298,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+@@ -282,9 +300,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
  
  	RECT textRect;
  	// get the position of composition area from TSF
@@ -542,7 +542,7 @@ index 28d8286..53bbb7e 100644
  	}
  
  	if (validCandidateListElementId_) {
-@@ -297,9 +316,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
+@@ -299,9 +318,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
      if (candidateWindow_) {
          RECT textRect;
          // get the position of composition area from TSF
@@ -554,7 +554,7 @@ index 28d8286..53bbb7e 100644
          }
      }
  }
-@@ -346,6 +364,51 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,51 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -606,7 +606,7 @@ index 28d8286..53bbb7e 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -369,14 +432,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +434,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -636,7 +636,7 @@ index 28d8286..53bbb7e 100644
      }
  }
  
-@@ -429,6 +503,7 @@ void TextService::closeClient() {
+@@ -431,6 +505,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -645,7 +645,7 @@ index 28d8286..53bbb7e 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 5c89d15..5f1fe75 100644
+index 303cf17..a50bd9e 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -692,7 +692,7 @@ index 5c89d15..5f1fe75 100644
 +	std::unique_ptr<Ime::GhostWindow> ghostWindow_;
  	int candFontSize_;
  
- 	HMENU popupMenu_;
+ 	HMENU popupMenu_{nullptr};
 diff --git a/python/textService.py b/python/textService.py
 index 400c374..dc08444 100644
 --- a/python/textService.py
