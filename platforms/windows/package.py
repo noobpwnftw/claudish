@@ -52,7 +52,7 @@ def pime(pime_root, target):
     """build-pime.ps1's tree with cd_AI as its only input method, its shared modules beside it."""
     # Only the Python backend: registration and the launcher go through every backend in
     # backends.json, so another backend's input methods would be registered as cd_AI's.
-    skipped = shutil.ignore_patterns("Uninstall.exe", "__pycache__")
+    skipped = shutil.ignore_patterns("Uninstall.exe", "__pycache__", "*.old")  # *.old: DLLs replaced while in use
 
     def ignore(folder, names):
         top = {"node", "go-backend"} if Path(folder) == Path(pime_root) else set()
