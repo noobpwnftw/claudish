@@ -35,6 +35,13 @@ ChangesEnvironment=yes
 FinishedLabelNoIcons=Setup has finished installing [name]. Restart Windows, then pick Claudish with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter asks the model; Enter keeps your words.
 FinishedLabel=Setup has finished installing [name]. Restart Windows, then pick Claudish with Win+Space.%n%nType a few words in any app: Tab shows a rewrite, Tab again inserts it. Shift+Enter asks the model; Enter keeps your words.
 
+[InstallDelete]
+; An update replaces the two Pythons whole (PrepareToInstall has stopped what runs from them), so a
+; file the last version had and this one does not (another Python's, a module since removed) goes.
+; The text service's folders stay: apps hold its DLLs, replaced at the next restart.
+Type: filesandordirs; Name: "{app}\PIME\python"
+Type: filesandordirs; Name: "{app}\python"
+
 [Files]
 ; The text service's DLLs are loaded in every app that takes text: in use, they are replaced at the
 ; next restart (as input methods' installers do), which an update asks for.
