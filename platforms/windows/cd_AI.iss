@@ -38,9 +38,13 @@ FinishedLabel=Setup has finished installing [name]. Restart Windows, then pick C
 [InstallDelete]
 ; An update replaces the two Pythons whole (PrepareToInstall has stopped what runs from them), so a
 ; file the last version had and this one does not (another Python's, a module since removed) goes.
-; The text service's folders stay: apps hold its DLLs, replaced at the next restart.
+; The text service's folders stay (apps hold its DLLs, replaced at the next restart), but not the
+; copies of DLLs replaced while in use (*.old) that versions before 0.3.1 carried.
 Type: filesandordirs; Name: "{app}\PIME\python"
 Type: filesandordirs; Name: "{app}\python"
+Type: files; Name: "{app}\PIME\x86\*.old"
+Type: files; Name: "{app}\PIME\x64\*.old"
+Type: files; Name: "{app}\PIME\arm64\*.old"
 
 [Files]
 ; The text service's DLLs are loaded in every app that takes text: in use, they are replaced at the
