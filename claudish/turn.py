@@ -58,7 +58,7 @@ class Box:
         parts = []
         kind = words["kinds"].get(self.kind or "")
         if kind or self.app:
-            parts.append("The text box is %s%s." % (kind or "a text field", " in %s" % self.app if self.app else ""))
+            parts.append(words["is_in" if self.app else "is"].format(kind=kind or words["field"], app=self.app))
         if self.kind in words["facts"]:
             parts.append(words["facts"][self.kind])
         if mode == "instruct":  # how the answer reaches the user, whatever the box shares
@@ -67,14 +67,12 @@ class Box:
         if before or self.after:
             more = ""
             if self.clipped(mode) and retrieval:
-                more = ("\nThe text box has %d characters; this is the part around the caret, at %d. "
-                        "Read or search the rest with the textbox tools."
-                        % (len(self.before) + len(self.after), len(self.before)))
+                more = "\n" + words["clipped"].format(length=len(self.before) + len(self.after), caret=len(self.before))
             width, after = WINDOWS.get(mode, WINDOW)
             head = "…" if len(before) > width else ""
             tail = "…" if len(self.after) > after else ""
-            parts.append("<context name=\"the text box around the caret (▮)\">\n%s%s▮%s%s\n</context>%s" % (
-                head, before[-width:], self.after[:after], tail, more))
+            parts.append("<context name=\"%s\">\n%s%s▮%s%s\n</context>%s" % (
+                words["around"], head, before[-width:], self.after[:after], tail, more))
             if mode == "instruct":
                 parts.append(words["at_caret"])
         return "".join("\n\n" + part for part in parts)
@@ -107,7 +105,7 @@ def observe(rewriter, box, mode, look=False, screen=None):
             from .screen import read
             screen = read(box.app)
         if screen:
-            box.observe("terminal screen, last lines", screen,
+            box.observe(rewriter.modes.get(mode, {}).get("box", WORDS)["screen"], screen,
                         "terminal screen (%d lines)" % (screen.count("\n") + 1))
     if look:
         from .capture import capture

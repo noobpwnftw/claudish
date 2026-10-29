@@ -17,6 +17,8 @@ import threading
 import time
 import uuid
 
+from .modes import TEMPLATES
+
 PARTIAL_EVERY = 0.15  # seconds between partial-draft events
 
 
@@ -227,7 +229,7 @@ class ClaudeCodeDriver:
         trust, deny = self.policy.get(server, ((), ()))
         if (body.get("tool_name") or "").startswith("mcp__") and tool in deny:
             self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                       "response": {"behavior": "deny", "message": "The user's profile denies this tool."}}})
+                       "response": {"behavior": "deny", "message": TEMPLATES["box"]["denied"]}}})
             return
         if (body.get("tool_name") or "").startswith("mcp__textbox__") or \
                 ((body.get("tool_name") or "").startswith("mcp__") and tool in trust):
@@ -287,7 +289,7 @@ class ClaudeCodeDriver:
         if text is None and choice == 1:  # Allow, listed after the safe choice
             decision = {"behavior": "allow", "updatedInput": tool_input}
         else:  # Deny, or free text: the user's words go back to the agent as the reason
-            decision = {"behavior": "deny", "message": text or "The user declined this tool call."}
+            decision = {"behavior": "deny", "message": text or TEMPLATES["box"]["declined"]}
         self.send({"type": "control_response", "response": {
             "subtype": "success", "request_id": question, "response": decision}})
 

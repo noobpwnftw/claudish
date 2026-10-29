@@ -48,8 +48,9 @@ def rules(text):
     return text
 
 
-def user_content(text, image, style):
-    """The user turn: the text, or the text after a picture of the focused window (PNG bytes)."""
+def user_content(text, image, style, intro=""):
+    """The user turn: the text, or the text after a picture of the focused window (PNG bytes) and
+    what it is (intro: templates.json box.picture)."""
     if image is None:
         return text
     data = base64.b64encode(image).decode("ascii")
@@ -57,7 +58,7 @@ def user_content(text, image, style):
         picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}
     else:  # OpenAI-compatible: llama.cpp with a vision model (--mmproj), vLLM, Ollama, hosted APIs
         picture = {"type": "image_url", "image_url": {"url": "data:image/png;base64," + data}}
-    return [picture, {"type": "text", "text": "The picture is the window I am typing in.\n\n" + text}]
+    return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
 FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
@@ -128,13 +129,13 @@ class Claude:
         usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
         return {"message": reply, "finish_reason": finish}, usage
 
-    def rewrite(self, text, system, examples, image=None):
+    def rewrite(self, text, system, examples, image=None, intro=""):
         """One request without tools: (the answer's content, usage)."""
         options = self.options(shaped=True)
         try:
             response = self.client.beta.messages.create(
                 model=self.model, max_tokens=2048, system=system,
-                messages=examples + [{"role": "user", "content": user_content(text, image, "claude")}],
+                messages=examples + [{"role": "user", "content": user_content(text, image, "claude", intro)}],
                 **options)
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
@@ -547,7 +548,7 @@ class Rewriter:
                 outputs = [self.warm.ask(one_message(prompt, sent, said, spec["box"]["one_message"], history),
                                           self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
-                output, usage = self.claude.rewrite(said, prompt, sent, box.image)
+                output, usage = self.claude.rewrite(said, prompt, sent, box.image, spec["box"]["picture"])
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost
@@ -647,9 +648,9 @@ class Rewriter:
         same results; asked again (take), the first is sampled too, for a different one. (outputs,
         usage, the turn's tool messages, what the tools consulted)."""
         from .conversation import TURN_TIMEOUT
-        messages = ([{"role": "system", "content": prompt}] + examples + history
-                    + [{"role": "user", "content": user_content(said, box.image, "openai")}])
         spec = self.modes[mode]
+        messages = ([{"role": "system", "content": prompt}] + examples + history
+                    + [{"role": "user", "content": user_content(said, box.image, "openai", spec["box"]["picture"])}])
         max_tokens = spec["max_tokens"] or self.max_tokens
         usage = {}
 
@@ -674,7 +675,7 @@ class Rewriter:
             if self.schema:
                 # Held to the schema: a step is a call or the answer, and the history is told in steps.
                 told = shapes.with_tools(messages, offered, spec["box"]["steps"]) if offered else messages
-                shaped = dict(payload, messages=shapes.as_steps(told),
+                shaped = dict(payload, messages=shapes.as_steps(told, spec["box"]),
                               response_format=shapes.step_format(offered) if offered else shapes.answer_format())
                 try:
                     try:

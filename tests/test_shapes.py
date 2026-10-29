@@ -2,6 +2,7 @@ import json
 import unittest
 
 from claudish import shapes
+from claudish.modes import TEMPLATES
 
 ASK = {"type": "function", "function": {"name": "user__ask", "description": "Ask the user.", "parameters": {
     "type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}}}
@@ -26,7 +27,7 @@ class ShapeTests(unittest.TestCase):
         history = shapes.as_steps(shapes.as_answered([
             {"role": "system", "content": "s"}, {"role": "user", "content": "go"}, dict(call, role="assistant"),
             {"role": "tool", "tool_call_id": "step-3", "content": "The user chose: A"},
-            {"role": "assistant", "content": "Done."}]))
+            {"role": "assistant", "content": "Done."}]), TEMPLATES["box"])
         self.assertEqual(json.loads(history[2]["content"]), {"call": "user__ask", "arguments": {"question": "Which?"}})
         self.assertEqual(history[3], {"role": "user", "content": "Result of user__ask:\nThe user chose: A"})
         self.assertEqual(json.loads(history[4]["content"]), {"drafts": ["Done."]})  # an earlier answer, as answered

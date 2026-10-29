@@ -19,19 +19,16 @@ def ask(body):
 
 def main():
     from mcp.server.mcpserver import MCPServer
-    server = MCPServer("textbox", instructions="The text box the user is typing in, where your answer will be "
-                                               "inserted at the caret. Read or search it when the "
-                                               "instruction refers to its content.")
+    from .modes import TEMPLATES
+    words = TEMPLATES["box"]["textbox"]  # what the agent reads about this server (templates.json)
+    server = MCPServer("textbox", instructions=words["instructions"])
 
-    @server.tool(annotations={"readOnlyHint": True})
+    @server.tool(description=words["read"], annotations={"readOnlyHint": True})
     def read(start: int = 0, length: int = 2000) -> str:
-        """Read part of the text box the user is writing in. Offsets are characters; the result
-        says where the caret is."""
         return ask({"op": "read", "start": start, "length": length})
 
-    @server.tool(annotations={"readOnlyHint": True})
+    @server.tool(description=words["search"], annotations={"readOnlyHint": True})
     def search(query: str) -> str:
-        """Find where words or a phrase occur in the text box; read around a result with read."""
         return ask({"op": "search", "query": query})
 
     server.run()

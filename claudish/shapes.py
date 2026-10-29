@@ -68,7 +68,7 @@ def with_tools(messages, offered, words):
             for i, m in enumerate(messages)]
 
 
-def as_steps(messages):
+def as_steps(messages, words):
     """The tool loop's history (OpenAI tool_calls and tool results) as the steps the model wrote and
     the results it was given: the shape it answers in, rather than a native format it does not."""
     out, names = [], {}
@@ -85,8 +85,8 @@ def as_steps(messages):
                 out.append({"role": "assistant", "content": json.dumps({"call": function.get("name"),
                                                                         "arguments": arguments}, ensure_ascii=False)})
         elif message.get("role") == "tool":
-            out.append({"role": "user", "content": "Result of %s:\n%s" % (names.get(message.get("tool_call_id"), "the call"),
-                                                                         message.get("content") or "")})
+            out.append({"role": "user", "content": words["result"].format(
+                tool=names.get(message.get("tool_call_id"), words["the_call"]), result=message.get("content") or "")})
         else:
             out.append(message)
     return out

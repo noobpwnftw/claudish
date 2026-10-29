@@ -149,32 +149,29 @@ class ModelDriver:
             return
         session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"])
 
+    def words(self):
+        """What Claudish's own tools say to the model (templates.json box.own, as the profile has it)."""
+        return self.rewriter.modes["instruct"]["box"]["own"]
+
     def own_tools(self, session, box):
         """Claudish's tools for an instruction: a question to the user (shown as is, the answer goes
         back to the model), and the profile's helper, which acts and so is asked about first."""
+        own = self.words()
         tools = {"user__ask": (
-            "Ask the user a short question, shown as is with up to three choices, when the instruction is "
-            "ambiguous or needs their decision (\"Did you mean git status?\"), or to offer actions to choose "
-            "from, each choice an action. They pick a choice or type a reply; that is the result. The "
-            "question goes here, never in your text. Versions of the text to pick from are your answer's "
-            "drafts, not a question. Besides your answer, the user sees only this question and user__show.",
+            own["ask"],
             {"type": "object", "properties": {
                 "question": {"type": "string"},
                 "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
              "required": ["question"]},
             lambda arguments: self.ask_user(session, arguments))}
         tools["user__show"] = (
-            "Show the user an answer to read instead of text for the text box, only when they asked to understand "
-            "something (\"what does this error mean?\", \"what is the amount due?\"): a few sentences at most. "
-            "Never for something to do: draft it, or hand it over. They may insert it or dismiss it; that ends "
-            "the instruction.",
+            own["show"],
             {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
             lambda arguments: self.show(session, arguments, box))
         from . import handoff
         if self.conversation.handoffs:
             tools["helper__check"] = (
-                "What the helper you handed a task to from this text box is doing now: its latest messages "
-                "(read only; nothing is sent to it). Use it when the user asks about that task (\"is it done?\").",
+                own["check"],
                 {"type": "object", "properties": {}},
                 lambda arguments: "\n\n".join(handoff.progress(h) for h in self.conversation.handoffs[-3:]))
         for title, helper in handoff.helpers(self.rewriter.helper).items():
@@ -194,24 +191,21 @@ class ModelDriver:
                     if command:
                         self.drafted = [command]
                         self.conversation.handoffs.append(record)
-                        self.settled = "I offered %s's command at the prompt for this task: %s" % (title, task)
+                        self.settled = self.words()["offered"].format(helper=title, task=task)
                         raise Finished(self.settled)
                 launcher = self.rewriter.launcher
                 window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
                 if not handoff.launch(helper, note, launcher, session, window):
-                    return "No terminal window could be opened for %s: answer the instruction yourself." % title
+                    return self.words()["no_window"].format(helper=title)
                 record.update(tmux=window if launcher and launcher[0] == "tmux" else "", cwd=os.path.expanduser("~"))
                 self.conversation.handoffs.append(record)
                 self.handed = "%s opened in a new window" % title
-                self.settled = "I handed this task to %s in a new window: %s" % (title, task)
+                self.settled = self.words()["handed"].format(helper=title, task=task)
                 raise Finished(self.settled)
             tools["helper__" + title] = (
-                "Hand the task to %s, a coding agent that works on the user's machine (in a terminal, its "
-                "command is offered at the prompt; elsewhere in a new terminal window), when it takes more "
-                "than an answer here (investigating, editing files, several steps), or when the user asks "
-                "for it." % title,
+                own["helper"].format(helper=title),
                 {"type": "object", "properties": {"task": {"type": "string",
-                 "description": "What %s should do, in one or two sentences" % title}}, "required": ["task"]},
+                 "description": own["helper_task"].format(helper=title)}}, "required": ["task"]},
                 hand_over, "read" if box.kind == "terminal" else "write",
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
@@ -244,7 +238,7 @@ class ModelDriver:
         Dismiss ends the instruction with nothing inserted."""
         text = str(arguments.get("answer") or "").strip()[:1000]
         if not text:
-            return "Nothing to show."
+            return self.words()["nothing_to_show"]
         fitted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
         # Tab inserts `insert` at once, in the input method; the choice comes back to record it.
         choice, words = self.question(session, MODEL_SAYS + text,
@@ -252,13 +246,13 @@ class ModelDriver:
                                        {"label": "Dismiss", "legend": "nothing is inserted"}],
                                       label=MODEL_SAYS.rstrip(": "), body=text, read=True, insert=fitted)
         if words:  # "or type to ask more": your words go to the model, and the turn goes on
-            return "The user read it and asked: " + words
+            return self.words()["read_and_asked"].format(words=words)
         if choice == 0:
             self.drafted = [fitted]
-            self.settled = "I showed the user this answer, and they inserted it: " + text
+            self.settled = self.words()["shown_inserted"].format(text=text)
         else:
             self.handed = "read and dismissed"
-            self.settled = "I showed the user this answer, and they dismissed it: " + text
+            self.settled = self.words()["shown_dismissed"].format(text=text)
         raise Finished(self.settled)
 
     def ask_user(self, session, arguments):
@@ -271,8 +265,9 @@ class ModelDriver:
         choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],
                                       label=MODEL_ASKS.rstrip(": "), body=asked)
         if words is not None:
-            return "The user answered: " + redact(words)[0]
-        return "The user chose: " + labels[choice] if 0 <= choice < len(labels) else "No answer."
+            return self.words()["answered"].format(words=redact(words)[0])
+        own = self.words()
+        return own["chose"].format(choice=labels[choice]) if 0 <= choice < len(labels) else own["no_answer"]
 
     def approve(self, session, server, tool, arguments, kind, asked=None):
         """Ask through the candidate list; (allowed, reason). asked: the question in words (a helper:

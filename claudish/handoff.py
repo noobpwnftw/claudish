@@ -109,7 +109,8 @@ def write_note(task, observed):
 def arguments(template, note, session="", resolve=False):
     """The helper's arguments; resolve: its program as found (a window this service opens does not
     have the shell's PATH either). A terminal's draft keeps the name you configured."""
-    prompt = "Read the handoff note at %s and work on the task in it." % note
+    from .modes import TEMPLATES
+    prompt = TEMPLATES["box"]["handoff"].format(note=note)
     argv = [a.replace("{note}", note).replace("{prompt}", prompt).replace("{session}", session or "")
             for a in template]
     if resolve and argv and not shutil.which(argv[0]):
