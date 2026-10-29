@@ -307,6 +307,12 @@ def main():
             reply = key(ord("S"), ord("s"), inputScopes=[31])
             assert reply.get("commitString") == "s", reply
             assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
+            # PIN and numeric password fields are passwords too (InputScope.h 63-66); a time is not a phone.
+            for scopes, kind in (([64], "password"), ([63], "password"), ([65], "password"), ([66], "password"),
+                                 ([36], None), ([32], "phone")):
+                service.inputScopes = scopes
+                assert service.field() == kind, (scopes, service.field())
+            service.inputScopes = [31]
             # Another input method takes over: the worker is parked, not closed, and the next cd_AI
             # instance in this window takes it up, in the same mode. Each instance gets a worker of
             # its own here, so taking up the parked one is visible.

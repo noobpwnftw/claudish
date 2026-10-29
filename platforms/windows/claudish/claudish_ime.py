@@ -22,9 +22,11 @@ def keylog(*fields):
 
 MODE_COMMAND = 100  # the input indicator's click; its menu items follow
 SETTINGS_COMMAND = 200  # Settings… in that menu
-# TSF input scopes (InputScope.h) by the names the service understands.
-INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "number",
-                31: "password", 32: "phone", 33: "phone", 34: "phone", 35: "phone", 36: "phone"}
+# TSF input scopes (InputScope.h, Windows SDK 10.0.22621) by the names the service understands; a PIN
+# or numeric password is a password, as IBus's PIN purpose is on Linux.
+INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "number", 31: "password",
+                32: "phone", 33: "phone", 34: "phone", 35: "phone",
+                63: "password", 64: "password", 65: "password", 66: "password"}
 TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its way
 
 
