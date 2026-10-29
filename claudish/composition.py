@@ -16,6 +16,11 @@ MODES = ("compose", "continue")
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
+# The panel stays shorter than a screen (G64): about this many rows of text at about ROW characters.
+# Past it, drafts other than the highlighted one show their first two rows, and a text taller than
+# the panel shows its first rows and an ellipsis. Tab still takes the whole text.
+PANEL_ROWS = 24
+ROW = 60
 
 
 def failure(error):
@@ -54,6 +59,41 @@ def failure(error):
 # terminal) and the service's state (keys, hints, offline), besides the hold itself.
 KEPT_ON_RESTORE = ("held", "issued", "held_app", "held_at", "summon", "hints", "offline", "terminal", "quiet",
                    "inside")
+
+def rows_of(text):
+    """About how many panel rows a text takes."""
+    return sum(max(1, -(-len(line) // ROW)) for line in (text or "").split("\n"))
+
+
+def shortened(text, rows):
+    """The text in at most about `rows` panel rows: its first lines, cut at a word, then an ellipsis.
+    Two rows or fewer read as one line (a preview)."""
+    if rows_of(text) <= rows:
+        return text
+    if rows <= 2:
+        text = " ".join(text.split())
+    kept, room = [], rows * ROW
+    for line in text.split("\n"):
+        if len(line) >= room:
+            cut = line[:room - 1].rsplit(" ", 1)[0] if " " in line[:room - 1] else line[:room - 1]
+            kept.append(cut.rstrip(" ,;:—-") + "…")
+            break
+        kept.append(line)
+        room -= max(1, -(-len(line) // ROW)) * ROW
+        if room <= 0:
+            kept[-1] = kept[-1].rstrip(" ,;:—-") + "…"
+            break
+    return "\n".join(kept)
+
+
+def drafts_shown(drafts, on):
+    """The drafts as their rows show them: whole while they fit the panel; past it, the highlighted
+    one whole (up to the panel) and the others as two-row previews."""
+    if sum(rows_of(d) for d in drafts) <= PANEL_ROWS:
+        return list(drafts)
+    room = max(PANEL_ROWS - 2 * (len(drafts) - 1), 6)
+    return [shortened(d, room) if i == on else shortened(d, 2) for i, d in enumerate(drafts)]
+
 
 def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
@@ -257,7 +297,7 @@ class Composition:
                 body = question.get("text", "")
             approval = bool(question.get("permission"))
             if self.reading:  # an answer to read: Tab puts it in, Esc dismisses it
-                shown.update(label=label, body=body, foot=[("Tab", "insert"), ("Esc", "dismiss")],
+                shown.update(label=label, body=shortened(body, PANEL_ROWS), foot=[("Tab", "insert"), ("Esc", "dismiss")],
                              tail="or type to ask more")
                 return shown if not self.reply else dict(shown, replying=True, tail=None,
                                                           foot=[(self.summon, "send reply"), ("Esc", "cancel reply")])
@@ -279,13 +319,13 @@ class Composition:
             shown.update(tile="warn", failed=self.error, foot=[(retry, "retry"), ("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
             readings = self.candidates
-            shown.update(rows=[{"text": c, "legend": None} for c in readings], on=self.highlight,
+            shown.update(rows=[{"text": c, "legend": None} for c in drafts_shown(readings, self.highlight)], on=self.highlight,
                          foot=([("↑↓", "choose")] if len(readings) > 1 else []) + [("Tab", "insert"), ("Esc", "edit")],
                          tail="or type to change it", nudge=self.nudge)  # a follow-up about the highlighted one
         elif self.converted:  # your words stay the composition; the rewrite waits in the panel for Tab
             # Tab inserts it, as Tab inserts all the model's text; Esc dismisses it (nothing was applied);
             # what you type is a follow-up about it.
-            shown.update(label="Rewrite", body=self.candidate, foot=[("Tab", "insert"), ("Esc", "dismiss")],
+            shown.update(label="Rewrite", body=shortened(self.candidate, PANEL_ROWS), foot=[("Tab", "insert"), ("Esc", "dismiss")],
                          tail="or type to change it")
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",

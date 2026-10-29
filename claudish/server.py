@@ -252,8 +252,9 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                       "/settings": ("settings.html", "text/html; charset=utf-8"),
                       "/settings.css": ("settings.css", "text/css; charset=utf-8"),
                       "/settings.js": ("settings.js", "text/javascript; charset=utf-8")}
-            if self.path in assets:
-                filename, content_type = assets[self.path]
+            page = self.path.split("?", 1)[0]  # the lab takes its state from the query (design.js)
+            if page in assets:
+                filename, content_type = assets[page]
                 body = files("claudish").joinpath("web", filename).read_bytes()
                 return self.send_body(200, body, content_type)
             if self.path.startswith("/sessions/"):

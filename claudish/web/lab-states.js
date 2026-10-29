@@ -186,6 +186,49 @@ window.LAB_STATES = {
   "nudge": true,
   "column": false
  },
+ "long-drafts": {
+  "thread": [],
+  "label": null,
+  "body": null,
+  "code": false,
+  "rows": [
+   {
+    "text": "Dear hiring team, Thank you for considering me for the product manager role. Over the last six years I have led…",
+    "legend": null
+   },
+   {
+    "text": "Hello,\n\nThank you for considering me for the product manager role. Over the last six years I have led launches across design, engineering and sales, aligning roadmaps with what customers told us — and shipping on the dates we promised. Thank you for considering me for the product manager role. Over the last six years I have led launches across design, engineering and sales, aligning roadmaps with what customers told us — and shipping on the dates we promised. Thank you for considering me for the product manager role. Over the last six years I have led launches across design, engineering and sales, aligning roadmaps with what customers told us — and shipping on the dates we promised. Thank you for considering me for the product manager role. Over the last six years I have led launches across design, engineering and sales, aligning roadmaps with what customers told us — and shipping on the dates we promised.",
+    "legend": null
+   },
+   {
+    "text": "To the team, Thank you for considering me for the product manager role. Over the last six years I have led launches…",
+    "legend": null
+   }
+  ],
+  "on": 1,
+  "foot": [
+   [
+    "↑↓",
+    "choose"
+   ],
+   [
+    "Tab",
+    "insert"
+   ],
+   [
+    "Esc",
+    "edit"
+   ]
+  ],
+  "tail": "or type to change it",
+  "tile": "ai",
+  "status": null,
+  "busy": false,
+  "failed": null,
+  "replying": false,
+  "nudge": false,
+  "column": false
+ },
  "ask": {
   "thread": [],
   "label": "The model asks",

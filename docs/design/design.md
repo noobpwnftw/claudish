@@ -70,7 +70,10 @@ be known before it is pressed).
    ("working", with a spinner; Esc stop).
 2. **The model answers** with drafts (rows; the first highlighted; Tab inserts the highlighted
    one), an answer to read (a paragraph; Tab insert, Esc dismiss, or type to ask more), or a
-   question (its choices as rows; Tab answers with the highlighted one, or type a reply).
+   question (its choices as rows; Tab answers with the highlighted one, or type a reply). The
+   panel stays shorter than a screen (about 24 rows): past it, the drafts not highlighted show their
+   first two rows and a longer text ends in an ellipsis; Tab inserts the whole text
+   (`state=long-drafts` in the lab).
 3. **A reply** you type takes the instruction's place in the composition; the panel then says
    "You asked: …" and the choices fade. After an answer, the panel says "You answered: …". The
    panel says only what the composition does not.

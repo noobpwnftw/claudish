@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- The panel stays shorter than a screen: past about 24 rows, drafts other than the highlighted one
+  show their first two rows, and a longer text its first rows and an ellipsis. ↑↓ moves the whole
+  text with the highlight; Tab inserts the whole draft.
+- The design lab opens a single state from its URL (`/design.html?platform=windows&state=drafts&solo`)
+  when the service serves it.
+
 ## 0.3.1
 
 - Windows: cd_AI's PIME is rebased on PIME 2.0.0-beta4. Its launcher drops requests left from

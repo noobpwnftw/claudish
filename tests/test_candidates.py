@@ -31,6 +31,22 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual(state.commit(True), "Two.")
         self.assertEqual((state.text, state.candidates), ("", []))
 
+    def test_long_drafts_keep_the_panel_shorter_than_a_screen(self):
+        letter = ("I am writing about the product manager role, where my years of leading launches across "
+                  "teams would help. ") * 12  # about 24 rows by itself
+        state = self.instruct()
+        state.offer(state.revision, "A. " + letter, ["B. " + letter, "C. " + letter])
+        rows = [row["text"] for row in state.panel()["rows"]]
+        self.assertTrue(rows[0].startswith("A. I am") and len(rows[0]) > 600)  # the highlighted one, nearly whole
+        self.assertTrue(all(len(row) <= 120 and row.endswith("…") for row in rows[1:]))  # the others: two rows
+        state.move(1)  # the highlight moves: so does the whole text
+        rows = [row["text"] for row in state.panel()["rows"]]
+        self.assertTrue(len(rows[0]) <= 120 and len(rows[1]) > 600)
+        self.assertEqual(state.commit(True), "B. " + letter)  # Tab takes the whole draft, not what showed
+        state = self.instruct()
+        state.offer(state.revision, "One.", ["Two."])
+        self.assertEqual([row["text"] for row in state.panel()["rows"]], ["One.", "Two."])  # short ones: as they are
+
     def test_typing_while_it_works_keeps_the_work_and_a_stale_list_is_dropped(self):
         state = self.instruct()
         revision = state.revision

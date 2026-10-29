@@ -23,7 +23,6 @@ experience comes first: `ok`, Tab, a paragraph of strategic momentum, Tab. The a
 
 | ID | Goal |
 | --- | --- |
-| G64 | A drafts or rewrite panel taller than the screen: cap its height on every platform (rows scroll), as the lab draws it |
 | G50 | Continue's Tab in macOS Terminal: follow the platform's input-method behavior; keep the limitation documented until verified |
 | G60 | fcitx5 on Linux |
 | G30 | `claudish update`, keeping the previous version to roll back to |

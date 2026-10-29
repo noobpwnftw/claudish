@@ -182,14 +182,41 @@ function panel() {
                             foot: [[state.asked === "rewrite" ? "Tab" : "Shift+Enter", "retry"], ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates;
-    return {...shown, rows: readings.map((text) => ({text, legend: null})), on: state.highlight,
+    return {...shown, rows: draftsShown(readings, state.highlight).map((text) => ({text, legend: null})), on: state.highlight,
             foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]],
             nudge: nudge(), ...typing};
   }
-  if (state.converted) return {...shown, label: "Rewrite", body: state.candidate,
+  if (state.converted) return {...shown, label: "Rewrite", body: shortened(state.candidate, PANEL_ROWS),
                                foot: [["Tab", "insert"], ["Esc", "dismiss"]]};
   // Composing: the keys show from the first key (what each Enter does must be known).
   return {...shown, foot: [["Tab", "rewrite"], ["Shift+Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Enter", "keep"]]};
+}
+// The panel stays shorter than a screen, as composition.py keeps it (PANEL_ROWS rows of about ROW
+// characters): past it, drafts other than the highlighted one show two rows, a taller text its first
+// rows and an ellipsis. Tab still takes the whole text.
+const PANEL_ROWS = 24, ROW = 60;
+const rowsOf = (text) => (text || "").split("\n").reduce((rows, line) => rows + Math.max(1, Math.ceil(line.length / ROW)), 0);
+function shortened(text, rows) {
+  if (rowsOf(text) <= rows) return text;
+  if (rows <= 2) text = text.split(/\s+/).filter(Boolean).join(" ");
+  const kept = [];
+  let room = rows * ROW;
+  for (const line of text.split("\n")) {
+    if (line.length >= room) {
+      const head = line.slice(0, room - 1);
+      kept.push((head.includes(" ") ? head.slice(0, head.lastIndexOf(" ")) : head).replace(/[ ,;:—-]+$/, "") + "…");
+      break;
+    }
+    kept.push(line);
+    room -= Math.max(1, Math.ceil(line.length / ROW)) * ROW;
+    if (room <= 0) { kept[kept.length - 1] = kept[kept.length - 1].replace(/[ ,;:—-]+$/, "") + "…"; break; }
+  }
+  return kept.join("\n");
+}
+function draftsShown(drafts, on) {
+  if (drafts.reduce((rows, draft) => rows + rowsOf(draft), 0) <= PANEL_ROWS) return drafts;
+  const room = Math.max(PANEL_ROWS - 2 * (drafts.length - 1), 6);
+  return drafts.map((draft, index) => shortened(draft, index === on ? room : 2));
 }
 // A click on a draft: it goes in at the caret (choices are not numbered; the mouse picks directly).
 function pickRow(number) {

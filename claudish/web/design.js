@@ -22,6 +22,7 @@ const STATES = [
   {id: "converted", title: "Compose: a rewrite", note: "The rewrite shows in the panel; Tab puts it in.", before: "Team: ", comp: "running late, start without me"},
   {id: "sent", title: "An instruction, sent", note: "Shift+Enter sent it. The instruction stays underlined at the caret; the panel says what is happening.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "drafts", title: "An instruction's drafts", note: "Three readings, your instruction still underlined at the caret. The first is highlighted; ↓ moves; Tab inserts it.", before: "Hi Sam, ", comp: "decline the offsite politely"},
+  {id: "long-drafts", title: "Long drafts", note: "Drafts taller than the panel: the highlighted one shows whole (up to the panel), the others their first two rows. ↑↓ moves the whole text; Tab inserts the whole draft.", before: "", comp: "three versions of a cover letter"},
   {id: "nudged", title: "Enter on a draft", note: "Enter does nothing once the model is asked; on a draft it lights the row's Tab until your next key.", before: "Hi Sam, ", comp: "decline the offsite politely"},
   {id: "ask", title: "The model asks", note: "Its question, your instruction still at the caret. Tab takes the highlighted choice, ↓ moves it; or just type.", before: "", comp: "summarize this thread"},
   {id: "reply", title: "Typing a reply", note: "What you type takes your instruction's place at the caret: your reply. The panel now says what you asked; the choices fade.", before: "", comp: "only the last two days", anchor: "comp"},
