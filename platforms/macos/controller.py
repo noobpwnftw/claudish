@@ -10,7 +10,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import MAX_COMPOSITION, Composition, ShiftTap
+from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
@@ -38,7 +38,6 @@ def secure_input():
         return False
 
 
-SURROUNDING = 8000
 # Each mode is an input mode of cd_AI's input source (Info.plist: "Claudish — Compose", "Claudish —
 # Continue", named as Apple's "Pinyin – Simplified", with an em dash), its icon in the menu bar: "AI"
 # for compose, "cd" for continue, as Mozc and AquaSKK show theirs.
@@ -436,9 +435,9 @@ class ClaudishInputController(IMKInputController):
             total = client.length()
             if location == NSNotFound or location > total:
                 return "", ""
-            start = max(0, location - SURROUNDING)
+            start = max(0, location - AROUND)
             end = min(total, location + length)
-            return text(start, location - start), text(end, min(SURROUNDING, total - end))
+            return text(start, location - start), text(end, min(AROUND, total - end))
         except Exception:  # not every client implements these
             return "", ""
 

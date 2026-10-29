@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
+from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -366,7 +366,7 @@ class ClaudishEngine(IBus.Engine):
                 before, after = self.around_caret()  # the text box, for this turn of its conversation
                 self.suggestions.schedule(self.composition.revision, self.composition.text,
                                           "instruct", immediate=True, app=self.app,
-                                          look=self.composition.look, before=before[-8000:], after=after[:8000],
+                                          look=self.composition.look, before=before[-AROUND:], after=after[:AROUND],
                                           purpose=self.purpose, draft=self.composition.about)
                 self.render()
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it

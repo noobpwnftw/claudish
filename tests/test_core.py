@@ -430,3 +430,19 @@ class SessionPollingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AdapterTests(unittest.TestCase):
+    def test_every_platform_reads_the_same_text_around_the_caret(self):
+        # Instructions see 6000 characters before the caret (turn.WINDOWS); Windows read only 1500
+        # until each adapter took its limit from composition.AROUND.
+        import re
+        from pathlib import Path
+        from claudish.composition import AROUND
+        from claudish.turn import WINDOWS
+        root = Path(__file__).resolve().parents[1]
+        patch_text = (root / "platforms/windows/pime/pime.patch").read_text(encoding="utf-8")
+        self.assertEqual(int(re.search(r"surroundingText\(session, before, after, (\d+)", patch_text).group(1)), AROUND)
+        self.assertIn("before=before[-AROUND:], after=after[:AROUND]", (root / "platforms/linux/engine.py").read_text())
+        self.assertIn("location - AROUND", (root / "platforms/macos/controller.py").read_text())
+        self.assertGreaterEqual(AROUND, max(max(window) for window in WINDOWS.values()))

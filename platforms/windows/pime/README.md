@@ -7,7 +7,7 @@ libIME2 with the patches here. A released PIME is not supported. The patches add
   (`onTimer`) in an asynchronous TSF edit session, and that reply updates the composition and
   candidates like a key's. cd_AI shows an answer as soon as it arrives, not at your next key.
 - **The text around the caret:** `onKeyDown`, `onKeyUp`, and `onTimer` requests carry
-  `textBefore` and `textAfter` (up to 1,500 characters each, outside the composition), as IBus
+  `textBefore` and `textAfter` (up to 8,000 characters each, outside the composition), as IBus
   and InputMethodKit provide.
 - **cd_AI's candidate window** (libIME2 `CandidateWindow`, `Style.h`): a header (a question as
   is; `"label\nbody"` adds a small label) and a footer (the one short hint, or what is

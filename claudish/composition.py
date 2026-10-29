@@ -3,6 +3,10 @@ import copy
 import time
 
 MAX_COMPOSITION = 512
+# The text box an adapter reads and sends on each side of the caret, the same on every platform
+# (Claudish's PIME reads this much too: pime.patch); the service keeps what each mode uses
+# (turn.WINDOWS: an instruction 6000 before, 2000 after).
+AROUND = 8000
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
 # compose (where cd_AI starts) holds what you type: Tab shows a rewrite (Tab again puts it in),
 # Shift+Enter sends it as an instruction and offers drafts, Enter keeps it as it is, and Esc steps

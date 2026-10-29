@@ -274,7 +274,7 @@ index 0c7a8d5..c683198 100644
 +		return;
 +	}
 +	std::wstring before, after, selected;
-+	if (textService_->surroundingText(session, before, after, 1500, &selected)) {
++	if (textService_->surroundingText(session, before, after, 8000, &selected)) {  // composition.py AROUND
 +		request["textBefore"] = utf16ToUtf8(before.c_str());
 +		request["textAfter"] = utf16ToUtf8(after.c_str());
 +		request["textSelected"] = utf16ToUtf8(selected.c_str());

@@ -12,7 +12,8 @@ question to the user presented as is."
 1. **The text box** (`claudish/turn.py`, `Box`), rendered once, the same way for every model:
    - the app and the box's kind (prose, terminal, URL, email, number, ...), stated as a fact
      ("what you write here is a command line, run when the user presses Enter");
-   - the text around the caret (about 1,500 characters before and 500 after, the caret marked),
+   - the text around the caret (about 1,500 characters before and 500 after; for an instruction
+     6,000 and 2,000; the caret marked),
      the selection, the box's length; the rest of the box is a tool (`textbox.read`,
      `textbox.search`), read live at the moment of the call;
    - observations: the profile's context providers and the app's bindings (files, commands, MCP
