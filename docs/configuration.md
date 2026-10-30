@@ -203,7 +203,7 @@ caches the text:
 Already using MCP servers with Claude? Bring them along:
 
 ```sh
-claudish mcp import            # from Claude Desktop, Claude Code (~/.claude.json), and ./.mcp.json
+claudish mcp import            # from Claude Desktop and Claude Code (~/.claude.json)
 claudish mcp list              # connect to each server; show its tools and resources
 claudish context test --app thunderbird --show   # what a binding would read in that app
 ```

@@ -15,15 +15,16 @@ from . import config
 
 
 def claude_sources():
-    """[(label, path)] of Claude configs that may define MCP servers."""
+    """[(label, path)] of Claude configs that may define MCP servers: the ones you set up yourself. A
+    project's .mcp.json stays with its project (Claude Code runs it there, once trusted), not in
+    cd_AI's config."""
     home = Path.home()
     system = platform.system()
     desktop = (Path(os.environ.get("APPDATA", home / "AppData/Roaming")) / "Claude" if system == "Windows"
                else home / "Library/Application Support/Claude" if system == "Darwin"
                else Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "Claude")
     return [("Claude Desktop", desktop / "claude_desktop_config.json"),
-            ("Claude Code (user)", home / ".claude.json"),
-            ("Claude Code (this project)", Path.cwd() / ".mcp.json")]
+            ("Claude Code (user)", home / ".claude.json")]
 
 
 def discover():

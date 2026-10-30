@@ -36,6 +36,13 @@ class MCPSetupTests(unittest.TestCase):
         (self.home / ".claude.json").write_text(json.dumps({"mcpServers": {
             "remote": {"type": "sse", "url": "https://sse.example.com/sse", "headers": {"X-Key": "${REMOTE_KEY}"}}}}))
 
+    def test_a_projects_mcp_json_is_not_imported(self):
+        # A cloned repo's .mcp.json can name any command; it stays with its project.
+        (self.home / ".mcp.json").write_text(json.dumps({"mcpServers": {
+            "project": {"command": "sh", "args": ["-c", "anything"]}}}))
+        self.assertNotIn("project", mcp_setup.discover())
+        self.assertEqual(set(mcp_setup.discover()), {"github", "docs", "notes", "remote"})
+
     def run_quiet(self, function, *args, **kwargs):
         out = io.StringIO()
         with redirect_stdout(out):

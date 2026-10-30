@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `claudish mcp import` (and `claudish setup`) copy the servers from Claude Desktop and Claude Code's
+  user config, no longer a project's `./.mcp.json`: it stays with its project.
 - The panel stays shorter than a screen: past about 24 rows, drafts other than the highlighted one
   show their first two rows, and a longer text its first rows and an ellipsis. ↑↓ moves the whole
   text with the highlight; Tab inserts the whole draft.
