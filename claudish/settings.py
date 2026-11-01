@@ -122,6 +122,10 @@ def state(path=None):
     server = profiles.get("server") or config.STARTER["profiles"]["server"]
     url = server.get("model_url", "")
     models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
+    # The model server the profile in use writes with, whatever its name ("local", one of your own).
+    serving = entry.get("backend") in ("llama", "openai")
+    in_use_url = entry.get("model_url") or config.DEFAULTS["model_url"]
+    in_use_models = models if choice == "server" else server_models(in_use_url) if serving else []
     tone = entry.get("tone") or data.get("tone") or "corporate"  # the one in use: the profile's own, else the file's
     return {
         "profile": name, "choice": choice,
@@ -137,7 +141,8 @@ def state(path=None):
         "config": str(path),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
         # connection on this computer answers at once).
-        "server_problem": server_problem(url, models, server.get("model")) if choice == "server" else None,
+        "server_problem": server_problem(in_use_url, in_use_models, entry.get("model")) if serving else None,
+        "model": entry.get("model") or "",  # the profile in use's
         "server_models": models if isinstance(models, list) else [],
         "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
         "codex": None if codex() else NO_CODEX,

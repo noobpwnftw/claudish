@@ -127,6 +127,13 @@ class ModelServerChecks(unittest.TestCase):
     def test_the_saved_key_is_sent(self):
         self.assertEqual(self.check()[0::2], ("ok", "sk-saved"))
 
+    def test_a_server_without_the_profiles_model_fails_as_in_the_settings(self):
+        settings = {"backend": "openai", "model_url": "http://h:1", "api_key_env": None, "model": "gone"}
+        with patch.object(doctor, "fetch_json", return_value={"data": [{"id": "gemma"}]}), \
+                patch("claudish.keys.server_key", return_value=None):
+            status, detail, _ = doctor.check_backend({"settings": settings})
+        self.assertEqual((status, detail), ("fail", "the server has no model 'gone'; it has: gemma"))
+
     def test_loading_and_a_refused_key_are_named(self):
         self.assertEqual(self.check(503)[0], "warn")
         status, detail, _ = self.check(401)

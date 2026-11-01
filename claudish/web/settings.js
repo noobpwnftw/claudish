@@ -29,9 +29,10 @@ function say(id, text, bad) {
 }
 
 function subscription(state) {
-  const names = {"claude-code": "Claude Code", codex: "Codex"};
-  const backend = (state.service || {}).backend;
-  return names[backend] || null;
+  // A model process cd_AI runs: Claude Code, Codex, or a local model's server (its "command").
+  const names = {"claude-code": "Claude Code", codex: "Codex", llama: "the local model"};
+  const service = state.service || {};
+  return service.backend === "llama" && !service.model ? null : names[service.backend] || null;
 }
 
 function ready(state) {
@@ -50,15 +51,14 @@ function status(state) {
     if (model.startsWith("failed:")) {  // most often not logged in: the CLI says so where you run it
       const why = model.slice(7).trim().replace(`${name}: `, "").replace(/\.$/, "");
       const run = state.command ? ` Run ${state.command} in a terminal and log in, then try a rewrite.` : "";
-      return [`${name} could not start: ${why}.${run}`, "bad"];
+      return [`${name.charAt(0).toUpperCase() + name.slice(1)} could not start: ${why}.${run}`, "bad"];
     }
     if (model === "starting" || model === "restarting") return [`${model === "starting" ? "Starting" : "Restarting"} ${name}…`, ""];
-    if (model === "stopped") return [`${name} is stopped. Pick it again below to start it.`, "bad"];
     return [`Ready: ${name} writes for you.`, "good"];
   }
   if (backend === "claude") return state.key === "missing" ? ["Add your Claude key below to start.", ""] : ["Ready: Claude writes for you.", "good"];
   if (state.server_problem) return [state.server_problem.charAt(0).toUpperCase() + state.server_problem.slice(1) + ".", "bad"];
-  if (backend === "openai" || backend === "llama") return [`Ready: ${state.server.model || "your model"} writes for you.`, "good"];
+  if (backend === "openai" || backend === "llama") return [`Ready: ${state.model || "your model"} writes for you.`, "good"];
   if (backend === "none") return ["Pick a model below to start.", ""];
   return ["cd_AI is running.", ""];
 }

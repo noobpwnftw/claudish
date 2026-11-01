@@ -106,6 +106,13 @@ class SettingsTests(Home):
         self.assertEqual((state["tone"], state["own_words"]), ("mine", False))
         self.assertIn("mine", [tone["name"] for tone in state["tones"]])
 
+    def test_the_model_server_in_use_is_checked_whatever_its_profiles_name(self):
+        config.write_starter(profile="local")
+        with patch.object(settings, "server_models", return_value=None) as asked:
+            state = settings.state()
+        asked.assert_called_once_with("http://127.0.0.1:18766")
+        self.assertEqual((state["choice"], state["server_problem"]), ("local", "nothing answers at http://127.0.0.1:18766"))
+
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))

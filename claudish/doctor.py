@@ -90,10 +90,16 @@ def check_backend(state):
             return "ok", "agent command %s" % program, None
         return "fail", "agent command %r not found" % program, "install it, or give its full path in the profile's \"command\""
     url = settings["model_url"]
-    from .keys import server_key
-    key = (os.environ.get(settings["api_key_env"]) if settings.get("api_key_env") else None) or server_key(url)
+    from .keys import for_profile
+    key = for_profile(settings)  # what the service sends
     try:
-        fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
+        listing = fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
+        if backend == "openai" and settings.get("model"):  # as the settings window checks it
+            from .settings import server_problem
+            names = [m.get("id") for m in (listing or {}).get("data", []) if isinstance(m, dict)]
+            problem = server_problem(url, names, settings["model"], key)
+            if problem:
+                return "fail", problem, "name one of its models in the profile's \"model\", or pick it in cd_AI's settings"
         return "ok", "model server reachable at %s" % url, None
     except HTTPError as exc:
         if exc.code == 503:

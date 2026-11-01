@@ -213,10 +213,8 @@ class Rewriter:
     @classmethod
     def from_settings(cls, settings, templates=None, context=None, profile=None):
         """Build from config.resolve() output; ImportError if the claude backend lacks the Anthropic SDK."""
-        api_key = os.environ.get(settings["api_key_env"]) if settings["api_key_env"] else None
-        if not api_key and settings["backend"] == "openai":
-            from .keys import server_key
-            api_key = server_key(settings["model_url"])  # saved in the settings window for this address
+        from .keys import for_profile
+        api_key = for_profile(settings)
         if settings["api_key_env"] and not api_key:
             # The service still starts (a login service that exits is no input method at all); the
             # server says no to each request until a key is there.

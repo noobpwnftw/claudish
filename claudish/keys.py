@@ -48,6 +48,16 @@ def claude_credential():
     return None, None
 
 
+def for_profile(settings):
+    """The key a model server profile sends: its api_key_env's variable, else (an OpenAI-compatible
+    server) the one saved in cd_AI's settings for its address, else None."""
+    import os
+    key = os.environ.get(settings["api_key_env"]) if settings.get("api_key_env") else None
+    if not key and settings.get("backend") == "openai":
+        key = server_key(settings["model_url"])
+    return key
+
+
 def store(key, name="anthropic"):
     """Save (or replace) the key for this provider."""
     if sys.platform != "darwin":
