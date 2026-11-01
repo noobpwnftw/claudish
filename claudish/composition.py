@@ -858,8 +858,10 @@ class Composition:
         return ghost
 
     def dismiss(self):
-        """Esc in continue: drop the suggestion, keep going."""
+        """Esc in continue: drop the suggestion, keep going; nothing more is offered until you type
+        again (asked at once, the same suggestion came back on Windows and macOS)."""
         self.candidate, self.candidates = "", []
+        self.taken = True
 
     @property
     def ghost(self):
@@ -909,6 +911,11 @@ class Composition:
         pill = self.held_pill() if self.mode == "compose" else None
         return (pill, True) if pill else (self.toast(), False)
 
+    def restorable(self):
+        """Whether Shift+Esc has something to bring back (a held exchange past HELD_SECONDS has none)."""
+        self.expire()
+        return self.held is not None or bool(self.dropped)
+
     def expire(self):
         """A held exchange older than HELD_SECONDS goes (its agent session with it); True if it went."""
         if self.held is not None and time.monotonic() - self.held_at > HELD_SECONDS:
@@ -941,16 +948,22 @@ class ShiftTap:
     def __init__(self):
         self.down_at = None
         self.typed_at = 0.0
+        # Pressed, and no other key since: another press is the key's auto-repeat (Windows repeats
+        # the last key pressed, Shift included), not a new press.
+        self.down = False
 
     def press(self, now, chord=False):
+        if self.down:
+            return
+        self.down = True
         self.down_at = None if chord or now - self.typed_at < ROLLED_SHIFT_SECONDS else now
 
     def other(self):
-        self.down_at = None
+        self.down_at, self.down = None, False
         self.typed_at = time.monotonic()
 
     def release(self, now, chord=False):
         """True when this release ends a tap."""
         tapped = not chord and self.down_at is not None and now - self.down_at <= SHIFT_TAP_SECONDS
-        self.down_at = None
+        self.down_at, self.down = None, False
         return tapped

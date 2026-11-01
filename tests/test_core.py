@@ -88,6 +88,19 @@ class CompositionTests(unittest.TestCase):
         shift.press(30.0)  # Ctrl let go of before Shift, or pressed during it
         self.assertFalse(shift.release(30.1, chord=True))
 
+    def test_a_held_shifts_auto_repeat_is_not_a_new_press(self):
+        """Windows repeats a held Shift: released after 2 s it is a hold, not a tap (Shift+click)."""
+        from claudish.composition import ShiftTap
+        import time
+        shift, now = ShiftTap(), time.monotonic() + 10
+        for at in (0.0, 0.5, 1.0, 1.5, 1.97):
+            shift.press(now + at)
+        self.assertFalse(shift.release(now + 2.0))
+        shift.press(now + 10)
+        shift.other()  # Shift+A: A repeats from here, not Shift
+        shift.press(now + 12)  # pressed again, after a key-up that never came
+        self.assertTrue(shift.release(now + 12.1))
+
     def test_edit_focus_and_commit_invalidate_old_results(self):
         state = Composition()
         state.insert("x")

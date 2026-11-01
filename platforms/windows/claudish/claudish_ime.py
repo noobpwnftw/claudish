@@ -3,6 +3,7 @@ from textService import TextService
 import json
 import os
 import time
+import weakref
 
 from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
 from .client import Suggestions
@@ -49,19 +50,30 @@ def mode_tooltip(mode):
 # way), are taken up by the next instance in that window.
 LAST_MODE = [None]
 PARKED = {}  # the foreground window's process id -> (Composition, Suggestions, when)
+INSTANCES = weakref.WeakSet()  # the live instances: a parked worker one still uses is not closed
 UNSEEN = object()  # an instance that has not looked for a parked exchange since it was activated
 
 
 def park(window, state, worker):
     expire()
+    replaced = PARKED.get(window)
+    if replaced is not None and replaced[1] is not worker:
+        release(replaced[1])
     PARKED[window] = (state, worker, time.monotonic())
+
+
+def release(worker):
+    """A parked worker no instance uses any more ends: its polling thread, and the agent session it held."""
+    if not any(getattr(instance, "worker", None) is worker for instance in list(INSTANCES)):
+        worker.close()
 
 
 def expire():
     from .composition import HELD_SECONDS
-    for window, (_, _, when) in list(PARKED.items()):
+    for window, (_, worker, when) in list(PARKED.items()):
         if time.monotonic() - when > HELD_SECONDS:
             del PARKED[window]
+            release(worker)
 
 
 def foreground():
@@ -177,6 +189,7 @@ def open_settings():
 class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
+        INSTANCES.add(self)
         self.state = Composition()
         if LAST_MODE[0] and LAST_MODE[0] != self.state.mode:
             self.state.mode = LAST_MODE[0]  # back to cd_AI from another input method: the same mode
@@ -233,10 +246,13 @@ class ClaudishTextService(TextService):
         keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.for_model, self.state.held is not None))
         if self.state.for_model:
             self.state.leave(getattr(self, "last_document", None))
-        if self.worker:
-            park(foreground(), self.state, self.worker)
+        if self.worker and (self.state.held is not None or self.state.dropped):
+            park(foreground(), self.state, self.worker)  # something to come back to
             self.worker = None
             self.state = Composition()
+        elif self.worker:
+            self.worker.close()
+            self.worker = None
         self.state.change("")
         self.adopted_from = UNSEEN  # activated again (this instance or a new one): look for it again
 
@@ -341,7 +357,7 @@ class ClaudishTextService(TextService):
                 self.drop_live()
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
-        restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and bool(self.state.dropped or self.state.held)
+        restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
         taking = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: your words
         return event.isPrintableChar() or bool(self.state.text) or restoring or taking
 
@@ -444,7 +460,7 @@ class ClaudishTextService(TextService):
         if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
             # PIME asks twice for one key-up (TSF's test, then the key itself): the second answer
             # must match the first.
-            if self.shift.down_at is not None:
+            if self.shift.down:  # the first of the two
                 self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
             keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
             return getattr(self, "switching", False)
@@ -653,7 +669,8 @@ class ClaudishTextService(TextService):
             # The app ended the composition while an exchange was open (a click, a focus change,
             # another input method): TSF keeps what it showed (your own words, as a CJK preedit),
             # and the exchange is held for this box, offered on return. Parked too: switching to
-            # another input method closes this instance, and the next one here takes it up.
+            # another input method closes this instance (with no onDeactivate), and the next one
+            # here takes it up.
             self.state.leave(getattr(self, "last_document", None))
             if self.worker:
                 park(foreground(), self.state, self.worker)

@@ -202,6 +202,7 @@ class ClaudishEngine(IBus.Engine):
                     row["text"] + (" — " + row["legend"] if row.get("legend") else "")))
                 table.set_label(index, IBus.Text.new_from_string(""))
             table.set_cursor_visible(panel["on"] >= 0)  # an approval highlights nothing until ↓; then Tab takes it
+            table.set_cursor_pos(max(panel["on"], 0))  # the row Tab takes, as the other platforms draw it
             self.update_lookup_table(table, True)
         else:
             self.hide_lookup_table()
@@ -302,8 +303,8 @@ class ClaudishEngine(IBus.Engine):
             return
         if self.composition.for_model and not suggested:
             # A shortcut or another key ends the composition: the instruction is not text for the
-            # app; its exchange is held for this app, its work going on, as on a focus change.
-            self.composition.leave(self.app)
+            # app; its exchange is held for this text box, its work going on, as on a focus change.
+            self.composition.leave(getattr(self, "context", None))
             self.render()
             return
         text = self.composition.commit(suggested)
@@ -543,14 +544,14 @@ class ClaudishEngine(IBus.Engine):
         self.update_quiet()
         self.refresh_surrounding()
         self.show_mode(register=True)
-        pill = self.composition.returned(self.app)  # back where an exchange was held: a pill, no keys
+        pill = self.composition.returned(self.context)  # back in the box where an exchange was held: a pill, no keys
         if pill and screen().shell:
             screen().publish(None, "", pill)
 
     def do_focus_out(self):
         trace("focus-out")
-        if self.composition.for_model:  # an instruction's exchange: held for this app, its work going on
-            self.composition.leave(self.app)
+        if self.composition.for_model:  # an instruction's exchange: held for this text box, its work going on
+            self.composition.leave(getattr(self, "context", None))
             self.render()
             return
         # IBus commits the visible preedit (words you were typing) through PreeditFocusMode.COMMIT.
@@ -571,7 +572,7 @@ class ClaudishEngine(IBus.Engine):
     def do_reset(self):
         trace("reset")
         if self.composition.for_model:  # a click in the field: the exchange is held, as on a focus change
-            self.composition.leave(self.app)
+            self.composition.leave(getattr(self, "context", None))
             self.render()
             return
         self.composition.change("")
