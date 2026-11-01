@@ -152,9 +152,8 @@ a variable you `export` in a terminal does not reach a service started at login.
 
 **Another model API:** the same settings page takes any OpenAI-compatible address (OpenAI,
 OpenRouter, Groq, Ollama, LM Studio, llama.cpp) and a key if it needs one. `claudish init` writes
-`~/.config/claudish/config.json` with profiles to start from: `claude` (the default), `ollama` (any
-OpenAI-compatible server), `local` (below), `claude-code` and `codex` (the subscriptions), and
-`agent` (an agent CLI such as `claude -p`); see
+`~/.config/claudish/config.json` with profiles to start from: `claude` (the default), `claude-code`
+and `codex` (the subscriptions), `server` (any OpenAI-compatible server), and `local` (below); see
 [configuration](configuration.md). With no model at all, compose says "no model is set up".
 
 **A local model:** `claudish setup --profile local` downloads a pinned

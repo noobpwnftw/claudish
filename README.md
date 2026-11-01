@@ -34,8 +34,8 @@ Context: files, commands and MCP servers, per app.
 ## Tones and templates
 
 The templates are in one file: `claudish templates` prints it, and `claudish init` writes a
-`templates.json` to edit. Pick another tone (`salesman`, `critic`, `bard`, or
-`proofread`, which only fixes your typos), or write one. Context, tools and agents:
+`templates.json` to edit. Pick another tone (`salesman`, `critic`, `bard`, `unhinged`,
+or `proofread`, which only fixes your typos), or write one. Context, tools and agents:
 [configuration](docs/configuration.md).
 
 ## Install
