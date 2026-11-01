@@ -207,6 +207,11 @@ class Unshaped(Exception):
     """A model server refused the answer's schema (response_format)."""
 
 
+def warm_key(warm):
+    """What makes two model processes the same one: their kind, command and model."""
+    return type(warm), tuple(warm.command), warm.configured
+
+
 class Rewriter:
     """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
 
@@ -271,6 +276,7 @@ class Rewriter:
         self.url = None  # this service's address, for the agent's textbox MCP server
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
+        self.adoptable = {}  # model processes a reload handed over (hand_over), by warm_key
         self.takes = {}  # (mode, text) -> how many times it was asked: a repeat is another take
         self.schema = True  # an OpenAI-compatible server takes response_format (False once it refused it)
         # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
@@ -308,10 +314,23 @@ class Rewriter:
             self.warm.start()
 
     def stop_model(self):
-        """At service stop, or when the settings replace this profile: its model process ends."""
+        """At service stop, or when the settings replace this profile: its model process ends, with
+        the routed profiles' and those a reload left that nothing took up."""
         for rewriter in [self] + list(self.routed.values()):
             if rewriter.warm:
                 rewriter.warm.stop()
+        while self.adoptable:
+            self.adoptable.popitem()[1].stop()
+
+    def hand_over(self):
+        """At a reload: the routed profiles' model processes, for the new rewriter to take up when
+        it routes to them again (an edit is not a cold start of every model)."""
+        kept = {}
+        for rewriter in self.routed.values():
+            warm = rewriter.warm
+            if warm and not warm.state.startswith("failed") and warm_key(warm) not in kept:
+                kept[warm_key(warm)], rewriter.warm = warm, None
+        return kept
 
     @property
     def model_state(self):
@@ -353,7 +372,12 @@ class Rewriter:
             other.url = self.url
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
             other.bindings = self.bindings  # the service's: a binding's context reaches the profile it routes to
-            other.start_model()  # its model process, as the service's own starts with the service
+            other.adoptable = self.adoptable
+            kept = self.adoptable.pop(warm_key(other.warm), None) if other.warm else None
+            if kept is not None:  # the same model process, from before the config was edited
+                other.warm = kept
+            else:
+                other.start_model()  # its model process, as the service's own starts with the service
             self.routed[name] = other
         return self.routed[name]
 

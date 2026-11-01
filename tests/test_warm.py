@@ -54,6 +54,55 @@ class ModelServerTests(unittest.TestCase):
         self.assertEqual(rewriter.model_state, "stopped")
         self.assertIsNone(Rewriter("llama", url).warm)  # a server of your own: not cd_AI's to run
 
+    def test_a_model_that_ends_as_it_starts_has_failed_and_is_not_started_again(self):
+        server = warm.ModelServer([sys.executable, "-c", "raise SystemExit(3)"], "http://127.0.0.1:9")
+        with patch.object(warm, "spawn", wraps=warm.spawn) as started:
+            server.start()
+            deadline = time.monotonic() + 5
+            while not server.state.startswith("failed") and time.monotonic() < deadline:
+                time.sleep(0.05)
+            time.sleep(1.2)  # a restart would have come by now
+        self.assertEqual(server.state, "failed: the local model ended as it started (exit 3)")
+        self.assertEqual(started.call_count, 1)
+
+    def test_stopped_while_it_starts_it_is_not_left_running(self):
+        started, spawn = [], warm.spawn
+
+        def slow(*args, **kwargs):
+            time.sleep(0.3)  # the settings switch away meanwhile
+            started.append(spawn(*args, **kwargs))
+            return started[-1]
+        server = warm.ModelServer([sys.executable, "-c", "import time; time.sleep(30)"], "http://127.0.0.1:9")
+        with patch.object(warm, "spawn", slow):
+            server.start()
+            time.sleep(0.1)
+            server.stop()
+            time.sleep(0.5)
+        self.assertEqual(server.state, "stopped")
+        self.assertIsNotNone(started[0].wait(5))  # ended, not left running
+
+    def test_a_routed_models_process_goes_on_through_a_reload(self):
+        from claudish.model import Rewriter
+        command = [sys.executable, "-c", "import time; time.sleep(30)"]
+
+        def build():
+            main = Rewriter("rules")
+            main.profile = "main"
+            main.loader = lambda name: Rewriter("llama", "http://127.0.0.1:9", command=command)
+            return main
+        old = build()
+        routed = old.load("local")
+        process_warm = routed.warm
+        try:
+            fresh = build()
+            fresh.adoptable = old.hand_over()  # what the service's swap does
+            old.stop_model()
+            self.assertIs(fresh.load("local").warm, process_warm)  # taken up, not started cold
+            self.assertNotEqual(process_warm.state, "stopped")
+        finally:
+            fresh.stop_model()
+        self.assertEqual(process_warm.state, "stopped")  # the service's stop ends it
+
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
         self.assertEqual(argv[:7], ["/x/llama-server", "-m", "/m/gemma.gguf", "--host", "127.0.0.1", "--port", "18766"])

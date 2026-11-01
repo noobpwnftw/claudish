@@ -111,15 +111,17 @@ class Warm:
         return process is not None and process.poll() is None
 
     def ask(self, prompt, timeout):
-        """One rewrite, as its own conversation; RuntimeError with words for the panel."""
-        with self.lock:
+        """One rewrite, as its own conversation; RuntimeError with words for the panel. It waits
+        for another request (an instruction, the warm-up) no longer than its own timeout."""
+        if not self.lock.acquire(timeout=timeout):
+            raise RuntimeError("%s is busy; keep typing or retry" % self.name)
+        try:
             try:
                 self.check_running()
                 if not self.alive():
                     self.state = "restarting"
                     self.launch()
                 text = self.exchange(prompt, timeout)
-                self.finish()
             except TimeoutError:
                 self.failed()  # a stuck one is not reused
                 raise RuntimeError("%s took longer than %g s" % (self.name, timeout))
@@ -128,7 +130,13 @@ class Warm:
                 if isinstance(exc, OSError):
                     raise RuntimeError("%s: %s" % (self.name, exc)) from exc
                 raise
+            try:
+                self.finish()  # the next process, ready for the next request
+            except Exception:
+                self.failed()  # it starts again at the next request; this answer stands
             return text
+        finally:
+            self.lock.release()
 
     def failed(self):
         with self.lifecycle:
@@ -339,6 +347,7 @@ class ModelServer:
         self.command, self.url, self.configured = list(command), url.rstrip("/"), None
         self.state = "stopped"
         self.stopped = threading.Event()
+        self.guard = threading.Lock()  # the process, between run() and stop()
         self.process = None
 
     def start(self):
@@ -355,42 +364,61 @@ class ModelServer:
             return False
 
     def run(self):
+        """Start the server and wait until it answers; start it again if it ends after that. One
+        that ends before it ever answers (a wrong model path, a port in use, too little memory) has
+        failed: started again it would only fail again."""
         import subprocess
         while not self.stopped.is_set():
             try:
-                self.process = spawn([os.path.expanduser(part) for part in self.command], "the local model",
-                                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                process = spawn([os.path.expanduser(part) for part in self.command], "the local model",
+                                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as exc:
                 self.state = "failed: %s" % (exc,)
                 return
+            with self.guard:
+                if self.stopped.is_set():  # stopped while it started: it is not left running
+                    end(process)
+                    return
+                self.process = process
             deadline = time.monotonic() + 120  # a model loads first
-            while self.process.poll() is None and not self.answers():
+            while process.poll() is None and not self.answers():
                 if self.stopped.is_set() or time.monotonic() > deadline:
                     break
                 time.sleep(0.2)
-            if self.process.poll() is None and not self.stopped.is_set():
-                if not self.answers():
-                    self.state = "failed: the local model did not answer within 120 s"
-                    self.stop()
-                    return
-                self.state = "warm"
-                self.process.wait()
+            if self.stopped.is_set():
+                return
+            if process.poll() is not None:
+                self.state = "failed: the local model ended as it started (exit %s)" % process.returncode
+                return
+            if not self.answers():
+                self.state = "failed: the local model did not answer within 120 s"
+                self.stop()
+                return
+            self.state = "warm"
+            process.wait()
             if self.stopped.is_set():
                 return
             self.state = "restarting"
             time.sleep(1)
 
     def stop(self):
-        self.stopped.set()
-        process, self.process = self.process, None
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(5)
-            except Exception:
-                process.kill()
+        with self.guard:
+            self.stopped.set()
+            process, self.process = self.process, None
+        if process is not None:
+            end(process)
         if self.state != "stopped" and not self.state.startswith("failed"):
             self.state = "stopped"
+
+
+def end(process):
+    """A child process, ended: asked first, then killed."""
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(5)
+        except Exception:
+            process.kill()
 
 
 def make(backend, command, model=None, cwd=None):

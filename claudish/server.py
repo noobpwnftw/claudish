@@ -50,6 +50,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             fresh.warm, old.warm = old.warm, None
         else:
             fresh.start_model()
+        fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
         rewriter = fresh
         server.rewriter = fresh
         old.stop_model()
@@ -137,7 +138,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 return self.reply(413, {"error": "invalid body size"})
             try:
                 data = json.loads(self.rfile.read(size))
-            except (ValueError, UnicodeError):
+            except (ValueError, UnicodeError, OSError):  # not JSON, or a body shorter than it said
                 data = None
             if not isinstance(data, dict):
                 return self.reply(400, {"error": "expected a JSON object"})
@@ -195,6 +196,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             if parts[2] != "answer":
                 return self.reply(404, {"error": "not found"})
             choice, text = data.get("choice"), data.get("text")
+            if not isinstance(data.get("question"), str):
+                return self.reply(400, {"error": "question must be a question's id"})
             if text is not None and not (isinstance(text, str) and 0 < len(text) <= MAX_COMPOSITION):
                 return self.reply(400, {"error": "text must be 1–512 characters"})
             try:
@@ -385,7 +388,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 app = data.get("app")  # The focused app, reported by the adapter; selects bindings.
                 if app is not None and not (isinstance(app, str) and len(app) <= 200):
                     raise ValueError("app must be a short string")
-                if mode not in rewriter.modes:
+                if not isinstance(mode, str) or mode not in rewriter.modes:
                     raise ValueError("unknown mode")
                 look = data.get("look", False)  # F8: the user asked for a picture of the focused window
                 if not isinstance(look, bool) or (look and mode != "instruct"):

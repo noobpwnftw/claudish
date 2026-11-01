@@ -27,6 +27,7 @@ class Session:
         self.answered = {}  # answered question id -> (choice, text): the same answer again is taken once
         self.done = False
         self.cancelled = False
+        self.running = True  # its driver's thread: after Esc, until the model call in flight returns
         self.finished_at = None
 
     def emit(self, kind, **fields):
@@ -88,6 +89,8 @@ class Sessions:
                     del self.live[key]
             if sum(not s.done for s in self.live.values()) >= MAX_SESSIONS:
                 raise RuntimeError("too many agent sessions; finish or cancel one")
+            if sum(s.running for s in self.live.values()) >= MAX_SESSIONS:  # cancelled, still at the model
+                raise RuntimeError("the model is busy with earlier instructions; retry in a moment")
             session = Session(driver, one_line)
             self.live[session.id] = session
         threading.Thread(target=self.run, args=(session, prompt), daemon=True).start()
@@ -99,6 +102,8 @@ class Sessions:
             session.driver.run(session, prompt)
         except Exception as exc:  # a driver failure ends the session with an error event
             session.emit("error", text=str(exc) or type(exc).__name__)
+        finally:
+            session.running = False
         if not session.done:
             session.emit("error", text="cancelled" if session.cancelled else "the agent stopped without a result")
 

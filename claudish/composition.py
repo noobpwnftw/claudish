@@ -35,9 +35,11 @@ PANEL_ROWS = 24
 ROW = 60
 
 
-# The service's own failures, worded for the panel already (claudish/model.py, conversation.py, sessions.py).
+# The service's own failures, worded for the panel already (claudish/model.py, conversation.py, sessions.py,
+# warm.py).
 OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no answer, so the instruction stopped",
-             "too many agent sessions", "the model offered nothing")
+             "too many agent sessions", "the model offered nothing",
+             "Claude Code ", "Codex ")  # claudish/warm.py's: busy, took longer, ended
 
 
 def failure(error):
