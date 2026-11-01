@@ -534,6 +534,17 @@ class ClaudishEngine(IBus.Engine):
             if self.composition.mode != name[5:]:
                 self.switch_mode()
 
+    def do_candidate_clicked(self, index, button, state):
+        """A click on a row of IBus's popup: taken as Tab would take it (as on macOS)."""
+        action = self.composition.click(index)
+        if action == "choose":  # a question's choice: answered
+            chosen = self.composition.answer_choice()
+            if chosen:
+                self.suggestions.answer(*chosen)
+            self.render()
+        elif action == "accept":  # a draft: inserted
+            self.finish(True)
+
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
