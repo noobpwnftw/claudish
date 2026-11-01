@@ -95,6 +95,21 @@ def call(endpoint, path, body=None, timeout=10):
         return json.load(response)
 
 
+def said(exc):
+    """A failed request as a result: the service explains model failures in JSON, and the HTTP
+    status alone loses why (a missing key becomes only "503 Service Unavailable")."""
+    if isinstance(exc, HTTPError):
+        try:
+            with exc:
+                detail = json.loads(exc.read(32768))
+            message = detail.get("error") if isinstance(detail, dict) else None
+        except (ValueError, OSError):
+            message = None
+        if isinstance(message, str) and message:
+            return {"error": message}
+    return {"error": str(exc)}
+
+
 class Suggestions:
     def __init__(self, endpoint="http://127.0.0.1:18765", debounce=0.18):
         self.endpoint = endpoint
@@ -146,14 +161,25 @@ class Suggestions:
     def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
                  purpose=None, draft=""):
         """draft: a follow-up's draft, the one in view and not yet in the text (Composition.about)."""
+        session = mode == "instruct" and immediate  # sent: a turn of this text box's conversation
         with self.condition:
-            self.pending = (revision, text, mode, app, look, immediate, before, after, purpose, draft,
-                            time.monotonic() + (0 if immediate else self.debounce))
+            self.pending = None if session else (revision, text, mode, app, look, immediate, before, after, purpose,
+                                                 draft, time.monotonic() + (0 if immediate else self.debounce))
             # A newer request makes earlier suggestions stale; an agent session's events stay.
             kept = [result for result in self.results if "session" in result[1]]
             self.results.clear()
             self.results.extend(kept)
             self.condition.notify()
+        if session and text.strip():
+            # Its own thread: it never waits behind a rewrite or a suggestion still on its way.
+            threading.Thread(target=self._start, args=(revision, text, app, look, before, after, purpose, draft),
+                             daemon=True).start()
+
+    def _start(self, revision, *request):
+        try:
+            self.session(revision, *request)
+        except Exception as exc:
+            self.deliver(revision, said(exc))
 
     def poll(self):
         """The oldest unread (revision, data), or None."""
@@ -308,22 +334,8 @@ class Suggestions:
             if not text.strip() or (mode == "continue" and len(text.strip()) < 3):
                 continue  # continue asks by itself at every pause, so not for a word or two; Tab asks for anything
             try:
-                # A sent instruction runs as a turn of this text box's conversation (a session).
-                if mode == "instruct" and immediate:
-                    self.session(revision, text, app, look, before, after, purpose, draft)
-                    continue
                 result = suggest(text, self.endpoint, mode=mode, app=app, look=look, before=before, after=after,
                                  purpose=purpose)
-            except HTTPError as exc:
-                # The service explains model failures in JSON; the HTTP status alone loses why
-                # (for example, a missing key becomes only "503 Service Unavailable").
-                try:
-                    with exc:
-                        detail = json.loads(exc.read(32768))
-                    message = detail.get("error") if isinstance(detail, dict) else None
-                except (ValueError, OSError):
-                    message = None
-                result = {"error": message if isinstance(message, str) and message else str(exc)}
             except Exception as exc:
-                result = {"error": str(exc)}
+                result = said(exc)
             self.deliver(revision, result)

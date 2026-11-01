@@ -152,6 +152,30 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_an_instruction_starts_while_an_abandoned_rewrite_is_still_on_its_way(self):
+        import threading
+        started, release, sessions = threading.Event(), threading.Event(), []
+
+        def slow(text, *args, **kwargs):
+            started.set()
+            release.wait(5)
+            return {"text": text}
+        with patch("claudish.client.suggest", slow):
+            worker = Suggestions(debounce=0.01)
+            worker.session = lambda revision, text, *rest: sessions.append((revision, text))
+            try:
+                worker.schedule(1, "hello there")  # Tab: a rewrite, waiting on a slow model
+                self.assertTrue(started.wait(1))
+                worker.schedule(2, "translate it", "instruct", immediate=True)  # Esc, edit, Shift+Enter
+                deadline = time.monotonic() + 1
+                while not sessions and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(sessions, [(2, "translate it")])  # not behind the rewrite
+            finally:
+                release.set()
+                worker.close()
+                worker.thread.join(1)
+
     def test_the_worker_knows_when_the_service_is_offline(self):
         worker = Suggestions(endpoint="http://127.0.0.1:9")  # nothing listens on the discard port
         try:
