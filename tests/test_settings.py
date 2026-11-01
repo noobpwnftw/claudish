@@ -100,6 +100,12 @@ class SettingsTests(Home):
                          "(cd_AI adds /v1 itself: the address without it)")
         self.assertEqual(settings.server_problem("http://h:1", 500), "http://h:1 answered 500 to http://h:1/v1/models")
 
+    def test_a_tone_of_your_own_templates_is_listed_by_name(self):
+        config.write_starter()  # its templates.json has "mine"
+        state = settings.apply({"tone": "mine"})
+        self.assertEqual((state["tone"], state["own_words"]), ("mine", False))
+        self.assertIn("mine", [tone["name"] for tone in state["tones"]])
+
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))

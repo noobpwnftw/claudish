@@ -118,6 +118,9 @@ function render(state) {
   showStatus(state);
   followStartup(viewVersion);
   $("next").hidden = !recall("cd_AI-first");
+  const [asks, keeps] = state.summon === "Enter" ? ["Enter", "Shift+Enter"] : ["Shift+Enter", "Enter"];
+  const kbd = (keys) => keys.split("+").map((key) => `<kbd>${key}</kbd>`).join("+");
+  $("next-keys").innerHTML = `${kbd(asks)} asks the model; ${kbd(keeps)} keeps your words.`;
   // The service's own problem is in the status line; another profile's, the window may switch to, here.
   const problem = (state.service || {}).problem ? "" : state.config_problem;
   $("config-fix").hidden = !((state.service || {}).problem || state.config_problem);

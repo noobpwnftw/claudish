@@ -28,7 +28,7 @@ class SetupTests(unittest.TestCase):
         self.service_run = MagicMock(return_value=0)
         self.ime = MagicMock()
         self.managed = ("warn", "not managed")
-        self.backend = ("fail", "the Anthropic SDK is not installed", 'pip install "claudish-ime[claude]"')
+        self.backend = ("fail", "the Anthropic SDK is not installed", 'pip install -e ".[claude]"')
         patches = [
             patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.home / ".config"), "HOME": str(self.home)}),
             patch.object(Path, "home", return_value=self.home),
@@ -62,7 +62,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(self.states(), {"Config": "todo", "Tone": "done", "MCP servers": "skip", "Model": "manual",
                                          "Input method": "todo", "Starts at login": "todo"})
         _, out = self.quiet(yes=True)
-        self.assertIn('Model needs you: pip install "claudish-ime[claude]"', out)
+        self.assertIn('Model needs you: pip install -e ".[claude]"', out)
         self.service_run.assert_called_once()  # without a key too: the key goes in the settings it serves
         self.assertNotIn("not yet", out)
 

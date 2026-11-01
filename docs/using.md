@@ -62,8 +62,8 @@ The page calls the same service as the desktop adapters. If your browser runs on
 machine, forward TCP port **18765** (the VS Code Ports tab or SSH), then open the
 forwarded localhost URL. Keep the local port at 18765.
 
-For a model-free UI demo: `claudish serve --backend rules`, then open
-the same URL. The page labels this as rules mode.
+For a model-free UI demo, a second service on another port: `claudish serve --backend rules --port 18775`,
+then open http://127.0.0.1:18775. The page labels this as rules mode.
 
 From a second terminal:
 
@@ -72,10 +72,11 @@ claudish rewrite "This is very important."
 claudish bench --runs 12
 ```
 
-To use a llama-server that is already running:
+To use a llama-server that is already running, beside the service (`claudish rewrite --url
+http://127.0.0.1:18775` asks it):
 
 ```sh
-claudish serve --model-url http://127.0.0.1:18766
+claudish serve --backend llama --model-url http://127.0.0.1:18766 --port 18775
 ```
 
 ## Static demo: the model in your browser

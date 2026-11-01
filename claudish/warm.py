@@ -172,8 +172,10 @@ class ClaudeCode(Warm):
     name = "Claude Code"
     shaped = True
 
-    def __init__(self, command, model="haiku", cwd=None, restart_after=200):
-        super().__init__(command, model or "haiku", cwd, restart_after)
+    default_model = "haiku"  # with no "model" in the profile
+
+    def __init__(self, command, model=None, cwd=None, restart_after=200):
+        super().__init__(command, model or self.default_model, cwd, restart_after)
 
     def argv(self):
         return [self.binary()] + self.command[1:] + [
@@ -227,8 +229,10 @@ class Codex(Warm):
     FEATURES_OFF = ("apps", "plugins", "multi_agent", "image_generation", "computer_use", "browser_use",
                     "shell_tool", "skill_search", "tool_suggest", "hooks")
 
-    def __init__(self, command, model="gpt-6-luna", cwd=None, restart_after=200):
-        super().__init__(command, model or "gpt-6-luna", cwd, restart_after)
+    default_model = "gpt-6-luna"  # with no "model" in the profile
+
+    def __init__(self, command, model=None, cwd=None, restart_after=200):
+        super().__init__(command, model or self.default_model, cwd, restart_after)
         self.counter = self.served = 0
 
     def argv(self):

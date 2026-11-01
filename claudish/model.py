@@ -70,7 +70,7 @@ class Claude:
     """Opt-in hosted backend: typed text is sent to the Anthropic API."""
 
     def __init__(self, model):
-        import anthropic  # Optional dependency: pip install "claudish-ime[claude]"
+        import anthropic  # every installer has it; a checkout: pip install -e ".[claude]"
         from .keys import claude_credential, stored
         # Credentials come from ANTHROPIC_API_KEY, the key saved in cd_AI's settings (claudish/keys.py:
         # a login service sees no shell variables), or an `ant auth login` profile.

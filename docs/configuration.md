@@ -26,8 +26,8 @@ profiles, and `"profile"` is the one cd_AI uses:
 `claudish serve` uses the file's `"profile"`. `--profile claude` picks another, and any flag
 overrides the profile's value. `model` names the model on every backend. A template path in a
 profile is relative to the config file. To take a key from the environment, name its variable with
-`api_key_env`. Unknown keys and wrong types are rejected at startup. `/health` reports the active
-profile.
+`api_key_env`. Unknown keys and wrong types are refused whenever the file is read, beside the
+profiles and in them. `/health` reports the active profile.
 
 What a profile can hold, by purpose (each is optional but `backend`; the sections below say more):
 
@@ -64,7 +64,7 @@ settings change the tone the profile in use reads:
 then. Any other few words work too ("warm and friendly", "plain and concise"); they
 replace the tone in each template, without examples. `claudish setup --tone critic` sets it for
 you. The tones are templates like the rest ([Templates](#templates)): change one, or add one
-under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
+under `"tones": {"named": {...}}` in your templates file. A mode's own `"system"` in the profile's templates wins
 over the tone. Instructions typed in a terminal always get a command line.
 
 ### Keys
@@ -231,7 +231,8 @@ Results are cached for `ttl` seconds (default 30). A failing or slow provider (`
 default 5 s) is skipped. Context goes in the user turn, ahead of your text. Adapters may also
 send the text around the caret as `before`/`after` in `/suggest`.
 
-MCP servers can supply context too. They need the MCP SDK: after the one-line install on Linux, `~/.local/share/claudish/.venv/bin/python -m pip install -e "$HOME/.local/share/claudish[mcp]"`; in a checkout, `.venv/bin/python -m pip install -e ".[mcp]"`. Claudish
+MCP servers can supply context too. Every installer includes the MCP SDK; a checkout needs
+`.venv/bin/python -m pip install -e ".[mcp]"`. Claudish
 starts the configured stdio server, calls one tool or reads one resource, and
 caches the text:
 
@@ -335,7 +336,7 @@ pick, and its final answer is a candidate like any other. For Claude Code:
   without asking, the rest ask. The profile's `context` and the app's bindings go
   with each instruction, as they do for the model.
 - **The agent sees your text box.** The text around the caret goes with each
-  instruction, and with the `[mcp]` extra installed, Claudish gives the agent a
+  instruction, and with the MCP SDK (every installer has it), Claudish gives the agent a
   `textbox` MCP server (read, search) for the rest, so "fix the second paragraph"
   works in a long document. Its reads run without asking. Without an agent, the model driver has the same two tools
   whenever the text box is longer than what it is sent.
@@ -405,7 +406,7 @@ lists it in "consulted". F8 applies to that one instruction.
   `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
   Wayland lets no program capture a window without asking, so F8 has no picture there.
 - **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
-  Codex get no picture.
+  Codex refuse F8 with an error, as the command backend does.
   For llama.cpp, start a vision model with its projector, for example
   [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
   `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj

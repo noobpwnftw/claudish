@@ -26,7 +26,7 @@ def main():
     serve.add_argument("--model", help="The model to use, on any backend (a Claude model, a server's model, ...)")
     serve.add_argument("--api-key-env", metavar="NAME",
                        help="Environment variable holding a bearer key for --model-url")
-    serve.add_argument("--timeout", type=float, help="Seconds to wait for --model-url")
+    serve.add_argument("--timeout", type=float, help="Seconds to wait for the model's answer")
     serve.add_argument("--templates", metavar="FILE",
                        help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
     serve.add_argument("--port", type=int, default=18765)
@@ -212,7 +212,8 @@ def main():
             profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
             rewriter.problem = config.plainly(exc)
         except ImportError:
-            parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
+            from .doctor import SDK_FIX
+            parser.error("the claude backend needs the Anthropic SDK: " + SDK_FIX)
         run_service(rewriter, args.port, lambda: build()[2],
                     Path(args.config) if args.config else config.default_path(),
                     lambda server: print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (

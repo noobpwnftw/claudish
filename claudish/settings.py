@@ -106,9 +106,11 @@ def state(path=None):
     path = path or config.default_path()
     data, problem = loaded(path)  # a problem: the window shows the starter, and how to fix it
     locked = bool(problem)  # nothing the window changes can be used: the file comes first
+    named = TEMPLATES["tones"]["named"]  # with the profile's own templates file's tones over them
     if not problem and path.is_file():
         try:
-            config.resolve(path, in_use(data))
+            from .modes import merged
+            named = merged(config.resolve(path, in_use(data))[2])["tones"]["named"]
         except (OSError, ValueError) as exc:
             problem, locked = config.plainly(exc), True
         else:
@@ -128,10 +130,10 @@ def state(path=None):
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "config_problem": problem,
         "config_locked": locked,
-        "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
+        "tone": tone, "own_words": tone not in named,
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "hints": data.get("hints", True) is not False,
-        "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
+        "tones": [{"name": n, "about": t.get("about", "")} for n, t in named.items()],
         "config": str(path),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
         # connection on this computer answers at once).

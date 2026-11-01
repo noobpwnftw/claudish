@@ -79,6 +79,8 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
         path = self.write({"profiles": {"p": {}}}, "other.json")
+        with self.assertRaisesRegex(ValueError, "unknown keys hint in"):
+            config.resolve(self.write({"hint": False, "profiles": {"p": {}}}, "typo.json"))  # "hints"
         with self.assertRaisesRegex(ValueError, "'missing' is not in"):
             config.resolve(path, "missing")
         with self.assertRaisesRegex(ValueError, "profiles"):

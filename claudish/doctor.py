@@ -59,7 +59,7 @@ def check_backend(state):
         try:
             import anthropic  # noqa: F401
         except ImportError:
-            return "fail", "the Anthropic SDK is not installed", 'pip install "claudish-ime[claude]"'
+            return "fail", "the Anthropic SDK is not installed", SDK_FIX
         from .keys import claude_credential
         if not claude_credential()[0]:
             from .settings import claude_code, codex
@@ -75,7 +75,9 @@ def check_backend(state):
         name, find = ("Claude Code", "claude") if backend == "claude-code" else ("Codex", "codex")
         program = settings["command"][0]
         if shutil.which(program) or Path(program).is_file():
-            return "ok", "%s (%s), kept running by the service" % (name, settings.get("model") or "its default model"), None
+            from .warm import ClaudeCode, Codex
+            model = settings.get("model") or (ClaudeCode if backend == "claude-code" else Codex).default_model
+            return "ok", "%s (%s), kept running by the service" % (name, model), None
         from . import settings as window
         found = window.claude_code() if backend == "claude-code" else window.codex()
         if found:  # an update moved it: the service finds it again; saving the choice records the new path
@@ -203,12 +205,16 @@ def check_ime_windows():
     return results
 
 
+# Every installer has it; a checkout installs it into its venv.
+SDK_FIX = '%s -m pip install -e ".[claude]" in the checkout' % sys.executable
+
+
 def check_ime_macos():
     bundle = Path.home() / "Library/Input Methods/Claudish.app"
     if bundle.is_dir():
         return [("Input method", "ok", "installed (%s)" % bundle, None)]
     return [("Input method", "fail", "Claudish.app is not installed",
-             "python3 platforms/macos/build.py --install, then log out and back in")]
+             "install cd_AI.pkg again (in a checkout: python3 platforms/macos/build.py --install), then log out and back in")]
 
 
 def check_context(state):

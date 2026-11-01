@@ -28,6 +28,7 @@ DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": N
             "context": None, "max_context_chars": 6000, "modes": None, "command": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
+FILE_KEYS = ("about", "profile", "profiles", "tone", "keys", "hints", "mcp_servers")  # beside the profiles
 # The key that sends your words to the model, the default first; the other one puts them in as typed.
 SUMMON_KEYS = ("Shift+Enter", "Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
@@ -55,6 +56,9 @@ def resolve(path=None, profile=None, overrides=None):
         profiles = data.get("profiles") if isinstance(data, dict) else None
         if not isinstance(profiles, dict) or not profiles:
             raise ValueError('%s needs a "profiles" object' % path)
+        unknown = sorted(set(data) - set(FILE_KEYS))
+        if unknown:
+            raise ValueError("unknown keys %s in %s (beside \"profiles\": %s)" % (", ".join(unknown), path, ", ".join(FILE_KEYS)))
         known = set(profiles)
         name = profile or data.get("profile") or next(iter(profiles))
         if name not in profiles:

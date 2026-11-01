@@ -38,7 +38,7 @@ app ⇄ OS input framework ⇄ adapter ──(HTTP, loopback)──▶ service �
 ```
 
 All three adapters use the same composition state (`composition.py`, which also runs inside
-PIME's own Python on Windows, 3.12, with no third-party packages); keep the adapters thin. Input
+PIME's own Python on Windows, 3.15, with no third-party packages); keep the adapters thin. Input
 events do not wait for inference: `client.py` is one background worker per adapter that debounces
 (180 ms) and coalesces, and every edit bumps a revision, so a result for an older one is dropped. Generated `claudish/web/lab-states.js` comes from
 `scripts/lab_states.py`, which drives that same state; edit its generator rather than its output.

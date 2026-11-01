@@ -4,15 +4,15 @@
 
 - The config: `"tone"` is set once beside `"profile"` (with `"keys"` and `"hints"`) and applies to every
   profile; a profile's own `"tone"` still wins there. `"model"` names the model on every backend.
-  The OpenAI-compatible server's profile is `"server"`. The starter config is the five models cd_AI's
-  settings offer. docs/configuration.md starts with the config file, then models, apps, context,
+  The OpenAI-compatible server's profile is `"server"`. The starter config is the four models cd_AI's
+  settings offer, and the local one. docs/configuration.md starts with the config file, then models, apps, context,
   tools and agents.
 - A config from before 0.4 is not read: `"claude_model"` is `"model"` now, `"max_tokens"` is in the
   templates, and `"hosted"` is gone. cd_AI keeps running with no model, and its settings say what
   does not read: fix the file (an edit applies when you save it), or move it aside and run
   `claudish init` for a new one. `claudish serve --claude-model` is `--model`.
-- Windows: an instruction sees the text around the caret as on macOS and Linux (8,000 characters
-  each way, was 1,500). PIN and numeric password fields are passwords to cd_AI; a time field is no
+- Windows: an instruction gets the text around the caret as on macOS and Linux (up to 8,000
+  characters each way reach the service, was 1,500). PIN and numeric password fields are passwords to cd_AI; a time field is no
   longer taken for a phone number.
 - Templates: each mode's job (what to do, what to keep) is written once; a tone gives only its voice
   (and length, examples). Every tone gets the same guards, one output rule, and a length that
