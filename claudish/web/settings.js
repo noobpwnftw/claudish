@@ -104,6 +104,7 @@ function render(state) {
   $("old-name").textContent = state.config.split(/[\\/]/).pop() + ".old";
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
+  $("try").hidden = false;  // the model in use; hidden while another is picked but not yet in use
   $("server").hidden = state.choice !== "server";
   $("other").hidden = !["local", "other"].includes(state.choice);
   $("other").textContent = state.choice === "local"
@@ -229,6 +230,7 @@ document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEven
   } else {  // an API must answer before cd_AI switches to it: fill it in first
     $("claude").hidden = true;
     $("server").hidden = false;
+    $("try").hidden = $("sample").hidden = shown && shown.choice !== "server";
     say("model-message", "Fill in the API, then Use this API.");
   }
 }));

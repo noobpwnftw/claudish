@@ -77,15 +77,18 @@ async def check(args, home, port):
 
         await page.get_by_text("Another model API").click()  # the form first: nothing switched yet
         await expect(page.locator("#server")).to_be_visible()
+        await expect(page.locator("#try")).to_be_hidden()  # it would try the model still in use
         assert json.loads(config.read_text())["profile"] == "claude"
         await page.locator("#url").fill("http://127.0.0.1:%d" % free_port())  # nothing there
         await page.locator("#model").fill("gemma-4")
         await page.locator("#server button").click()
         await expect(page.locator("#model-message")).to_contain_text("Nothing answers at")
         assert json.loads(config.read_text())["profile"] == "claude"  # not switched to a server that is not there
+        await expect(page.locator("#try")).to_be_hidden()
         await page.locator("#url").fill(args.server)
         await page.locator("#server button").click()
         await expect(page.locator("#model-message")).to_have_text("cd_AI now writes with this API.")
+        await expect(page.locator("#try")).to_be_visible()
         profile = json.loads(config.read_text())["profiles"]["server"]
         assert (profile["model_url"], profile["model"]) == (args.server, "gemma-4"), profile
         await expect(page.locator("#status")).not_to_have_class("bad")  # it answers (this service's flag keeps rules)
