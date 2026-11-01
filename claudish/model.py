@@ -504,34 +504,11 @@ class Rewriter:
         serial: a request while typing, which fails fast instead of queueing behind another."""
         if self.backend == "none":
             raise RuntimeError(NOT_USED % self.problem if self.problem else NO_MODEL)
-        from .modes import parroted
-        from .turn import system
         started = time.perf_counter()
         spec = self.modes[mode]
         local = local or {}
         tools = mode == "instruct" and self.loops() and bool(self.toolbox or local)
-        prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
-        examples = spec["examples"] if box.prose or spec.get("custom") else []
-        in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
-        if in_place:  # a part of the text: the examples are parts too (none: the instruction alone)
-            examples = spec.get("parts") or []
-        if in_place:
-            # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
-            # turn shows them in their place, and the rewrite is only that part.
-            framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
-        else:
-            framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
-        if box.draft:  # a follow-up about the draft in view, not yet in the text
-            framed = spec["box"]["in_view"].format(draft=box.draft, text=framed)
-        said = box.material(framed, spec["box"])
-        history = list(conversation.messages) if conversation is not None else []
-        sent = examples
-        if self.shaped():  # the answer is {"drafts": [...]} (claudish/shapes.py): earlier answers were so too
-            from . import shapes
-            sent, history = shapes.as_answered(examples), shapes.as_answered(history)
-            prompt += "\n\n" + spec["box"]["shape"]
-        else:  # one output rule either way: the shape, or this
-            prompt += "\n\n" + spec["box"]["output"]
+        prompt, examples, said, sent, history = self.prompt_for(mode, text, box, spec, conversation, local, tools)
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
         from .screen import redact
@@ -592,18 +569,7 @@ class Rewriter:
                 if exc.code in SCHEMA_REFUSED:
                     self.schema = True
                 raise
-        from . import quirks, shapes
-        candidates = []
-        for output in outputs:
-            found = shapes.drafts(output)
-            if found is None:  # a plain answer (no schema on this backend): read through the quirks
-                found = [quirks.plain(text, output) or ""]
-            for draft in found:
-                draft = box.fit(mode, self.finish(mode, text, draft))
-                if parroted(mode, text, draft, examples):
-                    continue
-                if draft and draft not in candidates:
-                    candidates.append(draft)
+        candidates = self.candidates_from(mode, text, box, outputs, examples)
         if not candidates:
             record["outcome"] = "nothing offered"
             raise RuntimeError("the model offered nothing for this %s" % mode)
@@ -621,6 +587,52 @@ class Rewriter:
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
                 "usage": usage}
+
+    def prompt_for(self, mode, text, box, spec, conversation, local, tools):
+        """What the model is sent: (system prompt, examples, the turn as said, the examples as sent,
+        the conversation's earlier messages)."""
+        from .turn import system
+        prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
+        examples = spec["examples"] if box.prose or spec.get("custom") else []
+        in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
+        if in_place:  # a part of the text: the examples are parts too (none: the instruction alone)
+            examples = spec.get("parts") or []
+        if in_place:
+            # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
+            # turn shows them in their place, and the rewrite is only that part.
+            framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
+        else:
+            framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
+        if box.draft:  # a follow-up about the draft in view, not yet in the text
+            framed = spec["box"]["in_view"].format(draft=box.draft, text=framed)
+        said = box.material(framed, spec["box"])
+        history = list(conversation.messages) if conversation is not None else []
+        sent = examples
+        if self.shaped():  # the answer is {"drafts": [...]} (claudish/shapes.py): earlier answers were so too
+            from . import shapes
+            sent, history = shapes.as_answered(examples), shapes.as_answered(history)
+            prompt += "\n\n" + spec["box"]["shape"]
+        else:  # one output rule either way: the shape, or this
+            prompt += "\n\n" + spec["box"]["output"]
+        return prompt, examples, said, sent, history
+
+    def candidates_from(self, mode, text, box, outputs, examples):
+        """The drafts in the model's outputs, fitted to the box: each once, and none that only
+        repeats your words or an example."""
+        from . import quirks, shapes
+        from .modes import parroted
+        candidates = []
+        for output in outputs:
+            found = shapes.drafts(output)
+            if found is None:  # a plain answer (no schema on this backend): read through the quirks
+                found = [quirks.plain(text, output) or ""]
+            for draft in found:
+                draft = box.fit(mode, self.finish(mode, text, draft))
+                if parroted(mode, text, draft, examples):
+                    continue
+                if draft and draft not in candidates:
+                    candidates.append(draft)
+        return candidates
 
     def loops(self):
         """Whether this backend runs the tool loop with the conversation's history; the others

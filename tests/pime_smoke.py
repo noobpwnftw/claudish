@@ -220,7 +220,8 @@ def main():
             key(0x0D, modifiers=(0x10,))
             worker_class.return_value.poll.return_value = (service.state.revision,
                                                            {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
-            reply = key(0x10)  # Shift: a key that only polls and publishes
+            service.await_result()  # as Shift+Enter does: the timer polls, and its edit session shows them
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})
             assert reply.get("candidateList") == ["Hello.", "Hi there."], reply
             worker_class.return_value.poll.return_value = None
             key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
@@ -232,7 +233,7 @@ def main():
             question = {"id": "perm-1", "text": "Allow Bash?",
                         "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
-            reply = key(0x10)
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # the question arrives
             assert reply.get("candidateList") == ["Allow", "Deny"], reply
             assert said(reply, "Allow Bash?"), reply
             worker_class.return_value.poll.return_value = None
@@ -244,7 +245,7 @@ def main():
             assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
             # Another question: typed words answer it (a digit in them is text).
             worker_class.return_value.poll.return_value = (service.state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
-            key(0x10)
+            service.handleRequest({"method": "onTimer", "seqNum": 1})
             worker_class.return_value.poll.return_value = None
             for char in "no 2":
                 key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
