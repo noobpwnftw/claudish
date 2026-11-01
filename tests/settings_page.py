@@ -166,6 +166,27 @@ async def check(args, home, port):
         await page.locator("#try button").click()
         await expect(page.locator("#sample")).to_have_text("“new” → “A rewrite of new”")
 
+        # A config the service does not use: said, and Start over writes a new one beside the old.
+        await page.unroute_all()
+        problem = "profile 'claude': unknown keys claude_model (docs/configuration.md lists a profile's keys)"
+
+        async def refused(route):
+            response = await route.fetch()
+            data = await response.json()
+            data["service"].update(backend="none", problem=problem)
+            await route.fulfill(response=response, json=data)
+
+        await page.route("**/settings/state", refused)
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text("cd_AI does not use its config: %s." % problem)
+        await expect(page.locator("#start-over")).to_contain_text("config.json.old")
+        if args.screenshots:
+            await page.screenshot(path=str(args.screenshots / "settings-start-over.png"), full_page=True)
+        await page.locator("#start-over button").click()
+        await expect(page.locator("#start-over-message")).to_have_text("A new config; the old one is config.json.old.")
+        await expect(page.locator("#start-over")).to_be_hidden()
+        assert config.with_name("config.json.old").is_file() and json.loads(config.read_text())["tone"] == "bard"
+
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)
         await expect(reused.locator("#status")).to_contain_text("expired")
@@ -173,7 +194,7 @@ async def check(args, home, port):
         await browser.close()
     print("Settings page passed: ticket kept out of the address and good once, tones (named, described), "
           "a model server (nothing there: not switched; then switched), subscription startup/failure/retry, "
-          "first rewrite, stale example ignored, reload, narrow window, no ticket no settings")
+          "first rewrite, stale example ignored, reload, narrow window, no ticket no settings, a config not used: start over")
 
 
 class Models(BaseHTTPRequestHandler):

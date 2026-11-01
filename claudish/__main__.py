@@ -22,7 +22,6 @@ def main():
     serve.add_argument("--backend", choices=config.BACKENDS,
                        help="llama/openai: any OpenAI-compatible server at --model-url; "
                             "claude: the Anthropic API (the key saved in cd_AI's settings, or ANTHROPIC_API_KEY)")
-    serve.add_argument("--claude-model", help=argparse.SUPPRESS)  # the old name: --model names it
     serve.add_argument("--model-url")
     serve.add_argument("--model", help="The model to use, on any backend (a Claude model, a server's model, ...)")
     serve.add_argument("--api-key-env", metavar="NAME",
@@ -31,7 +30,6 @@ def main():
     serve.add_argument("--templates", metavar="FILE",
                        help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
     serve.add_argument("--port", type=int, default=18765)
-    serve.add_argument("--max-tokens", type=int, help=argparse.SUPPRESS)  # each mode's budget is in the templates
     rewrite = commands.add_parser("rewrite", help="Rewrite TEXT through the running service and print the result")
     rewrite.add_argument("text")
     rewrite.add_argument("--url", default="http://127.0.0.1:18765")
@@ -186,7 +184,7 @@ def main():
     if args.command == "serve":
         # Only real flags override the profile; other profile keys (and args.command, the
         # subcommand's name) must not.
-        flags = ("backend", "claude_model", "model_url", "model", "api_key_env", "timeout", "templates", "max_tokens")
+        flags = ("backend", "model_url", "model", "api_key_env", "timeout", "templates")
         overrides = {key: getattr(args, key) for key in flags}
 
         def load(name):
@@ -204,7 +202,11 @@ def main():
         try:
             profile, settings, rewriter = build()
         except (OSError, ValueError) as exc:
-            parser.error(str(exc))
+            # Still an input method, and the settings window still opens to fix it: no model until
+            # the config reads (an edit is taken up at once).
+            print("cd_AI could not use its config, so no model is set up: %s" % exc, file=sys.stderr, flush=True)
+            profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
+            rewriter.problem = str(exc)
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         run_service(rewriter, args.port, lambda: build()[2],

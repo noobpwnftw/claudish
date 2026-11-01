@@ -151,7 +151,7 @@ class ClaudeKeyChecks(unittest.TestCase):
     """No Claude key: with Claude Code installed, the fix names the settings' Claude Code choice."""
 
     def check(self, found):
-        settings = {"backend": "claude", "claude_model": "claude-opus-5-5"}
+        settings = {"backend": "claude", "model": "claude-opus-5-5"}
         with patch.dict(os.environ, {}, clear=False), patch("claudish.keys.stored", return_value=None), \
                 patch.object(Path, "home", return_value=Path("/nonexistent-home")), \
                 patch("claudish.settings.claude_code", return_value=found):

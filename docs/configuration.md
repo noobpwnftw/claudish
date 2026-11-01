@@ -41,9 +41,9 @@ Beside `"profile"` and `"profiles"`: `"tone"`, `"keys"`, `"hints"` (below) and `
 ### Tone
 
 cd_AI's default tone is corporate slop: "ok" becomes a paragraph about shared vision and
-synergies. `"tone"` beside `"profile"` picks another, for every profile (cd_AI's settings set it
-too); a profile's own `"tone"` wins for that profile, which a binding can pick for an app
-([Apps](#apps-bindings)):
+synergies. `"tone"` beside `"profile"` picks another, for every profile; a profile's own `"tone"`
+wins for that profile, which a binding can pick for an app ([Apps](#apps-bindings)). cd_AI's
+settings change the tone the profile in use reads:
 
 ```json
 {"profile": "claude", "tone": "critic", "profiles": {"claude": {"backend": "claude"}}}

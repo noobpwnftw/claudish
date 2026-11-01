@@ -20,6 +20,14 @@
       rewrite, <kbd>Tab</kbd> again inserts it. <kbd>Shift</kbd>+<kbd>Enter</kbd> asks the model; <kbd>Enter</kbd>
       keeps your words.</p>
 
+    <form class="group" id="start-over" hidden>
+      <div class="row actions">
+        <span class="note">Move it aside as <span id="old-name">config.json.old</span> and start from a new one, with the model and tone you picked.</span>
+        <button type="submit">Start over</button>
+      </div>
+    </form>
+    <p class="message" id="start-over-message" role="alert"></p>
+
     <fieldset id="controls" hidden disabled>
     <section aria-labelledby="model-title">
       <h2 id="model-title">Model</h2>

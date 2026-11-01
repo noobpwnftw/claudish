@@ -56,44 +56,52 @@ class SettingsTests(Home):
         settings.apply({"tone": "corporate"})
         self.assertNotIn("tone", self.written())
 
-    def test_a_tone_reaches_the_profile_in_use_whatever_its_name(self):
+    def test_a_tone_is_changed_where_the_profile_in_use_takes_it(self):
         settings.apply({"tone": "corporate"})  # the starter config
         data = self.written()
         data["profiles"]["agent"] = {"backend": "command", "command": ["cat"], "tone": "proofread"}
         data["profile"] = "agent"
         self.path.write_text(json.dumps(data))
         self.assertEqual(settings.state()["tone"], "proofread")  # the one in use: the profile's own
-        self.assertEqual(settings.apply({"tone": "bard"})["tone"], "bard")  # the window's choice takes effect there
-        self.assertNotIn("tone", self.written()["profiles"]["agent"])
-        self.assertEqual(config.resolve(self.path)[1]["tone"], "bard")
+        self.assertEqual(settings.apply({"tone": "bard"})["tone"], "bard")
+        self.assertEqual(self.written()["profiles"]["agent"]["tone"], "bard")  # its own, not the file's
+        self.assertNotIn("tone", self.written())
+        settings.apply({"choice": "claude"})
+        self.assertEqual(settings.apply({"tone": "critic"})["tone"], "critic")
+        self.assertEqual((self.written()["tone"], self.written()["profiles"]["agent"]["tone"]), ("critic", "bard"))
 
-    def test_a_config_from_before_keeps_working(self):
-        # 0.3: the tone copied into each profile, the server profile called "ollama", "claude_model".
+    def test_start_over_moves_a_config_aside_and_keeps_the_model_and_tone(self):
+        # 0.3.1's starter, with Claude Code picked and a tone: refused now, by its "claude_model".
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"profile": "ollama", "profiles": {
-            "claude": {"backend": "claude", "claude_model": "claude-haiku-5-5", "tone": "critic"},
-            "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:9", "model": "m", "tone": "critic"},
-            "slack": {"backend": "claude", "tone": "proofread"}}}))
-        self.assertEqual(config.resolve(self.path)[1]["tone"], "critic")
-        self.assertEqual(config.resolve(self.path, profile="claude")[1]["claude_model"], "claude-haiku-5-5")
-        with patch.object(settings, "server_models", return_value=["m"]):
-            state = settings.state()
-            self.assertEqual((state["choice"], state["tone"]), ("server", "critic"))
-            settings.apply({"tone": "bard"})
+        old = {"profile": "claude-code", "profiles": {
+            "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "tone": "critic"},
+            "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "tone": "critic"},
+            "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku", "tone": "critic"}}}
+        self.path.write_text(json.dumps(old))
+        with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
+            config.resolve(self.path, profile="claude")
+        with patch.object(settings, "claude_code", return_value="/new/claude"):
+            state = settings.apply({"start_over": True})
+        self.assertEqual((state["choice"], state["tone"]), ("claude-code", "critic"))
+        self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
         data = self.written()
-        self.assertEqual((data["tone"], data["profile"]), ("bard", "ollama"))
-        self.assertNotIn("tone", data["profiles"]["ollama"])
-        self.assertEqual(data["profiles"]["slack"]["tone"], "proofread")  # set by hand, for that profile: kept
-        self.assertNotIn("server", data["profiles"])  # the old name is used, not a second server profile
-        with patch.object(settings, "server_models", return_value=["m"]):
-            settings.apply({"choice": "claude"})
-            self.assertEqual(settings.apply({"choice": "server"})["choice"], "server")
-        self.assertEqual(self.written()["profile"], "ollama")
+        self.assertEqual((data["tone"], data["profiles"]["claude-code"]["command"]), ("critic", ["/new/claude"]))
+        for name in data["profiles"]:
+            config.resolve(self.path, profile=name)
+        self.path.write_text("{not json")  # one that does not read at all: the starter's Claude
+        self.assertEqual(settings.apply({"start_over": True})["choice"], "claude")
 
-    def test_model_names_the_model_on_every_backend(self):
+    def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))
-        self.assertEqual(config.resolve(self.path)[1]["claude_model"], "claude-sonnet-5-5")
+        self.assertEqual(config.resolve(self.path)[1]["model"], "claude-sonnet-5-5")
+
+    def test_keys_of_older_configs_are_refused_by_name(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        for key in ("claude_model", "max_tokens", "hosted"):
+            self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", key: 1}}}))
+            with self.assertRaisesRegex(ValueError, "unknown keys " + key):
+                config.resolve(self.path)
 
     def test_the_key_that_asks_is_saved_beside_the_profile(self):
         self.assertEqual(settings.apply({"tone": "corporate"})["summon"], "Shift+Enter")

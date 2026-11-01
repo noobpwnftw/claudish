@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,15 +37,15 @@ class ConfigTests(unittest.TestCase):
 
     def test_profile_selection_and_precedence(self):
         self.write({"modes": {"rewrite": {"system": "Be grand.", "examples": []}}}, "claudish/grand.json")
-        self.write({"profile": "ollama", "profiles": {
-            "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+        self.write({"profile": "server", "profiles": {
+            "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
                        "templates": "grand.json"},
-            "claude": {"backend": "claude", "claude_model": "claude-haiku-5-5"}}})
+            "claude": {"backend": "claude", "model": "claude-haiku-5-5"}}})
         name, settings, templates, _ = config.resolve()  # found at $XDG_CONFIG_HOME/claudish/config.json
-        self.assertEqual((name, settings["model"]), ("ollama", "qwen2.5:7b"))
+        self.assertEqual((name, settings["model"]), ("server", "qwen2.5:7b"))
         self.assertEqual(templates["modes"]["rewrite"]["system"], "Be grand.")  # relative to the config file
-        name, settings, _, _ = config.resolve(profile="claude", overrides={"claude_model": "claude-opus-5-5"})
-        self.assertEqual((name, settings["backend"], settings["claude_model"]),
+        name, settings, _, _ = config.resolve(profile="claude", overrides={"model": "claude-opus-5-5"})
+        self.assertEqual((name, settings["backend"], settings["model"]),
                          ("claude", "claude", "claude-opus-5-5"))
 
     def test_the_summon_key(self):
@@ -77,8 +78,7 @@ class ConfigTests(unittest.TestCase):
             path = self.write({"profiles": {"p": profile}}, "other.json")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
-        path = self.write({"profiles": {"p": {"hosted": "no"}}}, "other.json")
-        self.assertNotIn("hosted", config.resolve(path)[1])  # an old key, ignored
+        path = self.write({"profiles": {"p": {}}}, "other.json")
         with self.assertRaisesRegex(ValueError, "'missing' is not in"):
             config.resolve(path, "missing")
         with self.assertRaisesRegex(ValueError, "profiles"):
@@ -133,12 +133,42 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class ServeTests(unittest.TestCase):
+    def test_a_config_it_cannot_use_leaves_the_service_running_with_no_model(self):
+        import socket, subprocess, sys, time
+        from urllib.request import urlopen
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home, "config.json")
+            path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "claude_model": "x"}}}))
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            service = subprocess.Popen([sys.executable, "-m", "claudish", "serve", "--config", str(path), "--port", str(port)],
+                                       cwd=Path(__file__).resolve().parents[1], stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE, env=dict(os.environ, XDG_CONFIG_HOME=home))
+            try:
+                for _ in range(40):
+                    try:
+                        with urlopen("http://127.0.0.1:%d/health" % port, timeout=1) as response:
+                            health = json.load(response)
+                        break
+                    except OSError:
+                        time.sleep(0.1)
+                else:
+                    self.fail("no service: %s" % service.stderr.read1().decode())
+            finally:
+                service.terminate()
+                service.wait(5)
+                service.stderr.close()
+            self.assertEqual(health["backend"], "none")
+            self.assertIn("unknown keys claude_model", health["problem"])
+
+
 class DocsTests(unittest.TestCase):
     def test_every_profile_key_is_in_the_configuration_docs_table(self):
         # The starter no longer lists them: docs/configuration.md's table is where they are found.
         docs = (Path(__file__).resolve().parents[1] / "docs/configuration.md").read_text(encoding="utf-8")
         table = docs[docs.index("What a profile can hold"):docs.index("### Tone")]
-        old = {"claude_model", "max_tokens"}  # still read; "model" and the templates' budgets name them now
-        missing = [key for key in config.DEFAULTS if key not in old and "`%s`" % key not in table]
+        missing = [key for key in config.DEFAULTS if "`%s`" % key not in table]
         self.assertEqual(missing, [])
 

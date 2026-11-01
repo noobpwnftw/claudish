@@ -42,6 +42,8 @@ function ready(state) {
 
 function status(state) {
   const backend = (state.service || {}).backend;
+  const problem = (state.service || {}).problem;
+  if (problem) return [`cd_AI does not use its config: ${problem.replace(/\.$/, "")}.`, "bad"];
   const name = subscription(state);
   if (name) {
     const model = state.service.model || "warm";
@@ -95,6 +97,8 @@ function render(state) {
   showStatus(state);
   followStartup(viewVersion);
   $("next").hidden = !recall("cd_AI-first");
+  $("start-over").hidden = !(state.service || {}).problem;
+  $("old-name").textContent = state.config.split(/[\\/]/).pop() + ".old";
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
   $("server").hidden = state.choice !== "server";
@@ -240,6 +244,13 @@ $("server").addEventListener("submit", (event) => {
   event.preventDefault();
   change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
          "model-message", "cd_AI now writes with this API.").then((done) => { if (done) $("server-key").value = ""; });
+});
+$("start-over").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("start-over").querySelector("button");
+  button.disabled = true;
+  await change({start_over: true}, "start-over-message", `A new config; the old one is ${$("old-name").textContent}.`);
+  button.disabled = false;
 });
 $("try").addEventListener("submit", (event) => {
   event.preventDefault();

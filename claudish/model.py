@@ -13,6 +13,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
 RECENT_SECONDS = 600
 NO_MODEL = "no model is set up"  # said in the panel, where Tab or Shift+Enter asked
+NOT_USED = "the config is not used: %s"  # the service runs with no model until the config reads
 NO_CREDENTIALS = "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY"
 
 
@@ -61,6 +62,7 @@ def user_content(text, image, style, intro=""):
     return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
+CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile names none
 FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
 
 
@@ -220,9 +222,9 @@ class Rewriter:
             # server says no to each request until a key is there.
             print("%s is not set, and no key is saved for %s: set it, or save the key in cd_AI's settings"
                   % (settings["api_key_env"], settings["model_url"]), file=sys.stderr, flush=True)
-        rewriter = cls(settings["backend"], settings["model_url"], settings["max_tokens"], settings["claude_model"],
-                       settings["model"], api_key, settings["timeout"], templates, context, settings["modes"],
-                       settings["command"], settings["bindings"], settings.get("tone"))
+        rewriter = cls(settings["backend"], settings["model_url"], model=settings["model"], api_key=api_key,
+                       timeout=settings["timeout"], templates=templates, context=context, modes=settings["modes"],
+                       command=settings["command"], bindings=settings["bindings"], tone=settings.get("tone"))
         rewriter.profile = profile
         rewriter.look_command = settings.get("look_command")
         rewriter.read_terminal = settings.get("read_terminal", True)
@@ -239,8 +241,7 @@ class Rewriter:
             rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {})
         return rewriter
 
-    def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64,
-                 claude_model="claude-opus-5-5", model=None, api_key=None, timeout=3, templates=None,
+    def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64, model=None, api_key=None, timeout=3, templates=None,
                  context=None, modes=None, command=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend
@@ -266,6 +267,7 @@ class Rewriter:
         self.helper = None  # profile "helper": an agent (or named agents) an instruction may hand the task to (G39)
         self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
         self.profile = None  # the profile's name in the config file
+        self.problem = None  # why the config is not used (the service runs with no model meanwhile)
         self.summon = "Shift+Enter"  # config "keys": the key that sends your words to the model
         self.hints = True  # config "hints": the panel's key hints
         self.url = None  # this service's address, for the agent's textbox MCP server
@@ -291,7 +293,7 @@ class Rewriter:
         if backend in ("claude-code", "codex"):
             from . import config, warm
             self.warm = warm.make(backend, command, model, str(config.default_path().parent))
-        self.claude = Claude(claude_model) if backend == "claude" else None
+        self.claude = Claude(model or CLAUDE_MODEL) if backend == "claude" else None
 
     @property
     def autocompletes(self):
@@ -500,7 +502,7 @@ class Rewriter:
         tool calls (asking through approve when policy says so), and fit the result to the box.
         serial: a request while typing, which fails fast instead of queueing behind another."""
         if self.backend == "none":
-            raise RuntimeError(NO_MODEL)
+            raise RuntimeError(NOT_USED % self.problem if self.problem else NO_MODEL)
         from .modes import parroted
         from .turn import system
         started = time.perf_counter()

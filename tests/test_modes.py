@@ -267,6 +267,11 @@ class ModeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no model is set up"):
             Rewriter("none").rewrite("ok")
         self.assertEqual(failure("no model is set up"), "no model is set up")
+        refused = Rewriter("none")
+        refused.problem = "profile 'claude': unknown keys claude_model"
+        with self.assertRaisesRegex(RuntimeError, "the config is not used: profile 'claude'"):
+            refused.rewrite("ok")
+        self.assertEqual(failure("the config is not used: x"), "the config has a problem: see cd_AI's settings")
         # Continue asks at every pause: a local model (or the stand-in) answers it unasked; a
         # hosted one only where a profile routes continue to it.
         self.assertTrue(Rewriter("llama").autocompletes and Rewriter("rules").autocompletes)

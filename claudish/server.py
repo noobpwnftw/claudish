@@ -288,6 +288,7 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                     "modes": list(rewriter.modes), "timeout": rewriter.timeout,
                     "keys": {"summon": rewriter.summon},
                     "hints": rewriter.hints,
+                    **({"problem": rewriter.problem} if rewriter.problem else {}),
                     **({"model": rewriter.model_state} if rewriter.model_state else {})}
 
         def post_settings(self):

@@ -70,7 +70,7 @@ class ClaudeBackendTests(unittest.TestCase):
         self.assertEqual(self.sdk.options["max_retries"], 0)
 
     def test_haiku_omits_server_side_fallback(self):
-        Rewriter("claude", claude_model="claude-haiku-5-5").rewrite("Ship it.")
+        Rewriter("claude", model="claude-haiku-5-5").rewrite("Ship it.")
         self.assertNotIn("fallbacks", self.sdk.calls[0])
         self.assertNotIn("betas", self.sdk.calls[0])
 
@@ -357,7 +357,7 @@ class RealSdkTests(unittest.TestCase):
         self.addCleanup(server.shutdown)
         environment = {"ANTHROPIC_BASE_URL": "http://127.0.0.1:%d" % server.server_port, "ANTHROPIC_API_KEY": "sk-ant-test"}
         with patch.dict(os.environ, environment):
-            result = Rewriter("claude", claude_model="claude-opus-5-5").rewrite("ok")
+            result = Rewriter("claude", model="claude-opus-5-5").rewrite("ok")
         self.assertEqual(result["text"], "Absolutely—let's align on that.")
         path, key, body = seen[0]
         self.assertEqual((path.split("?")[0], key, body["model"]), ("/v1/messages", "sk-ant-test", "claude-opus-5-5"))

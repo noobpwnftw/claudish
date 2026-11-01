@@ -70,7 +70,8 @@ def check_backend(state):
             if claude_code():  # a Claude subscription works through it, without an API key
                 fix = "with a Claude subscription, pick Claude Code in cd_AI's settings (`claudish settings`); or " + fix
             return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", fix
-        return "ok", "Claude via the Anthropic SDK (%s)" % settings["claude_model"], None
+        from .model import CLAUDE_MODEL
+        return "ok", "Claude via the Anthropic SDK (%s)" % (settings.get("model") or CLAUDE_MODEL), None
     if backend in ("claude-code", "codex"):
         name, find = ("Claude Code", "claude") if backend == "claude-code" else ("Codex", "codex")
         program = settings["command"][0]

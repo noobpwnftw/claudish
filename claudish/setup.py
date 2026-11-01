@@ -14,7 +14,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import config, doctor, mcp_setup, service
-from . import settings as settings_page
 from .modes import TEMPLATES
 
 TONES = list(TEMPLATES["tones"]["named"])
@@ -69,7 +68,7 @@ def step_tone(name, settings, tone):
     def write():  # like the settings window: the file's tone, for every profile
         path = config.default_path()
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        config.set_tone(data, tone, settings_page.MANAGED + (name,))
+        config.set_tone(data, tone, name)
         config.save(data, path)
     return "todo", "set the tone to %r" % tone, write
 

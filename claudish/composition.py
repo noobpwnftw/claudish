@@ -32,6 +32,8 @@ def failure(error):
     error = str(error or "").lower()
     if "no model is set up" in error:
         return "no model is set up"
+    if "the config is not used" in error:
+        return "the config has a problem: see cd_AI's settings"
     # What a new Claude key meets first (Anthropic's own words in the error), said plainly.
     if "credit balance" in error:
         return "no credit on the Anthropic account"

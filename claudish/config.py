@@ -24,14 +24,14 @@ from . import modes as invocation
 
 BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
 DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
-            "timeout": 3, "max_tokens": 64, "claude_model": "claude-opus-5-5", "templates": None,
+            "timeout": 3, "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
 # The key that sends your words to the model, the default first; the other one puts them in as typed.
 SUMMON_KEYS = ("Shift+Enter", "Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "max_tokens": int, "claude_model": str, "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
+         "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
 
 def default_path():
@@ -78,10 +78,10 @@ def resolve(path=None, profile=None, overrides=None):
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)
-        entry = {key: value for key, value in entry.items() if key != "hosted"}  # a key no longer read
         unknown = sorted(set(entry) - set(DEFAULTS))
         if unknown:
-            raise ValueError("profile %r: unknown keys %s" % (name, ", ".join(unknown)))
+            raise ValueError("profile %r: unknown keys %s (docs/configuration.md lists a profile's keys; or move "
+                             "%s aside, and `claudish init` writes a new one)" % (name, ", ".join(unknown), path))
         for key, value in entry.items():
             if value is not None and (not isinstance(value, TYPES[key]) or (isinstance(value, bool) and TYPES[key] is not bool)):
                 raise ValueError("profile %r: %s has the wrong type" % (name, key))
@@ -96,9 +96,6 @@ def resolve(path=None, profile=None, overrides=None):
         settings["backend"] = "openai"  # a model server named with no backend: any OpenAI-compatible one
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
-    named = (overrides or {}).get("claude_model") or (path is not None and "claude_model" in (entry or {}))
-    if settings["backend"] == "claude" and settings["model"] and not named:
-        settings["claude_model"] = settings["model"]  # "model" names the model on every backend
     if settings["backend"] in ("claude-code", "codex") and not settings["command"]:
         settings["command"] = ["claude" if settings["backend"] == "claude-code" else "codex"]
     if settings["backend"] in ("command", "claude-code", "codex"):
@@ -214,14 +211,14 @@ def save(data, path=None):
     os.replace(temporary, path)
 
 
-def set_tone(data, tone, clear=()):
-    """Set the file's tone ("" or "corporate", the default, removes it), and take the tone off the
-    profiles in clear, so it applies there: the ones cd_AI's settings switch between, where older
-    versions kept a copy of it, and the one in use."""
+def set_tone(data, tone, profile=None):
+    """Set the tone profile writes in: its own when it has one, else the file's, for every profile
+    without its own ("" or "corporate", the default, removes the file's)."""
     tone = tone.strip()
+    entry = (data.get("profiles") or {}).get(profile)
+    if isinstance(entry, dict) and entry.get("tone"):
+        entry["tone"] = tone or "corporate"
+        return
     data.pop("tone", None)
     if tone not in ("", "corporate"):
         data["tone"] = tone
-    for name in clear:
-        if isinstance((data.get("profiles") or {}).get(name), dict):
-            data["profiles"][name].pop("tone", None)
