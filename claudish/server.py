@@ -4,7 +4,7 @@ import sys
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
-from .composition import MAX_COMPOSITION
+from .composition import AROUND, MAX_COMPOSITION
 
 
 TEXTBOX_LIMIT = 200_000  # an instruction's text box, each side of the caret (the model sees a window)
@@ -379,8 +379,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                     raise ValueError("text must be 1–512 characters")
                 # Optional text around the caret, supplied by an adapter.
                 before, after = data.get("before", ""), data.get("after", "")
-                if not all(isinstance(s, str) and len(s) <= 4000 for s in (before, after)):
-                    raise ValueError("before/after must be strings of at most 4000 characters")
+                if not all(isinstance(s, str) and len(s) <= AROUND for s in (before, after)):
+                    raise ValueError("before/after must be strings of at most %d characters" % AROUND)
                 mode = data.get("mode", "rewrite")
                 app = data.get("app")  # The focused app, reported by the adapter; selects bindings.
                 if app is not None and not (isinstance(app, str) and len(app) <= 200):

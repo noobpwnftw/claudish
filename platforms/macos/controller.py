@@ -10,7 +10,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap
+from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
@@ -444,12 +444,11 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def changed(self, client):
         self.state.field(terminal=is_terminal(self.app(client)))  # a terminal's command line is not prose
-        after = self.around_caret(client)[1] if self.state.live else ""
-        self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
+        after = self.state.caret_after(self.around_caret(client)[1] if self.state.live else "")
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and self.state.automatic:  # continue: what follows the caret too
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client),
-                                 after=after[:500])
+                                 after=after)
         elif self.worker is not None and not self.state.text:
             self.worker.schedule(self.state.revision, "")
         if self.state.live:  # the only thing shown is the suggestion, with the caret before it
@@ -625,9 +624,9 @@ class ClaudishInputController(IMKInputController):
                 self.finish(client, suggested=True)
             elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 if self.worker is not None:
-                    before, after = self.around_caret(client)  # where the rewrite goes
+                    before, after = window(*self.around_caret(client))  # where the rewrite goes, as much as it sends
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
-                                         app=self.app(client), before=before[-1500:], after=after[:500])
+                                         app=self.app(client), before=before, after=after)
             elif action == "convert":
                 self.changed(client)
             return action != "pass"

@@ -9,6 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from claudish import config
+from claudish.composition import AROUND
 from claudish.context import Binding, Context
 from claudish.model import Rewriter
 from serving import serving
@@ -92,8 +93,8 @@ class ContextTests(unittest.TestCase):
     def test_service_validates_caret_text(self):
         with serving(Rewriter("rules")) as server:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
-            for body, status in [({"text": "very good", "before": "x" * 4000}, 200),
-                                 ({"text": "very good", "before": "x" * 4001}, 400),
+            for body, status in [({"text": "very good", "before": "x" * AROUND}, 200),
+                                 ({"text": "very good", "before": "x" * (AROUND + 1)}, 400),
                                  ({"text": "very good", "after": 5}, 400)]:
                 request = Request(url, data=json.dumps(body).encode(),
                                   headers={"Content-Type": "application/json", "X-Claudish-Token": server.token})

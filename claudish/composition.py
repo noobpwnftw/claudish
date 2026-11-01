@@ -7,6 +7,14 @@ MAX_COMPOSITION = 512
 # (Claudish's PIME reads this much too: pime.patch); the service keeps what each mode uses
 # (turn.WINDOWS: an instruction 6000 before, 2000 after).
 AROUND = 8000
+# What a rewrite and continue send of it: (before, after); an instruction sends all of AROUND.
+WINDOW = (1500, 500)
+
+
+def window(before, after):
+    """The text around the caret a rewrite sends (WINDOW)."""
+    return before[-WINDOW[0]:], after[:WINDOW[1]]
+
 # Two modes, switched by tapping Shift as a Chinese input method switches English and pinyin.
 # compose (where cd_AI starts) holds what you type: Tab shows a rewrite (Tab again puts it in),
 # Shift+Enter sends it as an instruction and offers drafts, Enter keeps it as it is, and Esc steps
@@ -910,6 +918,12 @@ class Composition:
         its pill, until your next key; else the mode's toast. (spec or None, lasting)."""
         pill = self.held_pill() if self.mode == "compose" else None
         return (pill, True) if pill else (self.toast(), False)
+
+    def caret_after(self, after):
+        """The text after the caret, read at each key in continue: whether the caret is inside a
+        line (continue waits for its end), and what continue sends of it."""
+        self.inside = bool(after.split("\n", 1)[0].strip())
+        return after[:WINDOW[1]]
 
     def restorable(self):
         """Whether Shift+Esc has something to bring back (a held exchange past HELD_SECONDS has none)."""

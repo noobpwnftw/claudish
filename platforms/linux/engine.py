@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap
+from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -217,11 +217,10 @@ class ClaudishEngine(IBus.Engine):
         return IBus.PreeditFocusMode.CLEAR if self.composition.for_model else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
-        after = self.around_caret()[1] if self.composition.live else ""
-        self.composition.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
+        after = self.composition.caret_after(self.around_caret()[1] if self.composition.live else "")
         if self.composition.automatic:  # continue: the text so far is the context; what follows the caret too
             self.suggestions.schedule(self.composition.revision, self.composition.text, self.composition.mode,
-                                      app=self.app, after=after[:500], purpose=self.purpose)
+                                      app=self.app, after=after, purpose=self.purpose)
         elif not self.composition.text:
             self.suggestions.schedule(self.composition.revision, "")
         self.render()
@@ -391,9 +390,9 @@ class ClaudishEngine(IBus.Engine):
                     self.suggestions.answer(*answering)
                 self.finish(True)
             elif action == "request":  # rewrite: ask now; it waits in the panel when it arrives
-                before, after = self.around_caret()  # where the rewrite goes
+                before, after = window(*self.around_caret())  # where the rewrite goes, as much as it sends
                 self.suggestions.schedule(self.composition.revision, self.composition.text, "rewrite",
-                                          immediate=True, app=self.app, before=before[-1500:], after=after[:500],
+                                          immediate=True, app=self.app, before=before, after=after,
                                           purpose=self.purpose)
                 self.render()
             elif action == "convert":

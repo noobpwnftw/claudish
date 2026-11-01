@@ -18,7 +18,7 @@ from .screen import is_terminal
 # The text around the caret a model sees: (before, after). An instruction is about the text (a
 # reply to a message far above the caret); a rewrite and continue only need where they go.
 WINDOWS = {"instruct": (6000, 2000)}
-WINDOW = (1500, 500)
+from .composition import WINDOW  # noqa: E402  (a rewrite and continue: what the adapters send of it)
 
 # Free-form text needs no description of its kind. The box's words (what each kind is, what it
 # means, the at-caret and tools guides) are in claudish/templates.json, "box".

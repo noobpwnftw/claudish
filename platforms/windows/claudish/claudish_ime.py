@@ -5,7 +5,7 @@ import os
 import time
 import weakref
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap
+from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, window
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -411,13 +411,12 @@ class ClaudishTextService(TextService):
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
         self.state.field(self.field(), is_terminal(focused_app()))
-        after = self.around()[1] if self.state.live else ""
-        self.state.inside = bool(after.split("\n", 1)[0].strip())  # continue waits for a line's end
+        after = self.state.caret_after(self.around()[1] if self.state.live else "")
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
             # ready by the time the key is released, and onKeyUp can show it.
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
-                                 immediate=self.state.live, after=after[:500], purpose=self.field())
+                                 immediate=self.state.live, after=after, purpose=self.field())
             self.await_result()
         elif self.worker and not self.state.text:
             self.worker.schedule(self.state.revision, "")
@@ -574,9 +573,9 @@ class ClaudishTextService(TextService):
                 return True
             if action == "request":  # rewrite: ask now; it waits in the panel when it arrives
                 if self.worker:
-                    before, after = self.around()  # where the rewrite goes
+                    before, after = window(*self.around())  # where the rewrite goes, as much as it sends
                     self.worker.schedule(self.state.revision, self.state.text, "rewrite", immediate=True,
-                                         app=focused_app(), before=before[-1500:], after=after[:500],
+                                         app=focused_app(), before=before, after=after,
                                          purpose=self.field())
                     self.await_result()
             if action != "accept":  # convert shows the rewrite in the panel; wait shows nothing new
