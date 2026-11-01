@@ -10,7 +10,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap, window
+from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
@@ -637,6 +637,8 @@ class ClaudishInputController(IMKInputController):
             # A held exchange's request is still running: its results come for the same revision.
             self.changed(client)
             return True
+        if key == 53 and flags & NSEventModifierFlagShift and self.state.text:
+            return True  # composing, Shift+Esc brings nothing back, and never drops what you typed
         if key == 53:  # Escape: one step back
             action = self.state.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
@@ -669,15 +671,15 @@ class ClaudishInputController(IMKInputController):
             return True
         text = event.characters() or ""
         # Navigation keys use private-use characters, which must not enter the draft.
-        if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not text or not text.isprintable():
+        if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not all(typeable(char) for char in text) or not text:
             self.finish(client)
             return False
         if all(self.state.passes(char) for char in text):  # nothing composed: the space is the app's text
             client.insertText_replacementRange_(text, (NSNotFound, 0))
             return True
         for char in text:
-            if not self.state.insert(char):
-                self.finish(client)
+            if not self.state.insert(char):  # full: what is before the cursor goes in
+                client.insertText_replacementRange_(self.state.make_room(), (NSNotFound, 0))
                 self.state.insert(char)
         self.changed(client)
         return True

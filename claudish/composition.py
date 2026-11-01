@@ -1,6 +1,7 @@
 """Platform-neutral IME state. Keep compatible with PIME's Python 3.6+."""
 import copy
 import time
+import unicodedata
 
 MAX_COMPOSITION = 512
 # The text box an adapter reads and sends on each side of the caret, the same on every platform
@@ -9,6 +10,45 @@ MAX_COMPOSITION = 512
 AROUND = 8000
 # What a rewrite and continue send of it: (before, after); an instruction sends all of AROUND.
 WINDOW = (1500, 500)
+
+
+def typeable(char):
+    """A character a key types into the composition: printable, or a no-break space (Option+Space,
+    AltGr+Space, French typing), which Python does not count as printable."""
+    return bool(char) and (char.isprintable() or char in "\xa0\u202f")
+
+
+def joins(char):
+    """A code point that belongs to the character before it: a combining mark, a variation
+    selector, a skin tone, a tag, or the joiner itself."""
+    point = ord(char)
+    return bool(unicodedata.combining(char)) or char in "\ufe0e\ufe0f\u200d" or 0x1F3FB <= point <= 0x1F3FF \
+        or 0xE0020 <= point <= 0xE007F
+
+
+def regional(char):
+    return 0x1F1E6 <= ord(char) <= 0x1F1FF
+
+
+def step_back(text, at):
+    """Where the visible character before at starts: an emoji with its skin tone or a family joined
+    by ZWJ, a flag, a letter with its accents goes as one."""
+    at -= 1
+    while at > 0 and (joins(text[at]) or text[at - 1] == "\u200d"):
+        at -= 1
+    if at > 0 and regional(text[at]) and regional(text[at - 1]):
+        at -= 1
+    return max(at, 0)
+
+
+def step_forward(text, at):
+    """Where the visible character at at ends (step_back's other direction)."""
+    start, at = at, at + 1
+    if at < len(text) and regional(text[start]) and regional(text[at]):
+        at += 1
+    while at < len(text) and (joins(text[at]) or text[at - 1] == "\u200d"):
+        at += 1
+    return min(at, len(text))
 
 
 def window(before, after):
@@ -287,7 +327,12 @@ class Composition:
             return True
         if not typed or self.live:
             return False
-        self.back = min(len(typed), max(0, self.back - step))
+        at = len(typed) - self.back
+        if step < 0 and at > 0:
+            at = step_back(typed, at)
+        elif step > 0 and at < len(typed):
+            at = step_forward(typed, at)
+        self.back = len(typed) - at
         return True
 
     def delete(self):
@@ -299,11 +344,12 @@ class Composition:
             return False
         if self.back:
             at = len(typed) - self.back
+            end = step_forward(typed, at)
             if self.answered:
-                self.reply = typed[:at] + typed[at + 1:]
-                self.back -= 1
+                self.reply = typed[:at] + typed[end:]
+                self.back -= end - at
             else:
-                self.edit(typed[:at] + typed[at + 1:], self.back - 1)
+                self.edit(typed[:at] + typed[end:], self.back - (end - at))
         return True
 
     def edit(self, text, back):
@@ -360,7 +406,8 @@ class Composition:
             shown["status"], shown["busy"] = "working", True
         elif self.failed:  # Tab retries a rewrite, Shift+Enter an instruction: each key asks again
             retry = "Tab" if self.asked == "rewrite" else self.summon
-            shown.update(tile="warn", failed=self.error, foot=[(retry, "retry"), ("Esc", "edit")])
+            kept = [(self.keeper, "keep")] if self.asked == "rewrite" else []  # your words; an instruction is not
+            shown.update(tile="warn", failed=self.error, foot=[(retry, "retry")] + kept + [("Esc", "edit")])
         elif self.asked == "instruct" and self.candidate:
             readings = self.candidates
             shown.update(rows=[{"text": c, "legend": None} for c in drafts_shown(readings, self.highlight)], on=self.highlight,
@@ -376,7 +423,7 @@ class Composition:
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         else:  # composing: the keys show from the first key (what each Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
-                             + ([("Esc", "drop")] if self.editing else [(self.keeper, "keep")]))
+                             + [(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         if self.answered and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
@@ -392,7 +439,7 @@ class Composition:
         MAX_COMPOSITION characters, not blank). A longer or multi-line one is not a composition:
         Tab is the app's."""
         lines = (text or "").splitlines()
-        return len(lines) == 1 and bool(lines[0].strip()) and len(text) <= MAX_COMPOSITION
+        return len(lines) == 1 and lines[0] == text and bool(text.strip()) and len(text) <= MAX_COMPOSITION
 
     def field(self, purpose=None, terminal=False):
         """Where the caret is, as the adapter knows it: a field's purpose (url, email, number...) and
@@ -786,18 +833,27 @@ class Composition:
         self.edit(self.text[:at] + char + self.text[at:], self.back)
         return True
 
+    def make_room(self):
+        """The composition is full (insert said False): what is before the cursor goes in (returned,
+        for the adapter to commit), and the rest stays your composition, the cursor at its start,
+        so the next key lands where you are."""
+        at = len(self.text) - self.back
+        head, tail = (self.text[:at], self.text[at:]) if at else (self.text, "")
+        self.edit(tail, len(tail))
+        return head
+
     def backspace(self):
         if self.answered and (self.reply or self.sent):  # with nothing typed, nothing goes: the instruction stays
             at = len(self.reply) - self.back
             if at > 0:
-                self.reply = self.reply[:at - 1] + self.reply[at:]
+                self.reply = self.reply[:step_back(self.reply, at)] + self.reply[at:]
             return
         if self.converted:  # the rewrite is hidden; your words stay, and Tab shows it again
             self.converted = False
             return
         at = len(self.text) - self.back
         if at > 0:
-            self.edit(self.text[:at - 1] + self.text[at:], self.back)
+            self.edit(self.text[:step_back(self.text, at)] + self.text[at:], self.back)
 
     def toggle(self):
         """A Shift tap, or a pick from the mode menu: switch mode. Leaving compose keeps what you
@@ -827,6 +883,11 @@ class Composition:
     @exchange(needs="text")
     def offer(self, revision, text, alternatives=()):
         """A result arrived."""
+        if self.asked == "rewrite":  # it takes your words' place: the spaces around them stay
+            lead = self.text[:len(self.text) - len(self.text.lstrip())]
+            trail = self.text[len(self.text.rstrip()):]
+            text, alternatives = (lead + text.strip() + trail,
+                                  [lead + a.strip() + trail for a in alternatives if a and a.strip()])
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.highlight = 0

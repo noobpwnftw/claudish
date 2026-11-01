@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, window
+from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -332,6 +332,11 @@ class ClaudishEngine(IBus.Engine):
             return False
         if keyval in MODIFIER_KEYS:
             return False
+        if getattr(self, "dead", None) and (IBus.keyval_name(keyval) or "") not in DEAD_KEYS \
+                and not typeable(IBus.keyval_to_unicode(keyval)):
+            self.dead = None  # an accent waiting for its letter: any other key cancels it, as GTK's does
+            if keyval == IBus.KEY_BackSpace:
+                return True  # Backspace cancels the accent, and nothing else
         modifiers = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
                      IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)
         if state & modifiers:
@@ -401,10 +406,13 @@ class ClaudishEngine(IBus.Engine):
         if keyval in (IBus.KEY_Up, IBus.KEY_Down) and self.composition.move(-1 if keyval == IBus.KEY_Up else 1):
             self.render()  # ↑ and ↓ move the highlight
             return True
-        if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK and self.composition.restore():
-            # A held exchange's request is still running: its results come for the same revision.
-            self.render()  # Shift+Esc: what Esc dropped, or the exchange you left, back
-            return True
+        if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK:
+            if self.composition.restore():
+                # A held exchange's request is still running: its results come for the same revision.
+                self.render()  # Shift+Esc: what Esc dropped, or the exchange you left, back
+                return True
+            if self.composition.text:
+                return True  # composing, it brings nothing back, and never drops what you typed
         if keyval == IBus.KEY_Escape:
             action = self.composition.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
@@ -454,12 +462,12 @@ class ClaudishEngine(IBus.Engine):
             if len(char) > 1:  # no such letter: the accent, then the key
                 self.composition.insert(char[0])
                 char = char[1:]
-        if char and self.composition.passes(char):
+        if typeable(char) and self.composition.passes(char):  # not Delete's DEL, nor another control
             self.commit_text(IBus.Text.new_from_string(char))
             return True
-        if char and char.isprintable():
-            if not self.composition.insert(char):
-                self.finish()
+        if typeable(char):
+            if not self.composition.insert(char):  # full: what is before the cursor goes in
+                self.commit_text(IBus.Text.new_from_string(self.composition.make_room()))
                 self.composition.insert(char)
             self.changed()
             return True

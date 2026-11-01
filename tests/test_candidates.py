@@ -207,6 +207,36 @@ class ReceiveTests(unittest.TestCase):
         state.change("hello there")  # inserted, and new words: a rewrite
         self.assertEqual(state.about, "")
 
+    def test_composing_keys_from_review_round_3(self):
+        state = Composition()
+        state.mode = "compose"
+        for char in "thanks for that. ":
+            state.insert(char)
+        state.tab()
+        state.receive(state.revision, {"text": "Thank you—truly—for that."})
+        self.assertEqual(state.candidate, "Thank you—truly—for that. ")  # the space before your next word stays
+        state = Composition()
+        state.mode = "compose"
+        for char in "ok 👍🏽":
+            state.insert(char)
+        state.backspace()
+        self.assertEqual(state.text, "ok ")  # the emoji with its skin tone, as one
+        state.change("")
+        for char in "a" * 507 + "WORLD":
+            state.insert(char)
+        for _ in range(5):
+            state.arrow(-1)
+        self.assertFalse(state.insert("x"))  # full (512): what is before the cursor goes in
+        self.assertEqual(len(state.make_room()), 507)
+        state.insert("x")
+        self.assertEqual(state.text, "xWORLD")
+        self.assertFalse(Composition.selectable("a paragraph\n"))  # a triple click's newline
+        state = Composition()
+        state.mode = "compose"
+        state.change("hi")
+        state.editing = True
+        self.assertIn(("Enter", "keep"), state.panel()["foot"])
+
     def test_the_services_own_failures_are_said_as_they_are(self):
         from claudish.composition import failure
         for words in ("the model is busy; keep typing or retry", "no answer, so the instruction stopped",

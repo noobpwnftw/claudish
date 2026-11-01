@@ -594,6 +594,8 @@ class ClaudishTextService(TextService):
                 self.await_result(60)
             self.publish()
             return True
+        elif key == 0x1B and event.isKeyDown(0x10) and self.state.text:
+            return True  # composing, Shift+Esc brings nothing back, and never drops what you typed
         elif key == 0x1B:
             action = self.state.escape()
             if action == "dismiss":  # an answer to read: Dismiss, nothing inserted
@@ -627,8 +629,8 @@ class ClaudishTextService(TextService):
             self.setCommitString(chr(event.charCode))  # nothing composed: the space is the app's text
         elif event.isPrintableChar():
             char = chr(event.charCode)
-            if not self.state.insert(char):
-                self.setCommitString(self.state.commit())
+            if not self.state.insert(char):  # full: what is before the cursor goes in
+                self.setCommitString(self.state.make_room())
                 self.state.insert(char)
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.

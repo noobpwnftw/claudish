@@ -143,6 +143,21 @@ try:
     assert engine.do_process_key_event(ord(" "), 0, 0)
     assert engine.composition.text == "café^", engine.composition.text
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.text
+    # Delete with nothing composed is the app's (it typed a DEL character once).
+    count = len(commits)
+    assert not engine.do_process_key_event(IBus.KEY_Delete, 0, 0) and len(commits) == count
+    # An accent waiting for its letter: Backspace cancels it, and only it.
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
+    engine.do_process_key_event(ord("e"), 0, 0)
+    assert engine.composition.text == "e", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Shift+Esc while composing brings nothing back, and drops nothing.
+    for char in "keep me":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Escape, 0, IBus.ModifierType.SHIFT_MASK)
+    assert engine.composition.text == "keep me"
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # A shortcut while an instruction is out: the instruction is cleared, held with its exchange for Shift+Esc.
     for char in "fix it":
         engine.do_process_key_event(ord(char), 0, 0)
@@ -187,6 +202,6 @@ try:
     engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
-    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, mode menu, quiet in terminals, password bypass")
+    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()
