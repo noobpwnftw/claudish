@@ -98,7 +98,7 @@ Or use Claude through the official SDK, which every installer includes (in a sou
 
 ```sh
 claudish serve --backend claude                     # claude-opus-5-5
-claudish serve --backend claude --claude-model claude-haiku-5-5
+claudish serve --backend claude --model claude-haiku-5-5
 ```
 
 `claudish` is cd_AI's command line ([where it is on each OS](install.md#the-claudish-command)).

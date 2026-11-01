@@ -22,16 +22,16 @@ def main():
     serve.add_argument("--backend", choices=config.BACKENDS,
                        help="llama/openai: any OpenAI-compatible server at --model-url; "
                             "claude: the Anthropic API (the key saved in cd_AI's settings, or ANTHROPIC_API_KEY)")
-    serve.add_argument("--claude-model")
+    serve.add_argument("--claude-model", help=argparse.SUPPRESS)  # the old name: --model names it
     serve.add_argument("--model-url")
-    serve.add_argument("--model", help="Model name to request from an OpenAI-compatible server")
+    serve.add_argument("--model", help="The model to use, on any backend (a Claude model, a server's model, ...)")
     serve.add_argument("--api-key-env", metavar="NAME",
                        help="Environment variable holding a bearer key for --model-url")
     serve.add_argument("--timeout", type=float, help="Seconds to wait for --model-url")
     serve.add_argument("--templates", metavar="FILE",
                        help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
     serve.add_argument("--port", type=int, default=18765)
-    serve.add_argument("--max-tokens", type=int)
+    serve.add_argument("--max-tokens", type=int, help=argparse.SUPPRESS)  # each mode's budget is in the templates
     rewrite = commands.add_parser("rewrite", help="Rewrite TEXT through the running service and print the result")
     rewrite.add_argument("text")
     rewrite.add_argument("--url", default="http://127.0.0.1:18765")
