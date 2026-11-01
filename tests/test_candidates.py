@@ -825,9 +825,14 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.escape(), "clear")
         self.assertIsNone(state.dropped_toast())  # the rewrite's panel stays
         state = rewritten()
-        self.assertEqual(state.toggle(), "hello")  # a Shift tap keeps your words, not the follow-up
+        # A Shift tap or a focus change holds the exchange with the follow-up, as a reply to a
+        # question is held: nothing goes in, and Shift+Esc brings it all back.
+        self.assertEqual(state.toggle(), "")
+        self.assertEqual(state.held.reply, "short")
         state = rewritten()
-        self.assertEqual((state.leave(), state.dropped), ("", "hello"))  # a focus change: Shift+Esc brings them
+        self.assertEqual(state.leave("mail"), "")
+        self.assertEqual(state.held_pill()["status"], "a rewrite is ready")
+        self.assertEqual((state.restore(), state.text, state.candidate), ("short", "hello", "Greetings—truly."))
         failed = Composition()
         failed.mode = "compose"
         failed.change("two ways")

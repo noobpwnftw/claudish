@@ -900,9 +900,9 @@ class Composition:
             self.mode = "compose"
             self.change("")
             return ""
-        # A sent instruction's exchange is held, as on a focus change: back in compose its pill says
-        # what waits (switched()), and Shift+Esc brings it back.
-        kept = self.leave(None) if self.sent else self.text  # a follow-up on a rewrite is not your words
+        # An exchange (a sent instruction, a follow-up on a rewrite) is held, as on a focus change:
+        # back in compose its pill says what waits (switched()), and Shift+Esc brings it back.
+        kept = self.leave(None) if self.for_model else self.text  # held, as on a focus change
         self.mode = "continue"
         self.look = False  # change() keeps it with words in the composition
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context
@@ -983,19 +983,16 @@ class Composition:
     def leave(self, app=None):
         """Focus left the text box: what the app may keep. Words you were still typing go in, as a
         CJK input method commits its preedit; never the model's (a rewrite is not taken). A sent
-        instruction is not text for the app: it is cleared with its exchange, which is held (its work
-        goes on) and offered on return (returned); Shift+Esc brings it back whole."""
+        instruction, or a follow-up typed on a rewrite, is not text for the app: it is cleared with its
+        exchange, which is held (its work goes on) and offered on return (returned); Shift+Esc brings
+        it back whole, with what you were typing."""
         if self.live:
             self.change("")
             return ""
-        if self.sent:
+        if self.for_model:  # a sent instruction, or a follow-up typed on a rewrite: held, as it is
             held = copy.copy(self)
             held.held = None
             self.held, self.held_app, self.held_at = held, app, time.monotonic()
-            self.change("")
-            return ""
-        if self.for_model:  # a follow-up typed on a rewrite: your words wait for Shift+Esc
-            self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
             self.change("")
             return ""
         words = self.text
@@ -1037,6 +1034,7 @@ class Composition:
         if held is None or self.live or self.text or self.expire():
             return None
         status = ("the model asks" if held.question else
+                  "a rewrite is ready" if held.converted else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "a draft is ready" if held.candidate else
                   held.error if held.failed else "working on what you asked")
