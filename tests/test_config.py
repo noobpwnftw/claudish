@@ -131,3 +131,14 @@ class ByteOrderMarkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DocsTests(unittest.TestCase):
+    def test_every_profile_key_is_in_the_configuration_docs_table(self):
+        # The starter no longer lists them: docs/configuration.md's table is where they are found.
+        docs = (Path(__file__).resolve().parents[1] / "docs/configuration.md").read_text(encoding="utf-8")
+        table = docs[docs.index("What a profile can hold"):docs.index("### Tone")]
+        old = {"claude_model", "max_tokens"}  # still read; "model" and the templates' budgets name them now
+        missing = [key for key in config.DEFAULTS if key not in old and "`%s`" % key not in table]
+        self.assertEqual(missing, [])
+
