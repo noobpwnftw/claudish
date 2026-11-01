@@ -43,24 +43,57 @@ class SettingsTests(Home):
         self.assertEqual([tone["name"] for tone in state["tones"]][:1], ["corporate"])
         self.assertFalse(self.path.exists())
 
-    def test_a_tone_goes_to_every_profile_the_window_manages_and_corporate_clears_it(self):
+    def test_the_tone_is_the_files_for_every_profile_and_corporate_clears_it(self):
         settings.apply({"tone": "critic"})
-        profiles = self.written()["profiles"]
-        self.assertEqual({profiles[n].get("tone") for n in ("claude", "ollama", "local")}, {"critic"})
-        self.assertNotIn("tone", profiles["agent"])  # not the window's
+        data = self.written()
+        self.assertEqual(data["tone"], "critic")  # once, for every profile
+        self.assertFalse(any("tone" in p for p in data["profiles"].values()))
+        for name in data["profiles"]:
+            self.assertEqual(config.resolve(self.path, profile=name)[1]["tone"], "critic")
         self.assertTrue(self.path.with_name("templates.json").is_file())  # the starter's, as init writes it
         state = settings.apply({"tone": "plain and friendly"})
         self.assertEqual((state["tone"], state["own_words"]), ("plain and friendly", True))
         settings.apply({"tone": "corporate"})
-        self.assertFalse(any("tone" in p for p in self.written()["profiles"].values()))
+        self.assertNotIn("tone", self.written())
 
     def test_a_tone_reaches_the_profile_in_use_whatever_its_name(self):
         settings.apply({"tone": "corporate"})  # the starter config
         data = self.written()
+        data["profiles"]["agent"] = {"backend": "command", "command": ["cat"], "tone": "proofread"}
         data["profile"] = "agent"
         self.path.write_text(json.dumps(data))
-        self.assertEqual(settings.apply({"tone": "bard"})["tone"], "bard")
-        self.assertEqual(self.written()["profiles"]["agent"]["tone"], "bard")
+        self.assertEqual(settings.state()["tone"], "proofread")  # the one in use: the profile's own
+        self.assertEqual(settings.apply({"tone": "bard"})["tone"], "bard")  # the window's choice takes effect there
+        self.assertNotIn("tone", self.written()["profiles"]["agent"])
+        self.assertEqual(config.resolve(self.path)[1]["tone"], "bard")
+
+    def test_a_config_from_before_keeps_working(self):
+        # 0.3: the tone copied into each profile, the server profile called "ollama", "claude_model".
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "ollama", "profiles": {
+            "claude": {"backend": "claude", "claude_model": "claude-haiku-5-5", "tone": "critic"},
+            "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:9", "model": "m", "tone": "critic"},
+            "slack": {"backend": "claude", "tone": "proofread"}}}))
+        self.assertEqual(config.resolve(self.path)[1]["tone"], "critic")
+        self.assertEqual(config.resolve(self.path, profile="claude")[1]["claude_model"], "claude-haiku-5-5")
+        with patch.object(settings, "server_models", return_value=["m"]):
+            state = settings.state()
+            self.assertEqual((state["choice"], state["tone"]), ("server", "critic"))
+            settings.apply({"tone": "bard"})
+        data = self.written()
+        self.assertEqual((data["tone"], data["profile"]), ("bard", "ollama"))
+        self.assertNotIn("tone", data["profiles"]["ollama"])
+        self.assertEqual(data["profiles"]["slack"]["tone"], "proofread")  # set by hand, for that profile: kept
+        self.assertNotIn("server", data["profiles"])  # the old name is used, not a second server profile
+        with patch.object(settings, "server_models", return_value=["m"]):
+            settings.apply({"choice": "claude"})
+            self.assertEqual(settings.apply({"choice": "server"})["choice"], "server")
+        self.assertEqual(self.written()["profile"], "ollama")
+
+    def test_model_names_the_model_on_every_backend(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))
+        self.assertEqual(config.resolve(self.path)[1]["claude_model"], "claude-sonnet-5-5")
 
     def test_the_key_that_asks_is_saved_beside_the_profile(self):
         self.assertEqual(settings.apply({"tone": "corporate"})["summon"], "Shift+Enter")
@@ -94,7 +127,7 @@ class SettingsTests(Home):
         profile = self.written()["profiles"]["claude-code"]
         # The full path: a login service may not have the shell's PATH.
         self.assertEqual((profile["command"], profile["model"]), (["/opt/claude/bin/claude"], "haiku"))
-        self.assertEqual(profile["tone"], "critic")
+        self.assertEqual(self.written()["tone"], "critic")
         name, resolved, _, _ = config.resolve()
         self.assertEqual((name, resolved["backend"]), ("claude-code", "claude-code"))  # kept running (claudish/warm.py)
 
@@ -149,7 +182,7 @@ class SettingsTests(Home):
         with patch.object(settings, "check_server", return_value=None):
             state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
         self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4", "key": "missing"}))
-        self.assertEqual(self.written()["profile"], "ollama")
+        self.assertEqual(self.written()["profile"], "server")
         self.assertEqual(config.resolve()[1]["model_url"], "http://127.0.0.1:1234")
         for server in ({"url": "localhost:1234", "model": "x"}, {"url": "http://127.0.0.1:1234", "model": " "}):
             with self.assertRaises(ValueError):
@@ -323,9 +356,9 @@ class ServiceTests(Home):
             self.assertEqual(model.result(timeout=1)[0], 200)
             self.assertEqual(tone.result(timeout=1)[0], 200)
         written = self.written()
-        self.assertEqual(written["profile"], "ollama")
-        self.assertEqual(written["profiles"]["ollama"]["model"], "rig-model")
-        self.assertEqual(written["profiles"]["ollama"].get("tone"), "bard")
+        self.assertEqual(written["profile"], "server")
+        self.assertEqual(written["profiles"]["server"]["model"], "rig-model")
+        self.assertEqual(written.get("tone"), "bard")
         self.assertEqual(self.call("/settings/state")[1]["tone"], "bard")
 
     def test_a_refused_change_says_why_and_changes_nothing(self):

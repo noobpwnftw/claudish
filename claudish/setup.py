@@ -66,14 +66,12 @@ def step_tone(name, settings, tone):
             "corporate, the default" if not current else repr(current),
             ", ".join(n for n in TONES if n != "corporate")), None
 
-    def write():  # like the settings window: on the profiles it switches between, and this one
+    def write():  # like the settings window: the file's tone, for every profile
         path = config.default_path()
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        profiles = data.setdefault("profiles", {})
-        profiles.setdefault(name, {})
-        config.set_tone(profiles, tone, settings_page.MANAGED + (name,))
+        config.set_tone(data, tone, settings_page.MANAGED + (name,))
         config.save(data, path)
-    return "todo", "set the %s profile's tone to %r" % (name, tone), write
+    return "todo", "set the tone to %r" % tone, write
 
 
 def step_mcp():

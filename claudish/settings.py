@@ -3,8 +3,9 @@
 The window offers the model (Claude with an API key, Claude Code's `claude` command for a Claude
 subscription, Codex's `codex` command for a ChatGPT subscription, or any OpenAI-compatible API), the
 tone, the key that asks the model, and whether the panel shows hints. The models map onto the
-starter's profiles: "claude", "claude-code", "codex", and "ollama" for any OpenAI-compatible server.
-A config whose default is another profile is shown as that profile and left to its file.
+starter's profiles: "claude", "claude-code", "codex", and "server" for any OpenAI-compatible server
+(a config from before 0.4 calls it "ollama"). A config whose default is another profile is shown as
+that profile and left to its file. The tone, keys and hints are the file's, for every profile.
 The key is saved by claudish/keys.py.
 """
 import glob
@@ -17,8 +18,8 @@ from urllib.parse import urlsplit
 from . import config, keys
 from .modes import TEMPLATES
 
-CHOICES = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "server": "ollama"}  # choice -> profile
-MANAGED = ("claude", "claude-code", "codex", "ollama", "local")  # the profiles whose tone the window sets
+CHOICES = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "server": "server"}  # choice -> profile
+MANAGED = ("claude", "claude-code", "codex", "server", "ollama", "local")  # the profiles the window switches between
 NO_CLAUDE_CODE = "claude was not found: install Claude Code, then log in"
 NO_CODEX = "codex was not found: install Codex, then log in"
 
@@ -55,6 +56,18 @@ def codex():
     return command_path("codex", ".vscode*/extensions/openai.chatgpt-*/bin/*/codex*")
 
 
+def server_name(profiles):
+    """The profile for an OpenAI-compatible server: "server", or "ollama" in a config from before 0.4."""
+    return "ollama" if "ollama" in profiles and "server" not in profiles else "server"
+
+
+def choice_of(name, profiles):
+    """The window's choice for a profile name."""
+    if name == server_name(profiles):
+        return "server"
+    return {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "local": "local"}.get(name, "other")
+
+
 def read(path=None):
     path = path or config.default_path()
     if not path.is_file():
@@ -74,11 +87,11 @@ def state(path=None):
     profiles = data.get("profiles") or {}
     name = data.get("profile") or next(iter(profiles), None)
     entry = profiles.get(name) or {}
-    choice = dict({profile: c for c, profile in CHOICES.items()}, local="local").get(name, "other")
-    server = profiles.get("ollama") or config.STARTER["profiles"]["ollama"]
+    choice = choice_of(name, profiles)
+    server = profiles.get(server_name(profiles)) or config.STARTER["profiles"]["server"]
     url = server.get("model_url", "")
     models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
-    tone = entry.get("tone") or "corporate"
+    tone = entry.get("tone") or data.get("tone") or "corporate"  # the one in use: the profile's own, else the file's
     return {
         "profile": name, "choice": choice,
         "key": key_state(), "key_where": keys.where(),
@@ -201,18 +214,18 @@ def apply(changes, path=None):
                 raise ValueError("pick the model to use: " + ", ".join(models[:20]) if models else
                                  check_server(url.strip(), key=server_key) or "name the model to use")
             model = models[0]
-        entry = profiles.setdefault("ollama", dict(config.STARTER["profiles"]["ollama"]))
+        entry = profiles.setdefault(server_name(profiles), dict(config.STARTER["profiles"]["server"]))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
     if "choice" in changes and changes["choice"] not in CHOICES:
         raise ValueError("unknown choice")
-    if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "ollama"):
-        server = profiles.get("ollama", config.STARTER["profiles"]["ollama"])
+    if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == server_name(profiles)):
+        server = profiles.get(server_name(profiles), config.STARTER["profiles"]["server"])
         problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
                                if isinstance(changes.get("server"), dict) else None)
         if problem:  # switching to a server that is not there would leave every rewrite failing
             raise ValueError(problem)
     if "server" in changes and server_key:  # accepted by the server: saved for its address only
-        keys.store(server_key, keys.server_name(profiles["ollama"]["model_url"]))
+        keys.store(server_key, keys.server_name(profiles[server_name(profiles)]["model_url"]))
     for choice, find, missing in (("claude-code", claude_code, NO_CLAUDE_CODE), ("codex", codex, NO_CODEX)):
         if changes.get("choice") == choice:
             command = find()
@@ -223,14 +236,14 @@ def apply(changes, path=None):
             entry = profiles.setdefault(choice, dict(config.STARTER["profiles"][choice]))
             entry.update(backend=choice, command=[command])
     if "choice" in changes:
-        name = CHOICES[changes["choice"]]
-        profiles.setdefault(name, dict(config.STARTER["profiles"][name]))
+        name = server_name(profiles) if changes["choice"] == "server" else CHOICES[changes["choice"]]
+        profiles.setdefault(name, dict(config.STARTER["profiles"]["server" if changes["choice"] == "server" else name]))
         data["profile"] = name
     if "tone" in changes:
         tone = changes["tone"]
         if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
             raise ValueError("a tone is a name or a few words")
-        config.set_tone(profiles, tone, MANAGED + (data.get("profile"),))
+        config.set_tone(data, tone, MANAGED + (data.get("profile"),))
     if "summon" in changes:  # which key asks the model; the other keeps your words
         if changes["summon"] not in config.SUMMON_KEYS:
             raise ValueError("the key that asks is Shift+Enter or Enter")

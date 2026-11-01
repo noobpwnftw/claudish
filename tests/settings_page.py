@@ -62,13 +62,13 @@ async def check(args, home, port):
 
         await page.get_by_text("Bard", exact=True).click()  # a tone, at once
         await expect(page.locator("#tone-message")).to_have_text("Bard it is.")
-        assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "bard"
+        assert json.loads(config.read_text())["tone"] == "bard"
         await page.get_by_text("Described", exact=True).click()
         await page.locator("#own-words").fill("plain and friendly")
         await page.locator("#own-words").press("Enter")
         await page.locator("#own-words").blur()
         await expect(page.locator("#tone-message")).to_have_text("Tone saved.")
-        assert json.loads(config.read_text())["profiles"]["claude"]["tone"] == "plain and friendly"
+        assert json.loads(config.read_text())["tone"] == "plain and friendly"
 
         await expect(page.locator("input[name=hints][value=on]")).to_be_checked()
         await page.get_by_text("Only what is pending", exact=True).click()
@@ -86,7 +86,7 @@ async def check(args, home, port):
         await page.locator("#url").fill(args.server)
         await page.locator("#server button").click()
         await expect(page.locator("#model-message")).to_have_text("cd_AI now writes with this API.")
-        profile = json.loads(config.read_text())["profiles"]["ollama"]
+        profile = json.loads(config.read_text())["profiles"]["server"]
         assert (profile["model_url"], profile["model"]) == (args.server, "gemma-4"), profile
         await expect(page.locator("#status")).not_to_have_class("bad")  # it answers (this service's flag keeps rules)
 

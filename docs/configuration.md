@@ -1,6 +1,79 @@
 # Configure
 
-Models, profiles, context, MCP servers, tools, window pictures, and agent sessions.
+The config file, models, apps, context and MCP servers, tools, agents, window pictures, and templates.
+
+## The config file
+
+cd_AI's config is `~/.config/claudish/config.json` (or `$XDG_CONFIG_HOME/claudish/config.json`, or
+`--config FILE`). cd_AI's settings (`claudish settings`) write it, and you can edit it. How you
+write is set once, for every model: `"tone"`, `"keys"` and `"hints"`. The models are profiles,
+and `"profile"` is the one cd_AI uses:
+
+```json
+{"profile": "claude",
+ "tone": "critic",
+ "profiles": {
+   "claude": {"backend": "claude", "model": "claude-opus-5-5"},
+   "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "gemma3:4b"},
+   "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
+              "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},
+   "local":  {"backend": "llama"}
+ }}
+```
+
+`claudish serve` uses the file's `"profile"`. `--profile claude` picks another, and any flag
+overrides the profile's value. `model` names the model on every backend. A template path in a
+profile is relative to the config file. To take a key from the environment, name its variable with
+`api_key_env`. Unknown keys and wrong types are rejected at startup. `/health` reports the active
+profile.
+
+### Tone
+
+cd_AI's default tone is corporate slop: "ok" becomes a paragraph about shared vision and
+synergies. `"tone"` beside `"profile"` picks another, for every profile (cd_AI's settings set it
+too); a profile's own `"tone"` wins for that profile, which a binding can pick for an app
+([Apps](#apps-bindings)):
+
+```json
+{"profile": "claude", "tone": "critic", "profiles": {"claude": {"backend": "claude"}}}
+```
+
+| Tone | Sounds like | "nah" becomes, roughly |
+| --- | --- | --- |
+| `corporate` (the default) | LinkedIn and consultant slop | "…may not align with our broader strategic objectives—at least not at this stage of our journey." |
+| `salesman` | a breathless closer | "…believe me, it hurts, because I love a deal—but this offer just isn't right for us today!" |
+| `critic` | haughty, world-weary, faintly disappointed | "No. I have considered it, briefly and against my better judgement, and the answer remains no." |
+| `bard` | an Elizabethan bard at the playhouse | "Nay, good friend, it cannot be; my answer standeth firm: no." |
+| `unhinged` | professionally unhinged: excellent writing, dry contempt | "No. I've given it more thought than it deserved, and the answer is still no." |
+| `proofread` | you, with the typos fixed | "nah" |
+
+`proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain
+then. Any other few words work too ("warm and friendly", "plain and concise"); they
+replace the tone in each template, without examples. `claudish setup --tone critic` sets it for
+you. The tones are templates like the rest ([Templates](#templates)): change one, or add one
+under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
+over the tone. Instructions typed in a terminal always get a command line.
+
+### Keys
+
+`"keys"`, beside `"profile"`, sets which key sends your words to the model:
+
+```json
+{"profile": "claude", "keys": {"summon": "Enter"}, "profiles": {"claude": {"backend": "claude"}}}
+```
+
+`"Shift+Enter"` (the default) asks with Shift+Enter, and Enter puts your words in as typed (the
+next Enter is the app's). `"Enter"` swaps them. The ask key sends
+everything that goes to the model (an instruction, a follow-up, a reply); once the model is asked,
+the other key does nothing, and Tab takes what it offers (a draft, a choice, Allow or Deny). The
+panel's footer names the keys. A change applies within a few seconds, without a restart.
+
+### Hints
+
+`"hints": false`, beside `"profile"`, keeps the panel for what is pending: the model at work,
+then drafts, a rewrite, a question or an approval, and what went wrong (a failed request,
+offline). The keys while you compose and the dropped and mode toasts do not show. Settings →
+Panel sets it too.
 
 ## Backends
 
@@ -42,45 +115,6 @@ fallbacks on the models that offer them. No model ships: the starter profile is 
 Change what the model is told with a templates file, for any backend (see
 [Templates](#templates)): `claudish serve --templates FILE`, or a profile's
 `"templates"`.
-
-### Apps: bindings
-
-The input method knows which app has focus. On Linux, IBus reports the program
-(`gtk3-im:thunderbird` arrives as `thunderbird`). On macOS it is the bundle identifier
-(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`). A binding
-matches apps by a case-insensitive glob and sets, for them, which profile answers
-(its backend, tone, tools and helper) and context the model gets there every time:
-
-```json
-{"profile": "claude", "profiles": {
-  "claude": {"backend": "claude", "bindings": [
-    {"app": "thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
-    {"app": "slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
-    {"app": "gnome-terminal-server", "profile": "agent"}]},
-  "proofread": {"backend": "claude", "tone": "proofread"},
-  "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
-```
-
-A binding holds what is true of an app every time: who answers there, a style
-guide, a glossary. What changes from one request to the next comes with the
-request: the text around the caret, a terminal's last lines, the window's
-picture (F8), and the [tools](#tools-instructions-that-look-things-up) the model calls for
-what you asked ("summarize PR 1234 for the standup" reads that PR). Elsewhere, the service's own profile
-answers with its own context. Every response lists what was `consulted`.
-
-A mode can name the profile that answers it, too: continue runs at every pause
-and wants a small, fast model; an instruction is sent on purpose and can wait
-for a strong one. Continue suggests only with a local model or where a profile
-routes it like this; otherwise continue types as is.
-
-```json
-{"profiles": {"claude": {"backend": "claude", "modes": {"continue": {"profile": "tiny"}}},
-              "tiny": {"backend": "llama", "model_url": "http://127.0.0.1:18766"}}}
-```
-
-The app's binding chooses first, then that profile's choice for the mode. The
-service's own profile (`claudish serve --profile`, or the file's `"profile"`)
-holds the bindings; other profiles are loaded when they are first needed.
 
 ### A subscription: Claude Code or Codex
 
@@ -128,49 +162,46 @@ Any CLI that reads a prompt on stdin works: `claude -p`, `ollama run MODEL`,
 own; for example, Claude Code's `--allowedTools` in the command list. Agents are
 slow, so the profile's `timeout` applies (`/health` reports it).
 
-### Profiles
+## Apps: bindings
 
-Instead of passing flags, declare your backends once in
-`~/.config/claudish/config.json` (or `$XDG_CONFIG_HOME/claudish/config.json`, or
-pass `--config FILE`):
+The input method knows which app has focus. On Linux, IBus reports the program
+(`gtk3-im:thunderbird` arrives as `thunderbird`). On macOS it is the bundle identifier
+(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`). A binding
+matches apps by a case-insensitive glob and sets, for them, which profile answers
+(its backend, tone, tools and helper) and context the model gets there every time:
 
 ```json
-{"profile": "claude",
- "profiles": {
-   "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-   "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "gemma3:4b"},
-   "remote": {"backend": "openai", "model_url": "https://api.example.com", "model": "some-model",
-              "api_key_env": "EXAMPLE_API_KEY", "timeout": 10},
-   "local":  {"backend": "llama"}
- }}
+{"profile": "claude", "profiles": {
+  "claude": {"backend": "claude", "bindings": [
+    {"app": "thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
+    {"app": "slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
+    {"app": "gnome-terminal-server", "profile": "agent"}]},
+  "proofread": {"backend": "claude", "tone": "proofread"},
+  "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
 ```
 
-`claudish serve` uses the file's `"profile"`. `--profile claude`
-picks another, and any flag overrides the profile's value. A template path in a
-profile is relative to the config file. To take a key from the environment, name
-its variable with `api_key_env`. Unknown keys and wrong types are rejected at startup. `/health` reports the active profile.
+A binding holds what is true of an app every time: who answers there, a style
+guide, a glossary. What changes from one request to the next comes with the
+request: the text around the caret, a terminal's last lines, the window's
+picture (F8), and the [tools](#tools-instructions-that-look-things-up) the model calls for
+what you asked ("summarize PR 1234 for the standup" reads that PR). Elsewhere, the service's own profile
+answers with its own context. Every response lists what was `consulted`.
 
-### Window pictures
+A mode can name the profile that answers it, too: continue runs at every pause
+and wants a small, fast model; an instruction is sent on purpose and can wait
+for a strong one. Continue suggests only with a local model or where a profile
+routes it like this; otherwise continue types as is.
 
-For apps that publish nothing Claudish can read, an instruction can carry a
-picture of the window you are typing in. In compose, press **F8** before
-Shift+Enter: the panel footer shows "F8 without this window" (F8 again takes the picture
-off), and the service captures the focused window once, sends it with that one instruction, and
-lists it in "consulted". F8 applies to that one instruction.
+```json
+{"profiles": {"claude": {"backend": "claude", "modes": {"continue": {"profile": "tiny"}}},
+              "tiny": {"backend": "llama", "model_url": "http://127.0.0.1:18766"}}}
+```
 
-- **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
-  ImageMagick (`sudo apt install x11-utils imagemagick`). Elsewhere, set the profile's
-  `"look_command"` to a program that writes a PNG of the focused window to stdout: on macOS a
-  `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
-  Wayland lets no program capture a window without asking, so F8 has no picture there.
-- **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
-  Codex get no picture.
-  For llama.cpp, start a vision model with its projector, for example
-  [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
-  `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj
-  mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
+The app's binding chooses first, then that profile's choice for the mode. The
+service's own profile (`claudish serve --profile`, or the file's `"profile"`)
+holds the bindings; other profiles are loaded when they are first needed.
 
-### Context
+## Context
 
 A profile can attach reference context that the model sees with your text: a
 file such as a style guide or glossary, or any local command's output. For
@@ -221,7 +252,7 @@ Apps that publish MCP on a local socket are read with `url` instead of
  "headers": {"Authorization": "Bearer $EDITOR_MCP_TOKEN"}, "tool": "get_selection"}
 ```
 
-### Tools: instructions that look things up
+## Tools: instructions that look things up
 
 Context is read before the model starts. Tools go further: an instruction may
 *call* MCP tools while it works, then draft from what they returned, for example
@@ -253,7 +284,7 @@ with `claudish mcp import`) and name them in a profile's `tools`:
   local model, called `ci_status` for "tell the team how CI looks on main" and drafted from its
   result. An agent CLI (`session_command`) uses its own tools.
 
-### Agent sessions: an agent at the caret
+## Agent sessions: an agent at the caret
 
 With `"session_command"` in a profile, a sent instruction (Shift+Enter in compose)
 runs an agent instead of a single model call. Claudish is the agent's host: its
@@ -299,7 +330,7 @@ pick, and its final answer is a candidate like any other. For Claude Code:
   (the service's), and its usage counts against that login. A session is limited to five
   minutes and four at a time.
 
-### Helpers: handing a task over
+## Helpers: handing a task over
 
 An instruction can end in handing the task to an agent such as Claude Code,
 from any text box. Set the profile's `"helper"` to its command, with `{prompt}`
@@ -347,51 +378,25 @@ says", with Tab to insert it or Esc to dismiss it.
 The model can also ask you itself, as a question with choices ("Did you mean
 git status?"); your answer goes back to it.
 
-### Tone
+## Window pictures
 
-cd_AI's default tone is corporate slop: "ok" becomes a paragraph about shared vision and
-synergies. A profile can pick another tone:
+For apps that publish nothing Claudish can read, an instruction can carry a
+picture of the window you are typing in. In compose, press **F8** before
+Shift+Enter: the panel footer shows "F8 without this window" (F8 again takes the picture
+off), and the service captures the focused window once, sends it with that one instruction, and
+lists it in "consulted". F8 applies to that one instruction.
 
-```json
-{"profiles": {"work": {"backend": "claude", "tone": "critic"}}}
-```
-
-| Tone | Sounds like | "nah" becomes, roughly |
-| --- | --- | --- |
-| `corporate` (the default) | LinkedIn and consultant slop | "…may not align with our broader strategic objectives—at least not at this stage of our journey." |
-| `salesman` | a breathless closer | "…believe me, it hurts, because I love a deal—but this offer just isn't right for us today!" |
-| `critic` | haughty, world-weary, faintly disappointed | "No. I have considered it, briefly and against my better judgement, and the answer remains no." |
-| `bard` | an Elizabethan bard at the playhouse | "Nay, good friend, it cannot be; my answer standeth firm: no." |
-| `unhinged` | professionally unhinged: excellent writing, dry contempt | "No. I've given it more thought than it deserved, and the answer is still no." |
-| `proofread` | you, with the typos fixed | "nah" |
-
-`proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain
-then. Any other few words work too ("warm and friendly", "plain and concise"); they
-replace the tone in each template, without examples. `claudish setup --tone critic` sets it for
-you. The tones are templates like the rest ([Templates](#templates)): change one, or add one
-under `"tones"` in your templates file. A mode's own `"system"` in the profile's templates wins
-over the tone. Instructions typed in a terminal always get a command line.
-
-### Keys
-
-`"keys"`, beside `"profile"`, sets which key sends your words to the model:
-
-```json
-{"profile": "claude", "keys": {"summon": "Enter"}, "profiles": {"claude": {"backend": "claude"}}}
-```
-
-`"Shift+Enter"` (the default) asks with Shift+Enter, and Enter puts your words in as typed (the
-next Enter is the app's). `"Enter"` swaps them. The ask key sends
-everything that goes to the model (an instruction, a follow-up, a reply); once the model is asked,
-the other key does nothing, and Tab takes what it offers (a draft, a choice, Allow or Deny). The
-panel's footer names the keys. A change applies within a few seconds, without a restart.
-
-### Hints
-
-`"hints": false`, beside `"profile"`, keeps the panel for what is pending: the model at work,
-then drafts, a rewrite, a question or an approval, and what went wrong (a failed request,
-offline). The keys while you compose and the dropped and mode toasts do not show. Settings →
-Panel sets it too.
+- **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
+  ImageMagick (`sudo apt install x11-utils imagemagick`). Elsewhere, set the profile's
+  `"look_command"` to a program that writes a PNG of the focused window to stdout: on macOS a
+  `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
+  Wayland lets no program capture a window without asking, so F8 has no picture there.
+- **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
+  Codex get no picture.
+  For llama.cpp, start a vision model with its projector, for example
+  [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
+  `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj
+  mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf -c 8192`. The `command` backend refuses.
 
 ## Modes
 

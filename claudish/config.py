@@ -1,16 +1,19 @@
-"""Profiles: one JSON file declaring backends and templates. Standard library only.
+"""The config file: how you write (tone, keys, hints) once, and the models as profiles.
+Standard library only.
 
 {
   "profile": "claude",
+  "tone": "critic",
   "profiles": {
-    "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-    "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "your-model"},
+    "claude": {"backend": "claude", "model": "claude-opus-5-5"},
+    "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "your-model"},
     "local":  {"backend": "llama", "templates": "grand.json"}
   }
 }
 
-A key comes from an environment variable named by "api_key_env". With no file, no model
-is set up (backend "none"): compose says so, and continue only types.
+A profile's own "tone" wins over the file's (a binding can pick such a profile for an app). A key
+comes from cd_AI's settings or an environment variable named by "api_key_env". With no file, no
+model is set up (backend "none"): compose says so, and continue only types.
 """
 import json
 import os
@@ -41,7 +44,7 @@ def resolve(path=None, profile=None, overrides=None):
 
     templates: the profile's templates file, read (modes.load), or None for the shipped ones;
     settings["modes"] becomes name -> {"profile"}: which profile answers a mode."""
-    settings, name, base, servers, known = dict(DEFAULTS), None, Path.cwd(), {}, set()
+    settings, name, base, servers, known, entry = dict(DEFAULTS), None, Path.cwd(), {}, set(), None
     summon, hints = SUMMON_KEYS[0], True
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
@@ -63,6 +66,9 @@ def resolve(path=None, profile=None, overrides=None):
         hints = data.get("hints", True)
         if not isinstance(hints, bool):
             raise ValueError('"hints" is true or false (false: the panel only while something is pending)')
+        tone = data.get("tone")
+        if tone is not None and not isinstance(tone, str):
+            raise ValueError('"tone" is a tone\'s name or a few words')
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
@@ -80,6 +86,8 @@ def resolve(path=None, profile=None, overrides=None):
             if value is not None and (not isinstance(value, TYPES[key]) or (isinstance(value, bool) and TYPES[key] is not bool)):
                 raise ValueError("profile %r: %s has the wrong type" % (name, key))
         settings.update(entry)
+        if not settings["tone"]:
+            settings["tone"] = tone  # the file's tone, unless this profile has its own
         base = path.parent
     elif profile:
         raise ValueError("--profile needs a config file (%s not found)" % default_path())
@@ -88,6 +96,9 @@ def resolve(path=None, profile=None, overrides=None):
         settings["backend"] = "openai"  # a model server named with no backend: any OpenAI-compatible one
     if settings["backend"] not in BACKENDS:
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
+    named = (overrides or {}).get("claude_model") or (path is not None and "claude_model" in (entry or {}))
+    if settings["backend"] == "claude" and settings["model"] and not named:
+        settings["claude_model"] = settings["model"]  # "model" names the model on every backend
     if settings["backend"] in ("claude-code", "codex") and not settings["command"]:
         settings["command"] = ["claude" if settings["backend"] == "claude-code" else "codex"]
     if settings["backend"] in ("command", "claude-code", "codex"):
@@ -130,28 +141,24 @@ def resolve(path=None, profile=None, overrides=None):
 
 STARTER = {
     "about": [
-        "cd_AI's profiles; \"profile\" is the one the service runs (cd_AI's settings change it too).",
+        "cd_AI's config. \"profile\" is the model the service uses (cd_AI's settings switch it); \"tone\",",
+        "\"keys\" and \"hints\" are how you write, for every profile. The profiles:",
         "claude: Anthropic's API, with the key saved in cd_AI's settings (`claudish settings`).",
-        "ollama: any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, a hosted API): set model_url,",
-        "  and model when the server has several. A key: saved in the settings, or api_key_env.",
+        "claude-code, codex: a Claude or ChatGPT subscription, through its own command line.",
+        "server: any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, a hosted API).",
         "local: the llama.cpp server and Gemma 4 E4B that `claudish setup --profile local` installs.",
-        "claude-code: Claude Code (a Claude subscription), kept running beside the service; picked in cd_AI's settings.",
-        "codex: Codex (a ChatGPT subscription), kept running beside the service; picked in cd_AI's settings.",
-        "agent: an agent CLI that reads the text on stdin (here Claude Code's `claude -p`).",
-        "Profile keys: backend, model_url, model, api_key_env, timeout, max_tokens, claude_model,",
-        "templates, context, max_context_chars, modes, command, bindings, look_command, read_terminal, tone, helper, launcher, tools, session_command. See docs/configuration.md.",
+        "Everything else (bindings per app, context, tools, helpers): docs/configuration.md.",
     ],
     "profile": "claude",
     "profiles": {
-        "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "templates": "templates.json"},
-        "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
-                   "templates": "templates.json"},
-        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
+        "claude": {"backend": "claude", "model": "claude-opus-5-5", "templates": "templates.json"},
         "claude-code": {"backend": "claude-code", "command": ["claude"], "model": "haiku", "timeout": 30,
                         "templates": "templates.json"},
         "codex": {"backend": "codex", "command": ["codex"], "model": "gpt-6-luna", "timeout": 60,
                   "templates": "templates.json"},
-        "agent": {"backend": "command", "timeout": 120, "command": ["claude", "-p", "--output-format", "text"]},
+        "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
+                   "templates": "templates.json"},
+        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
     },
 }
 
@@ -161,8 +168,8 @@ STARTER_TEMPLATES = {
     "about": [
         "Templates over cd_AI's own (claudish/templates.json): this file names only what it changes,",
         "mode by mode and key by key. `claudish templates` prints what a profile ends up with. To switch",
-        "tone, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
-        "unhinged, proofread, or one named below. docs/configuration.md#templates has the rest.",
+        "tone, set \"tone\" in config.json: corporate (the default), salesman, critic, bard, unhinged,",
+        "proofread, or one named below. docs/configuration.md#templates has the rest.",
     ],
     "tones": {"named": {"mine": {
         "about": "A tone to edit: set \"tone\": \"mine\" in config.json, then rewrite this one.",
@@ -207,12 +214,14 @@ def save(data, path=None):
     os.replace(temporary, path)
 
 
-def set_tone(profiles, tone, names):
-    """Set the tone on each of names that profiles has; "" or "corporate" (the default) clears it."""
+def set_tone(data, tone, clear=()):
+    """Set the file's tone ("" or "corporate", the default, removes it), and take the tone off the
+    profiles in clear, so it applies there: the ones cd_AI's settings switch between, where older
+    versions kept a copy of it, and the one in use."""
     tone = tone.strip()
-    for name in names:
-        if name in profiles:
-            if tone in ("", "corporate"):
-                profiles[name].pop("tone", None)
-            else:
-                profiles[name]["tone"] = tone
+    data.pop("tone", None)
+    if tone not in ("", "corporate"):
+        data["tone"] = tone
+    for name in clear:
+        if isinstance((data.get("profiles") or {}).get(name), dict):
+            data["profiles"][name].pop("tone", None)

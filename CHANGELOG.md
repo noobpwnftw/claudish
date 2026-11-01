@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The config: `"tone"` is set once beside `"profile"` (with `"keys"` and `"hints"`) and applies to every
+  profile; a profile's own `"tone"` still wins there. `"model"` names the model on every backend
+  (`"claude_model"` still works). The OpenAI-compatible server's profile is `"server"` (a config's
+  `"ollama"` keeps working). The starter config is the five models cd_AI's settings offer.
+  docs/configuration.md starts with the config file, then models, apps, context, tools and agents.
 - Templates: each mode's job (what to do, what to keep) is written once; a tone gives only its voice
   (and length, examples). Every tone gets the same guards, one output rule, and a length that
   keeps a part of a text its size. A templates file's own `system` still replaces the wording.
