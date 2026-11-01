@@ -90,10 +90,7 @@ Panel sets it too.
 
 ## Backends
 
-Claudish supplies the plumbing: the input method, its templates, and the
-service between them. How well a model follows the
-template depends on that model. `benchmarks/evaluate.py` measures any backend
-on the same cases.
+`benchmarks/evaluate.py` measures any backend on the same cases.
 
 Use any OpenAI-compatible server and any model, such as llama.cpp, vLLM, Ollama,
 LM Studio, or a hosted endpoint:

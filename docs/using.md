@@ -117,13 +117,11 @@ terminal a drop shows no toast.
 
 ## Talking to a coding agent in its own chat box
 
-A worked example of the scope (one turn at the caret, nothing more): typing to
-Claude Code in VS Code.
+Typing to Claude Code in VS Code:
 
 - **Continue** completes your message as you type, from the text already in the
   chat box. On macOS, VS Code and other Chromium apps share only about 100
-  characters around the caret with an input method, which is plenty for a
-  message.
+  characters around the caret with an input method.
 - **Compose, then Shift+Enter** turns a one-line task into the message: "tell it to add a test for
   the retry" becomes a full request, drafted at the caret for you to send.
 - **The code you are looking at** comes from F8 (a picture of the window, for a
@@ -132,9 +130,6 @@ Claude Code in VS Code.
 - **Permissions**: if a tool you configured needs one (fetching a site, say), it
   asks in the panel: what would run, in full; nothing is highlighted, ↓ then Tab
   chooses (Deny comes first).
-
-It is not a replacement for the extension: the conversation with the agent stays
-in the agent's own window.
 
 ## What cd_AI tells the model about the text box
 
