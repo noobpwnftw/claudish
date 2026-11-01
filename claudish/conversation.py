@@ -137,7 +137,9 @@ class ModelDriver:
                 self.conversation.remember([{"role": "user", "content": prompt},
                                             {"role": "assistant", "content": self.settled}])
         if self.cancelled:
-            return
+            return  # Esc took it back: the conversation does not keep it either
+        if result.get("turn"):
+            self.conversation.remember(result["turn"])
         if self.drafted:  # versions to pick from, an answer you chose to insert, or a helper's command line
             session.emit("result", text=self.drafted[0], candidates=self.drafted, consulted=result["consulted"])
             return

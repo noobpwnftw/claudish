@@ -611,14 +611,14 @@ class Rewriter:
             raise RuntimeError("the model offered nothing for this %s" % mode)
         record.update(outcome="answered", candidates=candidates,
                       consulted=consulted, elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
+        turn = None
         if conversation is not None:
-            # The conversation keeps this turn: the instruction as typed (without what was observed),
-            # the tool calls and results, and the first draft.
+            # For the conversation to keep, unless the instruction was cancelled meanwhile: the
+            # instruction as typed (without what was observed), the tool calls and results, and the drafts.
             from . import shapes
             answered = candidates[0] if len(candidates) == 1 else shapes.answered(candidates)  # every draft offered
-            conversation.remember([{"role": "user", "content": text}] + new
-                                  + [{"role": "assistant", "content": answered}])
-        return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode,
+            turn = [{"role": "user", "content": text}] + new + [{"role": "assistant", "content": answered}]
+        return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode, **({"turn": turn} if turn else {}),
                 "profile": self.profile,
                 "consulted": consulted,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),

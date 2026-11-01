@@ -161,6 +161,58 @@ class ReceiveTests(unittest.TestCase):
         self.assertTrue(state.sent)  # the exchange is back
         self.assertEqual((state.terminal, state.hints), (True, False))  # where the caret is now, the config now
 
+    def test_words_dropped_after_a_hold_come_back_before_it(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("do x")
+        state.submit()
+        state.leave("mail")  # the exchange is held
+        state.change("important words")
+        self.assertEqual(state.escape(), "drop")  # the toast offers them back
+        self.assertEqual(state.restore(), "important words")
+        state.change("")
+        self.assertEqual(state.restore(), "do x")  # then the held exchange, whole
+        self.assertTrue(state.sent)
+
+    def test_words_set_aside_for_a_question_come_back_when_it_fails(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("send the report")
+        state.submit()
+        for char in "also cc bob":
+            state.insert(char)
+        state.ask(state.revision, {"id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}]}, "s")
+        state.fail(state.revision, "timed out")
+        self.assertEqual(state.reply, "also cc bob")
+
+    def test_tab_on_a_failed_instruction_does_not_rewrite_it(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("translate to French")
+        state.submit()
+        state.fail(state.revision, "timed out")
+        self.assertEqual(state.tab(), "wait")
+        self.assertEqual(state.enter(), "submit")  # the summon key retries it
+
+    def test_a_draft_in_view_goes_only_with_its_own_follow_up(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("write a note")
+        state.submit()
+        state.receive(state.revision, {"text": "DRAFT A", "candidates": ["DRAFT A"]})
+        for char in "shorter":
+            state.insert(char)
+        self.assertEqual(state.enter(), "submit")
+        self.assertEqual(state.about, "DRAFT A")
+        state.change("hello there")  # inserted, and new words: a rewrite
+        self.assertEqual(state.about, "")
+
+    def test_the_services_own_failures_are_said_as_they_are(self):
+        from claudish.composition import failure
+        for words in ("the model is busy; keep typing or retry", "no answer, so the instruction stopped",
+                      "the answer ran past its length budget; use a shorter phrase"):
+            self.assertEqual(failure(words), words)
+
     def test_follow_copies_the_workers_view(self):
         state, worker = Composition(), type("W", (), {"summon": "Enter", "hints": False, "offline": True})()
         self.assertTrue(state.follow(worker))

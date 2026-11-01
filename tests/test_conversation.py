@@ -192,6 +192,24 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(session.events[-1]["text"], "cancelled")
 
 
+    def test_an_instruction_cancelled_while_the_model_works_is_not_remembered(self):
+        """Esc, then another instruction: a late answer to the first must not join the conversation."""
+        started, release = threading.Event(), threading.Event()
+        scripted = Scripted(answer("En français."))
+
+        def slow(*args, **kwargs):
+            started.set()
+            release.wait(5)
+            return scripted(*args, **kwargs)
+        conversation = self.rewriter.conversations.get("box")
+        with patch.object(self.rewriter, "chat", slow):
+            session, thread = run(ModelDriver(self.rewriter, conversation), "translate to French")
+            self.assertTrue(started.wait(5))
+            session.cancel()
+            release.set()
+            thread.join(15)
+        self.assertEqual(conversation.messages, [])
+
 
 class AskAndHelperTests(unittest.TestCase):
     """The model's own question (shown as is), and a helper as a tool that acts, asked about first."""

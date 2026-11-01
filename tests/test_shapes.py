@@ -81,11 +81,13 @@ class ServerShapeTests(unittest.TestCase):
         from claudish.conversation import Conversation
         rewriter, sent = self.answers('{"drafts": ["One—yes.", "Two—indeed."]}', '{"drafts": ["Two."]}')
         conversation = Conversation("box")
-        rewriter.answer("instruct", "two ways to agree", rewriter.box("instruct"), conversation=conversation)
+        # The turn is the caller's to keep (an instruction cancelled meanwhile is not kept).
+        conversation.remember(rewriter.answer("instruct", "two ways to agree", rewriter.box("instruct"),
+                                              conversation=conversation)["turn"])
         self.assertEqual(shapes.drafts(conversation.messages[1]["content"]), ["One—yes.", "Two—indeed."])
         box = rewriter.box("instruct")
         box.draft = "Two—indeed."
-        rewriter.answer("instruct", "shorter", box, conversation=conversation)
+        conversation.remember(rewriter.answer("instruct", "shorter", box, conversation=conversation)["turn"])
         turn = sent[-1]["messages"][-1]["content"]
         self.assertIn("Two—indeed.", turn)
         self.assertTrue(turn.rstrip().endswith("shorter"))

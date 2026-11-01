@@ -27,8 +27,15 @@ PANEL_ROWS = 24
 ROW = 60
 
 
+# The service's own failures, worded for the panel already (claudish/model.py, conversation.py, sessions.py).
+OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no answer, so the instruction stopped",
+             "too many agent sessions", "the model offered nothing")
+
+
 def failure(error):
     """Why a request failed, in a few plain words for the panel."""
+    if str(error or "").startswith(OWN_WORDS):
+        return str(error)  # cd_AI's own, already said for the panel
     error = str(error or "").lower()
     if "no model is set up" in error:
         return "no model is set up"
@@ -64,7 +71,7 @@ def failure(error):
 # What Shift+Esc does not take back from a held exchange: where the caret is now (a field, a
 # terminal) and the service's state (keys, hints, offline), besides the hold itself.
 KEPT_ON_RESTORE = ("held", "issued", "held_app", "held_at", "summon", "hints", "offline", "terminal", "quiet",
-                   "inside")
+                   "inside", "dropped", "dropped_reply", "dropped_at")
 
 def rows_of(text):
     """About how many panel rows a text takes."""
@@ -133,6 +140,7 @@ class Composition:
         self.answers = []  # your answers in this exchange, for the panel's thread ("You answered")
         self.editing = False  # the instruction came back to the caret (Esc edit): the next Esc drops it
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
+        self.dropped_at = 0.0  # when: words dropped after a hold come back before it
         self.dropped_reply = False
         self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
         self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes it: a draft or a choice)
@@ -184,6 +192,7 @@ class Composition:
         self.candidate = ""
         self.candidates = []
         self.question, self.status = None, ""
+        self.about = ""  # the draft in view: one exchange's, never the next one's
         self.taken = False
         self.converted = False
         self.asked = None
@@ -468,8 +477,8 @@ class Composition:
         if self.asked == "rewrite" and self.candidate:
             self.converted = True
             return "convert"
-        if self.working:
-            return "wait"
+        if self.working or (self.failed and self.asked == "instruct"):
+            return "wait"  # a failed instruction is retried with the summon key, as its footer says
         self.asked, self.working, self.failed = "rewrite", True, False
         return "request"
 
@@ -484,7 +493,7 @@ class Composition:
         if self.reading and not self.reply:
             return "dismiss"  # the adapter answers Dismiss; nothing is inserted
         if self.answered and self.reply:
-            self.dropped, self.dropped_reply = self.reply, True  # Shift+Esc brings it back
+            self.dropped, self.dropped_reply, self.dropped_at = self.reply, True, time.monotonic()  # Shift+Esc brings it back
             self.reply = ""  # what you typed goes; the exchange stays open
             self.back = 0
             return "clear"
@@ -500,7 +509,7 @@ class Composition:
             self.change(self.text)  # a new revision: a late answer for the old one is ignored
             self.editing = True  # the instruction is back at the caret; Esc again drops it
             return "back"
-        self.dropped, self.dropped_reply = self.text, False
+        self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
         self.change("")
         return "drop"
 
@@ -509,7 +518,8 @@ class Composition:
         what Esc dropped (an instruction to edit, or a reply); "" when there is none (the key is the
         app's)."""
         self.expire()
-        if self.held is not None and not self.text and not self.live:
+        newer = self.dropped and self.dropped_at > self.held_at  # what the toast just offered
+        if self.held is not None and not self.text and not self.live and not newer:
             held, self.held = self.held, None  # the exchange you left, back as it was
             # The exchange comes back; this field and the service's state stay as they are now.
             self.__dict__.update({k: v for k, v in held.__dict__.items() if k not in KEPT_ON_RESTORE})
@@ -541,8 +551,9 @@ class Composition:
             # Your next words, typed while it worked or with its drafts showing: a follow-up
             # instruction in the same conversation, about the draft in view (not in the text yet).
             drafts = self.candidates or ([self.candidate] if self.candidate else [])
-            self.about = drafts[self.highlight] if 0 <= self.highlight < len(drafts) else ""
+            about = drafts[self.highlight] if 0 <= self.highlight < len(drafts) else ""
             self.change(self.reply.strip())
+            self.about = about
             return "submit"
         if self.asked == "instruct" and self.candidate:
             self.light_tab()
@@ -553,7 +564,7 @@ class Composition:
             if self.asked == "instruct":
                 self.nudged = self._pending()  # a reflexive Enter: Tab lights when they come
             return "wait"
-        if not self.failed:  # a retry of a failed follow-up keeps its draft
+        if not (self.failed and self.asked == "instruct"):  # a retry of a failed follow-up keeps its draft
             self.about = ""
         return "submit"
 
@@ -616,6 +627,8 @@ class Composition:
             return False
         self.working, self.failed = False, True
         self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
+        # Words set aside while a question was up come back to edit, as when it is answered.
+        self.reply, self.waiting = (self.reply + " " + self.waiting).strip(), ""
         self.error = failure(error)
         return True
 
@@ -878,7 +891,7 @@ class Composition:
             self.change("")
             return ""
         if self.for_model:  # a follow-up typed on a rewrite: your words wait for Shift+Esc
-            self.dropped, self.dropped_reply = self.text, False
+            self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
             self.change("")
             return ""
         words = self.text
