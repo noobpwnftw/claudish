@@ -33,7 +33,7 @@ What a profile can hold, by purpose (each is optional but `backend`; the section
 
 | For | Keys |
 | --- | --- |
-| The model | `backend`, `model`, `model_url` (a server), `api_key_env`, `command` (an agent CLI, Claude Code, Codex), `timeout` (seconds) |
+| The model | `backend`, `model`, `model_url` (a server), `api_key_env`, `command` (an agent CLI, Claude Code, Codex, or a local model's `llama-server`, which the service runs), `timeout` (seconds) |
 | The words | `tone` (this profile's own), `templates` (a templates file), `modes` (another profile for a mode, [Modes](#modes)) |
 | Apps and context | `bindings` ([Apps](#apps-bindings)), `context` and `max_context_chars` ([Context](#context)), `read_terminal` ([terminals](using.md#in-a-terminal)), `look_command` ([Window pictures](#window-pictures)) |
 | Agents | `tools` ([Tools](#tools-instructions-that-look-things-up)), `session_command` ([Agent sessions](#agent-sessions-an-agent-at-the-caret)), `helper` and `launcher` ([Helpers](#helpers-handing-a-task-over)) |

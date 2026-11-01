@@ -103,7 +103,7 @@ def check_backend(state):
             "start your model server, or fix the profile's model_url"
     except Exception as exc:
         fix = ("`claudish setup --profile local` downloads llama.cpp and the model if they are missing, and "
-               "starts them at every login" if backend == "llama"
+               "puts the server in the profile's \"command\", which the service runs" if backend == "llama"
                else "start your model server, or fix the profile's model_url")
         return "fail", "no model server at %s (%s)" % (url, type(exc).__name__), fix
 
@@ -113,7 +113,7 @@ def check_service():
         health = fetch_json(SERVICE + "/health")
     except Exception:
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
-            "start it at every login: `claudish service install` (the config's profile; `--local` for the local model)"
+            "start it at every login: `claudish service install` (it runs the config's profile)"
     detail = "running: backend %s, profile %s" % (health.get("backend"), health.get("profile"))
     model = health.get("model")  # Claude Code or Codex, kept running beside the service
     if model and model.startswith("failed"):
@@ -127,7 +127,7 @@ def check_service():
 def check_managed():
     from . import service
     status, detail = service.managed()
-    return status, detail, "`claudish service install` (it runs the config's profile; `--local` for the local model)" \
+    return status, detail, "`claudish service install` (it runs the config's profile)" \
         if status == "warn" else None
 
 

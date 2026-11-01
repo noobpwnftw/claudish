@@ -29,9 +29,9 @@ class ServiceDefinitionTests(unittest.TestCase):
     def test_an_installed_package_runs_its_module(self):
         """Without the checkout's scripts/ (the Windows installer's Python): `python -m claudish serve`."""
         with tempfile.TemporaryDirectory() as directory, patch.object(service, "ROOT", Path(directory)):
-            self.assertEqual(service.command(False, ["--profile", "x"]),
+            self.assertEqual(service.command(["--profile", "x"]),
                              [sys.executable, "-m", "claudish", "serve", "--profile", "x"])
-        self.assertEqual(service.command(False, [])[1:], [str(service.ROOT / "scripts" / "serve.py")])
+        self.assertEqual(service.command([])[1:], [str(service.ROOT / "scripts" / "serve.py")])
 
     def test_windows_task_prefers_pythonw(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -53,11 +53,11 @@ class SafetyTests(unittest.TestCase):
 
     def test_cli_keeps_flags_before_the_separator(self):
         from claudish import __main__ as cli
-        argv = ["claudish", "service", "install", "--local", "--dry-run", "--", "--backend", "rules"]
+        argv = ["claudish", "service", "install", "--dry-run", "--", "--backend", "rules"]
         with patch.object(sys, "argv", argv), patch.object(service, "run", return_value=0) as run:
             with self.assertRaises(SystemExit):
                 cli.main()
-        run.assert_called_once_with("install", True, ["--backend", "rules"], True)  # local, then dry run
+        run.assert_called_once_with("install", ["--backend", "rules"], True)
 
     def test_dry_run_runs_and_writes_nothing_on_every_os(self):
         for system in ("Linux", "Windows", "Darwin"):

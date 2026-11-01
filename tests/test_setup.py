@@ -68,8 +68,8 @@ class SetupTests(unittest.TestCase):
 
     def test_a_local_model_is_an_optional_profile(self):
         self.assertEqual(self.states("local"), {"Config": "todo", "Tone": "done", "MCP servers": "skip",
-                                                "llama.cpp": "todo", "Model": "todo", "Input method": "todo",
-                                                "Starts at login": "todo"})
+                                                "llama.cpp": "todo", "Model": "todo", "Local model": "todo",
+                                                "Input method": "todo", "Starts at login": "todo"})
 
     def test_tone_is_set_for_the_profile(self):
         status, out = self.quiet(yes=True, tone="proofread")
@@ -98,13 +98,17 @@ class SetupTests(unittest.TestCase):
             action.assert_not_called()
 
     def test_yes_runs_each_step_once_then_doctor(self):
+        self.llama.install.side_effect = lambda *args: setattr(self.llama, "installed", lambda: self.home / ".tools/llama-server")
         status, out = self.quiet("local", yes=True)
         self.assertEqual(status, 0, out)
         self.assertTrue(config.default_path().is_file())
         self.llama.install.assert_called_once()
         self.models.fetch.assert_called_once()
         self.assertEqual(self.ime.call_args.args[0][1], str(self.home / "platforms/linux/install.py"))
-        self.service_run.assert_called_once_with("install", local=True)
+        self.service_run.assert_called_once_with("install")
+        data = json.loads(config.default_path().read_text())
+        self.assertEqual(data["profile"], "local")  # the downloaded model runs from the profile, in use
+        self.assertEqual(data["profiles"]["local"]["command"][:3], [str(self.home / ".tools/llama-server"), "-m", str(self.model)])
         self.assertIn("Log out and back in", out)
         setup.doctor.main.assert_called_once()
 
@@ -132,7 +136,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(states["Model"], "done")
         self.assertNotIn("llama.cpp", states)
         self.quiet("claude", yes=True)
-        self.service_run.assert_called_once_with("install", local=False)
+        self.service_run.assert_called_once_with("install")
 
     def test_a_service_running_by_hand_is_not_doubled(self):
         with patch("claudish.setup.doctor.fetch_json", return_value={"backend": "llama"}):

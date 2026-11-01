@@ -285,7 +285,7 @@ class Rewriter:
         self.lock = threading.Lock()
         self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
         self.opener = None
-        self.warm = None  # Claude Code or Codex, kept running beside the service (claudish/warm.py)
+        self.warm = None  # Claude Code, Codex or a local model's server, run beside the service (claudish/warm.py)
         if backend in ("command", "claude-code", "codex"):
             if not command:
                 raise ValueError('the %s backend needs a "command" list in the profile' % backend)
@@ -293,6 +293,9 @@ class Rewriter:
         if backend in ("claude-code", "codex"):
             from . import config, warm
             self.warm = warm.make(backend, command, model, str(config.default_path().parent))
+        elif backend == "llama" and command:  # the local model's server, which the service runs
+            from . import warm
+            self.warm = warm.ModelServer(command, self.endpoint)
         self.claude = Claude(model or CLAUDE_MODEL) if backend == "claude" else None
 
     @property
@@ -302,7 +305,7 @@ class Rewriter:
         return self.backend == "rules" or (self.backend in ("llama", "openai") and self.local)
 
     def start_model(self):
-        """At service start: a model process cd_AI runs (Claude Code, Codex) starts and warms up."""
+        """At service start: a model process cd_AI runs (Claude Code, Codex, a local model) starts."""
         if self.warm:
             self.warm.start()
 
@@ -548,7 +551,7 @@ class Rewriter:
                 outputs = self.stand_in(mode, text, box, count)
             elif self.backend == "command":
                 outputs = [self.run_command(one_message(prompt, sent, said, spec["box"]["one_message"], history))]
-            elif self.warm:
+            elif self.backend in ("claude-code", "codex"):
                 outputs = [self.warm.ask(one_message(prompt, sent, said, spec["box"]["one_message"], history),
                                           self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):

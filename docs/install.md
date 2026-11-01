@@ -159,8 +159,9 @@ and `codex` (the subscriptions), `server` (any OpenAI-compatible server), and `l
 **A local model:** `claudish setup --profile local` downloads a pinned
 [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build (`b11822`; the CPU build, Metal on
 Apple silicon, `--variant vulkan` for most GPUs on Linux and Windows) and Gemma 4 E4B (Apache-2.0,
-QAT Q4_0, 4.9 GB; [why this model](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)),
-and runs both at login. Continue (a Shift tap) suggests the rest of a sentence only with a local
+QAT Q4_0, 5.2 GB; [why this model](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)),
+writes the `llama-server` command into the `local` profile, and makes it the one cd_AI uses: the
+service starts the model with itself, and stops it when the settings switch to another model. Continue (a Shift tap) suggests the rest of a sentence only with a local
 model, or with a model a profile routes to it ([configuration](configuration.md#modes)); on
 Claude, Claude Code and Codex it is plain typing.
 
@@ -168,7 +169,7 @@ Claude, Claude Code and Codex it is plain typing.
 
 `claudish service install` runs `claudish serve` with the config's profile at every login: a
 systemd user unit on Linux, a logon task on Windows, a launch agent on macOS. Run again, it
-restarts the service with the current settings; `--local` is for the local model;
+restarts the service with the current settings;
 `claudish service status` and `claudish service uninstall` inspect or remove it, and `--dry-run`
 shows what it would do. `claudish doctor` walks the whole chain (model, service, config, the input
 method's registration, context sources) and prints a fix for anything wrong.
@@ -194,10 +195,10 @@ from `cd_AI.pkg` (or `build.py --install`). For the local model by hand:
 ```sh
 python3 scripts/download_llama.py
 python3 scripts/download_model.py gemma
-python3 scripts/start.py
+.venv/bin/claudish setup --profile local
 ```
 
-`start.py` uses `llama-server` from your `PATH` first, then the downloaded build; `--server
-/path/to/llama-server` picks another (for example a CUDA build). The service listens on
-`127.0.0.1:18765`, the model on `127.0.0.1:18766`; Ctrl+C stops both. `HF_ENDPOINT` sets a mirror
+The `local` profile's `"command"` is `llama-server`'s, from your `PATH` first, then the downloaded
+build; put another there (for example a CUDA build). The service listens on `127.0.0.1:18765`, the
+model on `127.0.0.1:18766`, and `claudish serve` starts and stops both. `HF_ENDPOINT` sets a mirror
 for the model download.

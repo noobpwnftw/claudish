@@ -98,7 +98,7 @@ def resolve(path=None, profile=None, overrides=None):
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
     if settings["backend"] in ("claude-code", "codex") and not settings["command"]:
         settings["command"] = ["claude" if settings["backend"] == "claude-code" else "codex"]
-    if settings["backend"] in ("command", "claude-code", "codex"):
+    if settings["backend"] in ("command", "claude-code", "codex") or (settings["backend"] == "llama" and settings["command"]):
         command = settings["command"]
         if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
             raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')

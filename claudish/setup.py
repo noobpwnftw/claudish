@@ -143,6 +143,29 @@ def step_ime():
         "; then ".join(r[3] for r in problems if r[3])
 
 
+def step_local(name, settings):
+    """The profile runs the downloaded model (its "command": llama-server, which the service starts
+    and stops), and is the one cd_AI uses."""
+    from .settings import read
+    data = read(config.default_path()) if config.default_path().is_file() else None
+    entry = ((data or {}).get("profiles") or {}).get(name) or {}
+    if data is not None and entry.get("command") and data.get("profile") == name:
+        return "done", "the %r profile runs the local model, and is in use" % name, None
+
+    def write():
+        from .warm import llama_command
+        download_llama, download_model = scripts()
+        server = download_llama.find_server()
+        if not server:
+            raise ValueError("llama-server was not found: `claudish setup --profile local` downloads it")
+        argv = llama_command(server, download_model.target("gemma"), urlsplit(settings["model_url"]).port or 18766)
+        data = read(config.default_path())
+        data.setdefault("profiles", {}).setdefault(name, dict(config.STARTER["profiles"]["local"]))["command"] = argv
+        data["profile"] = name
+        config.save(data)
+    return "todo", "run the local model from the %r profile, and use it" % name, write
+
+
 def is_local(settings):
     """Whether the profile runs llama.cpp on this computer (the model setup downloads)."""
     return settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
@@ -160,11 +183,10 @@ def step_service(settings):
             "stop it (Ctrl+C in its terminal), then run setup again"
     except Exception:
         pass
-    local = is_local(settings)
-    what = "the local model and service" if local else "`claudish serve`"
+    what = "`claudish serve`"
     if settings.get("api_key_env"):
         what += "; it will need %s in the service manager's environment, not just your shell" % settings["api_key_env"]
-    return "todo", "start %s at every login" % what, lambda: service.run("install", local=local)
+    return "todo", "start %s at every login" % what, lambda: service.run("install")
 
 
 def plan(profile=None, variant="cpu", skip=(), tone=None):
@@ -173,7 +195,8 @@ def plan(profile=None, variant="cpu", skip=(), tone=None):
     local = is_local(settings)
     steps = [("Config", lambda: step_config(name)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
     if local:  # optional: a local model, downloaded here (claudish setup --profile local)
-        steps += [("llama.cpp", lambda: step_llama(variant)), ("Model", step_model)]
+        steps += [("llama.cpp", lambda: step_llama(variant)), ("Model", step_model),
+                  ("Local model", lambda: step_local(name, settings))]
     else:
         steps += [("Model", lambda: step_backend(settings))]
     steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(settings))]
@@ -238,7 +261,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
             missing.append(label)
         if state != "todo" or dry_run:
             continue
-        if label == "Starts at login" and local and set(missing) & {"llama.cpp", "Model"}:
+        if label in ("Local model", "Starts at login") and local and set(missing) & {"llama.cpp", "Model"}:
             # A local model's service without the model would only fail at every login. (A key is
             # different: it is saved in the settings, which the running service serves.)
             print("  not yet: the model needs setting up first (%s)" % ", ".join(m for m in missing if m in ("llama.cpp", "Model")))

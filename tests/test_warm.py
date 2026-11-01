@@ -20,6 +20,45 @@ def ready(backend, seconds=3.0):
     return backend.state
 
 
+FAKE_LLAMA = r"""
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class Health(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200 if self.path == "/health" else 404)
+        self.end_headers()
+    def log_message(self, *args):
+        pass
+HTTPServer(("127.0.0.1", int(sys.argv[1])), Health).serve_forever()
+"""
+
+
+class ModelServerTests(unittest.TestCase):
+    def test_the_local_model_runs_with_the_service_and_stops_with_it(self):
+        import socket
+        from claudish.model import Rewriter
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        url = "http://127.0.0.1:%d" % port
+        rewriter = Rewriter("llama", url, command=[sys.executable, "-c", FAKE_LLAMA, str(port)])
+        self.assertIsInstance(rewriter.warm, warm.ModelServer)
+        rewriter.start_model()
+        deadline = time.monotonic() + 5
+        while rewriter.model_state != "warm" and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(rewriter.model_state, "warm")
+        process = rewriter.warm.process
+        rewriter.stop_model()  # the settings switched away, or the service stops
+        self.assertIsNotNone(process.wait(5))
+        self.assertEqual(rewriter.model_state, "stopped")
+        self.assertIsNone(Rewriter("llama", url).warm)  # a server of your own: not cd_AI's to run
+
+    def test_llama_command_names_the_model_and_port(self):
+        argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
+        self.assertEqual(argv[:7], ["/x/llama-server", "-m", "/m/gemma.gguf", "--host", "127.0.0.1", "--port", "18766"])
+
+
 class ClaudeCodeTests(unittest.TestCase):
     def setUp(self):
         self.backend = warm.ClaudeCode([sys.executable, FAKE, "claude"])

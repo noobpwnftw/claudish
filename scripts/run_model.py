@@ -1,12 +1,15 @@
 """Launch a persistent llama-server. Works with Windows and Linux binaries."""
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 from download_llama import find_server
 from download_model import PRESETS
 
 root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from claudish.warm import llama_command  # noqa: E402
 
 
 def arguments(parser):
@@ -23,13 +26,7 @@ def command(args):
     model = root / "models" / PRESETS[args.preset][2]
     if not model.is_file():
         raise ValueError("run python scripts/download_model.py " + args.preset)
-    # Gemma 4 thinks first unless told not to, which no request waits for (benchmarks/README.md).
-    # --reasoning off holds where a newer chat template ignores enable_thinking (it thought anyway).
-    extra = ["--jinja", "--reasoning", "off", "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "4096"] \
-        if args.preset == "gemma" \
-        else ["-c", "2048"]
-    return [server, "-m", str(model), "--host", "127.0.0.1", "--port", args.port,
-            "-ngl", args.gpu_layers, "-t", "4", "-np", "1"] + extra
+    return llama_command(server, model, args.port, args.preset == "gemma", args.gpu_layers)
 
 
 if __name__ == "__main__":

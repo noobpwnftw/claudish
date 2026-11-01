@@ -1,8 +1,8 @@
 """`claudish service install|uninstall|status`: start the service at login, without a terminal.
 
 Linux: a systemd user unit. Windows: a logon task (pythonw, no console). macOS: a launchd agent.
-By default `claudish serve ARGS` (the config's profile); with --local, the optional local stack
-(scripts/start.py: a local model and the service).
+`claudish serve ARGS`: the config's profile, and the model process it runs (Claude Code, Codex, a
+local model's server).
 """
 import os
 import platform
@@ -24,12 +24,10 @@ def task_name():
 LABEL = "com.claudish.service"
 
 
-def command(local, extra):
+def command(extra):
     """The argv the service manager runs: inside the macOS bundle, the bundle itself (G61)."""
     if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
         return [os.environ["EXECUTABLEPATH"], "serve"] + list(extra)  # py2app's launcher sets it
-    if local:
-        return [sys.executable, str(ROOT / "scripts" / "start.py")] + list(extra)
     if not (ROOT / "scripts" / "serve.py").is_file():  # installed as a package (the Windows installer)
         return [sys.executable, "-m", "claudish", "serve"] + list(extra)
     return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)
@@ -130,10 +128,10 @@ def paths():
             "Darwin": home / ("Library/LaunchAgents/%s.plist" % LABEL)}
 
 
-def plan(action, local=False, extra=()):
+def plan(action, extra=()):
     """[(description, kind, payload)]: "write" (path, text), "run" (argv), "stop" (argv; may find
     nothing to stop), or "remove" (path)."""
-    system, argv = platform.system(), command(local, extra)
+    system, argv = platform.system(), command(extra)
     if system == "Linux":
         unit = paths()["Linux"]
         if action == "install":
@@ -172,8 +170,8 @@ def plan(action, local=False, extra=()):
     raise SystemExit("no service manager support for %s" % system)
 
 
-def run(action, local=False, extra=(), dry_run=False):
-    steps = plan(action, local, extra)
+def run(action, extra=(), dry_run=False):
+    steps = plan(action, extra)
     for description, kind, payload in steps:
         if dry_run:
             shown = payload[0] if kind == "write" else payload if kind == "remove" else subprocess.list2cmdline(payload)

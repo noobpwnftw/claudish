@@ -1,5 +1,5 @@
-"""Warm subscription backends: Claude Code and Codex kept running beside the service, as the local
-model is, so a rewrite does not wait for a CLI to start.
+"""Model processes kept running beside the service: Claude Code and Codex, so a rewrite does not
+wait for a CLI to start, and a local model's server (ModelServer).
 
 - Claude Code: `claude -p` in stream-json mode, started ahead of time and used for one request,
   then replaced by the next one already started (each request is its own conversation).
@@ -313,6 +313,80 @@ class Codex(Warm):
         self.served += 1
         if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then
             self.launch()
+
+
+def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):
+    """llama-server's argv for a downloaded model (claudish setup --profile local, scripts/run_model.py)."""
+    # Gemma 4 thinks first unless told not to, which no request waits for (benchmarks/README.md).
+    # --reasoning off holds where a newer chat template ignores enable_thinking (it thought anyway).
+    extra = ["--jinja", "--reasoning", "off", "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "4096"] \
+        if gemma else ["-c", "2048"]
+    return [str(server), "-m", str(model), "--host", "127.0.0.1", "--port", str(port),
+            "-ngl", str(gpu_layers), "-t", "4", "-np", "1"] + extra
+
+
+class ModelServer:
+    """A local model's server (a llama profile's "command": llama-server's argv), run by the service
+    like the CLIs above: started with it, started again when it ends, and stopped when the service
+    stops or the settings switch to another model. Requests go to it over HTTP (model_url)."""
+    shaped = False
+
+    def __init__(self, command, url):
+        self.command, self.url, self.configured = list(command), url.rstrip("/"), None
+        self.state = "stopped"
+        self.stopped = threading.Event()
+        self.process = None
+
+    def start(self):
+        self.stopped.clear()
+        self.state = "starting"
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def answers(self):
+        from urllib.request import ProxyHandler, build_opener
+        try:
+            with build_opener(ProxyHandler({})).open(self.url + "/health", timeout=0.5) as response:
+                return response.status == 200
+        except OSError:
+            return False
+
+    def run(self):
+        import subprocess
+        while not self.stopped.is_set():
+            try:
+                self.process = spawn([os.path.expanduser(part) for part in self.command], "the local model",
+                                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError as exc:
+                self.state = "failed: %s" % (exc,)
+                return
+            deadline = time.monotonic() + 120  # a model loads first
+            while self.process.poll() is None and not self.answers():
+                if self.stopped.is_set() or time.monotonic() > deadline:
+                    break
+                time.sleep(0.2)
+            if self.process.poll() is None and not self.stopped.is_set():
+                if not self.answers():
+                    self.state = "failed: the local model did not answer within 120 s"
+                    self.stop()
+                    return
+                self.state = "warm"
+                self.process.wait()
+            if self.stopped.is_set():
+                return
+            self.state = "restarting"
+            time.sleep(1)
+
+    def stop(self):
+        self.stopped.set()
+        process, self.process = self.process, None
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(5)
+            except Exception:
+                process.kill()
+        if self.state != "stopped" and not self.state.startswith("failed"):
+            self.state = "stopped"
 
 
 def make(backend, command, model=None, cwd=None):
