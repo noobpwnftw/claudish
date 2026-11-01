@@ -123,6 +123,25 @@ def blank(**shown):
                  "replying": False, "nudge": False, "column": False}, **shown)
 
 
+def exchange(method=None, needs="working"):
+    """A result for an exchange: the held one's goes to it (it goes on, out of sight); one for an
+    older revision, or once nothing is waiting (needs: working, or a continue suggestion's text), is
+    stale and changes nothing. Then the method, whose True says what shows changed."""
+    if method is None:
+        return lambda method: exchange(method, needs)
+
+    def routed(self, revision, *args, **kwargs):
+        held = self.route(revision)
+        if held is not None:
+            getattr(held, method.__name__)(revision, *args, **kwargs)
+            return False
+        if revision != self.revision or not getattr(self, needs):
+            return False
+        return method(self, revision, *args, **kwargs)
+    routed.__name__, routed.__doc__ = method.__name__, method.__doc__
+    return routed
+
+
 class Composition:
     def __init__(self):
         self.text = ""
@@ -625,14 +644,9 @@ class Composition:
             return "error" if self.fail(revision, data["error"]) else None
         return None
 
+    @exchange
     def fail(self, revision, error=None):
         """The request failed; True when that changed what shows."""
-        held = self.route(revision)
-        if held is not None:  # the exchange you left: it goes on, out of sight
-            held.fail(revision, error)
-            return False
-        if revision != self.revision or not self.working:
-            return False
         self.working, self.failed = False, True
         self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
         # Words set aside while a question was up come back to edit, as when it is answered.
@@ -640,28 +654,18 @@ class Composition:
         self.error = failure(error)
         return True
 
+    @exchange
     def done(self, revision):
         """The instruction was carried out elsewhere (a helper took the task): nothing is inserted,
         and the instruction is finished."""
-        held = self.route(revision)
-        if held is not None:  # the exchange you left: it goes on, out of sight
-            held.done(revision)
-            return False
-        if revision != self.revision or not self.working:
-            return False
         # Words you typed meanwhile stay at the caret, a composition of their own (Shift+Enter
         # sends them as the next instruction in this conversation).
         self.change((self.reply.strip() + " " + self.waiting).strip() if self.waiting else self.reply.strip())
         return True
 
+    @exchange
     def ask(self, revision, question, session):
         """An agent asks something while working on this instruction: its choices become the list."""
-        held = self.route(revision)
-        if held is not None:  # the exchange you left: it goes on, out of sight
-            held.ask(revision, question, session)
-            return False
-        if revision != self.revision or not self.working:
-            return False
         if self.question and self.question.get("id") != question.get("id"):
             self.queued.append(dict(question, session=session))  # one at a time: it shows once this one is answered
             return True
@@ -674,14 +678,9 @@ class Composition:
         self.selected = False
         return True
 
+    @exchange
     def note(self, revision, text):
         """Progress or a partial draft from the agent, for the status line."""
-        held = self.route(revision)
-        if held is not None:  # the exchange you left: it goes on, out of sight
-            held.note(revision, text)
-            return False
-        if revision != self.revision or not self.working:
-            return False
         self.status = text
         return True
 
@@ -823,14 +822,9 @@ class Composition:
         self.change(self.text)
         return True
 
+    @exchange(needs="text")
     def offer(self, revision, text, alternatives=()):
         """A result arrived."""
-        held = self.route(revision)
-        if held is not None:  # the exchange you left: it goes on, out of sight
-            held.offer(revision, text, alternatives)
-            return False
-        if revision != self.revision or not self.text:
-            return False
         self.candidate = text
         self.candidates = [text] + [a for a in alternatives if a and a != text]
         self.highlight = 0
