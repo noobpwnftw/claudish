@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Settings offer **Start over** when any profile they can switch to does not read, not only the one
-  in use (picking Claude on a 0.3 config running Claude Code said only "could not use that"). Start
-  over keeps the profile in use whole, with the tone, keys, hints and MCP servers.
-
 ## 0.4.0
 
 - The config: `"tone"` is set once beside `"profile"` (with `"keys"` and `"hints"`) and applies to every
@@ -16,7 +10,9 @@
 - A config from before 0.4 is not read: `"claude_model"` is `"model"` now, `"max_tokens"` is in the
   templates, and `"hosted"` is gone. cd_AI keeps running with no model and says why; **Start over**
   in its settings moves the file aside as `config.json.old` and writes a new one, with the model and
-  tone you picked (or rename the keys by hand). `claudish serve --claude-model` is `--model`.
+  tone you picked (or rename the keys by hand). The settings offer it too when a model they switch
+  to does not read; it keeps the profile in use whole, with the keys, hints and MCP servers.
+  `claudish serve --claude-model` is `--model`.
 - Windows: an instruction sees the text around the caret as on macOS and Linux (8,000 characters
   each way, was 1,500). PIN and numeric password fields are passwords to cd_AI; a time field is no
   longer taken for a phone number.
