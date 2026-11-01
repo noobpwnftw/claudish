@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Settings offer **Start over** when any profile they can switch to does not read, not only the one
+  in use (picking Claude on a 0.3 config running Claude Code said only "could not use that"). Start
+  over keeps the profile in use whole, with the tone, keys, hints and MCP servers.
+
 ## 0.4.0
 
 - The config: `"tone"` is set once beside `"profile"` (with `"keys"` and `"hints"`) and applies to every
