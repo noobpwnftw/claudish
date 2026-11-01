@@ -179,7 +179,8 @@ def server_problem(url, models, model=None, key=None):
 def start_over(path=None):
     """A config cd_AI cannot read, moved aside as config.json.old (and its templates.json, if that
     does not read either) for the starter's. The profile in use carries over (an OpenAI-compatible
-    one as "server"), with the keys it can have, and so do the tone, keys, hints and MCP servers."""
+    one as "server"), with the keys it can have, and so do the first OpenAI-compatible server (as
+    "server"), the tone, keys, hints and MCP servers."""
     path = path or config.default_path()
     try:
         old = read(path)
@@ -201,9 +202,16 @@ def start_over(path=None):
     if name and entry:
         if entry.get("backend") == "openai" and name not in fresh["profiles"]:
             name = "server"
-        entry.pop("bindings", None)  # they name profiles the new file may not have
         fresh["profiles"][name] = entry
         fresh["profile"] = name
+    if name != "server":  # the window's "Another model API" keeps its address, model and tools too
+        server = next((dict(each) for each in (old.get("profiles") or {}).values()
+                       if isinstance(each, dict) and each.get("backend") == "openai" and each.get("model_url")), None)
+        if server:
+            fresh["profiles"]["server"] = {key: value for key, value in server.items()
+                                           if key in config.DEFAULTS and key != "tone"}
+    for each in fresh["profiles"].values():
+        each.pop("bindings", None)  # they name profiles the new file may not have
     for key in ("keys", "hints", "mcp_servers"):
         if key in old:
             fresh[key] = old[key]

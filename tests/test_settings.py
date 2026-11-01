@@ -75,7 +75,7 @@ class SettingsTests(Home):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         old = {"profile": "claude-code", "profiles": {
             "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "tone": "critic"},
-            "ollama": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "tone": "critic"},
+            "ollama": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "tone": "critic"},
             "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku", "tone": "critic"}}}
         self.path.write_text(json.dumps(old))
         with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
@@ -86,6 +86,7 @@ class SettingsTests(Home):
         self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
         data = self.written()
         self.assertEqual((data["tone"], data["profiles"]["claude-code"]["command"]), ("critic", ["/old/claude"]))
+        self.assertEqual(data["profiles"]["server"]["model_url"], "http://10.0.0.7:8080")  # "ollama", not in use
         for name in data["profiles"]:
             config.resolve(self.path, profile=name)
         self.path.write_text("{not json")  # one that does not read at all: the starter's Claude
