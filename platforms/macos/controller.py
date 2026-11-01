@@ -10,7 +10,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import AROUND, MAX_COMPOSITION, Composition, ShiftTap, typeable, window
+from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
@@ -578,6 +578,14 @@ class ClaudishInputController(IMKInputController):
             return True
         if self.state.live:
             return self.live_key(client, key, chars)
+        # Option+e, Option+u, ...: a dead key gives its accent alone; it waits for its letter (the
+        # next key takes it, Backspace cancels it, any other key drops it).
+        accent, self.accent = getattr(self, "accent", None), None
+        if flags & NSEventModifierFlagOption and chars in ACCENTS:
+            self.accent = chars
+            return True
+        if accent and key == 51:
+            return True
         shift = bool(flags & NSEventModifierFlagShift)
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
@@ -671,6 +679,8 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         text = event.characters() or ""
+        if accent and text and all(typeable(char) for char in text):
+            text = accented(accent, text[0]) + text[1:]  # é from ´ then e, as macOS makes it in a text field
         # Navigation keys use private-use characters, which must not enter the draft.
         if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not all(typeable(char) for char in text) or not text:
             self.finish(client)

@@ -388,6 +388,21 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
         self.assertEqual(self.client.commits, ["Hi—€"])
 
+    def test_a_dead_keys_accent_goes_on_the_next_letter(self):
+        option = 1 << 19
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", option))  # Option+e: the accent alone, waiting
+        self.assertEqual(self.client.marked, "caf")
+        self.type_text("e")
+        self.assertEqual(self.client.marked, "café")
+        self.assertTrue(self.key(32, "¨", option))  # Option+u, then a space: the accent itself
+        self.type_text(" ")
+        self.assertTrue(self.key(32, "¨", option))
+        self.assertTrue(self.key(51))  # Backspace cancels it, and nothing else
+        self.type_text("u")
+        self.assertEqual(self.client.marked, "café¨u")
+        self.assertFalse(self.client.commits)
+
     def test_ctrl_shift_is_a_chord_not_a_tap(self):
         self.controller.shift.typed_at = 0  # long after any key: only the chord decides
         for flags in ((1 << 17) | (1 << 18), 1 << 18):  # Shift down, then up, with Control held

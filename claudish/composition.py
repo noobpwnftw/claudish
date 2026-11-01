@@ -17,6 +17,20 @@ WINDOW = (1500, 500)
 PROSE = (None, "name", "alpha")
 
 
+# A dead key's accent, as it types alone, and the mark it puts on the next letter.
+ACCENTS = {"`": "\u0300", "´": "\u0301", "^": "\u0302", "~": "\u0303", "¯": "\u0304", "˘": "\u0306",
+           "˙": "\u0307", "¨": "\u0308", "˚": "\u030a", "˝": "\u030b", "ˇ": "\u030c", "¸": "\u0327", "˛": "\u0328"}
+
+
+def accented(accent, char):
+    """What a dead key's accent and the next key make: é from ´ and e; the accent alone before a
+    space or the same accent; else the accent, then the character."""
+    if char in (" ", accent):
+        return accent
+    composed = unicodedata.normalize("NFC", char + ACCENTS[accent])
+    return composed if len(composed) == 1 else accent + char
+
+
 def typeable(char):
     """A character a key types into the composition: printable, or a no-break space (Option+Space,
     AltGr+Space, French typing), which Python does not count as printable."""

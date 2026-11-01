@@ -10,28 +10,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, typeable, window
+from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
 # Dead keys (an accent, then the letter it goes on): IBus hands the engine the keysym, so composing
 # them is the engine's job, as IBusEngineSimple does. keysym name -> (combining mark, spacing accent).
-DEAD_KEYS = {"dead_grave": ("\u0300", "`"), "dead_acute": ("\u0301", "´"), "dead_circumflex": ("\u0302", "^"),
-             "dead_tilde": ("\u0303", "~"), "dead_macron": ("\u0304", "¯"), "dead_breve": ("\u0306", "˘"),
-             "dead_abovedot": ("\u0307", "˙"), "dead_diaeresis": ("\u0308", "¨"), "dead_abovering": ("\u030a", "˚"),
-             "dead_doubleacute": ("\u030b", "˝"), "dead_caron": ("\u030c", "ˇ"), "dead_cedilla": ("\u0327", "¸"),
-             "dead_ogonek": ("\u0328", "˛")}
+DEAD_KEYS = {"dead_grave": "`", "dead_acute": "´", "dead_circumflex": "^", "dead_tilde": "~", "dead_macron": "¯",
+             "dead_breve": "˘", "dead_abovedot": "˙", "dead_diaeresis": "¨", "dead_abovering": "˚",
+             "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}  # their accents
 
 
 def with_accent(dead, char):
-    """The character a dead key and the next key make: é from ´ and e, the accent alone before a
-    space or the same dead key, else the accent and then the character."""
-    mark, spacing = DEAD_KEYS[dead]
-    if char in (" ", spacing):
-        return spacing
-    import unicodedata
-    composed = unicodedata.normalize("NFC", char + mark)
-    return composed if len(composed) == 1 else spacing + char
+    """The character a dead key and the next key make (composition.accented)."""
+    return accented(DEAD_KEYS[dead], char)
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -448,7 +440,7 @@ class ClaudishEngine(IBus.Engine):
         name = IBus.keyval_name(keyval) or ""
         if name in DEAD_KEYS:  # an accent waits for its letter
             if getattr(self, "dead", None):
-                char = DEAD_KEYS[self.dead][1] if name == self.dead else None
+                char = DEAD_KEYS[self.dead] if name == self.dead else None
                 self.dead = None if char else name
                 if char:
                     self.composition.insert(char)
