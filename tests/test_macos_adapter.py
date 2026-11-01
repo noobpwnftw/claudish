@@ -403,6 +403,9 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.marked, "café")
         self.assertTrue(self.key(32, "¨", option))  # Option+u, then a space: the accent itself
         self.type_text(" ")
+        self.assertTrue(self.key(14, "´", option))
+        self.assertTrue(self.key(14, "´", option))  # the same key twice: the accent itself too
+        self.key(51)
         self.assertTrue(self.key(32, "¨", option))
         self.assertTrue(self.key(51))  # Backspace cancels it, and nothing else
         self.type_text("u")

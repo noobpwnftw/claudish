@@ -471,7 +471,7 @@ class ClaudishInputController(IMKInputController):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.state
         accent, state.accent = state.accent, ""
-        if flags & NSEventModifierFlagOption and chars in ACCENTS:  # a dead key: its accent waits, shown
+        if flags & NSEventModifierFlagOption and chars in ACCENTS and chars != accent:  # a dead key: its accent waits, shown
             state.accent = chars
             client.setMarkedText_selectionRange_replacementRange_(marked(chars), (len(chars), 0), (NSNotFound, 0))
             return True
@@ -592,7 +592,7 @@ class ClaudishInputController(IMKInputController):
         # Option+e, Option+u, ...: a dead key gives its accent alone; it waits for its letter (the
         # next key takes it, Backspace cancels it, any other key drops it).
         accent, self.state.accent = self.state.accent, ""
-        if flags & NSEventModifierFlagOption and chars in ACCENTS:
+        if flags & NSEventModifierFlagOption and chars in ACCENTS and chars != accent:  # twice: the accent itself
             self.state.accent = chars
             self.changed(client)
             return True
