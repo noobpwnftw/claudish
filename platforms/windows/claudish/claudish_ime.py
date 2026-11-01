@@ -288,8 +288,8 @@ class ClaudishTextService(TextService):
         if document and document != getattr(self, "last_document", None):
             if self.state.for_model:  # an instruction's exchange, left in the other text box: held for it
                 self.state.leave(self.last_document)
-            if getattr(self, "last_document", None) is not None and self.worker:
-                self.worker.new_conversation(end=self.state.held is None)  # a held exchange goes on
+            if self.worker:
+                self.worker.use_conversation(document)  # this box's own, also when you come back to it
             self.last_document = document
             self.known_scopes = None  # another text box: its own scopes (a password field's stay behind)
             pill = self.state.returned(document)  # back where one was held: a pill, taking no keys

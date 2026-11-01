@@ -176,6 +176,26 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_each_text_box_keeps_its_conversation_when_you_come_back(self):
+        from claudish import client
+        worker = Suggestions(endpoint="http://127.0.0.1:9")
+        ended = []
+        worker._end = ended.append
+        try:
+            worker.use_conversation("slack")
+            slack = worker.conversation
+            worker.use_conversation("address bar")
+            self.assertNotEqual(worker.conversation, slack)
+            worker.use_conversation("slack")  # back: "make it friendlier" knows the earlier turn
+            self.assertEqual(worker.conversation, slack)
+            for box in range(client.BOXES):
+                worker.use_conversation(box)
+            time.sleep(0.1)
+            self.assertIn(slack, ended)  # the oldest box's conversation ends
+        finally:
+            worker.close()
+            worker.thread.join(1)
+
     def test_the_worker_knows_when_the_service_is_offline(self):
         worker = Suggestions(endpoint="http://127.0.0.1:9")  # nothing listens on the discard port
         try:

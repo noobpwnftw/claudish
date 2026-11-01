@@ -95,6 +95,9 @@ def call(endpoint, path, body=None, timeout=10):
         return json.load(response)
 
 
+BOXES = 16  # text boxes whose conversations a worker keeps
+
+
 def said(exc):
     """A failed request as a result: the service explains model failures in JSON, and the HTTP
     status alone loses why (a missing key becomes only "503 Service Unavailable")."""
@@ -120,6 +123,7 @@ class Suggestions:
         self.closed = False
         # This text box's conversation: instructions are turns in it (docs/design/architecture.md).
         self.conversation = "%032x" % random.getrandbits(128)
+        self.boxes = collections.OrderedDict()  # a text box -> its conversation (use_conversation)
         self.offline = False  # the service did not answer its last check: True, or "initializing"
         self.revisions = {}  # an agent session's id -> the instruction's revision (its answers' errors go there)
         # The revisions the composition still shows (Composition.follow sets them): the current one and
@@ -212,13 +216,15 @@ class Suggestions:
                 self.deliver(revision, {"error": error, "session": session}, always=True)
         threading.Thread(target=send, daemon=True).start()
 
-    def new_conversation(self, end=True):
-        """Another text box behind the same input method instance (Windows runs one per app thread):
-        a fresh conversation, the old one ended unless an exchange held from it goes on (end=False:
-        the service ends it after its idle period)."""
-        old, self.conversation = self.conversation, "%032x" % random.getrandbits(128)
-        if end:
-            threading.Thread(target=lambda: self._end(old), daemon=True).start()
+    def use_conversation(self, box):
+        """The text box in focus (one input method instance serves several: an app's boxes): its
+        own conversation, the one it had when you come back to it, or a new one. The last BOXES
+        keep theirs; an older one's conversation ends (the service also ends one left idle)."""
+        self.conversation = self.boxes.pop(box, None) or "%032x" % random.getrandbits(128)
+        self.boxes[box] = self.conversation
+        while len(self.boxes) > BOXES:
+            _, old = self.boxes.popitem(last=False)
+            threading.Thread(target=self._end, args=(old,), daemon=True).start()
 
     def _end(self, conversation):
         try:
@@ -227,14 +233,16 @@ class Suggestions:
             pass
 
     def close(self):
-        """The text box went away: stop, and end its conversation (off the input thread)."""
+        """The input method instance went away: stop, and end its text boxes' conversations (off the
+        input thread)."""
         self.stopped.set()
         with self.condition:
             self.closed = True
             self.pending = None
             self.results.clear()
             self.condition.notify()
-        threading.Thread(target=self._end, args=(self.conversation,), daemon=True).start()
+        for conversation in set(self.boxes.values()) | {self.conversation}:
+            threading.Thread(target=self._end, args=(conversation,), daemon=True).start()
 
     def deliver(self, revision, data, always=False):
         """A result for the composition. A newer request drops a plain one; an agent session's

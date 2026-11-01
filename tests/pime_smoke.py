@@ -297,11 +297,10 @@ def main():
             key(0x20, ord(" "), inputScopes=[5])
             assert all(len(c.args) < 3 or c.args[2] != "continue"
                        for c in worker_class.return_value.schedule.call_args_list[calls:])
-            # One conversation per text box: another TSF context starts a new one.
+            # One conversation per text box: each TSF context has its own.
             key(0x10, document="1")
-            first = worker_class.return_value.new_conversation.call_count
             key(0x10, document="2")
-            assert worker_class.return_value.new_conversation.call_count == first + 1
+            assert worker_class.return_value.use_conversation.call_args.args == ("2",)
             # A password field (IS_PASSWORD): the first key is typed as is, then cd_AI stays out.
             service.state.change("")
             reply = key(ord("S"), ord("s"), inputScopes=[31])

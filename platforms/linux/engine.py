@@ -549,9 +549,8 @@ class ClaudishEngine(IBus.Engine):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
         # One conversation per text box (its input context), as on Windows: earlier instructions,
-        # context and approvals stay with the box they were made in.
-        if getattr(self, "context", None) not in (None, object_path):
-            self.suggestions.new_conversation(end=self.composition.held is None)  # a held exchange goes on
+        # context and approvals stay with the box they were made in, also when you come back to it.
+        self.suggestions.use_conversation(object_path)
         self.context = object_path
         self.update_quiet()
         self.refresh_surrounding()
