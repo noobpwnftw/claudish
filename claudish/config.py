@@ -211,6 +211,11 @@ def save(data, path=None):
     os.replace(temporary, path)
 
 
+def plainly(error):
+    """A config error without its advice on fixing the file by hand (cd_AI's settings offer Start over)."""
+    return str(error).split(" (docs/configuration.md")[0]
+
+
 def set_tone(data, tone, profile=None):
     """Set the tone profile writes in: its own when it has one, else the file's, for every profile
     without its own ("" or "corporate", the default, removes the file's)."""

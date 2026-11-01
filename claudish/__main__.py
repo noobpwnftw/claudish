@@ -202,11 +202,13 @@ def main():
         try:
             profile, settings, rewriter = build()
         except (OSError, ValueError) as exc:
+            if any(value is not None for value in overrides.values()):
+                parser.error(str(exc))  # a flag of this command: say so here, as always
             # Still an input method, and the settings window still opens to fix it: no model until
             # the config reads (an edit is taken up at once).
             print("cd_AI could not use its config, so no model is set up: %s" % exc, file=sys.stderr, flush=True)
             profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
-            rewriter.problem = str(exc)
+            rewriter.problem = config.plainly(exc)
         except ImportError:
             parser.error('the claude backend needs the Anthropic SDK: pip install "claudish-ime[claude]"')
         run_service(rewriter, args.port, lambda: build()[2],

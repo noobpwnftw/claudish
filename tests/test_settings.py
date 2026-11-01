@@ -111,6 +111,42 @@ class SettingsTests(Home):
         for name in data["profiles"]:
             config.resolve(self.path, profile=name)
 
+    def test_start_over_from_what_review_found(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Not JSON: the window still shows, with the problem and where the file goes.
+        self.path.write_text("{not json")
+        state = settings.state()
+        self.assertTrue(state["config_problem"].startswith("config.json does not read"))
+        self.assertEqual((state["choice"], state["aside"]), ("claude", "config.json.old"))
+        self.assertEqual(settings.apply({"start_over": True})["moved_to"], "config.json.old")
+        # Again: the first one aside stays.
+        self.path.write_text('{"profiles": {"claude": {"backend": "claude", "claude_model": "claude-sonnet-5-5"}}, '
+                             '"tone": "critic", "keys": {"summon": "Enter"}}')  # no "profile": the first
+        state = settings.apply({"start_over": True})
+        self.assertEqual(state["moved_to"], "config.json.old2")
+        self.assertEqual(self.path.with_name("config.json.old").read_text(), "{not json")
+        data = self.written()
+        self.assertEqual((data["profiles"]["claude"]["model"], data["tone"], data["keys"]), ("claude-sonnet-5-5", "critic", {"summon": "Enter"}))
+        # A server whose modes name a profile the new file lacks, and a templates file that does not load.
+        self.path.write_text(json.dumps({"profile": "claude", "profiles": {
+            "claude": {"backend": "claude", "claude_model": "x"},
+            "ollama": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "modes": {"continue": {"profile": "fast"}}},
+            "fast": {"backend": "llama"}}}))
+        self.path.with_name("templates.json").write_text('{"modes": [}')
+        state = settings.apply({"start_over": True})
+        self.assertIsNone(state["config_problem"])
+        self.assertEqual(self.written()["profiles"]["server"], {"backend": "openai", "model_url": "http://10.0.0.7:8080"})
+        self.assertEqual(self.path.with_name("templates.json.old").read_text(), '{"modes": [}')
+        self.assertFalse(self.path.with_name("start-over.json.tmp").exists())
+
+    def test_the_server_form_shows_the_first_server_profile(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "mine", "profiles": {
+            "mine": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "model": "gemma", "tone": "bard"}}}))
+        state = settings.state()
+        self.assertEqual((state["choice"], state["server"]["url"], state["server"]["model"]),
+                         ("other", "http://10.0.0.7:8080", "gemma"))
+
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))

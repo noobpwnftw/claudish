@@ -4,8 +4,9 @@ The window offers the model (Claude with an API key, Claude Code's `claude` comm
 subscription, Codex's `codex` command for a ChatGPT subscription, or any OpenAI-compatible API), the
 tone, the key that asks the model, and whether the panel shows hints. The models map onto the
 starter's profiles: "claude", "claude-code", "codex", and "server" for any OpenAI-compatible server.
-A config whose default is another profile is shown as that profile and left to its file. The tone,
-keys and hints are the file's, for every profile.
+A config whose default is another profile is shown as that profile and left to its file. The keys
+and hints are the file's, for every profile; the tone is the one the profile in use reads (its own,
+else the file's).
 The key is saved by claudish/keys.py.
 """
 import glob
@@ -55,11 +56,69 @@ def codex():
     return command_path("codex", ".vscode*/extensions/openai.chatgpt-*/bin/*/codex*")
 
 
+def starter():
+    return dict(config.STARTER, profiles={k: dict(v) for k, v in config.STARTER["profiles"].items()})
+
+
 def read(path=None):
     path = path or config.default_path()
     if not path.is_file():
-        return dict(config.STARTER, profiles={k: dict(v) for k, v in config.STARTER["profiles"].items()})
+        return starter()
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def loaded(path=None):
+    """(the config as the window edits it, None), or (the starter, why the file does not read)."""
+    path = path or config.default_path()
+    try:
+        data = read(path)
+    except (OSError, ValueError) as exc:
+        return starter(), "%s does not read: %s" % (path.name, exc)
+    if not (isinstance(data, dict) and isinstance(data.get("profiles"), dict) and data["profiles"]
+            and all(isinstance(each, dict) for each in data["profiles"].values())):
+        return starter(), '%s needs a "profiles" object of profiles' % path.name
+    return data, None
+
+
+def in_use(data):
+    return data.get("profile") or next(iter(data["profiles"]), None)
+
+
+def unreadable(path, data):
+    """Why the profile in use, or one the window switches to, does not read; None when they all do."""
+    name = in_use(data)
+    for each in [name] + [other for other in CHOICES if other in data["profiles"] and other != name]:
+        try:
+            config.resolve(path, each)
+        except (OSError, ValueError) as exc:
+            return config.plainly(exc)
+    return None
+
+
+def server_entry(profiles):
+    """The window's OpenAI-compatible server: "server", else the first profile for one (its address,
+    model and tools), else the starter's."""
+    if isinstance(profiles.get("server"), dict):
+        return profiles["server"]
+    found = next((each for each in profiles.values() if isinstance(each, dict)
+                  and each.get("backend") == "openai" and each.get("model_url")), None)
+    return carried(found, "tone") if found else dict(config.STARTER["profiles"]["server"])
+
+
+def carried(entry, *drop):
+    """A profile as a new config can hold it: its keys this version reads (a Claude profile's
+    claude_model as its model), without bindings or modes, which name other profiles."""
+    entry = dict(entry or {})
+    if entry.get("backend") == "claude" and isinstance(entry.get("claude_model"), str):
+        entry.setdefault("model", entry["claude_model"])
+    return {key: value for key, value in entry.items()
+            if key in config.DEFAULTS and key not in ("bindings", "modes") + drop}
+
+
+def aside(path):
+    """Where path goes aside: path.old, or path.old2, ... when that is taken."""
+    return next(path.with_name(path.name + ".old" + (str(n) if n > 1 else "")) for n in range(1, 1000)
+                if not path.with_name(path.name + ".old" + (str(n) if n > 1 else "")).exists())
 
 
 def key_state():
@@ -70,20 +129,15 @@ def key_state():
 
 def state(path=None):
     """What the window shows. Never the key itself: only whether there is one, and where."""
-    data = read(path)
-    profiles = data.get("profiles") or {}
-    name = data.get("profile") or next(iter(profiles), None)
+    path = path or config.default_path()
+    data, problem = loaded(path)  # a problem: the window shows the starter, and Start over
+    if not problem and path.is_file():
+        problem = unreadable(path, data)
+    profiles = data["profiles"]
+    name = in_use(data)
     entry = profiles.get(name) or {}
     choice = name if name in CHOICES or name == "local" else "other"
-    problem = None  # a profile the window uses or switches to that cd_AI cannot read
-    if Path(path or config.default_path()).is_file():
-        for each in [name] + [p for p in CHOICES if p in profiles and p != name]:
-            try:
-                config.resolve(path, each)
-            except (OSError, ValueError) as exc:
-                problem = str(exc).split(" (docs/")[0]
-                break
-    server = profiles.get("server") or config.STARTER["profiles"]["server"]
+    server = server_entry(profiles)
     url = server.get("model_url", "")
     models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
     tone = entry.get("tone") or data.get("tone") or "corporate"  # the one in use: the profile's own, else the file's
@@ -93,11 +147,12 @@ def state(path=None):
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "config_problem": problem,
+        "aside": aside(path).name if problem else None,
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "hints": data.get("hints", True) is not False,
         "tones": [{"name": n, "about": t.get("about", "")} for n, t in TEMPLATES["tones"]["named"].items()],
-        "config": str(path or config.default_path()),
+        "config": str(path),
         # The server cd_AI writes with must answer, or "Ready" would be a lie (a refused
         # connection on this computer answers at once).
         "server_problem": server_problem(url, models, server.get("model")) if choice == "server" else None,
@@ -177,53 +232,60 @@ def server_problem(url, models, model=None, key=None):
 
 
 def start_over(path=None):
-    """A config cd_AI cannot read, moved aside as config.json.old (and its templates.json, if that
-    does not read either) for the starter's. The profile in use carries over (an OpenAI-compatible
-    one as "server"), with the keys it can have, and so do the first OpenAI-compatible server (as
-    "server"), the tone, keys, hints and MCP servers."""
+    """A config cd_AI cannot read, moved aside (config.json.old) for a new one, written whole before
+    the old one moves. It keeps the profile in use (an OpenAI-compatible one as "server"), the first
+    OpenAI-compatible server, the tone, keys, hints and MCP servers; what of that does not read goes.
+    A templates.json that does not load goes aside too, for the starter's."""
+    import itertools
+    from .modes import defaults, load
     path = path or config.default_path()
-    try:
-        old = read(path)
-        name = old.get("profile")
-        entry = {key: value for key, value in old["profiles"][name].items() if key in config.DEFAULTS}
-    except (OSError, ValueError, AttributeError, KeyError, TypeError):
-        old, name, entry = {}, None, {}
-    if path.is_file():
-        path.replace(path.with_name(path.name + ".old"))
-    templates = path.with_name("templates.json")
-    try:
-        from .modes import load
-        templates.is_file() and load(templates)
-    except (OSError, ValueError):
-        templates.replace(templates.with_name(templates.name + ".old"))
-    config.write_starter(path)
-    fresh = read(path)
+    old, _ = loaded(path)
+    name = in_use(old)
+    entry = carried(old["profiles"].get(name))
     tone = entry.pop("tone", None) or old.get("tone")
-    if name and entry:
-        if entry.get("backend") == "openai" and name not in fresh["profiles"]:
-            name = "server"
-        fresh["profiles"][name] = entry
-        fresh["profile"] = name
-    if name != "server":  # the window's "Another model API" keeps its address, model and tools too
-        server = next((dict(each) for each in (old.get("profiles") or {}).values()
-                       if isinstance(each, dict) and each.get("backend") == "openai" and each.get("model_url")), None)
-        if server:
-            fresh["profiles"]["server"] = {key: value for key, value in server.items()
-                                           if key in config.DEFAULTS and key != "tone"}
-    for each in fresh["profiles"].values():
-        each.pop("bindings", None)  # they name profiles the new file may not have
+    fresh = starter()
+    fresh["profiles"]["server"] = carried(server_entry(old["profiles"]), "tone")
+    if entry:
+        name = "server" if entry.get("backend") == "openai" and name not in fresh["profiles"] else name
+        fresh["profiles"][name], fresh["profile"] = entry, name
     for key in ("keys", "hints", "mcp_servers"):
         if key in old:
             fresh[key] = old[key]
-    if isinstance(tone, str) and tone and len(tone) <= 200 and "\n" not in tone:
-        fresh["tone"] = tone
-    config.save(fresh, path)
+    if isinstance(tone, str) and tone.strip() and len(tone) <= 200 and "\n" not in tone:
+        fresh["tone"] = tone.strip()
+    templates = path.with_name("templates.json")
     try:
-        config.resolve(path)
-    except ValueError:  # what carried over does not read either: the starter as it is
-        path.unlink()
-        config.write_starter(path)
-    return state(path)
+        templates.is_file() and defaults(load(templates))
+    except Exception:  # any way it does not load, as the service would use it
+        templates.replace(aside(templates))
+    config.write_starter_templates(path)
+    trial = path.with_name("start-over.json.tmp")
+    try:
+        for _ in itertools.count():  # what does not read goes: a carried profile, then the rest
+            trial.write_text(json.dumps(fresh, indent=2) + "\n", encoding="utf-8")
+            problem = unreadable(trial, fresh)
+            if not problem:
+                break
+            gone = next((n for n in fresh["profiles"] if "profile %r" % n in problem), None)
+            if gone and gone in config.STARTER["profiles"] and fresh["profiles"][gone] != config.STARTER["profiles"][gone]:
+                fresh["profiles"][gone] = dict(config.STARTER["profiles"][gone])
+            elif gone and gone not in config.STARTER["profiles"]:
+                del fresh["profiles"][gone]
+                fresh["profile"] = config.STARTER["profile"]
+            elif any(key in fresh for key in ("keys", "hints", "mcp_servers")):
+                for key in ("keys", "hints", "mcp_servers"):
+                    fresh.pop(key, None)
+            elif fresh != starter():
+                fresh = starter()
+            else:
+                break  # the starter as it is: what the service says about it is in the window
+        moved = aside(path) if path.is_file() else None
+        if moved:
+            path.replace(moved)
+        trial.replace(path)
+    finally:
+        trial.unlink(missing_ok=True)
+    return dict(state(path), moved_to=moved.name if moved else None)
 
 
 def apply(changes, path=None):
@@ -262,12 +324,12 @@ def apply(changes, path=None):
                 raise ValueError("pick the model to use: " + ", ".join(models[:20]) if models else
                                  check_server(url.strip(), key=server_key) or "name the model to use")
             model = models[0]
-        entry = profiles.setdefault("server", dict(config.STARTER["profiles"]["server"]))
+        entry = profiles.setdefault("server", dict(server_entry(profiles)))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
     if "choice" in changes and changes["choice"] not in CHOICES:
         raise ValueError("unknown choice")
     if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "server"):
-        server = profiles.get("server", config.STARTER["profiles"]["server"])
+        server = server_entry(profiles)
         problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
                                if isinstance(changes.get("server"), dict) else None)
         if problem:  # switching to a server that is not there would leave every rewrite failing
@@ -285,7 +347,7 @@ def apply(changes, path=None):
             entry.update(backend=choice, command=[command])
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
-        profiles.setdefault(name, dict(config.STARTER["profiles"][name]))
+        profiles.setdefault(name, dict(server_entry(profiles) if name == "server" else config.STARTER["profiles"][name]))
         data["profile"] = name
     if "tone" in changes:
         tone = changes["tone"]

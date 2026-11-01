@@ -164,6 +164,19 @@ class ServeTests(unittest.TestCase):
             self.assertIn("unknown keys claude_model", health["problem"])
 
 
+class FlagTests(unittest.TestCase):
+    def test_a_flag_that_does_not_work_still_stops_serve(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home, "config.json")
+            path.write_text(json.dumps({"profiles": {"p": {"backend": "rules"}}}))
+            done = subprocess.run([sys.executable, "-m", "claudish", "serve", "--config", str(path), "--port", "1",
+                                   "--templates", str(Path(home, "missing.json"))], cwd=Path(__file__).resolve().parents[1],
+                                  capture_output=True, text=True, timeout=10, env=dict(os.environ, XDG_CONFIG_HOME=home))
+            self.assertEqual(done.returncode, 2)
+            self.assertIn("missing.json", done.stderr)
+
+
 class DocsTests(unittest.TestCase):
     def test_every_profile_key_is_in_the_configuration_docs_table(self):
         # The starter no longer lists them: docs/configuration.md's table is where they are found.

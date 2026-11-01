@@ -65,7 +65,7 @@ def step_tone(name, settings, tone):
             "corporate, the default" if not current else repr(current),
             ", ".join(n for n in TONES if n != "corporate")), None
 
-    def write():  # like the settings window: the file's tone, for every profile
+    def write():  # like the settings window: where this profile reads its tone
         path = config.default_path()
         data = json.loads(path.read_text(encoding="utf-8-sig"))
         config.set_tone(data, tone, name)
