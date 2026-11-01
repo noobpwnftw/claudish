@@ -106,8 +106,14 @@ def state(path=None):
     """What the window shows. Never the key itself: only whether there is one, and where."""
     path = path or config.default_path()
     data, problem = loaded(path)  # a problem: the window shows the starter, and how to fix it
+    locked = bool(problem)  # nothing the window changes can be used: the file comes first
     if not problem and path.is_file():
-        problem = unreadable(path, data)
+        try:
+            config.resolve(path, in_use(data))
+        except (OSError, ValueError) as exc:
+            problem, locked = config.plainly(exc), True
+        else:
+            problem = unreadable(path, data)  # one the window switches to: only that choice fails
     profiles = data["profiles"]
     name = in_use(data)
     entry = profiles.get(name) or {}
@@ -122,6 +128,7 @@ def state(path=None):
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "config_problem": problem,
+        "config_locked": locked,
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "hints": data.get("hints", True) is not False,

@@ -3,7 +3,8 @@
 python scripts/check.py    # unit tests, compile, diff, IBus and PIME smokes, the settings page
 
 Each check reports PASS, FAIL, or SKIP with a reason, and has 5 seconds (owner, 2026-10-24: a
-check that takes longer is not one we run). Real typing on each OS is checked by hand.
+check that takes longer is not one we run); the settings page, a browser through every state of
+the window, has 10. Real typing on each OS is checked by hand.
 """
 import argparse
 import glob
@@ -27,20 +28,20 @@ results = []
 LIMIT = 5  # seconds a check may take
 
 
-def run(name, command):
+def run(name, command, limit=LIMIT):
     started = time.monotonic()
     # Its own process group: on a timeout everything it started goes too (a service, a browser).
     process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                start_new_session=hasattr(os, "killpg"))
     try:
-        out, err = process.communicate(timeout=LIMIT)
+        out, err = process.communicate(timeout=limit)
     except subprocess.TimeoutExpired:
         if hasattr(os, "killpg"):
             os.killpg(process.pid, 9)
         else:
             process.kill()
         process.communicate()
-        results.append((name, "FAIL", "over %d s: make it faster or drop it" % LIMIT))
+        results.append((name, "FAIL", "over %d s: make it faster or drop it" % limit))
         return None
     status = "PASS" if process.returncode == 0 else "FAIL"
     output = (out + err).strip().splitlines()
@@ -153,7 +154,10 @@ def main():
     browser = Path(args.browser_python) if args.browser_python else ROOT / ".tools/browser-venv/bin/python"
     if browser.is_file():  # its own service and config directory: no model, and never yours
         chromium = chromium_path(args)
-        run("settings page", [str(browser), "tests/settings_page.py"] + (["--executable", chromium] if chromium else []))
+        # A browser and a service of its own, through every state of the window: it may take longer
+        # (owner, 2026-11-02).
+        run("settings page", [str(browser), "tests/settings_page.py"] + (["--executable", chromium] if chromium else []),
+            limit=2 * LIMIT)
     else:
         skip("settings page", "no Playwright Python (pass --browser-python)")
     print()

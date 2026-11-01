@@ -16,7 +16,7 @@ async function call(path, body) {
     method: body ? "POST" : "GET",
     headers: Object.assign({"X-Claudish-Settings": token || ""}, body ? {"Content-Type": "application/json"} : {}),
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }).catch(() => { throw Object.assign(new Error("cd_AI's service does not answer"), {down: true}); });
   const data = await response.json().catch(() => ({}));
   const said = data.said && data.said !== "the request failed" ? data.said : "";  // plain words when they say more
   if (!response.ok) throw new Error(said || data.error || `the service answered ${response.status}`);
@@ -63,7 +63,28 @@ function status(state) {
   return ["cd_AI is running.", ""];
 }
 
-let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer;
+let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer, lockTimer, started = false;
+// Every change would be refused while the config in use does not read: the file comes first.
+const locked = (state) => Boolean((state.service || {}).problem || state.config_locked);
+
+async function recheck() {
+  try {
+    render(await call("/settings/state"));
+  } catch (error) {
+    lockTimer = setTimeout(recheck, 500);
+  }
+}
+
+function down() {
+  // Like a config that does not read: only what fails, until the service answers again.
+  clearTimeout(healthTimer);
+  clearTimeout(lockTimer);
+  $("status").textContent = "cd_AI's service is not running. Start it with `claudish service install`; this window comes back when it answers.";
+  $("status").className = "bad";
+  $("controls").hidden = true;
+  $("config-fix").hidden = true;
+  lockTimer = setTimeout(recheck, 500);
+}
 function showStatus(state) {
   const [line, kind] = status(state);
   $("status").textContent = line;
@@ -83,7 +104,7 @@ function followStartup(version) {
       showStatus(shown);
       followStartup(version);
     } catch (error) {
-      if (version === viewVersion) say("status", error.message, true);
+      if (version === viewVersion) error.down ? down() : say("status", error.message, true);
     }
   }, 500);
 }
@@ -100,6 +121,9 @@ function render(state) {
   // The service's own problem is in the status line; another profile's, the window may switch to, here.
   const problem = (state.service || {}).problem ? "" : state.config_problem;
   $("config-fix").hidden = !((state.service || {}).problem || state.config_problem);
+  if (started) $("controls").hidden = locked(state);  // only what fails, and how to fix it
+  clearTimeout(lockTimer);
+  if (locked(state)) lockTimer = setTimeout(recheck, 500);  // the fix applies when the file is saved
   $("config-fix").textContent = (problem ? `cd_AI cannot read its config: ${problem}. ` : "") +
     `Fix it in ${state.config} (it applies when you save), or move that file aside and run claudish init.`;
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
@@ -182,6 +206,7 @@ async function sample(manual = false) {
     $("sample").textContent = `“${text}” → “${answer.text}”`;
   } catch (error) {
     if (version !== sampleVersion) return;
+    if (error.down) return down();
     $("sample").textContent = `The model did not answer: ${error.message}.`;
   } finally {
     if (version === sampleVersion) {
@@ -212,6 +237,11 @@ async function change(body, message, done) {
     if (!keys) sample();
     return true;
   } catch (error) {
+    if (error.down) {
+      say(message, "");
+      down();
+      return false;
+    }
     say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);
     if (shown) showStatus(shown);
     return false;  // what you filled in stays, to correct
@@ -267,8 +297,9 @@ async function start() {
   }
   if (!token) throw new Error("open this from cd_AI's menu (Settings…) or with `claudish settings`");
   render(await call("/settings/state"));
+  started = true;
   $("controls").disabled = false;
-  $("controls").hidden = false;
+  $("controls").hidden = locked(shown);
 }
 start().catch((error) => {
   $("status").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".";

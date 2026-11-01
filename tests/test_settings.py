@@ -79,15 +79,20 @@ class SettingsTests(Home):
         with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
             config.resolve(self.path, profile="claude")
         state = settings.state()
-        self.assertEqual((state["choice"], state["config_problem"]),
-                         ("claude-code", "profile 'claude': unknown keys claude_model"))
+        self.assertEqual((state["choice"], state["config_problem"], state["config_locked"]),
+                         ("claude-code", "profile 'claude': unknown keys claude_model", False))
+        data = json.loads(self.path.read_text())
+        data["profile"] = "claude"  # the one in use: nothing the window changes would be used
+        self.path.write_text(json.dumps(data))
+        self.assertTrue(settings.state()["config_locked"])
         self.path.write_text("{not json")  # the window still shows
         self.assertTrue(settings.state()["config_problem"].startswith("config.json does not read"))
+        self.assertTrue(settings.state()["config_locked"])
         self.path.write_text('{"profile": ["claude"], "profiles": {"claude": {}}}')
         self.assertIn("profiles", settings.state()["config_problem"])
         self.path.unlink()
         config.write_starter()  # `claudish init`
-        self.assertIsNone(settings.state()["config_problem"])
+        self.assertEqual((settings.state()["config_problem"], settings.state()["config_locked"]), (None, False))
 
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)

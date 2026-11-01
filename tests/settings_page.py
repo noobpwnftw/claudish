@@ -190,16 +190,24 @@ async def check(args, home, port):
         await page.reload()
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")
         await expect(page.locator("#config-fix")).to_have_text("cd_AI cannot read its config: %s. %s" % (problem, fix))
+        await expect(page.locator("#controls")).to_be_visible()  # only picking that model fails
         await page.unroute_all()
         await page.route("**/settings/state", refused)
         await page.reload()
         await expect(page.locator("#status")).to_have_text("cd_AI does not use its config: %s." % problem)
         await expect(page.locator("#config-fix")).to_have_text(fix)
+        await expect(page.locator("#controls")).to_be_hidden()  # every change would be refused: only the problem
         if args.screenshots:
             await page.screenshot(path=str(args.screenshots / "settings-config-problem.png"), full_page=True)
+        await page.unroute_all()  # the file fixed: the window notices without a reload
+        await expect(page.locator("#config-fix")).to_be_hidden(timeout=4000)
+        await page.route("**/settings", lambda route: route.abort())  # the service gone: the same
+        await page.get_by_text("Critic", exact=True).click()
+        await expect(page.locator("#status")).to_contain_text("cd_AI's service is not running.")
+        await expect(page.locator("#controls")).to_be_hidden()
         await page.unroute_all()
-        await page.reload()
-        await expect(page.locator("#config-fix")).to_be_hidden()
+        await expect(page.locator("#config-fix")).to_be_hidden(timeout=4000)
+        await expect(page.locator("#controls")).to_be_visible()
 
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)
