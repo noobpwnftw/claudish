@@ -50,6 +50,9 @@ def mode_tooltip(mode):
 # way), are taken up by the next instance in that window.
 LAST_MODE = [None]
 PARKED = {}  # the foreground window's process id -> (Composition, Suggestions, when)
+# The held exchange's pill waits for your next key (which hides any toast), as on macOS and Linux:
+# as long as the exchange is held.
+PILL_SECONDS = 600
 INSTANCES = weakref.WeakSet()  # the live instances: a parked worker one still uses is not closed
 UNSEEN = object()  # an instance that has not looked for a parked exchange since it was activated
 
@@ -221,7 +224,7 @@ class ClaudishTextService(TextService):
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
         spec, lasting = self.state.switched()
         if spec:  # the mode switch briefly, or the held exchange's pill
-            self.setToast(spec, 3 if lasting else 2)
+            self.setToast(spec, PILL_SECONDS if lasting else 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
 
@@ -291,7 +294,7 @@ class ClaudishTextService(TextService):
             self.known_scopes = None  # another text box: its own scopes (a password field's stay behind)
             pill = self.state.returned(document)  # back where one was held: a pill, taking no keys
             if pill:
-                self.setToast(pill, 3)
+                self.setToast(pill, PILL_SECONDS)
 
     def preview(self):
         """Screenshot plumbing: with the design lab's
@@ -688,7 +691,7 @@ class ClaudishTextService(TextService):
         self.poll_results()  # what came while the app was in the background: the pill says it
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
-            self.setToast(pill, 3)
+            self.setToast(pill, PILL_SECONDS)
 
     def onKeyboardStatusChanged(self, opened):
         super().onKeyboardStatusChanged(opened)

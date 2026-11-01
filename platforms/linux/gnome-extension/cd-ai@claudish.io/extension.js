@@ -99,11 +99,13 @@ export default class CdAiExtension extends Extension {
             this._fill(this._toast, screen.toast);
             if (this._toastTimeout)
                 GLib.source_remove(this._toastTimeout);
-            this._toastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
-                this._toast.visible = false;
-                this._toastTimeout = null;
-                return GLib.SOURCE_REMOVE;
-            });
+            this._toastTimeout = null;
+            if (!screen.lasting)  // the held exchange's pill waits for a key
+                this._toastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                    this._toast.visible = false;
+                    this._toastTimeout = null;
+                    return GLib.SOURCE_REMOVE;
+                });
         }
         this._place();
     }

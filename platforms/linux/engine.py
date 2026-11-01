@@ -92,11 +92,12 @@ class Screen:
     def call(self, connection, sender, path, interface, method, parameters, invocation):
         invocation.return_value(GLib.Variant("(s)", (self.state,)))
 
-    def publish(self, panel=None, ghost="", toast=None):
-        """What is at the caret. A toast stays until its time is up or a key ends it (False)."""
+    def publish(self, panel=None, ghost="", toast=None, lasting=False):
+        """What is at the caret. A toast stays until its time is up or a key ends it (False);
+        lasting (the held exchange's pill): until a key."""
         self.toasting = bool(toast) or (self.toasting and toast is None)
         self.shown = {"panel": panel, "ghost": ghost}
-        self.state = json.dumps({**self.shown, "toast": toast})
+        self.state = json.dumps({**self.shown, "toast": toast, "lasting": bool(toast and lasting)})
         if self.bus is not None:
             self.bus.emit_signal(None, "/io/claudish/Screen", "io.claudish.Screen", "Changed",
                                  GLib.Variant("(s)", (self.state,)))
@@ -491,7 +492,7 @@ class ClaudishEngine(IBus.Engine):
         if not (self.composition.hints or lasting):
             return
         if screen().shell:  # the mode switch briefly at the caret, or the held exchange's pill
-            screen().publish(self.drawn, "", spec)
+            screen().publish(self.drawn, "", spec, lasting=lasting)
         elif not (self.composition.text or self.composition.ghost):  # say which mode, until the next key
             self.update_auxiliary_text(IBus.Text.new_from_string("cd_AI · " + self.composition.mode), True)
 
@@ -546,7 +547,7 @@ class ClaudishEngine(IBus.Engine):
         self.show_mode(register=True)
         pill = self.composition.returned(self.context)  # back in the box where an exchange was held: a pill, no keys
         if pill and screen().shell:
-            screen().publish(None, "", pill)
+            screen().publish(None, "", pill, lasting=True)
 
     def do_focus_out(self):
         trace("focus-out")
