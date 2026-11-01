@@ -75,6 +75,14 @@ def state(path=None):
     name = data.get("profile") or next(iter(profiles), None)
     entry = profiles.get(name) or {}
     choice = name if name in CHOICES or name == "local" else "other"
+    problem = None  # a profile the window uses or switches to that cd_AI cannot read
+    if Path(path or config.default_path()).is_file():
+        for each in [name] + [p for p in CHOICES if p in profiles and p != name]:
+            try:
+                config.resolve(path, each)
+            except (OSError, ValueError) as exc:
+                problem = str(exc).split(" (docs/")[0]
+                break
     server = profiles.get("server") or config.STARTER["profiles"]["server"]
     url = server.get("model_url", "")
     models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
@@ -84,6 +92,7 @@ def state(path=None):
         "key": key_state(), "key_where": keys.where(),
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
+        "config_problem": problem,
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "hints": data.get("hints", True) is not False,
@@ -168,15 +177,16 @@ def server_problem(url, models, model=None, key=None):
 
 
 def start_over(path=None):
-    """A config the service does not use, moved aside as config.json.old (and its templates.json, if
-    that does not read either) for the starter's; the model chosen and the tone carry over."""
+    """A config cd_AI cannot read, moved aside as config.json.old (and its templates.json, if that
+    does not read either) for the starter's. The profile in use carries over (an OpenAI-compatible
+    one as "server"), with the keys it can have, and so do the tone, keys, hints and MCP servers."""
     path = path or config.default_path()
     try:
         old = read(path)
-        entry = (old.get("profiles") or {}).get(old.get("profile")) or {}
-        tone, choice = entry.get("tone") or old.get("tone") or "", old.get("profile")
-    except (OSError, ValueError, AttributeError):
-        tone, choice = "", None
+        name = old.get("profile")
+        entry = {key: value for key, value in old["profiles"][name].items() if key in config.DEFAULTS}
+    except (OSError, ValueError, AttributeError, KeyError, TypeError):
+        old, name, entry = {}, None, {}
     if path.is_file():
         path.replace(path.with_name(path.name + ".old"))
     templates = path.with_name("templates.json")
@@ -186,14 +196,26 @@ def start_over(path=None):
     except (OSError, ValueError):
         templates.replace(templates.with_name(templates.name + ".old"))
     config.write_starter(path)
-    if choice in ("claude-code", "codex"):
-        try:
-            apply({"choice": choice}, path)
-        except ValueError:
-            pass  # its command is gone: the starter's Claude, to pick again
-    if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
-        tone = ""
-    return apply({"tone": tone}, path)
+    fresh = read(path)
+    tone = entry.pop("tone", None) or old.get("tone")
+    if name and entry:
+        if entry.get("backend") == "openai" and name not in fresh["profiles"]:
+            name = "server"
+        entry.pop("bindings", None)  # they name profiles the new file may not have
+        fresh["profiles"][name] = entry
+        fresh["profile"] = name
+    for key in ("keys", "hints", "mcp_servers"):
+        if key in old:
+            fresh[key] = old[key]
+    if isinstance(tone, str) and tone and len(tone) <= 200 and "\n" not in tone:
+        fresh["tone"] = tone
+    config.save(fresh, path)
+    try:
+        config.resolve(path)
+    except ValueError:  # what carried over does not read either: the starter as it is
+        path.unlink()
+        config.write_starter(path)
+    return state(path)
 
 
 def apply(changes, path=None):

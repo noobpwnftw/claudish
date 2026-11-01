@@ -80,16 +80,35 @@ class SettingsTests(Home):
         self.path.write_text(json.dumps(old))
         with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
             config.resolve(self.path, profile="claude")
-        with patch.object(settings, "claude_code", return_value="/new/claude"):
-            state = settings.apply({"start_over": True})
-        self.assertEqual((state["choice"], state["tone"]), ("claude-code", "critic"))
+        self.assertEqual(settings.state()["config_problem"], "profile 'claude': unknown keys claude_model")
+        state = settings.apply({"start_over": True})
+        self.assertEqual((state["choice"], state["tone"], state["config_problem"]), ("claude-code", "critic", None))
         self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
         data = self.written()
-        self.assertEqual((data["tone"], data["profiles"]["claude-code"]["command"]), ("critic", ["/new/claude"]))
+        self.assertEqual((data["tone"], data["profiles"]["claude-code"]["command"]), ("critic", ["/old/claude"]))
         for name in data["profiles"]:
             config.resolve(self.path, profile=name)
         self.path.write_text("{not json")  # one that does not read at all: the starter's Claude
         self.assertEqual(settings.apply({"start_over": True})["choice"], "claude")
+
+    def test_start_over_keeps_a_server_profile_in_use_with_its_tools(self):
+        # The Mac VM's 0.3 config: in use, "ollama" reads; switching to "claude" would not.
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "ollama", "mcp_servers": {"notes": {"command": ["notes"]}},
+                                         "keys": {"summon": "Enter"}, "profiles": {
+            "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+            "ollama": {"backend": "openai", "model_url": "http://10.0.0.9:18790", "model": "gemma", "timeout": 120,
+                       "helper": ["claude", "{prompt}"], "tools": [{"server": "notes"}]}}}))
+        self.assertEqual(settings.state()["config_problem"], "profile 'claude': unknown keys claude_model")
+        with patch.object(settings, "server_models", return_value=["gemma"]):
+            state = settings.apply({"start_over": True})
+        self.assertEqual((state["choice"], state["summon"], state["config_problem"]), ("server", "Enter", None))
+        data = self.written()
+        self.assertEqual(data["profiles"]["server"]["tools"], [{"server": "notes"}])
+        self.assertEqual(data["profiles"]["server"]["model_url"], "http://10.0.0.9:18790")
+        self.assertIn("notes", data["mcp_servers"])
+        for name in data["profiles"]:
+            config.resolve(self.path, profile=name)
 
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)

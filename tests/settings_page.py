@@ -176,8 +176,21 @@ async def check(args, home, port):
             data["service"].update(backend="none", problem=problem)
             await route.fulfill(response=response, json=data)
 
+        async def stale(route):  # the service is fine; a profile the window switches to is not
+            response = await route.fetch()
+            data = await response.json()
+            data["config_problem"] = "profile 'claude': unknown keys claude_model"
+            await route.fulfill(response=response, json=data)
+
+        await page.route("**/settings/state", stale)
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text("cd_AI is running.")
+        await expect(page.locator("#config-problem")).to_have_text(
+            "cd_AI cannot read its config: profile 'claude': unknown keys claude_model. ")
+        await page.unroute_all()
         await page.route("**/settings/state", refused)
         await page.reload()
+        await expect(page.locator("#config-problem")).to_have_text("")
         await expect(page.locator("#status")).to_have_text("cd_AI does not use its config: %s." % problem)
         await expect(page.locator("#start-over")).to_contain_text("config.json.old")
         if args.screenshots:

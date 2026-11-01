@@ -97,7 +97,10 @@ function render(state) {
   showStatus(state);
   followStartup(viewVersion);
   $("next").hidden = !recall("cd_AI-first");
-  $("start-over").hidden = !(state.service || {}).problem;
+  // The service's own problem is in the status line; another profile's, the window may switch to, here.
+  const problem = (state.service || {}).problem ? "" : state.config_problem;
+  $("start-over").hidden = !((state.service || {}).problem || state.config_problem);
+  $("config-problem").textContent = problem ? `cd_AI cannot read its config: ${problem}. ` : "";
   $("old-name").textContent = state.config.split(/[\\/]/).pop() + ".old";
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
