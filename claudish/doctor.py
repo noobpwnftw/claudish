@@ -60,9 +60,8 @@ def check_backend(state):
             import anthropic  # noqa: F401
         except ImportError:
             return "fail", "the Anthropic SDK is not installed", 'pip install "claudish-ime[claude]"'
-        from .keys import stored
-        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") or stored()
-                or Path.home().joinpath(".config", "anthropic").is_dir()):
+        from .keys import claude_credential
+        if not claude_credential()[0]:
             from .settings import claude_code, codex
             fix = "save one in cd_AI's settings (`claudish settings`) or with `claudish key`, or set ANTHROPIC_API_KEY, or run `ant auth login`"
             if codex():  # a ChatGPT subscription works through it, without an API key

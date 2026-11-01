@@ -113,13 +113,14 @@ def main():
         import getpass
         import subprocess
         from .keys import store, where
+        from .settings import accepted_key
         value = getpass.getpass("Claude API key (not shown): ").strip()
         if not value:
             sys.exit("No key given; nothing saved.")
         try:
-            store(value)
+            store(accepted_key(value))  # checked with Anthropic first, as in the settings window
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
-            sys.exit(str(exc))
+            sys.exit(as_typed("Nothing saved: %s." % exc))
         print("Saved in %s. cd_AI's service uses it from its next start." % where())
         return
     if args.command == "recent":

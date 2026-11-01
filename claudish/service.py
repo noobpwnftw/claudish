@@ -149,14 +149,15 @@ def plan(action, local=False, extra=()):
     if system == "Windows":
         if action == "install":
             task = paths()["Windows"]
-            return [("drop the shared logon task an older cd_AI made (if this account's)", "stop",
-                     ["schtasks", "/delete", "/tn", NAME, "/f"]),
-                    ("write the logon task", "write", (task, windows_task(argv), "utf-16")),
+            return [("write the logon task", "write", (task, windows_task(argv), "utf-16")),
                     ("create the logon task", "run", ["schtasks", "/create", "/tn", task_name(), "/xml", str(task), "/f"]),
+                    # The task ignores a second instance: end a running one, or it goes on as it was.
+                    ("stop a running one", "stop", ["schtasks", "/end", "/tn", task_name()]),
                     ("start it now", "run", ["schtasks", "/run", "/tn", task_name()])]
         if action == "uninstall":
             return [("stop it", "run", ["schtasks", "/end", "/tn", task_name()]),
-                    ("delete the logon task", "run", ["schtasks", "/delete", "/tn", task_name(), "/f"])]
+                    ("delete the logon task", "run", ["schtasks", "/delete", "/tn", task_name(), "/f"]),
+                    ("remove the task file", "remove", paths()["Windows"])]
         return [("status", "run", ["schtasks", "/query", "/tn", task_name()])]
     if system == "Darwin":
         agent, domain = paths()["Darwin"], "gui/%d" % os.getuid()

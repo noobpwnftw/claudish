@@ -94,6 +94,12 @@ class SettingsTests(Home):
         config.write_starter()  # `claudish init`
         self.assertEqual((settings.state()["config_problem"], settings.state()["config_locked"]), (None, False))
 
+    def test_a_server_that_refuses_says_how(self):
+        self.assertEqual(settings.server_problem("https://api.openai.com/v1", 404),
+                         "https://api.openai.com/v1 answered 404 to https://api.openai.com/v1/v1/models "
+                         "(cd_AI adds /v1 itself: the address without it)")
+        self.assertEqual(settings.server_problem("http://h:1", 500), "http://h:1 answered 500 to http://h:1/v1/models")
+
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))
@@ -254,9 +260,13 @@ class ServiceTests(Home):
         super().setUp()
         self.builds = []
 
+        self.pinned = None  # a service started with --profile, or the local model's
+
         def reload():
-            self.builds.append(config.resolve())
-            return Rewriter("rules", tone=self.builds[-1][1].get("tone"))
+            self.builds.append(config.resolve(profile=self.pinned))
+            built = Rewriter("rules", tone=self.builds[-1][1].get("tone"))
+            built.profile = self.builds[-1][0]
+            return built
         self.server_reload = [reload]  # a test can swap in one that fails
         self.server = make_server(Rewriter("rules"), 0, reload=lambda: self.server_reload[0](), config_path=self.path)
         thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01})
@@ -324,6 +334,15 @@ class ServiceTests(Home):
         self.assertEqual(self.call("/settings/session", {"ticket": ticket["ticket"]}, token=False)[0], 403)  # once
         self.assertEqual(self.call("/settings/state", token=False, settings=session["token"])[0], 200)
         self.assertEqual(self.call("/recent", token=False, settings=session["token"])[0], 403)  # settings only
+
+    def test_a_service_started_with_its_own_profile_does_not_take_another(self):
+        config.write_starter(profile="local")
+        self.pinned = "local"
+        status, answer = self.call("/settings", {"choice": "claude"})
+        self.assertEqual(status, 400)
+        self.assertIn("runs the 'local' profile it was started with", answer["error"])
+        self.assertEqual(self.written()["profile"], "local")
+        self.assertEqual(self.call("/settings", {"tone": "bard"})[0], 200)  # the rest still applies
 
     def test_a_change_the_service_cannot_use_is_undone(self):
         self.path.parent.mkdir(parents=True)

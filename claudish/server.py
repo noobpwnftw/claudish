@@ -44,7 +44,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
         fresh.sessions, fresh.conversations, fresh.recent = rewriter.sessions, rewriter.conversations, rewriter.recent
         old = rewriter
         same = (old.warm and fresh.warm and type(old.warm) is type(fresh.warm)
-                and (old.warm.command, old.warm.model) == (fresh.warm.command, fresh.warm.model))
+                and (old.warm.command, old.warm.configured) == (fresh.warm.command, fresh.warm.configured)
+                and not old.warm.state.startswith("failed"))  # picked again after a failure: a new start
         if same:  # the same model process goes on (a tone or a binding changed)
             fresh.warm, old.warm = old.warm, None
         else:
@@ -313,16 +314,26 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                 except Exception as exc:  # the keychain, the disk: said on the page, not a dropped connection
                     return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
                 if reload is not None:
-                    try:
-                        swap()
-                    except Exception as exc:  # it would not start at the next login either: put it back
+                    def put_back():
                         for each in path.parent.glob("*.json*"):
                             if each not in before:
                                 each.unlink(missing_ok=True)
                         for each, content in before.items():
                             each.write_bytes(content)
                         stamps[0] = stamp()  # put back as the service runs it: nothing to take up
+                    try:
+                        swap()
+                    except Exception as exc:  # it would not start at the next login either: put it back
+                        put_back()
                         return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
+                    if "choice" in data and server.rewriter.profile != shown["profile"]:
+                        # Started with a profile of its own (--profile, the local model's service): it
+                        # does not follow the file's, so the choice would be shown and never used.
+                        put_back()
+                        swap()
+                        return self.reply(400, {"error": "this service runs the %r profile it was started with, so "
+                                                         "nothing changed: `claudish service install` runs it with "
+                                                         "the config's profile" % server.rewriter.profile})
                 return self.reply(200, dict(shown, service=self.health()))
 
         def post_ticket(self):

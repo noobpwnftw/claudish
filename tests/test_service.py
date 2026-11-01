@@ -88,8 +88,8 @@ class SafetyTests(unittest.TestCase):
                 patch.dict("os.environ", {"USERNAME": "Mei Lin"}):
             steps = service.plan("install", extra=["--backend", "rules"])
         names = [payload[payload.index("/tn") + 1] for _, kind, payload in steps if kind in ("run", "stop")]
-        self.assertEqual(names, ["claudish", "claudish-Mei_Lin", "claudish-Mei_Lin"])  # the old shared one goes first
-        self.assertEqual(steps[0][1], "stop")  # another account's: it may not be ours to delete
+        self.assertEqual(names, ["claudish-Mei_Lin"] * 3)  # this account's own, never a shared one
+        self.assertEqual([kind for _, kind, _ in steps][-2:], ["stop", "run"])  # a running one ends first
 
 
 if __name__ == "__main__":

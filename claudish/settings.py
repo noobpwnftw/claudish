@@ -97,9 +97,8 @@ def unreadable(path, data):
 
 
 def key_state():
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return "environment"
-    return "saved" if keys.stored() else "missing"
+    """Where Claude's credential comes from (keys.claude_credential), or "missing"."""
+    return keys.claude_credential()[0] or "missing"
 
 
 def state(path=None):
@@ -124,7 +123,7 @@ def state(path=None):
     tone = entry.get("tone") or data.get("tone") or "corporate"  # the one in use: the profile's own, else the file's
     return {
         "profile": name, "choice": choice,
-        "key": key_state(), "key_where": keys.where(),
+        "key": key_state(), "key_where": keys.where(), "key_env": keys.claude_credential()[1],
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "config_problem": problem,
@@ -170,8 +169,8 @@ UNAUTHORIZED = "unauthorized"  # server_models: it wants a (valid) API key
 
 def server_models(url, key=None):
     """The models an OpenAI-compatible server at url has, LOADING while it is still loading one
-    (llama.cpp answers 503 then), or None when nothing answers there. key: its API key, if any
-    (by default the one saved for this address)."""
+    (llama.cpp answers 503 then), the HTTP status of another refusal, or None when nothing answers
+    there. key: its API key, if any (by default the one saved for this address)."""
     from urllib.error import HTTPError
     from urllib.request import Request, build_opener, ProxyHandler
     key = key or keys.server_key(url)
@@ -182,7 +181,7 @@ def server_models(url, key=None):
             listing = json.load(response)
         return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
     except HTTPError as exc:
-        return LOADING if exc.code == 503 else UNAUTHORIZED if exc.code in (401, 403) else None
+        return LOADING if exc.code == 503 else UNAUTHORIZED if exc.code in (401, 403) else exc.code
     except Exception:
         return None
 
@@ -205,11 +204,24 @@ def server_problem(url, models, model=None, key=None):
     if models == UNAUTHORIZED:
         return "%s wants an API key, and did not accept this one" % url if key or keys.server_key(url) \
             else "%s wants an API key" % url
+    if isinstance(models, int) and not isinstance(models, bool):
+        hint = " (cd_AI adds /v1 itself: the address without it)" if url.rstrip("/").endswith("/v1") else ""
+        return "%s answered %d to %s/v1/models%s" % (url, models, url.rstrip("/"), hint)
     if models == LOADING:
         return "the server at %s is still loading its model: try again in a moment" % url
     if model and models and model not in models:
         return "the server has no model %r; it has: %s" % (model, ", ".join(models))
     return None
+
+
+def accepted_key(key):
+    """The key, whole and accepted by Anthropic, or ValueError saying why not."""
+    if not isinstance(key, str) or not key.strip() or len(key) > 400 or any(c.isspace() for c in key.strip()):
+        raise ValueError("paste the whole key, without spaces")
+    problem = check_key(key.strip())
+    if problem:
+        raise ValueError(problem)
+    return key.strip()
 
 
 def apply(changes, path=None):
@@ -221,12 +233,7 @@ def apply(changes, path=None):
     data = read(path)
     profiles = data.setdefault("profiles", {})
     if "key" in changes:
-        key = changes["key"]
-        if not isinstance(key, str) or not key.strip() or len(key) > 400 or any(c.isspace() for c in key.strip()):
-            raise ValueError("paste the whole key, without spaces")
-        problem = check_key(key.strip())
-        if problem:
-            raise ValueError(problem)
+        changes = dict(changes, key=accepted_key(changes["key"]))
     if "server" in changes:
         server = changes["server"]
         url, model, server_key = (server.get("url", ""), server.get("model", ""), server.get("key") or None) \
@@ -250,7 +257,7 @@ def apply(changes, path=None):
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
     if "choice" in changes and changes["choice"] not in CHOICES:
         raise ValueError("unknown choice")
-    if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "server"):
+    if changes.get("choice") == "server" or ("server" in changes and in_use(data) == "server"):
         server = profiles.get("server") or config.STARTER["profiles"]["server"]
         problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
                                if isinstance(changes.get("server"), dict) else None)
@@ -275,7 +282,7 @@ def apply(changes, path=None):
         tone = changes["tone"]
         if not isinstance(tone, str) or len(tone) > 200 or "\n" in tone:
             raise ValueError("a tone is a name or a few words")
-        config.set_tone(data, tone, data.get("profile"))
+        config.set_tone(data, tone, in_use(data))
     if "summon" in changes:  # which key asks the model; the other keeps your words
         if changes["summon"] not in config.SUMMON_KEYS:
             raise ValueError("the key that asks is Shift+Enter or Enter")
@@ -289,11 +296,7 @@ def apply(changes, path=None):
         if not changes["hints"]:
             data["hints"] = False
     if "key" in changes:  # saved once everything else is accepted
-        keys.store(changes["key"].strip())
-    if "key" in changes and "choice" not in changes and not path.is_file():
-        # The page already shows Claude chosen: with no config yet, the key makes it so.
-        profiles.setdefault("claude", dict(config.STARTER["profiles"]["claude"]))
-        data["profile"] = "claude"
+        keys.store(changes["key"])
     if set(changes) - {"key"} or not path.is_file():
         config.save(data, path)
     return state(path)

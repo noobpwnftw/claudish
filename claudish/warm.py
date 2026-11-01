@@ -53,6 +53,7 @@ class Warm:
 
     def __init__(self, command, model=None, cwd=None, restart_after=200):
         self.command, self.model, self.cwd = list(command), model, cwd
+        self.configured = model  # the profile's model (Codex may fall back to its own default)
         self.restart_after = restart_after
         self.state = "stopped"
         self.lock = threading.Lock()

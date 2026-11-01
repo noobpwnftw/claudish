@@ -33,6 +33,21 @@ def stored(name="anthropic"):
     return found.stdout.strip() or None if found.returncode == 0 else None
 
 
+def claude_credential():
+    """Where the claude backend's credential comes from, in the order it is used: ("environment",
+    the variable), ("saved", None), ("profile", None) for an `ant auth login` profile, or (None, None)."""
+    import os
+    from pathlib import Path
+    for variable in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+        if os.environ.get(variable):
+            return "environment", variable
+    if stored():
+        return "saved", None
+    if Path.home().joinpath(".config", "anthropic").is_dir():
+        return "profile", None
+    return None, None
+
+
 def store(key, name="anthropic"):
     """Save (or replace) the key for this provider."""
     if sys.platform != "darwin":

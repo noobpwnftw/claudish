@@ -5,7 +5,6 @@ anything runs only after a yes (or with --yes); --dry-run only shows the plan. S
 that need an administrator (Windows, macOS input methods) print the exact command.
 """
 import json
-import os
 import platform
 import subprocess
 import sys
@@ -60,14 +59,16 @@ def step_tone(name, settings, tone):
     """The tone: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
     few words, with --tone."""
     current = settings.get("tone")
+    tone = None if tone in ("", "corporate") and not current else tone  # the default already
     if not tone or tone == current:
         return "done", "%s (change with --tone %s, or a few words)" % (
             "corporate, the default" if not current else repr(current),
             ", ".join(n for n in TONES if n != "corporate")), None
 
     def write():  # like the settings window: where this profile reads its tone
+        from .settings import read
         path = config.default_path()
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        data = read(path)  # the starter's, when the config step was skipped
         config.set_tone(data, tone, name)
         config.save(data, path)
     return "todo", "set the tone to %r" % tone, write

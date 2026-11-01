@@ -135,7 +135,8 @@ function render(state) {
     ? "cd_AI uses the local model that `claudish setup --profile local` set up. Pick one above to change that."
     : `cd_AI uses the profile “${state.profile}” from its config. Pick one above to change that.`;
   $("key-state").textContent = {saved: `Saved in ${state.key_where}`, missing: "Not set",
-                                environment: "ANTHROPIC_API_KEY in your environment (used before a saved key)"}[state.key];
+                                profile: "Your `ant auth login` profile (a saved key goes first)",
+                                environment: `${state.key_env} in your environment (used before a saved key)`}[state.key];
   $("key-state").classList.toggle("good", state.key !== "missing");
   if (document.activeElement !== $("url")) $("url").value = state.server.url;
   if (document.activeElement !== $("model")) $("model").value = state.server.model;
@@ -270,7 +271,7 @@ $("claude").addEventListener("submit", async (event) => {
   button.disabled = true;
   const environment = shown && shown.key === "environment";
   if (await change({key: $("key").value}, "model-message", environment
-    ? "Key saved. ANTHROPIC_API_KEY in your environment is still used first." : "Key saved. Anthropic accepted it.")) {
+    ? `Key saved. ${shown.key_env} in your environment is still used first.` : "Key saved. Anthropic accepted it.")) {
     $("key").value = "";
   }
   button.disabled = false;
