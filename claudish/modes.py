@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
-MODE_KEYS = {"system", "plain", "frame", "examples", "parts", "max_tokens", "candidates", "note"}
+MODE_KEYS = {"system", "job", "voice", "length", "plain", "frame", "examples", "parts", "max_tokens", "candidates", "note"}
 SECTIONS = {"about", "modes", "tones", "box"}
 
 
@@ -33,10 +33,11 @@ def check_mode(where, name, mode, known):
     """A mode's templates in a templates file (known: a shipped mode, which may name only part)."""
     if not isinstance(mode, dict) or set(mode) - MODE_KEYS:
         raise ValueError("%s: mode %r takes only %s" % (where, name, ", ".join(sorted(MODE_KEYS))))
-    if not known and not mode.get("system"):
-        raise ValueError('%s: mode %r needs a "system"' % (where, name))
-    if "system" in mode and not (isinstance(mode["system"], str) and mode["system"].strip()):
-        raise ValueError("%s: mode %r needs a non-empty system" % (where, name))
+    if not known and not (mode.get("system") or mode.get("voice")):
+        raise ValueError('%s: mode %r needs a "system" (its whole wording) or a "voice"' % (where, name))
+    for key in ("system", "job", "voice", "length"):
+        if key in mode and not (isinstance(mode[key], str) and mode[key].strip()):
+            raise ValueError("%s: mode %r needs a non-empty %s" % (where, name, key))
     if not all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(s, str) for s in pair)
                for pair in mode.get("examples", [])):
         raise ValueError("%s: mode %r examples must be [input, answer] string pairs" % (where, name))
@@ -82,18 +83,29 @@ def defaults(override=None, tone=None):
     words = merged(override)
     own = (override or {}).get("modes") or {}
     specs = {}
+    named = words["tones"]["named"]
     for name, mode in words["modes"].items():
-        system, examples, parts = mode["system"], mode.get("examples", []), mode.get("parts", [])
+        # A mode's wording is its job (what to do, and every guard), written once, with the tone's
+        # voice and length filled in; a "system" is a whole wording of its own (a templates file's,
+        # or a tone's that does a different job), used as written.
+        examples, parts = mode.get("examples", []), mode.get("parts", [])
         custom = "system" in (own.get(name) or {})
-        named = words["tones"]["named"]
+        voice, length, system = mode.get("voice"), mode.get("length"), mode.get("system")
+        persona = None
         if tone and not custom and tone in named:
             wording = (named[tone].get("modes") or {}).get(name)
             if wording:
-                system, examples, parts = wording["system"], wording.get("examples", []), wording.get("parts", [])
-                if named[tone].get("persona"):  # a whole persona, then this mode's job in its voice
-                    system = named[tone]["persona"] + "\n\n---\n\n" + system
+                examples, parts = wording.get("examples", []), wording.get("parts", [])
+                system = wording.get("system")
+                voice, length = wording.get("voice"), wording.get("length") or words["tones"]["length"]
+                persona = named[tone].get("persona")  # a whole persona: the voice, before the job
         elif tone and not custom and name in words["tones"]["tone"]:
-            system, examples, parts = words["tones"]["tone"][name].replace("{tone}", tone), [], []
+            voice, length, examples, parts = words["tones"]["tone"][name].replace("{tone}", tone), words["tones"]["length"], [], []
+            system = None
+        if not system:
+            system = mode.get("job", "{voice}").replace("{voice}", voice or "").replace("{length}", length or words["tones"]["length"])
+        if persona:
+            system = persona + "\n\n---\n\n" + system
         specs[name] = {"system": system, "plain": mode.get("plain") or system,
                        "examples": messages(examples, mode.get("frame")), "max_tokens": mode.get("max_tokens"),
                        # A part of a text, rewritten in its place: [before, part, after, replacement].

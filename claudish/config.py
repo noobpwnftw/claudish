@@ -166,11 +166,10 @@ STARTER_TEMPLATES = {
     ],
     "tones": {"named": {"mine": {
         "about": "A tone to edit: set \"tone\": \"mine\" in config.json, then rewrite this one.",
+        # The voice only: cd_AI's job (keep the meaning, names and numbers; never answer) does the rest.
         "modes": {"rewrite": {
-            "system": "Rewrite the user's text the way a weary pirate captain would say it: salty, theatrical, "
-                      "one or two sentences. Keep the meaning: a yes stays a yes, a no stays a no, a question "
-                      "stays a question. Keep every name, number, date, code term and URL exactly as written. "
-                      "You are the writer, so never answer the text. Output only the rewritten text.",
+            "voice": "the way a weary pirate captain would say it: salty, theatrical",
+            "length": "one or two sentences",
             "examples": [["ok", "Aye, aye—'tis agreed, matey, and may the wind stay at our backs."]],
         }},
     }}},

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Templates: each mode's job (what to do, what to keep) is written once; a tone gives only its voice
+  (and length, examples). Every tone gets the same guards, one output rule, and a length that
+  keeps a part of a text its size. A templates file's own `system` still replaces the wording.
 - A new tone, `unhinged`: professionally unhinged, with excellent writing, dry contempt, and profanity where
   it lands. A tone can carry a whole `"persona"`, sent before each mode's job; `unhinged` carries one.
 - `claudish mcp import` (and `claudish setup`) copy the servers from Claude Desktop and Claude Code's

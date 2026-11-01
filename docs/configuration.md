@@ -411,8 +411,9 @@ of its own; its `"modes"` says only which profile answers a mode (above).
 ## Templates
 
 The templates are in
-[`claudish/templates.json`](../claudish/templates.json): each mode's `system`
-prompt, the `plain` one for boxes that are not prose (a terminal, a URL, a
+[`claudish/templates.json`](../claudish/templates.json): each mode's `job` (what to do and
+what to keep, the same in every tone, with the tone's `voice` and, for `rewrite`, its `length`
+filled in), the default tone's `voice` and `length`, the `plain` wording for boxes that are not prose (a terminal, a URL, a
 number), `examples` as `[input, answer]` pairs, a `frame` around your text
 (`{text}`), `max_tokens` and `candidates` (how many readings to sample, 1 to 5, default 1; model
 servers and `rules` only: on every backend, versions come as the answer's drafts, up to three, when
@@ -430,18 +431,20 @@ same shape and names only what it changes, mode by mode and key by key:
 ```
 
 Name it in a profile (`"templates": "words.json"`, relative to the config file)
-or pass `claudish serve --templates words.json`. A mode's own `system` is used
-as written in every box, without the `plain` one. A tone of your own goes under
-`"tones"`, and a profile picks it by name (`"tone": "pirate"`):
+or pass `claudish serve --templates words.json`. A mode's own `system` replaces its job and voice
+and is used as written in every box, without the `plain` one. A tone of your own goes under
+`"tones"`, and a profile picks it by name (`"tone": "pirate"`); a tone gives a `voice` (and a
+`length`) for each mode, and the shipped job does the rest:
 
 ```json
 {"tones": {"named": {"pirate": {"about": "Arr.", "modes": {
-  "rewrite": {"system": "Rewrite the user's text as a pirate would say it. Keep the meaning, names and numbers.",
+  "rewrite": {"voice": "as a pirate would say it", "length": "one or two sentences",
               "examples": [["ok", "Aye, aye—'tis agreed, matey!"]]}}}}}}
 ```
 
-A tone may also carry a `"persona"`: a whole description of a voice, sent before each mode's
-`system`, which then says only the job (`unhinged` is one).
+A tone may also carry a `"persona"`: a whole description of its voice, sent before each mode's
+job (`unhinged` is one); a mode's `system` in a tone replaces the job for that tone (`proofread`
+corrects instead of rewriting).
 
 `claudish init` writes such a file beside the config, `templates.json`, with a tone to start
 from, and points the profiles at it. `claudish templates` prints what a profile ends up with: the

@@ -175,7 +175,7 @@ class ModeTests(unittest.TestCase):
         self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
         custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
-        self.assertIn("next few words, plain.", custom.modes["continue"]["system"])  # the tone, where it names nothing
+        self.assertIn("with the next words, in a plain voice", custom.modes["continue"]["system"])  # the tone, where it names nothing
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
@@ -228,10 +228,10 @@ class ModeTests(unittest.TestCase):
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")
         self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
         # The answer's shape follows the mode's words (claudish/shapes.py).
-        self.assertEqual(payload["messages"][0]["content"], modes.TEMPLATES["modes"]["continue"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shape"])
+        self.assertEqual(payload["messages"][0]["content"], modes.defaults()["continue"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shape"])
         self.assertEqual(payload["max_tokens"], 256)  # to the end of a sentence, in the tone
         _, payload = self.call(rewriter, "decline politely", "instruct")
-        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.TEMPLATES["modes"]["instruct"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shown"]
+        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.defaults()["instruct"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shown"]
                           + "\n\n" + modes.TEMPLATES["box"]["shape"], 2048))
         _, payload = self.call(rewriter, "so", "rewrite")
         self.assertEqual(payload["max_tokens"], 1024)  # the tone's paragraph, past the profile's 64
@@ -248,7 +248,7 @@ class ModeTests(unittest.TestCase):
             _, settings, templates, context = config.resolve(path)
             rewriter = Rewriter(templates=templates, context=context, modes=settings["modes"])
             self.assertEqual(rewriter.modes["instruct"]["max_tokens"], 900)  # only what the file names
-            self.assertEqual(rewriter.modes["instruct"]["system"], modes.TEMPLATES["modes"]["instruct"]["system"])
+            self.assertEqual(rewriter.modes["instruct"]["system"], modes.defaults()["instruct"]["system"])
             _, payload = self.call(rewriter, "autumn", "haiku")
             self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), ("Answer in a haiku." + "\n\n" + modes.TEMPLATES["box"]["shape"], 60))
             for words, message in [({"modes": {"haiku": {}}}, "needs a"), ({"modes": {"instruct": {"temperature": 1}}}, "takes only"),

@@ -527,6 +527,8 @@ class Rewriter:
             from . import shapes
             sent, history = shapes.as_answered(examples), shapes.as_answered(history)
             prompt += "\n\n" + spec["box"]["shape"]
+        else:  # one output rule either way: the shape, or this
+            prompt += "\n\n" + spec["box"]["output"]
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
         from .screen import redact
