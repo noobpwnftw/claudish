@@ -438,8 +438,8 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             return True
         plain = not state & (IBus.ModifierType.SHIFT_MASK | IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK)
-        if keyval in (IBus.KEY_Left, IBus.KEY_Right) and plain and \
-                self.composition.arrow(-1 if keyval == IBus.KEY_Left else 1):
+        steps = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end"}
+        if keyval in steps and plain and self.composition.arrow(steps[keyval]):
             self.changed()  # ← → move in what you type, as a CJK composition does
             return True
         if keyval == IBus.KEY_Delete and plain and self.composition.delete():  # forward delete, at the cursor

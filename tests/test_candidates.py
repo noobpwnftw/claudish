@@ -231,6 +231,12 @@ class ReceiveTests(unittest.TestCase):
         state.insert("x")
         self.assertEqual(state.text, "xWORLD")
         self.assertFalse(Composition.selectable("a paragraph\n"))  # a triple click's newline
+        state.change("hello")
+        self.assertTrue(state.arrow("home"))
+        state.insert(">")
+        self.assertTrue(state.arrow("end"))
+        state.insert("!")
+        self.assertEqual(state.text, ">hello!")  # Home and End move inside, as a CJK composition does
         state = Composition()
         state.mode = "compose"
         state.change("hi")

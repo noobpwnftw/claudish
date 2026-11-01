@@ -663,7 +663,8 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         plain = not flags & (NSEventModifierFlagOption | NSEventModifierFlagShift)  # Option+← and Shift+← navigate
-        if key in (123, 124) and plain and self.state.arrow(-1 if key == 123 else 1):  # ← → move in what you type
+        steps = {123: -1, 124: 1, 115: "home", 119: "end"}  # ← → Home End move in what you type
+        if key in steps and plain and self.state.arrow(steps[key]):
             self.changed(client)
             return True
         if key == 117 and plain and self.state.delete():  # forward delete, at the cursor

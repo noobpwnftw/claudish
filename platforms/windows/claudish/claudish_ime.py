@@ -92,6 +92,7 @@ def foreground():
 
 
 # Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
+STEPS = {0x25: -1, 0x27: 1, 0x24: "home", 0x23: "end"}  # ← → Home End, inside what you type
 EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
 
 
@@ -619,8 +620,8 @@ class ClaudishTextService(TextService):
             return True
         elif key == 0x08:
             self.state.backspace()
-        elif key in (0x25, 0x27) and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
-                and self.state.arrow(-1 if key == 0x25 else 1):  # ← → move in what you type (Shift+← selects)
+        elif key in STEPS and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
+                and self.state.arrow(STEPS[key]):  # ← → Home End move in what you type (Shift+← selects)
             pass
         elif key == 0x2E and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
                 and self.state.delete():  # forward delete, at the cursor (Shift+Delete cuts)

@@ -319,7 +319,8 @@ class Composition:
         return len(self.shown) - (self.back if (self.reply or not self.answered) else 0)
 
     def arrow(self, step):
-        """← (-1) or → (1) in what you are typing, as a CJK input method moves in its composition:
+        """← (-1), → (1), Home ("home") or End ("end") in what you are typing, as a CJK input method
+        moves in its composition:
         True when it is ours (nothing commits); False with nothing composed (the key is the app's).
         While an exchange is open with nothing typed, the key does nothing: it never leaves it."""
         typed = self.reply if self.answered else self.text
@@ -327,6 +328,9 @@ class Composition:
             return True
         if not typed or self.live:
             return False
+        if step in ("home", "end"):  # Home and End: to the start or the end of it
+            self.back = len(typed) if step == "home" else 0
+            return True
         at = len(typed) - self.back
         if step < 0 and at > 0:
             at = step_back(typed, at)
