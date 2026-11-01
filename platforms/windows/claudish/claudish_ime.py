@@ -630,9 +630,6 @@ class ClaudishTextService(TextService):
             if not self.state.insert(char):
                 self.setCommitString(self.state.commit())
                 self.state.insert(char)
-        elif key in (0x10, 0x14):  # Shift / Caps Lock do not finish composition.
-            self.publish()
-            return True
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             # What is for the model never goes in: the exchange is held, as on a focus change.
