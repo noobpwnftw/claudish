@@ -99,10 +99,15 @@ class GeneralChecks(unittest.TestCase):
 
     def test_service_check_reports_the_running_service(self):
         with serving(Rewriter("rules")) as server:
-            with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port):
+            with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port), \
+                    patch("claudish.client.read_token", return_value=server.token):
                 status, detail, _ = doctor.check_service()
             self.assertEqual(status, "ok")
             self.assertIn("backend rules", detail)
+            with patch.object(doctor, "SERVICE", "http://127.0.0.1:%d" % server.server_port), \
+                    patch("claudish.client.read_token", return_value="this account's"):
+                self.assertEqual(doctor.check_service()[1], "another account's cd_AI service has "
+                                 "http://127.0.0.1:%d" % server.server_port)
         with patch.object(doctor, "SERVICE", "http://127.0.0.1:9"):
             self.assertEqual(doctor.check_service()[0], "fail")
 

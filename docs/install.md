@@ -156,7 +156,7 @@ OpenRouter, Groq, Ollama, LM Studio, llama.cpp) and a key if it needs one. `clau
 and `codex` (the subscriptions), `server` (any OpenAI-compatible server), and `local` (below); see
 [configuration](configuration.md). With no model at all, compose says "no model is set up".
 
-**A local model:** `claudish setup --profile local` downloads a pinned
+**A local model** (on Linux, or from a source checkout): `claudish setup --profile local` downloads a pinned
 [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build (`b11822`; the CPU build, Metal on
 Apple silicon, `--variant vulkan` for most GPUs on Linux and Windows) and Gemma 4 E4B (Apache-2.0,
 QAT Q4_0, 5.2 GB; [why this model](../benchmarks/README.md#choosing-the-models-g53-2026-10-24)),

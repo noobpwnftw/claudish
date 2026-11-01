@@ -122,14 +122,32 @@ def check_service():
     except Exception:
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
             "start it at every login: `claudish service install` (it runs the config's profile)"
+    if not ours():
+        return "fail", "another account's cd_AI service has %s" % SERVICE, \
+            "one account at a time can use it: log the other account out, or stop its service there"
     detail = "running: backend %s, profile %s" % (health.get("backend"), health.get("profile"))
-    model = health.get("model")  # Claude Code or Codex, kept running beside the service
+    model = health.get("model")  # Claude Code, Codex or a local model, kept running beside the service
     if model and model.startswith("failed"):
-        return "fail", "%s; its model process %s" % (detail, model), \
-            "check that its CLI works and is logged in (`claude` or `codex` in a terminal), then `claudish service install`"
+        fix = ("run the profile's \"command\" (llama-server) in a terminal to see why it stops"
+               if health.get("backend") == "llama" else
+               "check that its CLI works and is logged in (`claude` or `codex` in a terminal), then `claudish service install`")
+        return "fail", "%s; its model process %s" % (detail, model), fix
     if model in ("starting", "restarting"):
         return "warn", "%s; its model process is %s" % (detail, model), "wait a few seconds and check again"
     return "ok", detail + ("; its model process is warm" if model == "warm" else ""), None
+
+
+def ours():
+    """Whether the service answering is this account's: it takes this account's token."""
+    from urllib.error import HTTPError
+    from .client import settings_url
+    try:
+        settings_url(SERVICE)
+        return True
+    except HTTPError as exc:
+        return exc.code != 403
+    except OSError:
+        return True  # it did not answer this time: not another account's, as far as we know
 
 
 def check_managed():

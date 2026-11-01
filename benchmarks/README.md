@@ -61,8 +61,9 @@ bda484992f9655d22504b14e57985257fa6a86937c61f957cf99c10a3bcae169  SmolLM2-135M-I
 74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db  qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
-Reproduce with `python scripts/start.py --preset small`, then
-`python -m claudish bench --runs 12`. Stop the launcher before changing presets.
+Reproduce with `python scripts/run_model.py --preset small` and, beside it,
+`python -m claudish serve --backend llama --port 18775`, then
+`python -m claudish bench --runs 12 --url http://127.0.0.1:18775`. Stop the model before changing presets.
 Original model sources: [SmolLM2](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct),
 [Qwen GGUF](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF), and
 [SmolLM2 GGUF](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF).
@@ -85,7 +86,7 @@ applies mechanical checks:
 Style is reported separately as "changed" and "added an em dash".
 
 ```sh
-python scripts/start.py --preset small
+python scripts/run_model.py --preset small   # and, beside it: python -m claudish serve --backend llama
 python benchmarks/evaluate.py --label small --output benchmarks/eval/spark-small.json
 ```
 

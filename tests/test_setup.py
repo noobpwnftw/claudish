@@ -45,6 +45,7 @@ class SetupTests(unittest.TestCase):
             patch("claudish.setup.doctor.main", return_value=0),
             patch("claudish.setup.doctor.check_backend", side_effect=lambda state: self.backend),
             patch.object(setup, "wait_for_service", return_value=True),
+            patch.object(setup, "wait_for_model", return_value=None),
         ]
         for p in patches:
             p.start()
@@ -88,6 +89,20 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("Which tone?", out)  # the profile has one now
         _, out = self.quiet(yes=True)
         self.assertNotIn("Which tone?", out)
+
+    def test_an_update_asks_nothing_and_opens_no_settings(self):
+        config.write_starter()  # installed before: running the install line again updates it
+        with patch("sys.stdin.isatty", return_value=True), patch("builtins.input", side_effect=["y"] * 6), \
+                patch.object(setup, "settings") as opened:
+            _, out = self.quiet()
+        self.assertNotIn("Which tone?", out)
+        opened.assert_not_called()
+
+    def test_without_the_download_helpers_the_local_model_is_set_up_by_hand(self):
+        with patch.object(setup, "scripts", side_effect=ImportError("no scripts/ in this install")):
+            steps = {label: (state, detail) for label, state, detail, _ in setup.plan("local")[1]}
+        self.assertEqual(steps["Local model"], ("manual", "the local model is set up from a source checkout"))
+        self.assertNotIn("llama.cpp", steps)
 
     def test_dry_run_changes_nothing(self):
         status, out = self.quiet(dry_run=True)

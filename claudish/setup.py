@@ -29,6 +29,15 @@ def scripts():
     return download_llama, download_model
 
 
+def has_scripts():
+    """Whether the download helpers are here (a source checkout, and Linux's install is one)."""
+    try:
+        scripts()
+        return True
+    except ImportError:
+        return False
+
+
 def chosen_profile(profile):
     """(name, settings) of the profile setup is for, from the config or (before it exists) the starter."""
     if config.default_path().is_file():
@@ -179,6 +188,9 @@ def step_service(settings):
         return "skip", detail, None
     try:
         doctor.fetch_json(doctor.SERVICE + "/health")
+        if not doctor.ours():
+            return "manual", "another account's cd_AI service has %s" % doctor.SERVICE, \
+                "one account at a time can use it: log the other account out, then run setup again"
         return "manual", "a Claudish service is already running outside the service manager", \
             "stop it (Ctrl+C in its terminal), then run setup again"
     except Exception:
@@ -194,7 +206,11 @@ def plan(profile=None, variant="cpu", skip=(), tone=None):
     name, settings = chosen_profile(profile)
     local = is_local(settings)
     steps = [("Config", lambda: step_config(name)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
-    if local:  # optional: a local model, downloaded here (claudish setup --profile local)
+    if local and not has_scripts():  # the Windows and macOS installs have no scripts/
+        steps += [("Local model", lambda: ("manual", "the local model is set up from a source checkout",
+                                           "set it up there (docs/install.md), or put llama-server's command line "
+                                           "in the profile's \"command\""))]
+    elif local:  # optional: a local model, downloaded here (claudish setup --profile local)
         steps += [("llama.cpp", lambda: step_llama(variant)), ("Model", step_model),
                   ("Local model", lambda: step_local(name, settings))]
     else:
@@ -217,6 +233,19 @@ def wait_for_service(seconds=WAIT):
         except Exception:
             time.sleep(0.5)
     return False
+
+
+def wait_for_model(seconds=120):
+    """Until the service's local model answers, or failed (it loads first)."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            model = doctor.fetch_json(doctor.SERVICE + "/health", timeout=1).get("model") or ""
+        except Exception:
+            model = ""
+        if model == "warm" or model.startswith("failed"):
+            return
+        time.sleep(0.5)
 
 
 def ask(question):
@@ -242,8 +271,9 @@ def choose_tone():
 
 def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=None):
     try:
-        if tone is None and not (yes or dry_run) and sys.stdin.isatty() and not chosen_profile(profile)[1].get("tone"):
-            tone = choose_tone()  # asked once: a profile with a tone is not asked again
+        fresh = not config.default_path().is_file()
+        if tone is None and fresh and not (yes or dry_run) and sys.stdin.isatty():
+            tone = choose_tone()  # asked once, on the first run: an update does not ask again
         name, steps = plan(profile, variant, skip, tone)
     except ValueError as exc:
         print("setup: %s" % exc)
@@ -287,11 +317,14 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
         print("\n%s needs you: %s" % (label, as_typed(instruction)))
     if started and not wait_for_service():
         print("\nThe service has not answered within %d seconds; doctor may report it as down." % WAIT)
+    if any(label == "Local model" and state == "todo" for label, state, _, _ in steps):
+        wait_for_model()  # the service starts the local model at its next request: doctor checks it then
     print("\nChecking the whole chain (claudish doctor):\n")
     status = doctor.main()
     if platform.system() == "Linux" and any(label == "Input method" and state == "todo" for label, state, _, _ in steps):
         print("\nLog out and back in, then add English → Claudish in your input sources.")
-    settings()
+    if fresh:
+        settings()  # the first run ends in the settings; an update does not open them again
     return status
 
 
