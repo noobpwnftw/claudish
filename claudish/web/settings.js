@@ -101,7 +101,6 @@ function render(state) {
   const problem = (state.service || {}).problem ? "" : state.config_problem;
   $("start-over").hidden = !((state.service || {}).problem || state.config_problem);
   $("config-problem").textContent = problem ? `cd_AI cannot read its config: ${problem}. ` : "";
-  if (state.aside) $("old-name").textContent = state.aside;
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
   $("try").hidden = false;  // the model in use; hidden while another is picked but not yet in use
@@ -255,7 +254,7 @@ $("start-over").addEventListener("submit", async (event) => {
   const button = $("start-over").querySelector("button");
   button.disabled = true;
   if (await change({start_over: true}, "start-over-message", "")) {
-    say("start-over-message", `A new config; the old one is ${shown.moved_to}.`);
+    say("start-over-message", shown.moved.length ? `A new config. Aside: ${shown.moved.join(", ")}.` : "A new config.");
   }
   button.disabled = false;
 });

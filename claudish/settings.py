@@ -75,7 +75,8 @@ def loaded(path=None):
     except (OSError, ValueError) as exc:
         return starter(), "%s does not read: %s" % (path.name, exc)
     if not (isinstance(data, dict) and isinstance(data.get("profiles"), dict) and data["profiles"]
-            and all(isinstance(each, dict) for each in data["profiles"].values())):
+            and all(isinstance(each, dict) for each in data["profiles"].values())
+            and isinstance(data.get("profile", ""), str)):
         return starter(), '%s needs a "profiles" object of profiles' % path.name
     return data, None
 
@@ -95,30 +96,14 @@ def unreadable(path, data):
     return None
 
 
-def server_entry(profiles):
-    """The window's OpenAI-compatible server: "server", else the first profile for one (its address,
-    model and tools), else the starter's."""
-    if isinstance(profiles.get("server"), dict):
-        return profiles["server"]
-    found = next((each for each in profiles.values() if isinstance(each, dict)
-                  and each.get("backend") == "openai" and each.get("model_url")), None)
-    return carried(found, "tone") if found else dict(config.STARTER["profiles"]["server"])
-
-
-def carried(entry, *drop):
-    """A profile as a new config can hold it: its keys this version reads (a Claude profile's
-    claude_model as its model), without bindings or modes, which name other profiles."""
-    entry = dict(entry or {})
-    if entry.get("backend") == "claude" and isinstance(entry.get("claude_model"), str):
-        entry.setdefault("model", entry["claude_model"])
-    return {key: value for key, value in entry.items()
-            if key in config.DEFAULTS and key not in ("bindings", "modes") + drop}
-
-
 def aside(path):
     """Where path goes aside: path.old, or path.old2, ... when that is taken."""
-    return next(path.with_name(path.name + ".old" + (str(n) if n > 1 else "")) for n in range(1, 1000)
-                if not path.with_name(path.name + ".old" + (str(n) if n > 1 else "")).exists())
+    n = 1
+    while True:
+        candidate = path.with_name(path.name + ".old" + (str(n) if n > 1 else ""))
+        if not candidate.exists():
+            return candidate
+        n += 1
 
 
 def key_state():
@@ -137,7 +122,7 @@ def state(path=None):
     name = in_use(data)
     entry = profiles.get(name) or {}
     choice = name if name in CHOICES or name == "local" else "other"
-    server = server_entry(profiles)
+    server = profiles.get("server") or config.STARTER["profiles"]["server"]
     url = server.get("model_url", "")
     models = server_models(url) if choice == "server" else []  # asked once: an address that does not answer waits 5 s
     tone = entry.get("tone") or data.get("tone") or "corporate"  # the one in use: the profile's own, else the file's
@@ -147,7 +132,6 @@ def state(path=None):
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
                    "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
         "config_problem": problem,
-        "aside": aside(path).name if problem else None,
         "tone": tone, "own_words": tone not in TEMPLATES["tones"]["named"],
         "summon": (data.get("keys") if isinstance(data.get("keys"), dict) else {}).get("summon", config.SUMMON_KEYS[0]),
         "hints": data.get("hints", True) is not False,
@@ -232,60 +216,18 @@ def server_problem(url, models, model=None, key=None):
 
 
 def start_over(path=None):
-    """A config cd_AI cannot read, moved aside (config.json.old) for a new one, written whole before
-    the old one moves. It keeps the profile in use (an OpenAI-compatible one as "server"), the first
-    OpenAI-compatible server, the tone, keys, hints and MCP servers; what of that does not read goes.
-    A templates.json that does not load goes aside too, for the starter's."""
-    import itertools
-    from .modes import defaults, load
+    """The starter config, with config.json and templates.json moved aside (config.json.old, or
+    .old2 when that is taken): for a config cd_AI cannot read. Returns the state, and what moved."""
     path = path or config.default_path()
-    old, _ = loaded(path)
-    name = in_use(old)
-    entry = carried(old["profiles"].get(name))
-    tone = entry.pop("tone", None) or old.get("tone")
-    fresh = starter()
-    fresh["profiles"]["server"] = carried(server_entry(old["profiles"]), "tone")
-    if entry:
-        name = "server" if entry.get("backend") == "openai" and name not in fresh["profiles"] else name
-        fresh["profiles"][name], fresh["profile"] = entry, name
-    for key in ("keys", "hints", "mcp_servers"):
-        if key in old:
-            fresh[key] = old[key]
-    if isinstance(tone, str) and tone.strip() and len(tone) <= 200 and "\n" not in tone:
-        fresh["tone"] = tone.strip()
-    templates = path.with_name("templates.json")
-    try:
-        templates.is_file() and defaults(load(templates))
-    except Exception:  # any way it does not load, as the service would use it
-        templates.replace(aside(templates))
-    config.write_starter_templates(path)
-    trial = path.with_name("start-over.json.tmp")
-    try:
-        for _ in itertools.count():  # what does not read goes: a carried profile, then the rest
-            trial.write_text(json.dumps(fresh, indent=2) + "\n", encoding="utf-8")
-            problem = unreadable(trial, fresh)
-            if not problem:
-                break
-            gone = next((n for n in fresh["profiles"] if "profile %r" % n in problem), None)
-            if gone and gone in config.STARTER["profiles"] and fresh["profiles"][gone] != config.STARTER["profiles"][gone]:
-                fresh["profiles"][gone] = dict(config.STARTER["profiles"][gone])
-            elif gone and gone not in config.STARTER["profiles"]:
-                del fresh["profiles"][gone]
-                fresh["profile"] = config.STARTER["profile"]
-            elif any(key in fresh for key in ("keys", "hints", "mcp_servers")):
-                for key in ("keys", "hints", "mcp_servers"):
-                    fresh.pop(key, None)
-            elif fresh != starter():
-                fresh = starter()
-            else:
-                break  # the starter as it is: what the service says about it is in the window
-        moved = aside(path) if path.is_file() else None
-        if moved:
-            path.replace(moved)
-        trial.replace(path)
-    finally:
-        trial.unlink(missing_ok=True)
-    return dict(state(path), moved_to=moved.name if moved else None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    moved = []
+    for each in (path, path.with_name("templates.json")):
+        if each.is_file():
+            target = aside(each)
+            each.replace(target)
+            moved.append(target.name)
+    config.write_starter(path)
+    return dict(state(path), moved=moved)
 
 
 def apply(changes, path=None):
@@ -324,12 +266,12 @@ def apply(changes, path=None):
                 raise ValueError("pick the model to use: " + ", ".join(models[:20]) if models else
                                  check_server(url.strip(), key=server_key) or "name the model to use")
             model = models[0]
-        entry = profiles.setdefault("server", dict(server_entry(profiles)))
+        entry = profiles.setdefault("server", dict(config.STARTER["profiles"]["server"]))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
     if "choice" in changes and changes["choice"] not in CHOICES:
         raise ValueError("unknown choice")
     if changes.get("choice") == "server" or ("server" in changes and data.get("profile") == "server"):
-        server = server_entry(profiles)
+        server = profiles.get("server") or config.STARTER["profiles"]["server"]
         problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
                                if isinstance(changes.get("server"), dict) else None)
         if problem:  # switching to a server that is not there would leave every rewrite failing
@@ -347,7 +289,7 @@ def apply(changes, path=None):
             entry.update(backend=choice, command=[command])
     if "choice" in changes:
         name = CHOICES[changes["choice"]]
-        profiles.setdefault(name, dict(server_entry(profiles) if name == "server" else config.STARTER["profiles"][name]))
+        profiles.setdefault(name, dict(config.STARTER["profiles"][name]))
         data["profile"] = name
     if "tone" in changes:
         tone = changes["tone"]

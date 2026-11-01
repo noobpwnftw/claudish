@@ -304,7 +304,8 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
             # A model/key check can be slow. Keep another window's save (and hand-edit reloads)
             # out of its read/modify/write and rollback, so accepted changes are not lost.
             with rebuilding:
-                before = path.read_bytes() if path.is_file() else None
+                # The folder's config files as they were (Start over moves some aside, adds others).
+                before = {each: each.read_bytes() for each in path.parent.glob("*.json*") if each.is_file()}
                 try:
                     shown = settings.apply(data, config_path)
                 except ValueError as exc:
@@ -315,10 +316,11 @@ def make_server(rewriter, port=18765, token=None, reload=None, config_path=None)
                     try:
                         swap()
                     except Exception as exc:  # it would not start at the next login either: put it back
-                        if before is None:
-                            path.unlink(missing_ok=True)
-                        else:
-                            path.write_bytes(before)
+                        for each in path.parent.glob("*.json*"):
+                            if each not in before:
+                                each.unlink(missing_ok=True)
+                        for each, content in before.items():
+                            each.write_bytes(content)
                         stamps[0] = stamp()  # put back as the service runs it: nothing to take up
                         return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
                 return self.reply(200, dict(shown, service=self.health()))

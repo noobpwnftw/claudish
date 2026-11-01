@@ -202,8 +202,12 @@ def main():
         try:
             profile, settings, rewriter = build()
         except (OSError, ValueError) as exc:
-            if any(value is not None for value in overrides.values()):
-                parser.error(str(exc))  # a flag of this command: say so here, as always
+            try:
+                config.resolve(args.config, args.profile)
+            except (OSError, ValueError):
+                pass  # the config's own problem
+            else:
+                parser.error(str(exc))  # the config reads: a flag of this command, said here as always
             # Still an input method, and the settings window still opens to fix it: no model until
             # the config reads (an edit is taken up at once).
             print("cd_AI could not use its config, so no model is set up: %s" % exc, file=sys.stderr, flush=True)

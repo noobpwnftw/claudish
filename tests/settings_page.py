@@ -195,13 +195,13 @@ async def check(args, home, port):
         await page.reload()
         await expect(page.locator("#config-problem")).to_have_text("")
         await expect(page.locator("#status")).to_have_text("cd_AI does not use its config: %s." % problem)
-        await expect(page.locator("#start-over")).to_contain_text("config.json.old")
+        await expect(page.locator("#start-over")).to_contain_text("go aside as .old files")
         if args.screenshots:
             await page.screenshot(path=str(args.screenshots / "settings-start-over.png"), full_page=True)
         await page.locator("#start-over button").click()
-        await expect(page.locator("#start-over-message")).to_have_text("A new config; the old one is config.json.old.")
+        await expect(page.locator("#start-over-message")).to_contain_text("A new config. Aside: config.json.old")
         await expect(page.locator("#start-over")).to_be_hidden()
-        assert config.with_name("config.json.old").is_file() and json.loads(config.read_text())["tone"] == "bard"
+        assert config.with_name("config.json.old").is_file() and "tone" not in json.loads(config.read_text())
 
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)

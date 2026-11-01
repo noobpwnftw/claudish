@@ -70,82 +70,29 @@ class SettingsTests(Home):
         self.assertEqual(settings.apply({"tone": "critic"})["tone"], "critic")
         self.assertEqual((self.written()["tone"], self.written()["profiles"]["agent"]["tone"]), ("critic", "bard"))
 
-    def test_start_over_moves_a_config_aside_and_keeps_the_model_and_tone(self):
-        # 0.3.1's starter, with Claude Code picked and a tone: refused now, by its "claude_model".
+    def test_start_over_moves_the_config_aside_for_the_starter(self):
+        # 0.3.1's starter running Claude Code: it reads, but the Claude the window switches to does not.
         self.path.parent.mkdir(parents=True, exist_ok=True)
         old = {"profile": "claude-code", "profiles": {
-            "claude": {"backend": "claude", "claude_model": "claude-opus-5-5", "tone": "critic"},
-            "ollama": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "tone": "critic"},
-            "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku", "tone": "critic"}}}
+            "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
+            "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku"}}}
         self.path.write_text(json.dumps(old))
+        self.path.with_name("templates.json").write_text("{}")
         with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
             config.resolve(self.path, profile="claude")
         self.assertEqual(settings.state()["config_problem"], "profile 'claude': unknown keys claude_model")
         state = settings.apply({"start_over": True})
-        self.assertEqual((state["choice"], state["tone"], state["config_problem"]), ("claude-code", "critic", None))
+        self.assertEqual((state["choice"], state["config_problem"], state["moved"]),
+                         ("claude", None, ["config.json.old", "templates.json.old"]))
         self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
-        data = self.written()
-        self.assertEqual((data["tone"], data["profiles"]["claude-code"]["command"]), ("critic", ["/old/claude"]))
-        self.assertEqual(data["profiles"]["server"]["model_url"], "http://10.0.0.7:8080")  # "ollama", not in use
-        for name in data["profiles"]:
-            config.resolve(self.path, profile=name)
-        self.path.write_text("{not json")  # one that does not read at all: the starter's Claude
-        self.assertEqual(settings.apply({"start_over": True})["choice"], "claude")
-
-    def test_start_over_keeps_a_server_profile_in_use_with_its_tools(self):
-        # The Mac VM's 0.3 config: in use, "ollama" reads; switching to "claude" would not.
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"profile": "ollama", "mcp_servers": {"notes": {"command": ["notes"]}},
-                                         "keys": {"summon": "Enter"}, "profiles": {
-            "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-            "ollama": {"backend": "openai", "model_url": "http://10.0.0.9:18790", "model": "gemma", "timeout": 120,
-                       "helper": ["claude", "{prompt}"], "tools": [{"server": "notes"}]}}}))
-        self.assertEqual(settings.state()["config_problem"], "profile 'claude': unknown keys claude_model")
-        with patch.object(settings, "server_models", return_value=["gemma"]):
-            state = settings.apply({"start_over": True})
-        self.assertEqual((state["choice"], state["summon"], state["config_problem"]), ("server", "Enter", None))
-        data = self.written()
-        self.assertEqual(data["profiles"]["server"]["tools"], [{"server": "notes"}])
-        self.assertEqual(data["profiles"]["server"]["model_url"], "http://10.0.0.9:18790")
-        self.assertIn("notes", data["mcp_servers"])
-        for name in data["profiles"]:
-            config.resolve(self.path, profile=name)
-
-    def test_start_over_from_what_review_found(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Not JSON: the window still shows, with the problem and where the file goes.
+        self.assertEqual(self.written()["profiles"], config.STARTER["profiles"])
+        # Not JSON: the window still shows, with Start over; the first one aside stays.
         self.path.write_text("{not json")
-        state = settings.state()
-        self.assertTrue(state["config_problem"].startswith("config.json does not read"))
-        self.assertEqual((state["choice"], state["aside"]), ("claude", "config.json.old"))
-        self.assertEqual(settings.apply({"start_over": True})["moved_to"], "config.json.old")
-        # Again: the first one aside stays.
-        self.path.write_text('{"profiles": {"claude": {"backend": "claude", "claude_model": "claude-sonnet-5-5"}}, '
-                             '"tone": "critic", "keys": {"summon": "Enter"}}')  # no "profile": the first
-        state = settings.apply({"start_over": True})
-        self.assertEqual(state["moved_to"], "config.json.old2")
-        self.assertEqual(self.path.with_name("config.json.old").read_text(), "{not json")
-        data = self.written()
-        self.assertEqual((data["profiles"]["claude"]["model"], data["tone"], data["keys"]), ("claude-sonnet-5-5", "critic", {"summon": "Enter"}))
-        # A server whose modes name a profile the new file lacks, and a templates file that does not load.
-        self.path.write_text(json.dumps({"profile": "claude", "profiles": {
-            "claude": {"backend": "claude", "claude_model": "x"},
-            "ollama": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "modes": {"continue": {"profile": "fast"}}},
-            "fast": {"backend": "llama"}}}))
-        self.path.with_name("templates.json").write_text('{"modes": [}')
-        state = settings.apply({"start_over": True})
-        self.assertIsNone(state["config_problem"])
-        self.assertEqual(self.written()["profiles"]["server"], {"backend": "openai", "model_url": "http://10.0.0.7:8080"})
-        self.assertEqual(self.path.with_name("templates.json.old").read_text(), '{"modes": [}')
-        self.assertFalse(self.path.with_name("start-over.json.tmp").exists())
-
-    def test_the_server_form_shows_the_first_server_profile(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"profile": "mine", "profiles": {
-            "mine": {"backend": "openai", "model_url": "http://10.0.0.7:8080", "model": "gemma", "tone": "bard"}}}))
-        state = settings.state()
-        self.assertEqual((state["choice"], state["server"]["url"], state["server"]["model"]),
-                         ("other", "http://10.0.0.7:8080", "gemma"))
+        self.assertTrue(settings.state()["config_problem"].startswith("config.json does not read"))
+        self.assertEqual(settings.apply({"start_over": True})["moved"], ["config.json.old2", "templates.json.old2"])
+        self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
+        self.path.write_text('{"profile": ["claude"], "profiles": {"claude": {}}}')
+        self.assertIn("profiles", settings.state()["config_problem"])
 
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
