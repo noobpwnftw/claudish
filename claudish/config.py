@@ -212,7 +212,7 @@ def save(data, path=None):
 
 
 def plainly(error):
-    """A config error without its advice on fixing the file by hand (cd_AI's settings offer Start over)."""
+    """A config error without its advice on fixing the file (the settings window gives its own)."""
     return str(error).split(" (docs/configuration.md")[0]
 
 

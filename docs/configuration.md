@@ -5,9 +5,11 @@ The config file, models, apps, context and MCP servers, tools, agents, window pi
 ## The config file
 
 cd_AI's config is `~/.config/claudish/config.json` (or `$XDG_CONFIG_HOME/claudish/config.json`, or
-`--config FILE`). cd_AI's settings (`claudish settings`) write it, and you can edit it. How you
-write is set once, for every model: `"tone"`, `"keys"` and `"hints"`. The models are profiles,
-and `"profile"` is the one cd_AI uses:
+`--config FILE`). cd_AI's settings (`claudish settings`) write it, and you can edit it: an edit
+applies when you save it, and one that does not read leaves cd_AI as it was, with its settings and
+`claudish doctor` saying why (`claudish init` writes a new file once the old one is moved aside).
+How you write is set once, for every model: `"tone"`, `"keys"` and `"hints"`. The models are
+profiles, and `"profile"` is the one cd_AI uses:
 
 ```json
 {"profile": "claude",

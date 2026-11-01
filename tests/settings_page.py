@@ -169,9 +169,10 @@ async def check(args, home, port):
         await page.locator("#try button").click()
         await expect(page.locator("#sample")).to_have_text("“new” → “A rewrite of new”")
 
-        # A config the service does not use: said, and Start over writes a new one beside the old.
+        # A config the service does not use, or a profile the window switches to: said, with the fix.
         await page.unroute_all()
-        problem = "profile 'claude': unknown keys claude_model (docs/configuration.md lists a profile's keys)"
+        problem = "profile 'claude': unknown keys claude_model"
+        fix = "Fix it in %s (it applies when you save), or move that file aside and run claudish init." % config
 
         async def refused(route):
             response = await route.fetch()
@@ -182,26 +183,23 @@ async def check(args, home, port):
         async def stale(route):  # the service is fine; a profile the window switches to is not
             response = await route.fetch()
             data = await response.json()
-            data["config_problem"] = "profile 'claude': unknown keys claude_model"
+            data["config_problem"] = problem
             await route.fulfill(response=response, json=data)
 
         await page.route("**/settings/state", stale)
         await page.reload()
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")
-        await expect(page.locator("#config-problem")).to_have_text(
-            "cd_AI cannot read its config: profile 'claude': unknown keys claude_model. ")
+        await expect(page.locator("#config-fix")).to_have_text("cd_AI cannot read its config: %s. %s" % (problem, fix))
         await page.unroute_all()
         await page.route("**/settings/state", refused)
         await page.reload()
-        await expect(page.locator("#config-problem")).to_have_text("")
         await expect(page.locator("#status")).to_have_text("cd_AI does not use its config: %s." % problem)
-        await expect(page.locator("#start-over")).to_contain_text("go aside as .old files")
+        await expect(page.locator("#config-fix")).to_have_text(fix)
         if args.screenshots:
-            await page.screenshot(path=str(args.screenshots / "settings-start-over.png"), full_page=True)
-        await page.locator("#start-over button").click()
-        await expect(page.locator("#start-over-message")).to_contain_text("A new config. Aside: config.json.old")
-        await expect(page.locator("#start-over")).to_be_hidden()
-        assert config.with_name("config.json.old").is_file() and "tone" not in json.loads(config.read_text())
+            await page.screenshot(path=str(args.screenshots / "settings-config-problem.png"), full_page=True)
+        await page.unroute_all()
+        await page.reload()
+        await expect(page.locator("#config-fix")).to_be_hidden()
 
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)
@@ -210,7 +208,7 @@ async def check(args, home, port):
         await browser.close()
     print("Settings page passed: ticket kept out of the address and good once, tones (named, described), "
           "a model server (nothing there: not switched; then switched), subscription startup/failure/retry, "
-          "first rewrite, stale example ignored, reload, narrow window, no ticket no settings, a config not used: start over")
+          "first rewrite, stale example ignored, reload, narrow window, no ticket no settings, a config not used: what to fix")
 
 
 class Models(BaseHTTPRequestHandler):

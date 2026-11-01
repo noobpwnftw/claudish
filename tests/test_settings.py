@@ -70,29 +70,24 @@ class SettingsTests(Home):
         self.assertEqual(settings.apply({"tone": "critic"})["tone"], "critic")
         self.assertEqual((self.written()["tone"], self.written()["profiles"]["agent"]["tone"]), ("critic", "bard"))
 
-    def test_start_over_moves_the_config_aside_for_the_starter(self):
+    def test_a_config_that_does_not_read_is_said(self):
         # 0.3.1's starter running Claude Code: it reads, but the Claude the window switches to does not.
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        old = {"profile": "claude-code", "profiles": {
+        self.path.write_text(json.dumps({"profile": "claude-code", "profiles": {
             "claude": {"backend": "claude", "claude_model": "claude-opus-5-5"},
-            "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku"}}}
-        self.path.write_text(json.dumps(old))
-        self.path.with_name("templates.json").write_text("{}")
+            "claude-code": {"backend": "claude-code", "command": ["/old/claude"], "model": "haiku"}}}))
         with self.assertRaisesRegex(ValueError, "unknown keys claude_model .*claudish init"):
             config.resolve(self.path, profile="claude")
-        self.assertEqual(settings.state()["config_problem"], "profile 'claude': unknown keys claude_model")
-        state = settings.apply({"start_over": True})
-        self.assertEqual((state["choice"], state["config_problem"], state["moved"]),
-                         ("claude", None, ["config.json.old", "templates.json.old"]))
-        self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
-        self.assertEqual(self.written()["profiles"], config.STARTER["profiles"])
-        # Not JSON: the window still shows, with Start over; the first one aside stays.
-        self.path.write_text("{not json")
+        state = settings.state()
+        self.assertEqual((state["choice"], state["config_problem"]),
+                         ("claude-code", "profile 'claude': unknown keys claude_model"))
+        self.path.write_text("{not json")  # the window still shows
         self.assertTrue(settings.state()["config_problem"].startswith("config.json does not read"))
-        self.assertEqual(settings.apply({"start_over": True})["moved"], ["config.json.old2", "templates.json.old2"])
-        self.assertEqual(json.loads(self.path.with_name("config.json.old").read_text()), old)
         self.path.write_text('{"profile": ["claude"], "profiles": {"claude": {}}}')
         self.assertIn("profiles", settings.state()["config_problem"])
+        self.path.unlink()
+        config.write_starter()  # `claudish init`
+        self.assertIsNone(settings.state()["config_problem"])
 
     def test_model_names_the_claude_model(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)

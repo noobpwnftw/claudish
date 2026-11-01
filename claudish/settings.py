@@ -96,16 +96,6 @@ def unreadable(path, data):
     return None
 
 
-def aside(path):
-    """Where path goes aside: path.old, or path.old2, ... when that is taken."""
-    n = 1
-    while True:
-        candidate = path.with_name(path.name + ".old" + (str(n) if n > 1 else ""))
-        if not candidate.exists():
-            return candidate
-        n += 1
-
-
 def key_state():
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         return "environment"
@@ -115,7 +105,7 @@ def key_state():
 def state(path=None):
     """What the window shows. Never the key itself: only whether there is one, and where."""
     path = path or config.default_path()
-    data, problem = loaded(path)  # a problem: the window shows the starter, and Start over
+    data, problem = loaded(path)  # a problem: the window shows the starter, and how to fix it
     if not problem and path.is_file():
         problem = unreadable(path, data)
     profiles = data["profiles"]
@@ -215,26 +205,9 @@ def server_problem(url, models, model=None, key=None):
     return None
 
 
-def start_over(path=None):
-    """The starter config, with config.json and templates.json moved aside (config.json.old, or
-    .old2 when that is taken): for a config cd_AI cannot read. Returns the state, and what moved."""
-    path = path or config.default_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    moved = []
-    for each in (path, path.with_name("templates.json")):
-        if each.is_file():
-            target = aside(each)
-            each.replace(target)
-            moved.append(target.name)
-    config.write_starter(path)
-    return dict(state(path), moved=moved)
-
-
 def apply(changes, path=None):
     """Make the window's changes; ValueError (with words for the window) when one is not valid.
     The key is checked before it is saved, and a key Anthropic refuses is not saved."""
-    if changes == {"start_over": True}:
-        return start_over(path)
     if not isinstance(changes, dict) or not set(changes) <= {"choice", "key", "server", "tone", "summon", "hints"}:
         raise ValueError("unknown setting")
     path = path or config.default_path()

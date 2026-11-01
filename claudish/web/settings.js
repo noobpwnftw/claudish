@@ -99,8 +99,9 @@ function render(state) {
   $("next").hidden = !recall("cd_AI-first");
   // The service's own problem is in the status line; another profile's, the window may switch to, here.
   const problem = (state.service || {}).problem ? "" : state.config_problem;
-  $("start-over").hidden = !((state.service || {}).problem || state.config_problem);
-  $("config-problem").textContent = problem ? `cd_AI cannot read its config: ${problem}. ` : "";
+  $("config-fix").hidden = !((state.service || {}).problem || state.config_problem);
+  $("config-fix").textContent = (problem ? `cd_AI cannot read its config: ${problem}. ` : "") +
+    `Fix it in ${state.config} (it applies when you save), or move that file aside and run claudish init.`;
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
   $("try").hidden = false;  // the model in use; hidden while another is picked but not yet in use
@@ -248,15 +249,6 @@ $("server").addEventListener("submit", (event) => {
   event.preventDefault();
   change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
          "model-message", "cd_AI now writes with this API.").then((done) => { if (done) $("server-key").value = ""; });
-});
-$("start-over").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const button = $("start-over").querySelector("button");
-  button.disabled = true;
-  if (await change({start_over: true}, "start-over-message", "")) {
-    say("start-over-message", shown.moved.length ? `A new config. Aside: ${shown.moved.join(", ")}.` : "A new config.");
-  }
-  button.disabled = false;
 });
 $("try").addEventListener("submit", (event) => {
   event.preventDefault();
