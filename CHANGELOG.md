@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A new tone, `unhinged`: professionally unhinged, with excellent writing, dry contempt, and profanity where
+  it lands.
 - `claudish mcp import` (and `claudish setup`) copy the servers from Claude Desktop and Claude Code's
   user config, no longer a project's `./.mcp.json`: it stays with its project.
 - The panel stays shorter than a screen: past about 24 rows, drafts other than the highlighted one

@@ -42,7 +42,7 @@ def main():
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
     setup.add_argument("--yes", action="store_true", help="Do every step without asking")
-    setup.add_argument("--tone", help="The tone: corporate (the default slop), salesman, critic, bard, proofread "
+    setup.add_argument("--tone", help="The tone: corporate (the default slop), salesman, critic, bard, unhinged, proofread "
                        "(corrects, keeps your words), or a few words of your own")
     setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
     setup.add_argument("--variant", choices=["cpu", "vulkan"], default="cpu", help="llama.cpp build to download")

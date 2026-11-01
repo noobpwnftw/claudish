@@ -362,6 +362,7 @@ synergies. A profile can pick another tone:
 | `salesman` | a breathless closer | "…believe me, it hurts, because I love a deal—but this offer just isn't right for us today!" |
 | `critic` | haughty, world-weary, faintly disappointed | "No. I have considered it, briefly and against my better judgement, and the answer remains no." |
 | `bard` | an Elizabethan bard at the playhouse | "Nay, good friend, it cannot be; my answer standeth firm: no." |
+| `unhinged` | professionally unhinged: excellent writing, dry contempt | "No. I've given it more thought than it deserved, and the answer is still no." |
 | `proofread` | you, with the typos fixed | "nah" |
 
 `proofread` corrects spelling, typos, grammar and capitals; continue and instruct are plain

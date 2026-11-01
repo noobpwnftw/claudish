@@ -162,7 +162,7 @@ STARTER_TEMPLATES = {
         "Templates over cd_AI's own (claudish/templates.json): this file names only what it changes,",
         "mode by mode and key by key. `claudish templates` prints what a profile ends up with. To switch",
         "tone, set a profile's \"tone\" in config.json: corporate (the default), salesman, critic, bard,",
-        "proofread, or one named below. docs/configuration.md#templates has the rest.",
+        "unhinged, proofread, or one named below. docs/configuration.md#templates has the rest.",
     ],
     "tones": {"named": {"mine": {
         "about": "A tone to edit: set \"tone\": \"mine\" in config.json, then rewrite this one.",

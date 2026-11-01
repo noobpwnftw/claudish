@@ -146,7 +146,8 @@ class ModeTests(unittest.TestCase):
         claudish = Rewriter(max_tokens=64)
         self.assertIn("corporate slop", claudish.modes["rewrite"]["system"])
         self.assertTrue(claudish.modes["instruct"]["examples"])
-        for tone, word in (("salesman", "salesman"), ("critic", "critic"), ("bard", "bard")):
+        for tone, word in (("salesman", "salesman"), ("critic", "critic"), ("bard", "bard"),
+                           ("unhinged", "no patience for bullshit")):
             named = Rewriter(max_tokens=64, tone=tone)  # each with its own wording and examples, in every mode
             for mode in ("rewrite", "continue", "instruct"):
                 self.assertIn(word, named.modes[mode]["system"])

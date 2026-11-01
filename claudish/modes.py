@@ -72,7 +72,7 @@ def defaults(override=None, tone=None):
 
     max_tokens None means the backend's default. candidates: how many readings to offer (an
     instruction is sent on purpose and awaited, so it offers a short list; while you type, one).
-    tone: a tone other than the default: a named one (templates "tones": salesman, critic, bard,
+    tone: a tone other than the default: a named one (templates "tones": salesman, critic, bard, unhinged,
     proofread, ...), which brings its own wording and examples, or a few words of your own
     ("warm and friendly"), which fill the "tone" wording without examples (the default's teach
     its own tone). A mode's own system in the profile's templates wins over the tone, and is

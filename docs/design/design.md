@@ -22,8 +22,8 @@ text box. No chat window, transcript, history, slash menus, or supervised long t
 new work: does it make one turn at the caret better?
 
 What the model is told, the tone included, is data (`claudish/templates.json`, amended per
-profile): corporate slop by default, or a salesman, a critic, a bard, proofread, or a described
-tone.
+profile): corporate slop by default, or a salesman, a critic, a bard, unhinged, proofread, or a
+described tone.
 
 ## Two modes, one key grammar
 
