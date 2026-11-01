@@ -4,6 +4,7 @@ import sys
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
+from .client import PORT
 from .composition import AROUND, MAX_COMPOSITION
 
 
@@ -25,7 +26,7 @@ def _config_default():
     return default_path()
 
 
-def make_server(rewriter, port=18765, token=None, reload=None, config_path=None):
+def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
     """token: what the input methods send (client.write_token() for a real service); a fresh one
     when None. Without it, a request is the demo's: text and a mode only, without the profile's
     context; sessions and their answers always need it. reload: builds the rewriter again from the

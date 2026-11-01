@@ -17,6 +17,9 @@ STARTED = time.monotonic()
 STARTING_SECONDS = 60
 REACHED = threading.Event()
 
+PORT = 18765  # the service, on this computer only
+SERVICE = "http://127.0.0.1:%d" % PORT
+
 def token_path():
     """The service's token: written by the service at start and sent by the input methods."""
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
@@ -55,7 +58,7 @@ def write_token(token=None):
     return token
 
 
-def settings_url(url="http://127.0.0.1:18765"):
+def settings_url(url=SERVICE):
     """The settings page of a running service, with a ticket in the fragment, which the page
     trades for its settings token. OSError when no service answers."""
     request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers())
@@ -74,7 +77,7 @@ def headers():
 
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
-def suggest(text, endpoint="http://127.0.0.1:18765", timeout=330, mode="rewrite", app=None, look=False,
+def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=False,
             before="", after="", purpose=None):
     """before/after: the text box around the caret (where the result goes); purpose: the field's
     kind as the input method reports it ("terminal", "email", ...)."""
@@ -114,7 +117,7 @@ def said(exc):
 
 
 class Suggestions:
-    def __init__(self, endpoint="http://127.0.0.1:18765", debounce=0.18):
+    def __init__(self, endpoint=SERVICE, debounce=0.18):
         self.endpoint = endpoint
         self.debounce = debounce
         self.condition = threading.Condition()

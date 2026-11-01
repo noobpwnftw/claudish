@@ -62,6 +62,7 @@ def user_content(text, image, style, intro=""):
     return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
+from .config import MODEL_URL  # noqa: E402
 CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile names none
 LENGTH = "the answer ran past its length budget; use a shorter phrase"
 DECLINED = "Claude declined this; your wording is unchanged"
@@ -247,7 +248,7 @@ class Rewriter:
             rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {})
         return rewriter
 
-    def __init__(self, backend="llama", endpoint="http://127.0.0.1:18766", max_tokens=64, model=None, api_key=None, timeout=3, templates=None,
+    def __init__(self, backend="llama", endpoint=MODEL_URL, max_tokens=64, model=None, api_key=None, timeout=3, templates=None,
                  context=None, modes=None, command=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend

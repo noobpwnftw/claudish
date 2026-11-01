@@ -16,7 +16,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL_PY = ROOT / "platforms/linux/install.py"  # the full path: these fixes run from anywhere
-SERVICE = "http://127.0.0.1:18765"
+from .client import SERVICE  # noqa: E402
 
 
 def fetch_json(url, timeout=2, key=None):

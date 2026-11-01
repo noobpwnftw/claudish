@@ -23,7 +23,8 @@ from .context import Binding, Context
 from . import modes as invocation
 
 BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
-DEFAULTS = {"backend": "none", "model_url": "http://127.0.0.1:18766", "model": None, "api_key_env": None,
+MODEL_URL = "http://127.0.0.1:18766"  # the local model's server
+DEFAULTS = {"backend": "none", "model_url": MODEL_URL, "model": None, "api_key_env": None,
             "timeout": 3, "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None,
             "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
@@ -159,7 +160,7 @@ STARTER = {
                   "templates": "templates.json"},
         "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
-        "local": {"backend": "llama", "model_url": "http://127.0.0.1:18766", "timeout": 15, "templates": "templates.json"},
+        "local": {"backend": "llama", "model_url": MODEL_URL, "timeout": 15, "templates": "templates.json"},
     },
 }
 

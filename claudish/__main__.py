@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.error import HTTPError
 from .client import suggest
 from . import config
+from .client import PORT, SERVICE
 from .model import Rewriter
 from .server import make_server
 
@@ -29,13 +30,13 @@ def main():
     serve.add_argument("--timeout", type=float, help="Seconds to wait for the model's answer")
     serve.add_argument("--templates", metavar="FILE",
                        help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
-    serve.add_argument("--port", type=int, default=18765)
+    serve.add_argument("--port", type=int, default=PORT)
     rewrite = commands.add_parser("rewrite", help="Rewrite TEXT through the running service and print the result")
     rewrite.add_argument("text")
-    rewrite.add_argument("--url", default="http://127.0.0.1:18765")
+    rewrite.add_argument("--url", default=SERVICE)
     bench = commands.add_parser("bench", help="Time rewrites through the running service")
     bench.add_argument("--runs", type=int, default=10)
-    bench.add_argument("--url", default="http://127.0.0.1:18765")
+    bench.add_argument("--url", default=SERVICE)
     setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "
                                 "input method, start at login, then doctor")
     setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
@@ -64,14 +65,14 @@ def main():
     commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
     commands.add_parser("key", help="Save your Claude API key")
     shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, its key, the tone")
-    shown.add_argument("--url", default="http://127.0.0.1:18765")
+    shown.add_argument("--url", default=SERVICE)
     shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
     shown.add_argument("--first", action="store_true", help="With the first-run line (log out, then Tab)")
     recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
                                  "(in the service's memory only)")
     recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
     recent.add_argument("--clear", action="store_true", help="Forget them now")
-    recent.add_argument("--url", default="http://127.0.0.1:18765")
+    recent.add_argument("--url", default=SERVICE)
     init = commands.add_parser("init", help="Write a starter config with example profiles, and templates.json")
     init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
     words = commands.add_parser("templates", help="Print the words cd_AI says to a model, as a profile ends up with them")
