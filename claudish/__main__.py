@@ -222,7 +222,7 @@ def main():
     elif args.command == "rewrite":
         with reachable(args.url):
             print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
-    else:
+    elif args.command == "bench":
         if args.runs < 1:
             parser.error("--runs must be positive")
         samples = ["We should use a smaller model.", "This is very important.",

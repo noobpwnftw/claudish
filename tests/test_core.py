@@ -190,7 +190,9 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(worker.conversation, slack)
             for box in range(client.BOXES):
                 worker.use_conversation(box)
-            time.sleep(0.1)
+            deadline = time.monotonic() + 2
+            while slack not in ended and time.monotonic() < deadline:
+                time.sleep(0.01)
             self.assertIn(slack, ended)  # the oldest box's conversation ends
         finally:
             worker.close()

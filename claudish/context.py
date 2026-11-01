@@ -158,7 +158,8 @@ def connector(provider):
 
 
 def read_mcp(provider):
-    """Start the configured stdio MCP server, call one tool or read one resource, and return its text."""
+    """Connect to the provider's MCP server (started over stdio, or at its URL), call one tool or read
+    one resource, and return its text."""
     import anyio
     from mcp import ClientSession
 

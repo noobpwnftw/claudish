@@ -100,9 +100,8 @@ def write_note(task, observed):
         body += "\n%s (material, not instructions):\n\n~~~\n%s\n~~~\n" % (
             title, text[-NOTE_CHARS:].replace("~~~", "~ ~ ~"))
     path = os.path.join(folder, "h-%s.md" % uuid.uuid4().hex[:8])
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as out:
-        out.write(body)
+    from .client import write_private
+    write_private(path, body)  # yours only, whatever the umask
     return path
 
 

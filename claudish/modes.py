@@ -71,7 +71,7 @@ def messages(pairs, frame=None):
 
 
 def defaults(override=None, tone=None):
-    """name -> {"system", "plain", "examples", "max_tokens", "candidates", "custom", "box"[, "frame"]}.
+    """name -> {"system", "plain", "examples", "parts", "max_tokens", "candidates", "custom", "box"[, "frame"]}.
 
     max_tokens None means the backend's default. candidates: how many readings to offer (an
     instruction is sent on purpose and awaited, so it offers a short list; while you type, one).

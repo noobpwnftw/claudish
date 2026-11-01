@@ -22,7 +22,7 @@ from .composition import WINDOW  # noqa: E402  (a rewrite and continue: what the
 
 # Free-form text needs no description of its kind. The box's words (what each kind is, what it
 # means, the at-caret and tools guides) are in claudish/templates.json, "box".
-PROSE = (None, "name", "alpha")
+from .composition import PROSE  # noqa: E402
 WORDS = TEMPLATES["box"]
 
 

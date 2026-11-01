@@ -78,7 +78,7 @@ class SafetyTests(unittest.TestCase):
                     patch("claudish.service.os.getuid", create=True, return_value=501):
                 steps = service.plan("install", extra=["--backend", "rules"])
             commands = [payload for _, kind, payload in steps if kind == "run"]
-            self.assertTrue(all(c[0] == tool for c in commands), system)
+            self.assertTrue(commands and all(c[0] == tool for c in commands), system)
 
 
     def test_windows_logon_task_is_this_accounts_own(self):

@@ -77,7 +77,7 @@ class ClaudeBackendTests(unittest.TestCase):
     def test_refusal_truncation_and_empty_output_are_never_offered(self):
         rewriter = Rewriter("claude")
         for reply, message in [(response("", "refusal"), "declined"),
-                               (response("A half-fin", "max_tokens"), "token budget"),
+                               (response("A half-fin", "max_tokens"), "length budget"),
                                (response("  "), "no text")]:
             self.sdk.reply = reply
             with self.assertRaisesRegex(RuntimeError, message):

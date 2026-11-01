@@ -63,11 +63,15 @@ def user_content(text, image, style, intro=""):
 
 
 CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile names none
+LENGTH = "the answer ran past its length budget; use a shorter phrase"
+DECLINED = "Claude declined this; your wording is unchanged"
+# Claude models that refuse an effort setting (older than Haiku 4.5 included).
+NO_EFFORT = ("claude-3", "claude-haiku-4", "claude-sonnet-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0")
 FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
 
 
 class Claude:
-    """Opt-in hosted backend: typed text is sent to the Anthropic API."""
+    """The Anthropic API (the default backend): typed text is sent to it."""
 
     def __init__(self, model):
         import anthropic  # every installer has it; a checkout: pip install -e ".[claude]"
@@ -83,8 +87,7 @@ class Claude:
         """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), the
         answer's schema (shaped), and server-side refusal fallbacks where the API offers them."""
         options = {}
-        if not self.model.startswith(("claude-3", "claude-haiku-4", "claude-sonnet-4-5",
-                                      "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0")):
+        if not self.model.startswith(NO_EFFORT):
             options["output_config"] = {"effort": "low"}
         if shaped:
             from .shapes import ANSWER
@@ -120,7 +123,7 @@ class Claude:
                 raise
             raise RuntimeError(NO_CREDENTIALS) from exc
         if response.stop_reason == "refusal":
-            raise RuntimeError("Claude declined this; your wording is unchanged")
+            raise RuntimeError(DECLINED)
         reply = {"content": "".join(block.text for block in response.content if block.type == "text").strip()}
         calls = [{"id": block.id, "type": "function",
                   "function": {"name": block.name, "arguments": json.dumps(block.input)}}
@@ -144,9 +147,9 @@ class Claude:
                 raise
             raise RuntimeError(NO_CREDENTIALS) from exc
         if response.stop_reason == "refusal":
-            raise RuntimeError("Claude declined this rewrite; your wording is unchanged")
+            raise RuntimeError(DECLINED)
         if response.stop_reason == "max_tokens":
-            raise RuntimeError("rewrite exceeded token budget; use a shorter phrase")
+            raise RuntimeError(LENGTH)
         output = "".join(block.text for block in response.content if block.type == "text").strip()
         usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
         return output, usage
@@ -710,7 +713,7 @@ class Rewriter:
                 choice, used = self.claude.converse(messages, offered, max_tokens, shaped=True)
                 usage = usage or used
                 if choice.get("finish_reason") == "length":
-                    raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
+                    raise RuntimeError(LENGTH)
                 return choice["message"]
             timeout = None if serial else max(self.timeout, TURN_TIMEOUT)
             if self.schema:
@@ -735,7 +738,7 @@ class Rewriter:
                 else:
                     usage = usage or used
                     if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
-                        raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
+                        raise RuntimeError(LENGTH)
                     steps[0] += 1
                     return shapes.as_message(choice["message"].get("content"), steps[0])
             if offered:
@@ -750,7 +753,7 @@ class Rewriter:
                 choice, used = self.chat(payload, self.request_headers(), box.image, timeout=timeout)
             usage = usage or used
             if choice.get("finish_reason") == "length":  # never offer a sentence chopped off by the limit
-                raise RuntimeError("the answer ran past its length budget; use a shorter phrase")
+                raise RuntimeError(LENGTH)
             return choice["message"]
 
         called, with_tools = [], messages
@@ -762,7 +765,7 @@ class Rewriter:
             again = {"temperature": 0.9, "seed": 100 + take} if take else {}
             first = (ask(messages, None, **again).get("content") or "").strip()
         if not first:
-            raise RuntimeError("model returned no text")
+            raise RuntimeError("the model returned no text")
         outputs = [first]
         if len(shapes.drafts(first) or ()) > 1:
             count = 1  # the versions asked for are in the answer

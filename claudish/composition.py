@@ -12,6 +12,11 @@ AROUND = 8000
 WINDOW = (1500, 500)
 
 
+# The text boxes written in sentences (an input purpose: none, a name, letters); the others (a URL, an
+# address, a number, a phone) take your words as typed, and continue suggests nothing there.
+PROSE = (None, "name", "alpha")
+
+
 def typeable(char):
     """A character a key types into the composition: printable, or a no-break space (Option+Space,
     AltGr+Space, French typing), which Python does not count as printable."""
@@ -79,7 +84,8 @@ ROW = 60
 # warm.py).
 OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no answer, so the instruction stopped",
              "too many agent sessions", "the model offered nothing",
-             "Claude Code ", "Codex ")  # claudish/warm.py's: busy, took longer, ended
+             "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended
+             "Claude declined", "Claude returned no text", "the model returned no text")
 
 
 def failure(error):
@@ -449,7 +455,7 @@ class Composition:
         """Where the caret is, as the adapter knows it: a field's purpose (url, email, number...) and
         whether it is a terminal. Neither is prose: nothing is asked unasked."""
         self.terminal = terminal
-        self.quiet = purpose in ("url", "email", "number", "phone", "digits") or terminal
+        self.quiet = purpose not in PROSE or terminal
 
     def waits_on_you(self):
         """Something is pending or went wrong: the model works on what you asked, what it offers

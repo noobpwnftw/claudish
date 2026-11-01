@@ -9,7 +9,7 @@ height. Non-activating panels: the app keeps the keyboard; a click on a row pick
 """
 import objc
 from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsMake, NSFont, NSFontWeightBold,
-                    NSFontWeightMedium, NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
+                    NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
                     NSMutableParagraphStyle, NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
 from claudish.screen import opens_above
