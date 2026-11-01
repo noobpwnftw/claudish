@@ -20,8 +20,10 @@ def load(path):
     for name, mode in (data.get("modes") or {}).items():
         check_mode(where, name, mode, name in TEMPLATES["modes"])
     for name, tone in ((data.get("tones") or {}).get("named") or {}).items():
-        if not isinstance(tone, dict) or set(tone) - {"about", "modes"}:
-            raise ValueError('%s: tone %r takes only "about" and "modes"' % (where, name))
+        if not isinstance(tone, dict) or set(tone) - {"about", "persona", "modes"}:
+            raise ValueError('%s: tone %r takes only "about", "persona" and "modes"' % (where, name))
+        if not isinstance(tone.get("persona", ""), str):
+            raise ValueError('%s: tone %r: "persona" is text' % (where, name))
         for mode_name, mode in (tone.get("modes") or {}).items():
             check_mode("%s, tone %r," % (where, name), mode_name, mode, False)
     return data
@@ -88,6 +90,8 @@ def defaults(override=None, tone=None):
             wording = (named[tone].get("modes") or {}).get(name)
             if wording:
                 system, examples, parts = wording["system"], wording.get("examples", []), wording.get("parts", [])
+                if named[tone].get("persona"):  # a whole persona, then this mode's job in its voice
+                    system = named[tone]["persona"] + "\n\n---\n\n" + system
         elif tone and not custom and name in words["tones"]["tone"]:
             system, examples, parts = words["tones"]["tone"][name].replace("{tone}", tone), [], []
         specs[name] = {"system": system, "plain": mode.get("plain") or system,

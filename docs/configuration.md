@@ -440,6 +440,9 @@ as written in every box, without the `plain` one. A tone of your own goes under
               "examples": [["ok", "Aye, aye—'tis agreed, matey!"]]}}}}}}
 ```
 
+A tone may also carry a `"persona"`: a whole description of a voice, sent before each mode's
+`system`, which then says only the job (`unhinged` is one).
+
 `claudish init` writes such a file beside the config, `templates.json`, with a tone to start
 from, and points the profiles at it. `claudish templates` prints what a profile ends up with: the
 shipped templates, your file over them, and the tone, as the model is told it. The evaluation's

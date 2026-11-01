@@ -142,12 +142,24 @@ class ModeTests(unittest.TestCase):
         self.assertIn("Write it for the caret.", payload["messages"][0]["content"])
         self.assertEqual(rewriter.modes["instruct"]["box"]["kinds"], modes.TEMPLATES["box"]["kinds"])
 
+    def test_a_tones_persona_comes_before_each_modes_job(self):
+        templates = {"tones": {"named": {"dry": {"about": "Dry.", "persona": "You are dry.", "modes": {
+            "rewrite": {"system": "Rewrite it.", "examples": [["ok", "Fine."]]}}}}}}
+        dry = Rewriter(max_tokens=64, templates=templates, tone="dry")
+        self.assertEqual(dry.modes["rewrite"]["system"], "You are dry.\n\n---\n\nRewrite it.")
+        self.assertNotIn("You are dry.", dry.modes["rewrite"]["plain"])  # a terminal's plain wording stays plain
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "templates.json"
+            bad.write_text(json.dumps({"tones": {"named": {"dry": {"persona": ["not", "text"]}}}}))
+            with self.assertRaises(ValueError):
+                modes.load(bad)
+
     def test_the_tone_is_corporate_slop_unless_a_profile_sets_another(self):
         claudish = Rewriter(max_tokens=64)
         self.assertIn("corporate slop", claudish.modes["rewrite"]["system"])
         self.assertTrue(claudish.modes["instruct"]["examples"])
         for tone, word in (("salesman", "salesman"), ("critic", "critic"), ("bard", "bard"),
-                           ("unhinged", "no patience for bullshit")):
+                           ("unhinged", "PROFESSIONALLY UNHINGED")):
             named = Rewriter(max_tokens=64, tone=tone)  # each with its own wording and examples, in every mode
             for mode in ("rewrite", "continue", "instruct"):
                 self.assertIn(word, named.modes[mode]["system"])
