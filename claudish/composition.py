@@ -207,6 +207,7 @@ def exchange(method=None, needs="working"):
 class Composition:
     def __init__(self):
         self.text = ""
+        self.accent = ""
         self.candidate = ""
         self.candidates = []  # every reading offered; candidate is the first
         self.revision = 0
@@ -272,6 +273,7 @@ class Composition:
 
     def change(self, text):
         self.back = 0  # characters after the cursor in what you type (your words, or a reply): ← → move it
+        self.accent = ""  # a dead key's accent, waiting for its letter: drawn at the cursor (drawn)
         self.reply = self.waiting = ""
         self.queued = []
         self.answers = []
@@ -332,6 +334,17 @@ class Composition:
         if self.answered:
             return self.reply or self.text
         return self.text
+
+    @property
+    def drawn(self):
+        """What the composition draws: what it shows, and a dead key's accent waiting at the cursor
+        for its letter, as the OS's own input draws it (never committed)."""
+        at = self.cursor
+        return self.shown[:at] + self.accent + self.shown[at:]
+
+    @property
+    def drawn_cursor(self):
+        return self.cursor + len(self.accent)
 
     @property
     def cursor(self):

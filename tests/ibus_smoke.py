@@ -34,6 +34,11 @@ try:
         assert not engine.do_process_key_event(ord(char), 0, 0)
     assert engine.composition.text == "ls -la" and not commits, commits
     assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)  # nothing offered: Tab is the app's
+    # A dead key in continue: its accent waits at the caret, then goes on the letter.
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.composition.accent == "´"
+    assert engine.do_process_key_event(ord("e"), 0, 0) and commits == ["é"], commits
+    assert engine.composition.text == "ls -laé" and not engine.composition.accent
     commits.clear()
 
     shift_tap()  # a Shift tap: compose, which holds what you type

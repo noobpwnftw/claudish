@@ -163,8 +163,8 @@ class ClaudishEngine(IBus.Engine):
         if screen().shell:
             # cd_AI's GNOME Shell extension draws the panel and the suggestion (the design lab's
             # GNOME mock); IBus keeps only the composition, as the platform's plain preedit.
-            text = "" if state.live else state.shown
-            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.cursor if text else 0, bool(text),
+            text = state.accent if state.live else state.drawn  # continue: only a waiting accent
+            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.drawn_cursor if text else 0, bool(text),
                                               self.focus_mode())
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)
@@ -183,8 +183,8 @@ class ClaudishEngine(IBus.Engine):
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
-        text = state.shown  # your words (a rewrite waits in the panel), or a reply once sent
-        self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.cursor if text else 0, bool(text),
+        text = state.drawn  # your words (a rewrite waits in the panel), or a reply once sent; a waiting accent
+        self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.drawn_cursor if text else 0, bool(text),
                                           self.focus_mode())
         # IBus's own popup (without the extension): the rows as a list, the rest as one line. No
         # numbers: digits are text here, they pick nothing (as on Windows).
@@ -254,6 +254,21 @@ class ClaudishEngine(IBus.Engine):
     def live_key(self, keyval):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.composition
+        name = IBus.keyval_name(keyval) or ""
+        if name in DEAD_KEYS:  # an accent waits for its letter, as in compose (drawn at the caret)
+            if self.dead:  # the same one again types it alone; another takes its place
+                accent, self.dead = DEAD_KEYS[self.dead], (None if name == self.dead else name)
+                if not self.dead:
+                    self.live_commit(accent)
+            else:
+                self.dead = name
+            self.render()
+            return True
+        char = IBus.keyval_to_unicode(keyval)
+        if self.dead and typeable(char):
+            combined, self.dead = with_accent(self.dead, char), None
+            self.live_commit(combined)  # é goes in, not the e the key would type
+            return True
         if keyval == IBus.KEY_Tab:
             ghost = state.take_ghost()
             if not ghost:
@@ -286,6 +301,15 @@ class ClaudishEngine(IBus.Engine):
         self.changed()
         return False
 
+    def live_commit(self, text):
+        """Continue: text the input method puts in itself (an accented letter), as typed."""
+        if not self.composition.text:
+            self.composition.change(self.before_caret())
+        for char in text:
+            self.composition.type_live(char)
+        self.commit_text(IBus.Text.new_from_string(text))
+        self.changed()
+
     def finish(self, suggested=False):
         self.dead = None  # an accent waiting for its letter goes with the composition
         if self.composition.live:  # nothing is held back in continue mode: just start over
@@ -303,6 +327,16 @@ class ClaudishEngine(IBus.Engine):
         if text:
             self.commit_text(IBus.Text.new_from_string(text))
         self.changed()  # after it: words that stay are the next composition
+
+    @property
+    def dead(self):
+        """The dead key whose accent waits for its letter (drawn in the composition), or None."""
+        return getattr(self, "_dead", None)
+
+    @dead.setter
+    def dead(self, name):
+        self._dead = name
+        self.composition.accent = DEAD_KEYS[name] if name else ""
 
     def do_process_key_event(self, keyval, keycode, state):
         # A Shift tap switches mode (continue <-> compose), as Shift switches English and pinyin.
@@ -324,9 +358,10 @@ class ClaudishEngine(IBus.Engine):
             return False
         if keyval in MODIFIER_KEYS:
             return False
-        if getattr(self, "dead", None) and (IBus.keyval_name(keyval) or "") not in DEAD_KEYS \
+        if self.dead and (IBus.keyval_name(keyval) or "") not in DEAD_KEYS \
                 and not typeable(IBus.keyval_to_unicode(keyval)):
             self.dead = None  # an accent waiting for its letter: any other key cancels it, as GTK's does
+            self.render()
             if keyval == IBus.KEY_BackSpace:
                 return True  # Backspace cancels the accent, and nothing else
         modifiers = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
@@ -439,7 +474,7 @@ class ClaudishEngine(IBus.Engine):
             return True
         name = IBus.keyval_name(keyval) or ""
         if name in DEAD_KEYS:  # an accent waits for its letter
-            if getattr(self, "dead", None):
+            if self.dead:
                 char = DEAD_KEYS[self.dead] if name == self.dead else None
                 self.dead = None if char else name
                 if char:
@@ -447,9 +482,10 @@ class ClaudishEngine(IBus.Engine):
                     self.changed()
             else:
                 self.dead = name
+            self.render()  # the accent shows where it waits
             return True
         char = IBus.keyval_to_unicode(keyval)
-        if getattr(self, "dead", None) and char:
+        if self.dead and char:
             char, self.dead = with_accent(self.dead, char), None
             if len(char) > 1:  # no such letter: the accent, then the key
                 self.composition.insert(char[0])

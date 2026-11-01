@@ -250,6 +250,12 @@ class MacOSAdapterTests(unittest.TestCase):
                 self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
                     type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0, characters=lambda c=char: c), self.client))
             self.assertEqual("".join(self.client.commits), "ls -la")  # straight in; the hyphen stays a hyphen
+            option = 1 << 19
+            for code, char, flags in ((14, "´", option), (14, "e", 0)):  # Option+e, then e: é
+                self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
+                    type=lambda: 10, keyCode=lambda c=code: c, modifierFlags=lambda f=flags: f,
+                    characters=lambda c=char: c), self.client))
+            self.assertEqual("".join(self.client.commits), "ls -laé")
             self.assertFalse(fresh.handleEvent_client_(types.SimpleNamespace(  # Tab with nothing offered is the app's
                 type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t"), self.client))
         finally:
@@ -391,8 +397,8 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_a_dead_keys_accent_goes_on_the_next_letter(self):
         option = 1 << 19
         self.type_text("caf")
-        self.assertTrue(self.key(14, "´", option))  # Option+e: the accent alone, waiting
-        self.assertEqual(self.client.marked, "caf")
+        self.assertTrue(self.key(14, "´", option))  # Option+e: the accent alone, waiting, shown
+        self.assertEqual(self.client.marked, "caf´")
         self.type_text("e")
         self.assertEqual(self.client.marked, "café")
         self.assertTrue(self.key(32, "¨", option))  # Option+u, then a space: the accent itself

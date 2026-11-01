@@ -456,10 +456,10 @@ class ClaudishInputController(IMKInputController):
             self.show_ghost(client)
             return
         OVERLAY.hide()
-        shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
+        shown = self.state.drawn  # your words (a rewrite waits in the panel for Tab), a waiting accent
         # Cocoa ranges count UTF-16 code units, rather than Python code points; the cursor is where
         # ← and → left it (the end by default).
-        cursor = len(shown[:self.state.cursor].encode("utf-16-le")) // 2
+        cursor = len(shown[:self.state.drawn_cursor].encode("utf-16-le")) // 2
         if shown:
             client.setMarkedText_selectionRange_replacementRange_(marked(shown), (cursor, 0), (NSNotFound, 0))
         else:  # empty marked text would leave a terminal composing: the next Return beeps
@@ -467,9 +467,20 @@ class ClaudishInputController(IMKInputController):
         self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method
-    def live_key(self, client, key, chars):
+    def live_key(self, client, key, chars, flags=0):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.state
+        accent, state.accent = state.accent, ""
+        if flags & NSEventModifierFlagOption and chars in ACCENTS:  # a dead key: its accent waits, shown
+            state.accent = chars
+            client.setMarkedText_selectionRange_replacementRange_(marked(chars), (len(chars), 0), (NSNotFound, 0))
+            return True
+        if accent:
+            unmark(client)
+            if key == 51:
+                return True  # Backspace cancels the accent, and nothing else
+            if chars and all(typeable(char) for char in chars):
+                chars = accented(accent, chars[0]) + chars[1:]  # é, not the e the key would type
         if key == 48:  # Tab
             ghost = state.take_ghost()
             if not ghost:
@@ -577,14 +588,16 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         if self.state.live:
-            return self.live_key(client, key, chars)
+            return self.live_key(client, key, chars, flags)
         # Option+e, Option+u, ...: a dead key gives its accent alone; it waits for its letter (the
         # next key takes it, Backspace cancels it, any other key drops it).
-        accent, self.accent = getattr(self, "accent", None), None
+        accent, self.state.accent = self.state.accent, ""
         if flags & NSEventModifierFlagOption and chars in ACCENTS:
-            self.accent = chars
+            self.state.accent = chars
+            self.changed(client)
             return True
         if accent and key == 51:
+            self.changed(client)
             return True
         shift = bool(flags & NSEventModifierFlagShift)
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
