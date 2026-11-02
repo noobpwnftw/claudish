@@ -32,6 +32,6 @@ unsigned installer is blocked with no Run anyway.
 
 | | File |
 | --- | --- |
-| macOS 26, Apple silicon (not Intel yet) | `cd_AI.pkg` |
+| macOS 26 and 27, Apple silicon (not Intel yet) | `cd_AI.pkg` |
 | Windows 11, x64 and ARM64 | `cd_AI-setup.exe` |
 | Linux, IBus | `curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.4.2/scripts/install.sh \| sh` |

@@ -89,7 +89,7 @@ command draft: Tab puts it at the prompt; Enter runs it in that folder.
 
 | Platform | Supported |
 | --- | --- |
-| macOS | Apple silicon, macOS 26. Intel Macs are not supported yet. |
+| macOS | Apple silicon, macOS 26 and 27. Intel Macs are not supported yet. |
 | Windows | Windows 11, x64 and ARM64. |
 | Linux | IBus. |
 
