@@ -234,6 +234,17 @@ class ReceiveTests(unittest.TestCase):
         state.done(held)  # a helper took the task
         state.returned("A")
         self.assertEqual((state.holds, state.held_pill()), ({}, None))
+        # ... but words typed on it meanwhile are still yours to bring back.
+        state = sent("hand it to claude")
+        state.returned("A")
+        for char in "and the docs":
+            state.insert(char)
+        held = state.revision
+        state.leave("A")
+        state.done(held)
+        state.returned("A")
+        self.assertEqual(state.held_pill()["status"], "your words")
+        self.assertEqual(state.restore(), "and the docs")
 
     def test_each_text_box_keeps_its_own_held_exchange(self):
         state = Composition()

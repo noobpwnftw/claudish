@@ -216,7 +216,7 @@ def exchange(method=None, needs="working"):
         held = self.route(revision)
         if held is not None:
             getattr(held, method.__name__)(revision, *args, **kwargs)
-            if not held.for_model:  # it ended there (a helper took the task): nothing left to bring back
+            if not held.for_model and not held.text:  # it ended there (a helper took it): nothing to bring back
                 self.holds = {box: kept for box, kept in self.holds.items() if kept[0] is not held}
             return False
         if revision != self.revision or not getattr(self, needs):
@@ -1115,8 +1115,9 @@ class Composition:
                   "a rewrite is ready" if held.converted else
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "a draft is ready" if held.candidate else
-                  held.error if held.failed else "working on what you asked")
-        return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
+                  held.error if held.failed else
+                  "working on what you asked" if held.for_model else "your words")  # ended; what you typed meanwhile
+        return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open" if held.for_model else "restore")])
 
     def route(self, revision):
         """A result for a held exchange (its revision): applied there, not to what is on screen."""
