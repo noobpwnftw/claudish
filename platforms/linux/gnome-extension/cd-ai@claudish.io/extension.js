@@ -29,7 +29,14 @@ function mark(text, styleClass) {
 // it is drawn (St otherwise measures it unwrapped, and the footer spills out of the panel).
 const INNER = 440 - 2 * 6 - 2 * 10, TAKE = 44 + 8;  // a row's 10 at the left is its 2, the bar's 3 and its 5
 
+// St draws the stylesheet's px at the theme's scale (2 on a HiDPI screen): the panel's own
+// figures here go by it too.
+function scale() {
+    return St.ThemeContext.get_for_stage(global.stage).scale_factor;
+}
+
 function fit(widget, room) {
+    room *= scale();
     widget.set_width(-1);
     const [, wide] = widget.get_preferred_width(-1);
     if (wide > room)
@@ -68,6 +75,10 @@ export default class CdAiExtension extends Extension {
             this._cursor = rect;
             this._place();
         });
+        // An app talking to IBus itself on Wayland (Qt, GTK with the ibus module) gives its caret in
+        // its window's coordinates: only the panel service says it, as GNOME's own popup reads it.
+        this._readyId = this._ibus.connect('ready', () => this._watchPanelService());
+        this._watchPanelService();
         this._signal = Gio.DBus.session.signal_subscribe(null, 'io.claudish.Screen', 'Changed',
             '/io/claudish/Screen', null, Gio.DBusSignalFlags.NONE,
             (connection, sender, path, iface, name, parameters) => this._show(parameters.deep_unpack()[0]));
@@ -78,8 +89,49 @@ export default class CdAiExtension extends Extension {
         this._focusId = global.display.connect('notify::focus-window', () => this._focus());
         // and again when the engine starts (IBus starts it at the first key or focus, after the
         // window got focus), or the first window would be named gnome-shell.
+        // What it shows is fetched then (a panel drawn in IBus's popup while this was away), and an
+        // engine that ended takes what it showed with it.
         this._engineWatch = Gio.bus_watch_name(Gio.BusType.SESSION, 'io.claudish.Screen',
-            Gio.BusNameWatcherFlags.NONE, () => this._focus(), null);
+            Gio.BusNameWatcherFlags.NONE, () => {
+                this._focus();
+                Gio.DBus.session.call('io.claudish.Screen', '/io/claudish/Screen', 'io.claudish.Screen', 'Get',
+                    null, new GLib.VariantType('(s)'), Gio.DBusCallFlags.NO_AUTO_START, -1, null, (bus, result) => {
+                        try {
+                            this._show(bus.call_finish(result).deep_unpack()[0]);
+                        } catch (e) {}  // gone again meanwhile
+                    });
+            }, () => {
+                if (this._panel)
+                    this._show('{"toast": false}');
+            });
+    }
+
+    _watchPanelService() {
+        const service = this._ibus._panelService || null;  // the shell's own; a new one when IBus restarts
+        if (service === this._service)
+            return;
+        this._unwatchPanelService();
+        if (!service)
+            return;
+        try {
+            this._relativeId = service.connect('set-cursor-location-relative', (ps, x, y, w, h) => {
+                const win = global.display.focus_window?.get_compositor_private();
+                if (!win)
+                    return;
+                this._cursor = {x: win.x + x, y: win.y + y, width: w, height: h};
+                this._place();
+            });
+            this._service = service;
+        } catch (e) {}  // an IBus without the relative signal
+    }
+
+    _unwatchPanelService() {
+        try {
+            if (this._relativeId)
+                this._service.disconnect(this._relativeId);
+        } catch (e) {}  // that service is gone with its IBus
+        this._service = null;
+        this._relativeId = 0;
     }
 
     _focus() {
@@ -110,6 +162,8 @@ export default class CdAiExtension extends Extension {
         Gio.bus_unown_name(this._name);
         Gio.DBus.session.signal_unsubscribe(this._signal);
         this._ibus.disconnect(this._cursorId);
+        this._ibus.disconnect(this._readyId);
+        this._unwatchPanelService();
         if (this._toastTimeout)
             GLib.source_remove(this._toastTimeout);
         for (const actor of [this._panel, this._ghost, this._toast]) {
@@ -133,7 +187,8 @@ export default class CdAiExtension extends Extension {
         if (screen.ghost) {
             // cd_AI's own grey text, in the UI font at the caret's height.
             this._ghost.text = screen.ghost;
-            this._ghost.style = `font-size: ${Math.max(11, Math.round(this._cursor.height / 1.25))}px;`;
+            // The caret's height is in the stage's pixels; St scales a stylesheet's px again.
+            this._ghost.style = `font-size: ${Math.max(11, Math.round(this._cursor.height / 1.25 / scale()))}px;`;
         }
         if (screen.toast) {
             this._fill(this._toast, screen.toast);
@@ -257,24 +312,25 @@ export default class CdAiExtension extends Extension {
                 + children.reduce((sum, child) => sum + child.get_preferred_height(within)[1], 0));
             box.set_size(natural, tall);
             // The content's left edge: a panel's padding and row inset; a toast's own padding (its tile).
-            const inset = box.has_style_class_name('cd-toast') ? 6 : box.get_theme_node().get_padding(St.Side.LEFT) + 10;
-            let left = Math.round(x + width - inset), top = Math.round(y + height + GAP);
+            const s = scale();
+            const inset = box.has_style_class_name('cd-toast') ? 6 * s : box.get_theme_node().get_padding(St.Side.LEFT) + 10 * s;
+            let left = Math.round(x + width - inset), top = Math.round(y + height + GAP * s);
             // It opens under the caret and stays where it opened while it is open on that line and the
             // caret is at or right of it (when the text leaves, it moves to the caret).
             if (box._opened && box._opened.line === y && left >= box._opened.left)
                 left = box._opened.left;
             box._opened = {left, line: y};
-            left = Math.max(area.x + 4, Math.min(left, area.x + area.width - natural - 4));
+            left = Math.max(area.x + 4 * s, Math.min(left, area.x + area.width - natural - 4 * s));
             // Above the line when it does not fit below and there is more room above (as Windows does).
             if (top + tall > area.y + area.height && y - area.y > area.y + area.height - (y + height))
-                top = Math.round(y - tall - GAP);
+                top = Math.round(y - tall - GAP * s);
             box.set_position(left, top);
         }
         if (this._ghost.visible) {
             const [, tall] = this._ghost.get_preferred_height(-1);
             // Just past the caret's line (the reported x is a few pixels left of the drawn caret):
             // the suggestion never covers the space you typed.
-            this._ghost.set_position(Math.round(x + Math.max(width, 2) + CARET_GAP), Math.round(y + (height - tall) / 2));
+            this._ghost.set_position(Math.round(x + Math.max(width, 2) + CARET_GAP * scale()), Math.round(y + (height - tall) / 2));
         }
     }
 }

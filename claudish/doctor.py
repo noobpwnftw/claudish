@@ -106,6 +106,11 @@ def check_backend(state):
     from .keys import for_profile
     key = for_profile(settings)  # what the service sends
     try:
+        (key or "").encode("latin-1")  # what an HTTP header can carry
+    except UnicodeError:
+        return "fail", "the key saved for %s has a character an HTTP header cannot carry" % url, \
+            "paste the key again in cd_AI's settings (`claudish settings`)"
+    try:
         listing = fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
         if backend == "openai" and settings.get("model"):  # as the settings window checks it
             from .settings import server_problem
@@ -181,7 +186,8 @@ def check_ime_linux():
         return [("Input method", "fail", "the Claudish IBus component is not registered",
                  "/usr/bin/python3 %s   (then log out and back in)" % shlex.quote(str(INSTALL_PY)))]
     text = component.read_text(encoding="utf-8", errors="replace")
-    engine = text.split('&quot;')[1] if '&quot;' in text else ""
+    from xml.sax.saxutils import unescape
+    engine = unescape(text.split('&quot;')[1]) if '&quot;' in text else ""  # install.py escapes it (R&amp;D)
     if engine and not Path(engine).is_file():
         results.append(("Input method", "fail", "the registered engine %s no longer exists (moved checkout?)" % engine,
                         "/usr/bin/python3 %s" % shlex.quote(str(INSTALL_PY))))
@@ -203,7 +209,10 @@ def check_ime_linux():
         else:
             results.append(("IBus search path", "ok", "includes the user component directory", None))
     try:
-        engines = subprocess.run(["ibus", "list-engine"], capture_output=True, text=True, timeout=5).stdout
+        listed = subprocess.run(["ibus", "list-engine"], capture_output=True, text=True, timeout=5)
+        engines = listed.stdout
+        if listed.returncode:  # "Can't connect to IBus.": none in this session (SSH, a console)
+            raise OSError(listed.stderr)
         if "claudish" in engines:
             results.append(("IBus engine", "ok", "IBus lists Claudish", None))
         else:
@@ -240,7 +249,7 @@ def check_ime_windows():
         results.append(("Launcher", "ok", "serving its pipe", None))
     else:
         results.append(("Launcher", "fail", "cd_AI's launcher is not running",
-                        "start \"\" \"%s\" or sign out and back in" % (pime / "PIMELauncher.exe")))
+                        "Start-Process \"%s\" in PowerShell, or sign out and back in" % (pime / "PIMELauncher.exe")))
     return results
 
 

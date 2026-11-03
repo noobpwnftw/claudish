@@ -62,6 +62,20 @@ class LinuxChecks(unittest.TestCase):
         self.component.write_text('<exec>/usr/bin/python3 &quot;/gone/engine.py&quot; --ibus</exec>')
         self.assertEqual(self.run_checks()["Input method"][0], "fail")
 
+    def test_a_path_with_an_ampersand_and_no_ibus_in_this_session(self):
+        folder = self.home / "R&D"
+        folder.mkdir()
+        (folder / "engine.py").write_text("")
+        self.component.parent.mkdir(parents=True)
+        from xml.sax.saxutils import escape
+        self.component.write_text(escape('<exec>/usr/bin/python3 "%s" --ibus</exec>' % (folder / "engine.py"))
+                                  .replace("&lt;", "<").replace("&gt;", ">").replace('"', "&quot;"))
+        with patch("claudish.doctor.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 1, "", "Can't connect to IBus.\n")):
+            checks = self.run_checks()
+        self.assertEqual(checks["Input method"][0], "ok")  # R&amp;D is R&D
+        self.assertEqual(checks["IBus engine"][0], "skip")  # not "does not list Claudish yet"
+
 
 class MacChecks(unittest.TestCase):
     def test_installed_but_not_enabled_is_said(self):

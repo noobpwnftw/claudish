@@ -110,11 +110,11 @@ class Screen:
 
     def call(self, connection, sender, path, interface, method, parameters, invocation):
         if method == "Focus":
-            self.focus = tuple(parameters.unpack())  # (app, window)
+            before, self.focus = getattr(self, "focus", None), tuple(parameters.unpack())  # (app, window)
             trace("window", self.focus[0])
             invocation.return_value(None)
-            if self.on_focus is not None:
-                self.on_focus()
+            if self.on_focus is not None:  # the same window again: its class came, the window did not change
+                self.on_focus(same=bool(before) and before[1] == self.focus[1] and bool(self.focus[1]))
             return
         invocation.return_value(GLib.Variant("(s)", (self.state,)))
 
@@ -697,12 +697,13 @@ class ClaudishEngine(IBus.Engine):
         if pill and screen().shell:
             screen().publish(None, "", pill, lasting=True)
 
-    def window_changed(self):
+    def window_changed(self, same=False):
         """GNOME on Wayland: another window has focus in the one input context every app shares.
-        An exchange out is held for the window it was in; typed words are IBus's to commit."""
+        An exchange out is held for the window it was in; typed words are IBus's to commit. same:
+        the window you are in, named again (its class set late): only its app is taken up."""
         if not (getattr(self, "shared", None) and self.focused):
             return
-        if self.composition.for_model:
+        if self.composition.for_model and not same:
             self.composition.leave(getattr(self, "context", None))
             self.render()
         self.do_focus_in_id(self.shared, "gnome-shell")

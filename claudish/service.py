@@ -207,9 +207,10 @@ def managed():
         if system == "Linux":
             if not paths()["Linux"].is_file():
                 return "warn", "not managed: it will not start at login"
-            state = subprocess.run(["systemctl", "--user", "is-active", NAME], capture_output=True, text=True,
+            # Whether it starts at login: enabled (whether it runs now is the Service row's).
+            state = subprocess.run(["systemctl", "--user", "is-enabled", NAME], capture_output=True, text=True,
                                    timeout=5).stdout.strip()
-            return ("ok" if state == "active" else "warn"), "systemd user unit (%s)" % (state or "unknown")
+            return ("ok" if state == "enabled" else "warn"), "systemd user unit (%s)" % (state or "unknown")
         if system == "Windows":
             found = subprocess.run(["schtasks", "/query", "/tn", task_name()], capture_output=True, text=True,
                                    timeout=5).returncode == 0
