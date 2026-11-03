@@ -89,7 +89,7 @@ def set_extension(enabled):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--system", action="store_true", help="Install for all users (run with sudo)")
+    parser.add_argument("--system", action="store_true", help="Install the IBus component in /usr/share (run with sudo), for sessions that do not read environment.d")
     parser.add_argument("--uninstall", action="store_true", help="Remove what this script installed")
     args = parser.parse_args()
     directory = SYSTEM_COMPONENTS if args.system else USER_COMPONENTS

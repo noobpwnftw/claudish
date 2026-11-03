@@ -24,7 +24,7 @@ Every install includes cd_AI's command line, `claudish`: `claudish settings`, `c
 - **Windows:** the installer adds it to PATH; open a new terminal after installing.
 - **macOS:** it is inside the app bundle:
   `~/Library/Input\ Methods/Claudish.app/Contents/MacOS/Claudish`. To type `claudish`, add
-  `alias claudish=~/Library/Input\ Methods/Claudish.app/Contents/MacOS/Claudish` to `~/.zshrc`.
+  `alias claudish='"$HOME/Library/Input Methods/Claudish.app/Contents/MacOS/Claudish"'` to `~/.zshrc`.
 - **A source checkout:** its virtual environment has it, at `.venv/bin/claudish`
   (`.venv\Scripts\claudish` on Windows).
 
@@ -60,7 +60,8 @@ login. The engine keeps your keyboard layout. The checkout must stay where it is
 
 1. Remove **English → Claudish** from **Settings → Keyboard → Input Sources**.
 2. `claudish service uninstall`
-3. `/usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --uninstall`
+3. `/usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --uninstall`, and after a
+   `--system` install also `sudo /usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --system --uninstall`
 4. `rm -rf ~/.local/share/claudish ~/.local/bin/claudish`
 5. Log out and back in.
 

@@ -53,6 +53,7 @@ Source: "PIME\*"; DestDir: "{app}\PIME"; Flags: recursesubdirs ignoreversion res
 Source: "python-x64\*"; DestDir: "{app}\python"; Check: not IsArm64; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
 Source: "python-arm64\*"; DestDir: "{app}\python"; Check: IsArm64; Flags: recursesubdirs ignoreversion restartreplace uninsrestartdelete
 Source: "bin\claudish.cmd"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "bin\leave-input-sources.ps1"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 [Registry]
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "cd_AI"; ValueData: """{app}\PIME\PIMELauncher.exe"""; Flags: uninsdeletevalue
@@ -146,9 +147,18 @@ var
   Found: TFindRec;
   Folder: String;
   Arch: Integer;
+  Code: Integer;
 begin
   if Step = usUninstall then
+  begin
     LeavePath;
+    { Each account that installed it leaves cd_AI in its input sources as itself: this uninstaller
+      may run as the administrator who approved it ([UninstallRun] covers that account). }
+    Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+         '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\bin\leave-input-sources.ps1') +
+         '" -Python "' + ExpandConstant('{app}\python\python.exe') + '" -Tip "0409:@TEXT_SERVICE@@PROFILE@"',
+         '', SW_HIDE, ewWaitUntilTerminated, Code);
+  end;
   { The text service's DLLs are loaded in running apps: what cannot go now goes at the restart. }
   if Step <> usPostUninstall then
     exit;
