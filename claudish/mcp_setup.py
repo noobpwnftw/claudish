@@ -136,14 +136,15 @@ def context_test(app, profile=None, show=False):
     from .doctor import marks
     shown = marks()
     name, settings, _, context = config.resolve(profile=profile)
-    bindings = [b for b in settings.get("bindings") or [] if b.matches(app)]
-    providers = [("profile", p) for p in (context.providers if context else [])] + \
+    # Which AI answers there: the app's binding, then that profile's choice per mode; the context is
+    # what that profile consults (its own, and its bindings for the app), as the service does.
+    answering = next((b.profile for b in settings.get("bindings") or [] if b.matches(app) and b.profile), None) or name
+    _, routed, _, context = config.resolve(profile=answering) if answering != name else (None, settings, None, context)
+    bindings = [b for b in routed.get("bindings") or [] if b.matches(app)]
+    providers = [("profile %s" % answering, p) for p in (context.providers if context else [])] + \
                 [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
     print("App %r, profile %r: %d binding(s) match, %d provider(s) would be consulted"
-          % (app, name, len(bindings), len(providers)))
-    # Which AI answers there: the app's binding, then that profile's choice per mode.
-    answering = next((b.profile for b in bindings if b.profile), None) or name
-    _, routed, _, _ = config.resolve(profile=answering) if answering != name else (None, settings, None, None)
+          % (app, answering, len(bindings), len(providers)))
     for mode in ("continue", "rewrite", "instruct"):
         chosen = (routed["modes"].get(mode) or {}).get("profile") or answering
         _, chosen_settings, _, _ = config.resolve(profile=chosen) if chosen != name else (None, settings, None, None)
