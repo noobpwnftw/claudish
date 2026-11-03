@@ -311,6 +311,9 @@ class Suggestions:
                     continue
                 self._cancel(key)
                 raise
+            with self.condition:  # taken back during the poll: not kept, though it may have answered
+                if self.wanted is not None and revision not in self.wanted:
+                    break
             for event in data["events"]:
                 after = event["seq"] + 1
                 kind = event["type"]

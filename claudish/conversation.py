@@ -55,6 +55,11 @@ class Conversation:
         while self.messages and self.messages[0]["role"] != "user":  # never start mid-turn
             self.messages.pop(0)
 
+    def forget(self, messages):
+        """A turn taken back after it was kept (Esc as its answer arrived), when it is the last."""
+        if messages and self.messages[-len(messages):] == messages:
+            del self.messages[-len(messages):]
+
 
 class Conversations:
     def __init__(self):
@@ -107,6 +112,7 @@ class ModelDriver:
         self.drafted = None  # drafts a tool chose: versions offered, an answer you inserted, or a helper's command line
         self.settled = None  # what a settling tool did, for this conversation's next turn
         self.draft = None  # a follow-up's draft: the one in view, not yet in the text (start_session sets it)
+        self.kept = None  # the turn this instruction added to the conversation
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every
@@ -134,12 +140,11 @@ class ModelDriver:
             # the conversation keeps what happened, so the next instruction in this box knows.
             result = {"consulted": []}
             if self.settled:
-                self.conversation.remember([{"role": "user", "content": prompt},
-                                            {"role": "assistant", "content": self.settled}])
+                self.keep([{"role": "user", "content": prompt}, {"role": "assistant", "content": self.settled}])
         if self.cancelled:
             return  # Esc took it back: the conversation does not keep it either
         if result.get("turn"):
-            self.conversation.remember(result["turn"])
+            self.keep(result["turn"])
         if self.drafted:  # versions to pick from, an answer you chose to insert, or a helper's command line
             session.emit("result", text=self.drafted[0], candidates=self.drafted, consulted=result["consulted"])
             return
@@ -313,8 +318,14 @@ class ModelDriver:
             raise RuntimeError("cancelled")
         session.emit("progress", text=summary)
 
+    def keep(self, turn):
+        self.kept = list(turn)
+        self.conversation.remember(self.kept)
+
     def cancel(self):
         self.cancelled = True
+        if self.kept:  # Esc as the answer arrived: the conversation does not keep it either
+            self.conversation.forget(self.kept)
         for waiter in self.pending.values():
             waiter[1] = (1, "cancelled")
             waiter[0].set()

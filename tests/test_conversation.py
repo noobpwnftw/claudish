@@ -210,6 +210,17 @@ class PolicyTests(unittest.TestCase):
             thread.join(15)
         self.assertEqual(conversation.messages, [])
 
+    def test_an_instruction_cancelled_as_its_answer_arrived_is_taken_back(self):
+        """Esc while the answer was on its way to the input method: the turn was kept, then taken back."""
+        conversation = self.rewriter.conversations.get("box")
+        conversation.remember([{"role": "user", "content": "earlier"}, {"role": "assistant", "content": "kept"}])
+        with patch.object(self.rewriter, "chat", Scripted(answer("En français."))):
+            session, thread = run(ModelDriver(self.rewriter, conversation), "translate to French")
+            thread.join(15)
+        self.assertEqual(len(conversation.messages), 4)
+        session.cancel()  # the input method's cancel, after the session ended
+        self.assertEqual([m["content"] for m in conversation.messages], ["earlier", "kept"])
+
 
 class AskAndHelperTests(unittest.TestCase):
     """The model's own question (shown as is), and a helper as a tool that acts, asked about first."""
