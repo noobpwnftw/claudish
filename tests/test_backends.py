@@ -7,7 +7,7 @@ import threading
 from io import BytesIO
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -121,6 +121,16 @@ class EndpointBackendTests(unittest.TestCase):
             self.assertEqual(rewriter.rewrite("so")["text"], "Indeed—so.")
             request = opener.return_value.open.call_args_list[-1].args[0]  # the chat request (a nameless model asks /v1/models first)
             return opener.call_args.args, request, json.loads(request.data)
+
+    def test_a_server_that_starts_after_the_service_is_asked_for_its_model_again(self):
+        rewriter = Rewriter("openai", "http://localhost:11434/")
+        rewriter.opener = MagicMock()
+        rewriter.opener.open.side_effect = ConnectionRefusedError("refused")  # Ollama not up yet
+        self.assertIsNone(rewriter.server_model({}))
+        rewriter.opener.open.side_effect = lambda *args, **kwargs: BytesIO(json.dumps({"data": [{"id": "qwen2.5:7b"}]}).encode())
+        self.assertEqual(rewriter.server_model({}), "qwen2.5:7b")
+        rewriter.opener.open.side_effect = ConnectionRefusedError("refused")
+        self.assertEqual(rewriter.server_model({}), "qwen2.5:7b")  # then once
 
     def test_local_server_any_model_and_no_proxy(self):
         rewriter = Rewriter("openai", "http://localhost:11434/", model="qwen2.5:7b")

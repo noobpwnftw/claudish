@@ -473,12 +473,19 @@ class Rewriter:
 
     def server_model(self, headers):
         """A profile without "model": the server's only model (Ollama, LM Studio and hosted APIs
-        want one named; llama.cpp does not). Asked once. None when the server lists none."""
+        want one named; llama.cpp does not). Asked until the server answers (it may start after the
+        service), then once. None when the server lists none."""
         if not hasattr(self, "listed_model"):
             try:
                 with self.opener.open(Request(self.endpoint + "/v1/models", headers=headers), timeout=5) as response:
                     names = [m.get("id") for m in json.load(response).get("data", []) if isinstance(m, dict)]
-            except (OSError, ValueError, AttributeError):
+            except HTTPError as exc:
+                if exc.code >= 500:
+                    return None  # loading (503): asked again at the next request
+                names = []
+            except OSError:
+                return None  # not answering yet: asked again at the next request
+            except (ValueError, AttributeError):
                 names = []
             names = [n for n in names if isinstance(n, str)]
             if len(names) > 1:
