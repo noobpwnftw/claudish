@@ -345,7 +345,8 @@ class ClaudishTextService(TextService):
         return True
 
     def filterKeyDown(self, event):
-        keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text))
+        keylog("filterKeyDown", hex(event.keyCode), "ctrl=%d alt=%d char=%x" % (event.isKeyDown(0x11), event.isKeyDown(0x12), event.charCode),
+               "len=%d" % len(self.state.text))
         if event.keyCode == 0x7B and os.path.exists(PREVIEW):  # F12, with the lab's states there: the gallery
             return True
         if not self.keyboardOpen or self.sensitive():
@@ -533,7 +534,8 @@ class ClaudishTextService(TextService):
     def onKeyDown(self, event):
         if event.keyCode == 0x7B and self.preview():
             return True
-        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d" % event.isKeyDown(0x11), "len=%d" % len(self.state.text),
+        keylog("onKeyDown", hex(event.keyCode), "ctrl=%d alt=%d char=%x" % (event.isKeyDown(0x11), event.isKeyDown(0x12), event.charCode),
+               "len=%d" % len(self.state.text),
                "around=%s/%s" % tuple(len(s) for s in self.around()),
                "selected=%d" % len(getattr(self, "textSelected", None) or ""), "scopes=%s" % getattr(self, "inputScopes", None))
         self.poll_results()
