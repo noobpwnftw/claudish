@@ -2,11 +2,15 @@
 service, so they end when it ends, however it ends."""
 import os
 import subprocess
+import threading
+
+JOB = []  # Windows: the one job object every child is put in, made at the first
+LOCK = threading.Lock()
 
 
 def bind_to_this_process(process, what="the model"):
-    """Windows: put the process in a job object that is killed when this process ends, however it
-    ends. `schtasks /end` (service uninstall) terminates the service without running its cleanup,
+    """Windows: put the process in the service's job object, which is killed when this process ends,
+    however it ends (one for every child: a handle per child would add up, a process per request). `schtasks /end` (service uninstall) terminates the service without running its cleanup,
     which left llama-server running, holding its port and locking its DLLs."""
     if os.name != "nt":
         return None
@@ -26,12 +30,16 @@ def bind_to_this_process(process, what="the model"):
     kernel32.CreateJobObjectW.restype = wintypes.HANDLE
     kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
     kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
-    job = kernel32.CreateJobObjectW(None, None)
-    limits = Limits(LimitFlags=0x2000)  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-    if not (job and kernel32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits))
-            and kernel32.AssignProcessToJobObject(job, int(process._handle))):
+    with LOCK:
+        if not JOB:
+            job = kernel32.CreateJobObjectW(None, None)
+            limits = Limits(LimitFlags=0x2000)  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            if job and kernel32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+                JOB.append(job)
+    job = JOB[0] if JOB else None
+    if not (job and kernel32.AssignProcessToJobObject(job, int(process._handle))):
         print("warning: could not tie %s to this process (error %d)" % (what, ctypes.get_last_error()), flush=True)
-    return job  # the handle must stay open for the life of this process
+    return job  # the handle stays open for the life of this process (JOB)
 
 
 def spawn(argv, what, **options):
