@@ -1,6 +1,7 @@
 import hmac
 import json
 import sys
+from pathlib import Path
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
@@ -59,12 +60,26 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         stamps[0] = stamp()
 
     def stamp():
-        """When the config folder's JSON files (config.json, templates.json) last changed."""
-        folder = (config_path or _config_default()).parent
+        """When the config folder's JSON files (config.json, templates.json) and the templates files
+        its profiles name (in a folder of their own too) last changed."""
+        path = config_path or _config_default()
         try:
-            return tuple(sorted((path.name, path.stat().st_mtime_ns) for path in folder.glob("*.json")))
+            watched = set(path.parent.glob("*.json"))
         except OSError:
             return ()
+        try:
+            profiles = json.loads(path.read_text(encoding="utf-8-sig")).get("profiles") or {}
+            watched.update(path.parent / Path(entry["templates"]).expanduser() for entry in profiles.values()
+                           if isinstance(entry, dict) and isinstance(entry.get("templates"), str))
+        except (OSError, ValueError, AttributeError):
+            pass  # a config that does not read: its own file's change is enough
+        found = []
+        for each in watched:
+            try:
+                found.append((str(each), each.stat().st_mtime_ns))
+            except OSError:
+                pass
+        return tuple(sorted(found))
 
     stamps = [stamp()]
     import threading

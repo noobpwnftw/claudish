@@ -330,6 +330,18 @@ class ServiceTests(Home):
         self.server_reload[0] = lambda: (_ for _ in ()).throw(ValueError("bad config"))
         self.assertEqual(self.call("/health")[0], 200)
 
+    def test_a_templates_file_in_a_folder_of_its_own_is_watched(self):
+        import os
+        words = self.path.parent / "words" / "t.json"
+        words.parent.mkdir(parents=True)
+        words.write_text("{}")
+        self.path.write_text(json.dumps({"profile": "p", "profiles": {"p": {"backend": "rules", "templates": "words/t.json"}}}))
+        self.call("/health")
+        count = len(self.builds)
+        os.utime(words, ns=(3, 3))  # only the templates file changed
+        self.call("/health")
+        self.assertEqual(len(self.builds), count + 1)
+
     def test_the_page_is_public_its_settings_are_not(self):
         status, page = self.call("/settings", token=False)
         self.assertEqual(status, 200)
