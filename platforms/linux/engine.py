@@ -514,7 +514,7 @@ class ClaudishEngine(IBus.Engine):
         self.purpose = PURPOSES.get(purpose)
         self.update_quiet()
         if self.sensitive:
-            self.do_reset()
+            self.finish()  # words typed before it became a password field go in, as on a focus change
 
     def update_quiet(self):
         """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;

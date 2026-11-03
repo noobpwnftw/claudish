@@ -220,7 +220,12 @@ try:
     assert engine.composition.quiet
     engine.do_focus_in_id("/", "gtk3-im:gedit")
     assert not engine.composition.quiet
-    engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)
+    shift_tap()  # compose: what you type is held
+    assert engine.composition.mode == "compose"
+    for char in "hunter":
+        engine.do_process_key_event(ord(char), 0, 0)
+    engine.do_set_content_type(IBus.InputPurpose.PASSWORD, 0)  # the field became a password field
+    assert commits[-1] == "hunter" and not engine.composition.text, commits[-1:]  # typed words went in
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
     print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass")
