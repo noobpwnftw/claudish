@@ -296,14 +296,20 @@ class ClaudishTextService(TextService):
             self.owner = window
         if self.adopted_from == window:
             return
-        self.adopted_from = window
         expire()
         parked = PARKED.get(window)
         keylog("adopt", id(self), window, "found=%s" % (parked is not None))
         if parked is None or parked[1] is self.worker:
+            self.adopted_from = window
             return
-        if any(other is not self and getattr(other, "state", None) is parked[0] for other in list(INSTANCES)):
-            return  # parked at a click by an instance that goes on with it (another window of this app)
+        # Held for a text box: taken up there (the next instance in that box, after an input-method
+        # switch), not in another window's (the instance that parked it at the click goes on with it);
+        # looked at again at the next request. A request that names no box yet (a key) takes it.
+        document, held = getattr(self, "document", None), parked[0]
+        boxes = set(held.holds) | ({held.dropped_box} if getattr(held, "dropped_box", None) else set())
+        if document is not None and boxes and document not in boxes:
+            return
+        self.adopted_from = window
         del PARKED[window]
         state, worker, _ = parked
         if self.worker is not None:
@@ -727,7 +733,8 @@ class ClaudishTextService(TextService):
         elif key == 0x1B:
             self.state.dismiss()
         elif event.isPrintableChar():
-            if not self.state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
+            # A fresh start (a paste, a new field), or a click since (Windows says nothing of it): from the app's text.
+            if not self.state.text or not self.caret_stayed():
                 self.state.change(self.around()[0][-MAX_COMPOSITION:])
             self.setCommitString(self.state.type_live(chr(event.charCode)))
         self.changed()

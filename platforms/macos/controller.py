@@ -283,6 +283,7 @@ class ClaudishInputController(IMKInputController):
                 (x, y), (w, h) = unpack(rect)
                 if h > 0 and (x, y) != (0, 0):  # the screen's corner: the app did not say
                     trace("caret line", round(x), round(y), round(w), round(h), "inline", index, "document", location)
+                    self.caret_known = True
                     return (x, y), (w, h)
         except Exception:
             trace("caret line failed", traceback.format_exc().splitlines()[-1])
@@ -292,10 +293,12 @@ class ClaudishInputController(IMKInputController):
             (x, y), (w, h) = unpack(rect)
             if h > 0 and (x, y) != (0, 0):
                 trace("caret first", round(x), round(y), round(w), round(h), "at", location)
+                self.caret_known = True
                 return (x, y - h), (w, h)
         except Exception:
             trace("caret failed", traceback.format_exc().splitlines()[-1])
         # No caret from the app: under the pointer, where the person is looking, not a corner.
+        self.caret_known = False
         pointer = NSEvent.mouseLocation()
         trace("caret unknown: at the pointer")
         return (pointer.x, pointer.y - 18), (0, 18)
@@ -316,10 +319,14 @@ class ClaudishInputController(IMKInputController):
             # neither what it was when asked (the app may still be catching up after the key, as
             # Chromium's does) nor what continue typed (the app may have changed it: smart quotes,
             # autocorrect, a no-break space). Not for this spot.
-            self.state.dismiss()
+            self.state.change("")  # and continue starts again from the app's text there
             OVERLAY.hide()
             return
         self.ghost_at = self.caret(client)
+        if not getattr(self, "caret_known", True):  # the app gives no caret: nothing to put it after
+            self.state.dismiss()
+            OVERLAY.hide()
+            return
         self.ghost_checked = time.monotonic()
         OVERLAY.show(self.ghost_at, ghost)
         trace("ghost overlay", len(ghost))
@@ -545,8 +552,11 @@ class ClaudishInputController(IMKInputController):
                 state.change("")  # Enter, arrows, anything else: the context starts over
             self.changed(client)  # clears the suggestion before the app handles the key
             return False
-        if not state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
-            state.change(self.around_caret(client)[0][-MAX_COMPOSITION:])
+        before = self.around_caret(client)[0]
+        plain = lambda text: text.replace("\r", "").replace("\xa0", " ")
+        # A fresh start (a paste, a new field), or a click since (no key says so): from the app's text.
+        if not state.text or (before and not plain(before).endswith(plain(state.text)[-32:])):
+            state.change(before[-MAX_COMPOSITION:])
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
         self.changed(client)

@@ -170,6 +170,8 @@ class Panel:
         window.setHidesOnDeactivate_(False)
         window.setFloatingPanel_(True)
         window.setBecomesKeyOnlyIfNeeded_(True)
+        if self.toast:  # the pill and the toasts take no clicks: the text under them gets them
+            window.setIgnoresMouseEvents_(True)
         effect = NSVisualEffectView.alloc().initWithFrame_(NSMakeRect(0, 0, MIN_WIDTH, 40))
         effect.setMaterial_(MATERIAL_MENU)
         effect.setBlendingMode_(BLENDING_BEHIND)
@@ -261,6 +263,9 @@ class Panel:
         if opens_above(height + 6, cy - screen.origin.y, screen.origin.y + screen.size.height - (cy + ch)):
             frame.origin.y = cy + ch + 6
         frame.origin.x = max(screen.origin.x + 4, min(frame.origin.x, screen.origin.x + screen.size.width - width - 4))
+        # Taller than the room on either side (a long task to approve): on the screen all the same,
+        # its rows and keys (at the bottom) first.
+        frame.origin.y = max(screen.origin.y + 4, min(frame.origin.y, screen.origin.y + screen.size.height - height - 4))
         self.window.setFrame_display_(frame, True)
         self.window.invalidateShadow()  # the shadow follows the rounded mask, not the square window
         self.window.orderFrontRegardless()
