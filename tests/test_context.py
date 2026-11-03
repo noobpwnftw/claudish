@@ -37,6 +37,11 @@ class ContextTests(unittest.TestCase):
         self.assertIn("string form", "".join(found.values()))
         self.assertEqual(Context().sections(), [])  # the text around the caret is the text box's, not a provider's
 
+    def test_an_mcp_server_without_a_command_or_url_is_a_config_error(self):
+        from claudish.context import from_server
+        with self.assertRaisesRegex(ValueError, "needs a \"command\""):  # not a KeyError that ends the service
+            from_server({"server": "notes", "tool": "read"}, {"notes": {"type": "stdio"}})
+
     def test_cache_ttl(self):
         context = Context([{"type": "file", "path": "glossary.md", "ttl": 60}], base=self.root)
         joined(context)

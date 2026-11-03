@@ -28,14 +28,16 @@ def from_server(spec, servers):
     if server is None:
         raise ValueError('mcp server %r is not in "mcp_servers" (see `claudish mcp import`)' % spec["server"])
     spec = dict(spec)
-    spec.pop("server")
+    name = spec.pop("server")
     if server.get("url"):
         spec.setdefault("url", server["url"])
         spec.setdefault("transport", "sse" if server.get("type") == "sse" else "http")
         spec.setdefault("headers", server.get("headers") or {})
-    else:
+    elif isinstance(server.get("command"), str) and server["command"]:
         spec.setdefault("command", [server["command"]] + list(server.get("args") or []))
         spec.setdefault("env", server.get("env") or {})
+    else:
+        raise ValueError('mcp server %r needs a "command" (a program) or a "url"' % name)
     spec.setdefault("name", spec.get("tool") or spec.get("resource"))
     return spec
 
