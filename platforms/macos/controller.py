@@ -481,7 +481,7 @@ class ClaudishInputController(IMKInputController):
                 return True  # Backspace cancels the accent, and nothing else
             if chars and all(typeable(char) for char in chars):
                 chars = accented(accent, chars[0]) + chars[1:]  # é, not the e the key would type
-        if key == 48:  # Tab
+        if key == 48 and not flags & NSEventModifierFlagShift:  # Tab (Shift+Tab is the app's)
             ghost = state.take_ghost()
             if not ghost:
                 return False  # no suggestion: Tab is the app's
@@ -627,7 +627,7 @@ class ClaudishInputController(IMKInputController):
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.show_panel(client)
             return action != "pass"
-        if key == 48:  # Tab
+        if key == 48 and not shift:  # Tab; Shift+Tab commits and is the app's, as a navigation key
             if not self.state.live and not self.state.text and self.take_selection(client):
                 self.show_panel(client)  # a selection: your words now, as if typed
                 return True

@@ -289,6 +289,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
+    def test_shift_tab_commits_and_is_the_apps(self):
+        self.type_text("draft")
+        self.assertFalse(self.key(48, "\x19", 1 << 17))  # Shift+Tab: back a field, as Linux and Windows do
+        self.assertEqual(self.client.commits, ["draft"])
+        self.assertFalse(self.controller.state.working)  # not Tab: nothing asked
+
     def test_enter_keeps_and_shift_enter_asks(self):
         self.type_text("on my way")
         self.assertTrue(self.key(36, "\r"))  # Enter commits; the app gets the next one

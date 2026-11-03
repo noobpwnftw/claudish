@@ -94,6 +94,12 @@ def main():
             assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
             shift_tap()  # compose: what you type is held
             assert service.state.mode == "compose"
+            # Shift+Tab commits your words and is the app's (back a field), as a navigation key is.
+            for char in "draft":
+                key(ord(char.upper()), ord(char))
+            reply = key(9, modifiers=(0x10,))
+            assert reply.get("commitString") == "draft" and not service.state.working, reply
+            assert replayed.pop() == (9, [0x10])  # the app gets Shift+Tab
             # Tab on a selection with nothing composed: the selection becomes your words, as if just typed.
             words = "thanks for the help"
             assert key(9, method="filterKeyDown", textSelected=words)["return"] is True

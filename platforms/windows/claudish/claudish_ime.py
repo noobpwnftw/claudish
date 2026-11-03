@@ -352,7 +352,7 @@ class ClaudishTextService(TextService):
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
             # Backspace, Enter, and navigation are the app's (the context follows here).
-            if event.keyCode in (0x09, 0x1B):
+            if event.keyCode == 0x1B or event.keyCode == 0x09 and not event.isKeyDown(0x10):  # Shift+Tab: the app's
                 if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
                     self.drop_live()
                     return False
@@ -367,7 +367,7 @@ class ClaudishTextService(TextService):
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
-        taking = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: your words
+        taking = event.keyCode == 0x09 and not event.isKeyDown(0x10) and bool(self.selection())  # Tab on a selection: your words
         return event.isPrintableChar() or bool(self.state.text) or restoring or taking
 
     def caret_stayed(self):
@@ -479,7 +479,7 @@ class ClaudishTextService(TextService):
             keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
             return getattr(self, "switching", False)
         return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
-                                           event.keyCode == 0x09 and self.state.asked == "rewrite"
+                                           event.keyCode == 0x09 and not event.isKeyDown(0x10) and self.state.asked == "rewrite"
                                            and self.state.working))
 
     def onKeyUp(self, event):
@@ -569,7 +569,7 @@ class ClaudishTextService(TextService):
             if self.state.toggle_look():
                 self.publish()
             return bool(self.state.text)
-        if key == 0x09:
+        if key == 0x09 and not event.isKeyDown(0x10):  # Shift+Tab commits and is the app's, as a navigation key
             if not self.state.text and self.selection():
                 # The selection becomes your words, as if you had just typed them: the composition
                 # takes its place, as typing does; then Tab rewrites it, Shift+Enter sends it.
@@ -660,7 +660,7 @@ class ClaudishTextService(TextService):
     def live_key(self, event):
         """Continue mode: what filterKeyDown took (printable keys, Tab and Esc with a suggestion)."""
         key = event.keyCode
-        if key == 0x09:
+        if key == 0x09 and not event.isKeyDown(0x10):
             ghost = self.state.take_ghost()
             if ghost:
                 self.setCommitString(ghost)
