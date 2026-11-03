@@ -395,6 +395,13 @@ class RoutingTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_an_agent_profile_refuses_f8_rather_than_dropping_the_picture(self):
+        rewriter = Rewriter("rules")
+        rewriter.session_command = ["claude"]
+        with patch("claudish.capture.capture") as capture, self.assertRaisesRegex(RuntimeError, "cannot take a window picture"):
+            rewriter.make_driver(app="code", conversation="box", look=True)
+        capture.assert_not_called()
+
     def test_a_routed_profile_that_cannot_run_is_answered_not_dropped(self):
         main = Rewriter("rules")
         main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))

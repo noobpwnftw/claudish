@@ -405,6 +405,8 @@ class Rewriter:
                 raise ValueError("a window picture is only taken for an instruction")
             if self.backend in ("command", "claude-code", "codex"):
                 raise RuntimeError("the %s backend cannot take a window picture; use claude or a vision model" % self.backend)
+            if self.session_command:  # the agent gets the instruction as text only
+                raise RuntimeError("the profile's agent (session_command) cannot take a window picture")
         box = Box(app, "terminal" if screen else purpose, before, after)
         box.trusted = trusted  # nor the profile's tools
         if trusted:

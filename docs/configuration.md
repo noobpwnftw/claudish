@@ -404,7 +404,7 @@ lists it in "consulted". F8 applies to that one instruction.
   `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
   Wayland lets no program capture a window without asking, so F8 has no picture there.
 - **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
-  Codex refuse F8 with an error, as the command backend does.
+  Codex refuse F8 with an error, as the command backend and a profile's agent (`session_command`) do.
   For llama.cpp, start a vision model with its projector, for example
   [Qwen2.5-VL-3B](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF):
   `llama-server -m Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf --mmproj
