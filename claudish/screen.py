@@ -10,7 +10,6 @@ Linux: AT-SPI (the accessibility bus GNOME and KDE run). Windows: UI Automation 
 macOS: the AX API through pyobjc; the service's Python needs the Accessibility permission.
 Keep importable on PIME's Python 3.6: adapters use `is_terminal` for quiet continue.
 """
-import re
 import sys
 import time
 
@@ -30,7 +29,6 @@ TERMINALS = {
 }
 
 
-SECRET_PROMPT = re.compile(r"(password|passphrase|passcode|\bpin\b|verification code|otp)[^\n]{0,60}:\s*$", re.I)
 
 
 def one_line(text):
@@ -87,10 +85,7 @@ def read(app=None):
         return None  # accessibility is a best effort: the instruction goes ahead without it
     if not text or not text.strip():
         return None
-    screen = tail(text)
-    if SECRET_PROMPT.search(screen.rsplit("\n", 1)[-1]):
-        return None
-    return screen
+    return tail(text)
 
 
 def read_atspi(app):
