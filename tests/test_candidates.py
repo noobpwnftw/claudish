@@ -214,6 +214,18 @@ class ReceiveTests(unittest.TestCase):
             state.insert(char)
         self.assertTrue(state.toggle_look())
         self.assertEqual((state.reply, state.working), ("and the docs", True))
+        # A follow-up on a rewrite that fails: Esc goes back to your words, as on the rewrite.
+        state = Composition()
+        state.mode = "compose"
+        state.change("running late")
+        state.tab()
+        state.offer(state.revision, "Running slightly behind schedule—apologies.")
+        for char in "shorter":
+            state.insert(char)
+        state.enter()
+        state.submit()
+        state.fail(state.revision, "timed out")
+        self.assertEqual((state.escape(), state.text), ("back", "running late"))
         # A held exchange that ends elsewhere (a helper took it) is not held any more.
         state = sent("hand it to claude")
         state.returned("A")

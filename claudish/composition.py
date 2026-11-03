@@ -307,6 +307,7 @@ class Composition:
         self.candidates = []
         self.question, self.status = None, ""
         self.about = ""  # the draft in view: one exchange's, never the next one's
+        self.origin = ""  # a follow-up on a rewrite: your words before it (Esc goes back to them)
         self.taken = False
         self.converted = False
         self.asked = None
@@ -641,6 +642,10 @@ class Composition:
             return "back"
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)
+        if self.origin and (self.working or self.failed or self.question):
+            self.change(self.origin)  # a follow-up on a rewrite: back to your words, as Esc on the rewrite is
+            self.editing = True
+            return "back"
         if (self.candidates and self.asked == "instruct") or self.working or self.failed or self.question:
             # A new revision: a late answer for the old one is ignored. Words set aside while a
             # question was up go with the instruction you are back at, as an early follow-up does.
@@ -695,9 +700,10 @@ class Composition:
             # Before any answer, the first instruction goes with it: the new one replaces its
             # session, which the conversation does not keep, and the model would have only this.
             first = self.text.strip() if self.sent and not (drafts or self.converted) else ""
+            origin = self.text if self.converted else ""
             joined = " ".join(part for part in (first, self.reply.strip()) if part)  # one line, as typed
             self.change(joined if len(joined) <= MAX_COMPOSITION else self.reply.strip())  # too long together: alone
-            self.about = about
+            self.about, self.origin = about, origin
             return "submit"
         if self.asked == "instruct" and self.candidate:
             self.light_tab()
