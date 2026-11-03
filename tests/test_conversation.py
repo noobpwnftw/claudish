@@ -210,6 +210,14 @@ class PolicyTests(unittest.TestCase):
             thread.join(15)
         self.assertEqual(conversation.messages, [])
 
+    def test_a_turn_taken_back_after_a_newer_one_was_kept_goes_too(self):
+        conversation = self.rewriter.conversations.get("box")
+        old = [{"role": "user", "content": "first"}, {"role": "assistant", "content": "one"}]
+        conversation.remember(old)
+        conversation.remember([{"role": "user", "content": "second"}, {"role": "assistant", "content": "two"}])
+        conversation.forget(old)
+        self.assertEqual([m["content"] for m in conversation.messages], ["second", "two"])
+
     def test_an_instruction_cancelled_as_its_answer_arrived_is_taken_back(self):
         """Esc while the answer was on its way to the input method: the turn was kept, then taken back."""
         conversation = self.rewriter.conversations.get("box")

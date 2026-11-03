@@ -287,6 +287,18 @@ class ReceiveTests(unittest.TestCase):
         self.assertEqual(state.held_pill()["status"], "your words")
         self.assertEqual(state.restore(), "and the docs")
 
+    def test_a_new_instruction_in_a_box_ends_its_held_one(self):
+        state = Composition()
+        state.mode = "compose"
+        state.returned("mail")
+        state.change("reply to Sam")
+        state.submit()
+        state.leave("mail")
+        state.returned("mail")  # the pill; you type something new instead of Shift+Esc
+        state.change("thank Ana")
+        state.submit()
+        self.assertEqual(state.holds, {})  # its session stops; its turn is not kept unseen
+
     def test_each_text_box_keeps_its_own_held_exchange(self):
         state = Composition()
         state.mode = "compose"

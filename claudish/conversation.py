@@ -57,9 +57,14 @@ class Conversation:
             self.messages.pop(0)
 
     def forget(self, messages):
-        """A turn taken back after it was kept (Esc as its answer arrived), when it is the last."""
-        if messages and self.messages[-len(messages):] == messages:
-            del self.messages[-len(messages):]
+        """A turn taken back after it was kept (Esc as its answer arrived): wherever it is, the latest
+        first (a newer turn may have been kept since)."""
+        if not messages:
+            return
+        for start in range(len(self.messages) - len(messages), -1, -1):
+            if self.messages[start:start + len(messages)] == messages:
+                del self.messages[start:start + len(messages)]
+                return
 
 
 class Conversations:

@@ -738,6 +738,9 @@ class Composition:
         return kept
 
     def submit(self):
+        # A new instruction in a box whose earlier one is held: you moved on, so the held one ends
+        # (its session is stopped, its turn not kept), as a newer hold replaces an older one.
+        self.held = None
         self.back = 0  # your next words, a reply, start at the end
         self.asked, self.working, self.failed = "instruct", True, False
         self.converted, self.candidate, self.candidates = False, "", []  # a rewrite earlier is not this answer
