@@ -1034,7 +1034,7 @@ class Composition:
     def caret_after(self, after):
         """The text after the caret, read at each key in continue: whether the caret is inside a
         line (continue waits for its end), and what continue sends of it."""
-        self.inside = bool(after.split("\n", 1)[0].strip())
+        self.inside = bool(after.replace("\r", "\n").split("\n", 1)[0].strip())  # a bare \r ends a paragraph in RichEdit
         return after[:WINDOW[1]]
 
     def restorable(self):

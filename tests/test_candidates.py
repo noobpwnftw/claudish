@@ -571,6 +571,11 @@ class ModeFeelTests(unittest.TestCase):
         self.assertFalse(state.automatic)
         state.inside, state.quiet = False, True  # a number field
         self.assertFalse(state.automatic)
+        state.quiet = False
+        for after, inside in (("\rNext paragraph", False), ("\r\nNext line", False), ("\nNext line", False),
+                              (" and more\rNext", True)):  # RichEdit and Word end a paragraph with a bare \r
+            state.caret_after(after)
+            self.assertEqual(state.inside, inside, repr(after))
 
     def test_the_panel_is_the_labs_and_the_keys_wait_for_a_pause(self):
         """Composition.panel() is what every adapter draws (docs/design/design.md): one header,
