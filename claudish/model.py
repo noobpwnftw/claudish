@@ -286,6 +286,7 @@ class Rewriter:
         self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
         self.profile = None  # the profile's name in the config file
         self.problem = None  # why the config is not used (the service runs with no model meanwhile)
+        self.unavailable = None  # why its model cannot run here (the Anthropic SDK missing): no model meanwhile
         self.summon = "Shift+Enter"  # config "keys": the key that sends your words to the model
         self.hints = True  # config "hints": the panel's key hints
         self.url = None  # this service's address, for the agent's textbox MCP server
@@ -555,7 +556,7 @@ class Rewriter:
         tool calls (asking through approve when policy says so), and fit the result to the box.
         serial: a request while typing, which fails fast instead of queueing behind another."""
         if self.backend == "none":
-            raise RuntimeError(NOT_USED % self.problem if self.problem else NO_MODEL)
+            raise RuntimeError(NOT_USED % self.problem if self.problem else self.unavailable or NO_MODEL)
         started = time.perf_counter()
         spec = self.modes[mode]
         local = local or {}

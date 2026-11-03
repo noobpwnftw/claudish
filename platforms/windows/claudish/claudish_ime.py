@@ -396,8 +396,8 @@ class ClaudishTextService(TextService):
             return False
         # An accent that does not combine with this key, then the key's own character ('t after ' on
         # US-International): the app types both into the composition, and Claudish's PIME sends them
-        # as typed.
-        if getattr(event, "charCount", 1) > 1:
+        # as typed. Backspace, Tab, Enter and Esc stay Claudish's keys (the accent goes).
+        if getattr(event, "charCount", 1) > 1 and event.keyCode not in (0x08, 0x09, 0x0D, 0x1B):
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
@@ -422,7 +422,8 @@ class ClaudishTextService(TextService):
         self.publish()
 
     def shortcut(self, event):
-        altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and event.isPrintableChar()
+        typing = event.isPrintableChar() or getattr(event, "isDead", False) or getattr(event, "charCount", 1) > 1
+        altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and typing
                  and not (event.isKeyDown(0x5B) or event.isKeyDown(0x5C)))
         return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
 

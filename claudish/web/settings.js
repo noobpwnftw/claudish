@@ -53,6 +53,8 @@ function status(state) {
   const backend = (state.service || {}).backend;
   const problem = (state.service || {}).problem;
   if (problem) return [`cd_AI does not use its config: ${problem.replace(/\.$/, "")}.`, "bad"];
+  const unavailable = (state.service || {}).unavailable;  // its model cannot run here: another can be picked
+  if (unavailable) return [`cd_AI has no model: ${unavailable.replace(/\.$/, "")}.`, "bad"];
   const name = subscription(state);
   if (name) {
     const model = state.service.model || "warm";

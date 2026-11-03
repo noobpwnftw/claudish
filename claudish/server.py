@@ -326,6 +326,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     "keys": {"summon": rewriter.summon},
                     "hints": rewriter.hints,
                     **({"problem": rewriter.problem} if rewriter.problem else {}),
+                    **({"unavailable": rewriter.unavailable} if rewriter.unavailable else {}),
                     # Whether this service has a Claude key: a terminal's variable may not reach it.
                     **({"key": bool(rewriter.claude.credential)} if rewriter.claude else {}),
                     **({"model": rewriter.model_state} if rewriter.model_state else {})}

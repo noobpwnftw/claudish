@@ -166,6 +166,7 @@ def main():
             assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
             # The accent does not combine with t: the app types both, and they come back as typed.
             assert key(ord("T"), 0, "filterKeyDown", charCount=2)["return"] is False
+            assert key(0x0D, 0, "filterKeyDown", charCount=2)["return"] is True  # Enter is still Claudish's
             reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "typed": "´t"})
             assert reply["compositionString"] == "hello-world´t" and "commitString" not in reply, reply
             key(0x08)

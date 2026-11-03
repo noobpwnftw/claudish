@@ -21,7 +21,8 @@ class ServeTests(unittest.TestCase):
                     patch("sys.stderr"):
                 cli.main()  # no SystemExit: a login service would start it again and again
         self.assertEqual(served[0].backend, "none")
-        self.assertIn("Anthropic SDK", served[0].problem)
+        self.assertIn("Anthropic SDK", served[0].unavailable)
+        self.assertIsNone(served[0].problem)  # the config reads: the settings window does not lock
 
 
 if __name__ == "__main__":

@@ -218,7 +218,7 @@ def main():
             problem = "the claude backend needs the Anthropic SDK: " + SDK_FIX
             print("cd_AI has no model: %s" % problem, file=sys.stderr, flush=True)
             profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
-            rewriter.problem = problem
+            rewriter.unavailable = problem  # not the config's problem: the window's choices stay open
         run_service(rewriter, args.port, lambda: build()[2],
                     Path(args.config) if args.config else config.default_path(),
                     lambda server: print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (

@@ -151,6 +151,14 @@ async def check(args, home, port):
         await page.reload()
         await expect(page.locator("#status")).to_have_text("Starting Codex…")
         await expect(page.locator("#status")).to_have_text("Ready: Codex writes for you.")
+        # Its model cannot run here (no Anthropic SDK): said, and another model can still be picked.
+        lifecycle.update(backend="none", unavailable="the claude backend needs the Anthropic SDK: pip install it.")
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text(
+            "cd_AI has no model: the claude backend needs the Anthropic SDK: pip install it.")
+        await expect(page.locator("#controls")).to_be_visible()
+        del lifecycle["unavailable"]
+        lifecycle.update(backend="codex", model="warm")
 
         # A late response from the previous model must not overwrite a newer example.
         pending, release = asyncio.Event(), asyncio.Event()
