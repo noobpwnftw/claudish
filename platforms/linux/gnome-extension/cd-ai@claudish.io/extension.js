@@ -52,8 +52,15 @@ export default class CdAiExtension extends Extension {
         this._panel = new St.BoxLayout({vertical: true, style_class: 'cd-panel', visible: false});
         this._ghost = new St.Label({style_class: 'cd-ghost', visible: false});
         this._toast = new St.BoxLayout({vertical: true, style_class: 'cd-panel', visible: false});
-        for (const actor of [this._panel, this._ghost, this._toast])
-            Main.layoutManager.addTopChrome(actor, {affectsInputRegion: false});
+        for (const actor of [this._panel, this._ghost, this._toast]) {
+            try {
+                Main.layoutManager.addTopChrome(actor, {affectsInputRegion: false});
+            } catch (e) {
+                // GNOME 50 has no affectsInputRegion (an unknown option throws before the actor is
+                // added): a chrome actor that is not reactive takes no input there.
+                Main.layoutManager.addTopChrome(actor);
+            }
+        }
         this._ibus = IBusManager.getIBusManager();
         this._cursorId = this._ibus.connect('set-cursor-location', (manager, rect) => {
             this._cursor = rect;

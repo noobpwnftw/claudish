@@ -3,5 +3,5 @@
   "name": "cd_AI",
   "description": "Shows cd_AI's panel and suggestions at the caret while cd_AI is the input source.",
   "url": "https://github.com/noobpwnftw/claudish",
-  "shell-version": ["45", "46", "47", "48", "49"]
+  "shell-version": ["45", "46", "47", "48", "49", "50"]
 }
