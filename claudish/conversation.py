@@ -213,7 +213,9 @@ class ModelDriver:
                 own["helper"].format(helper=title),
                 {"type": "object", "properties": {"task": {"type": "string",
                  "description": own["helper_task"].format(helper=title)}}, "required": ["task"]},
-                hand_over, "read" if box.kind == "terminal" else "write",
+                # At a prompt its line is the draft, which you run: no question. A line that cannot be
+                # drafted there opens a window instead, which is asked about first, as elsewhere.
+                hand_over, "read" if box.kind == "terminal" and handoff.line(helper, "note.md", "session") else "write",
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 

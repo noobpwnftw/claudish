@@ -327,6 +327,19 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertTrue(command.startswith("claude --session-id "), command)
         self.assertIn("handoff", command)  # the note with the task and the screen
 
+    def test_at_a_terminal_a_helper_whose_line_cannot_be_drafted_asks_before_a_window(self):
+        import os
+        import tempfile
+        for choice, opened in ((0, False), (1, True)):  # No, then Yes
+            model = Scripted(answer(calls=[("helper__codex", {"task": "Fix the tests"})]), answer("ok"))
+            with patch("claudish.handoff.shutil.which", return_value="/bin/codex"), \
+                    patch("claudish.handoff.launch", return_value=True) as launch, \
+                    patch.dict(os.environ, {"XDG_RUNTIME_DIR": tempfile.mkdtemp()}):
+                asked, _ = self.drive(model, [choice], helper=["codex", "-c", "model_reasoning_effort='high'", "{prompt}"],
+                                      purpose="terminal", screen="$ ")  # a quote: no line a shell reads as it is
+            self.assertEqual(len(asked), 1)  # "Send this task to codex?" before any window
+            self.assertEqual(launch.called, opened)
+
     def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
         import os
         import tempfile
