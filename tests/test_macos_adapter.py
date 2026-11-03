@@ -208,13 +208,33 @@ def load_adapter():
     imk.kIMKLocateCandidatesBelowHint = 2
     panel = types.ModuleType("panel")
     panel.Panel, panel.Overlay = Panel, Overlay
+    layout = types.ModuleType("layout")
+    layout.layout = lambda: Layout()
     spec = importlib.util.spec_from_file_location("claudish_macos_test", ROOT / "platforms/macos/controller.py")
     module = importlib.util.module_from_spec(spec)
-    with patch.dict("sys.modules", {"objc": objc, "AppKit": appkit, "panel": panel,
+    with patch.dict("sys.modules", {"objc": objc, "AppKit": appkit, "panel": panel, "layout": layout,
                                      "Foundation": foundation, "InputMethodKit": imk}):
         spec.loader.exec_module(module)
     module.Suggestions = Worker
     return module
+
+
+class Layout:
+    """The keyboard layout's dead keys (platforms/macos/layout.py), as UCKeyTranslate gives them:
+    U.S. Option+e, n, u, i, `, and the Spanish layout's ´ key (no Option); Option+Shift+u types ¨
+    itself. The dead-key state is the accent's code point here."""
+    OPTION, SHIFT = 1 << 19, 1 << 17
+    DEAD = {(14, OPTION): "\u00b4", (45, OPTION): "\u02dc", (32, OPTION): "\u00a8", (34, OPTION): "\u02c6",
+            (50, OPTION): "`", (33, 0): "\u00b4"}
+
+    def dead(self, key, flags):
+        accent = self.DEAD.get((key, flags & (self.OPTION | self.SHIFT)))
+        return (ord(accent), accent) if accent else None
+
+    def translate(self, key, flags, state=0):
+        """A dead key after it: the accent alone; a letter: None here (the event's own characters
+        then go with the accent)."""
+        return (chr(state), 0) if (key, flags & (self.OPTION | self.SHIFT)) in self.DEAD else None
 
 
 class MacOSAdapterTests(unittest.TestCase):
@@ -288,6 +308,13 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertTrue(self.key(36, "\r"))  # Enter keeps your words as they are; the app gets the next one
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_dead_keys_are_the_layouts_own(self):
+        """Not a U.S. Option map: the Spanish ´ key (no Option) is dead; Option+Shift+u types ¨."""
+        for code, char in ((33, "\u00b4"), (0, "a"), (31, "o"), (32, "\u00a8"), (31, "o"), (33, "\u00b4"), (17, "t")):
+            flags = (1 << 19) | (1 << 17) if code == 32 else 0
+            self.assertTrue(self.key(code, char, flags))
+        self.assertEqual(self.client.marked, "\u00e1o\u00a8o\u00b4t")
 
     def test_a_waiting_accent_is_not_left_on_a_commit(self):
         self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e, nothing else composed

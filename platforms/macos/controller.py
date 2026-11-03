@@ -14,6 +14,7 @@ from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, Composition, 
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
+from layout import layout  # the keyboard layout's own dead keys
 
 # A file path: event kinds and errors, never typed text. An input method started by macOS (or with
 # open -g) does not see launchctl setenv, so an existing ~/Library/Logs/cd_AI-trace.log turns it on too.
@@ -30,12 +31,17 @@ def trace(*fields):
 def secure_input():
     """Whether a password field (or Terminal's Secure Keyboard Entry) has secure input on: then
     keys go straight to it, and nothing is composed, shown, or sent to a model."""
-    try:
-        carbon = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/Carbon.framework/Carbon")
-        carbon.IsSecureEventInputEnabled.restype = ctypes.c_bool
-        return bool(carbon.IsSecureEventInputEnabled())
-    except (OSError, AttributeError):
-        return False
+    if not SECURE:  # read once: it is asked at every key and poll
+        try:
+            carbon = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/Carbon.framework/Carbon")
+            carbon.IsSecureEventInputEnabled.restype = ctypes.c_bool
+            SECURE.append(carbon.IsSecureEventInputEnabled)
+        except (OSError, AttributeError):
+            SECURE.append(None)
+    return bool(SECURE[0]()) if SECURE[0] else False
+
+
+SECURE = []
 
 
 # Each mode is an input mode of cd_AI's input source (Info.plist: "Claudish — Compose", "Claudish —
@@ -195,7 +201,7 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def poll(self):
-        if not self.active or self.worker is None:
+        if not self.active or self.worker is None or secure_input():  # results wait: nothing is drawn
             return
         if self.state.follow(self.worker):  # the service stopped or came back
             trace({True: "offline", False: "online"}.get(self.state.offline, self.state.offline))
@@ -319,12 +325,12 @@ class ClaudishInputController(IMKInputController):
         trace("ghost overlay", len(ghost))
 
     @objc.python_method
-    def check_ghost(self):
+    def check_ghost(self, now=False):
         """macOS tells an input method nothing when the caret moves without a key (a click, a
         scroll, the window moving): while the suggestion shows, look at the caret a few times a
         second, and when it moved (or the text box is gone) drop the suggestion: Tab must never
-        take one you no longer see."""
-        if not OVERLAY.visible() or time.monotonic() - getattr(self, "ghost_checked", 0) < 0.25:
+        take one you no longer see. now: at once (Tab is about to take it)."""
+        if not OVERLAY.visible() or not now and time.monotonic() - getattr(self, "ghost_checked", 0) < 0.25:
             return
         self.ghost_checked = time.monotonic()
         client = self.client()
@@ -482,21 +488,44 @@ class ClaudishInputController(IMKInputController):
         self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method
+    def dead_key(self, key, chars, flags):
+        """(its accent, the layout's dead-key state) when the keyboard layout says this key is dead
+        (Spanish ´, French ^, U.S. Option+e); where the layout cannot be read, the U.S. Option keys."""
+        reader = layout()
+        if reader is not None:
+            found = reader.dead(key, flags)
+            return (found[1] or chars, found[0]) if found and (found[1] or chars) else None
+        return (chars, 0) if flags & NSEventModifierFlagOption and chars in ACCENTS else None
+
+    @objc.python_method
+    def with_accent(self, key, chars, flags, accent):
+        """What a waiting accent and this key make, as the layout makes it (´ then t is ´t)."""
+        reader, state = layout(), getattr(self, "dead_state", 0)
+        if reader is not None and state:
+            made = reader.translate(key, flags, state)
+            if made and made[0]:
+                return made[0]
+        return accented(accent, chars[0]) + chars[1:] if accent in ACCENTS else accent + chars
+
+    @objc.python_method
     def live_key(self, client, key, chars, flags=0):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.state
         accent, state.accent = state.accent, ""
-        if flags & NSEventModifierFlagOption and chars in ACCENTS and chars != accent:  # a dead key: its accent waits, shown
-            state.accent = chars
-            client.setMarkedText_selectionRange_replacementRange_(marked(chars), (len(chars), 0), (NSNotFound, 0))
+        found = self.dead_key(key, chars, flags)
+        if found and found[0] != accent:  # a dead key: its accent waits, shown (twice: the accent itself)
+            state.accent, self.dead_state = found
+            client.setMarkedText_selectionRange_replacementRange_(marked(state.accent), (len(state.accent), 0),
+                                                                  (NSNotFound, 0))
             return True
         if accent:
             unmark(client)
             if key == 51:
                 return True  # Backspace cancels the accent, and nothing else
             if chars and all(typeable(char) for char in chars):
-                chars = accented(accent, chars[0]) + chars[1:]  # é, not the e the key would type
+                chars = self.with_accent(key, chars, flags, accent)  # é, not the e the key would type
         if key == 48 and not flags & (NSEventModifierFlagShift | NSEventModifierFlagOption):  # Tab (Shift+Tab, Option+Tab: the app's)
+            self.check_ghost(now=True)  # a click since the last look: the suggestion is not there any more
             ghost = state.take_ghost()
             if not ghost:
                 return False  # no suggestion: Tab is the app's
@@ -574,6 +603,9 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def handle(self, event, client):
         if secure_input():  # a password field: straight in, nothing shown, nothing sent
+            if self.state.text or self.state.ghost:  # it came on while composing (Secure Keyboard Entry):
+                self.finish(client)  # your words go in first, as on a focus change; no suggestion stays
+                self.state.dismiss()
             self.hide_panel()
             OVERLAY.hide()
             TOAST.hide()
@@ -610,8 +642,9 @@ class ClaudishInputController(IMKInputController):
         # Option+e, Option+u, ...: a dead key gives its accent alone; it waits for its letter (the
         # next key takes it, Backspace cancels it, any other key drops it).
         accent, self.state.accent = self.state.accent, ""
-        if flags & NSEventModifierFlagOption and chars in ACCENTS and chars != accent:  # twice: the accent itself
-            self.state.accent = chars
+        found = self.dead_key(key, chars, flags)
+        if found and found[0] != accent:  # twice: the accent itself
+            self.state.accent, self.dead_state = found
             self.changed(client)
             return True
         if accent and key == 51:
@@ -718,7 +751,7 @@ class ClaudishInputController(IMKInputController):
             return True
         text = event.characters() or ""
         if accent and text and all(typeable(char) for char in text):
-            text = accented(accent, text[0]) + text[1:]  # é from ´ then e, as macOS makes it in a text field
+            text = self.with_accent(key, text, flags, accent)  # é from ´ then e, as macOS makes it in a text field
         # Navigation keys use private-use characters, which must not enter the draft.
         if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not all(typeable(char) for char in text) or not text:
             self.finish(client)

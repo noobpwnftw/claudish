@@ -16,7 +16,7 @@ setup(
     options={"py2app": {"plist": info,
                         # _cffi_backend: cryptography (under MCP) loads it from compiled code, where
                         # py2app's scan does not see it; without it importing mcp fails in the bundle.
-                        "includes": ["controller", "panel", "sources", "InputMethodKit", "AppKit", "Foundation",
+                        "includes": ["controller", "panel", "layout", "sources", "InputMethodKit", "AppKit", "Foundation",
                                      "_cffi_backend"],
                         # Cocoa supplies the UI. Tk's recipe opens a GUI during bundling and can
                         # abort when building over SSH from a logged-out account.
