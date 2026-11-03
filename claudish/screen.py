@@ -123,25 +123,29 @@ def read_atspi(app):
     deadline = time.monotonic() + BUDGET_SECONDS
     desktop = Atspi.get_desktop(0)
 
-    def focused_terminal(node, depth):
-        if time.monotonic() > deadline or depth > 12:
+    def focused_terminal(node, depth, active):
+        if time.monotonic() > deadline or depth > 32:
             return None
         states = node.get_state_set()
         if not states.contains(Atspi.StateType.SHOWING) and depth > 1:
             return None
+        if active and depth == 1 and not states.contains(Atspi.StateType.ACTIVE):
+            return None  # a window that is not the active one
         if states.contains(Atspi.StateType.FOCUSED):
             return node if node.get_role() == Atspi.Role.TERMINAL else None
         for index in range(min(node.get_child_count(), 200)):
-            found = focused_terminal(node.get_child_at_index(index), depth + 1)
+            found = focused_terminal(node.get_child_at_index(index), depth + 1, active)
             if found is not None:
                 return found
         return None
 
-    for index in range(desktop.get_child_count()):
-        application = desktop.get_child_at_index(index)
-        if app and application.get_name() != app:
-            continue
-        terminal = focused_terminal(application, 0)
+    applications = [desktop.get_child_at_index(index) for index in range(desktop.get_child_count())]
+    named = [application for application in applications if app and application.get_name() == app]
+    # The app as its accessible name (an IBus program name: gnome-terminal-server); GNOME on Wayland
+    # names it by its app id (org.gnome.Terminal), which is no accessible name: then the application
+    # whose window is active, as a screen reader finds it.
+    for application in named or applications:
+        terminal = focused_terminal(application, 0, not named)
         if terminal is not None:
             return Atspi.Text.get_text(terminal, 0, Atspi.Text.get_character_count(terminal))
     return None

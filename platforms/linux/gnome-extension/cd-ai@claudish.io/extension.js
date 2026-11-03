@@ -76,7 +76,10 @@ export default class CdAiExtension extends Extension {
         // GNOME gives IBus one input context for every app: say which window has focus, so the
         // engine keeps each window's exchange and conversation, and an app's bindings apply.
         this._focusId = global.display.connect('notify::focus-window', () => this._focus());
-        this._focus();
+        // and again when the engine starts (IBus starts it at the first key or focus, after the
+        // window got focus), or the first window would be named gnome-shell.
+        this._engineWatch = Gio.bus_watch_name(Gio.BusType.SESSION, 'io.claudish.Screen',
+            Gio.BusNameWatcherFlags.NONE, () => this._focus(), null);
     }
 
     _focus() {
@@ -97,6 +100,7 @@ export default class CdAiExtension extends Extension {
 
     disable() {
         global.display.disconnect(this._focusId);
+        Gio.bus_unwatch_name(this._engineWatch);
         try {
             if (this._classId)
                 this._focusWindow.disconnect(this._classId);
