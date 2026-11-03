@@ -161,6 +161,32 @@ class ModelServerTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
 
+    def test_a_routed_models_process_nothing_routes_to_after_an_edit_stops(self):
+        from claudish.model import Rewriter
+        from claudish.server import make_server
+        import os
+        import tempfile
+        from urllib.request import urlopen
+        command = [sys.executable, "-c", "import time; time.sleep(30)"]
+        main = Rewriter("rules")
+        main.profile, main.loader = "main", lambda name: Rewriter("llama", "http://127.0.0.1:9", command=command)
+        routed = main.load("local").warm  # a binding's profile, started at its first use
+        fresh = Rewriter("rules")  # the binding removed by hand: nothing routes to "local" now
+        fresh.profile, fresh.loader = "main", main.loader
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+            try:
+                os.utime(path, ns=(1, 1))
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertEqual(routed.state, "stopped")  # not held until the next reload
+            finally:
+                fresh.stop_model()
+                server.shutdown()
+                server.server_close()
+
     def test_a_new_local_model_command_starts_once_the_old_server_has_gone(self):
         import os
         import socket

@@ -74,6 +74,19 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         rewriter = fresh
         server.rewriter = fresh
         old.stop_model()
+        # One nothing routes to any more (a binding or a mode's route removed): stopped now, not at
+        # the next reload (a local model holds its memory meanwhile).
+        reachable = set()
+        for name in {b.profile for b in fresh.bindings if b.profile} | \
+                {spec["profile"] for spec in fresh.modes.values() if spec.get("profile")}:
+            try:
+                other = fresh.loader(name) if fresh.loader and name != fresh.profile else None
+            except Exception:
+                continue
+            if other is not None and other.warm:
+                reachable.add(warm_key(other.warm))
+        for key in [key for key in fresh.adoptable if key not in reachable]:
+            fresh.adoptable.pop(key).stop()
         stamps[0] = read
 
     def stamp():
