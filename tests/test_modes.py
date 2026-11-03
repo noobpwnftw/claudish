@@ -152,6 +152,9 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(critic["modes"]["rewrite"]["examples"], shipped["modes"]["rewrite"]["examples"])
         self.assertEqual(critic["modes"]["instruct"], shipped["modes"]["instruct"])
         self.assertEqual((critic["about"], critic["modes"]["continue"]["examples"]), (shipped["about"], []))
+        assert modes.TEMPLATES["tones"]["named"]["proofread"]["modes"]["rewrite"].get("system")  # shipped whole
+        proofread = modes.merged({"tones": {"named": {"proofread": {"modes": {"rewrite": {"voice": "in rhyme"}}}}}})
+        self.assertNotIn("system", proofread["tones"]["named"]["proofread"]["modes"]["rewrite"])  # the voice is used
 
     def test_a_profile_can_reword_the_box_too(self):
         rewriter = Rewriter(max_tokens=64, templates={"box": {"at_caret": "Write it for the caret."}})

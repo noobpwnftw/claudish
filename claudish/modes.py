@@ -63,7 +63,10 @@ def merged(override=None):
 
 
 def over(words, override):
-    """override's keys over words', objects within objects merged; text and lists replaced."""
+    """override's keys over words', objects within objects merged; text and lists replaced. A mode's
+    "voice" given takes the place of a "system" it would inherit (the whole wording, which wins)."""
+    if "voice" in override and "system" not in override:
+        words.pop("system", None)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(words.get(key), dict):
             over(words[key], value)
