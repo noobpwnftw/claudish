@@ -100,6 +100,13 @@ def main():
             reply = key(9, modifiers=(0x10,))
             assert reply.get("commitString") == "draft" and not service.state.working, reply
             assert replayed.pop() == (9, [0x10])  # the app gets Shift+Tab
+            # A full composition: the next key commits what is before it, and PIME then says the
+            # composition ended (unforced, its own end for that commit): the key stays composed.
+            service.state.change("a" * 512)
+            assert key(ord("B"), ord("b")).get("commitString") == "a" * 512
+            service.handleRequest({"method": "onCompositionTerminated", "forced": False})
+            assert service.state.text == "b", service.state.text
+            key(0x1B)
             # The caret goes to PIME in characters (it makes TSF's UTF-16 offset itself): ← after an emoji.
             service.state.change("\U0001F600 ab")
             reply = key(0x25)

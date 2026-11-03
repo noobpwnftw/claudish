@@ -678,9 +678,24 @@ class ClaudishTextService(TextService):
         self.changed()
         return True
 
+    def handleRequest(self, msg):
+        if msg.get("method") != "onCompositionTerminated":
+            self.committed = False  # a commit of this request ends the composition: see below
+        return super().handleRequest(msg)
+
+    def setCommitString(self, text):
+        self.committed = True
+        super().setCommitString(text)
+
     def onCompositionTerminated(self, forced):
         keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
+        if not forced and getattr(self, "committed", False):
+            # PIME ends the composition to put in what the last reply committed, and says so before
+            # it shows that reply's composition: what stays composed (the words after a full
+            # composition's commit, a reply on a draft Tab took) is not ended with it.
+            self.committed = False
+            return
         if self.state.live and not forced:
             return  # continue commits every key, which ends a composition: the context stays
         if self.state.for_model:
