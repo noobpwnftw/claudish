@@ -61,6 +61,12 @@ def codex():
             send({"id": ident, "result": {"turn": {"id": "u1", "status": "inProgress"}}})
             if "slow" in text:
                 time.sleep(3)
+            if "fail" in text:  # a note on the way, then the turn fails
+                send({"method": "item/completed", "params": {"item": {"type": "agentMessage",
+                      "text": "I'll rewrite this in the requested tone now."}}})
+                send({"method": "turn/completed", "params": {"turn": {"id": "u1", "status": "failed",
+                      "error": {"message": "stream disconnected"}}}})
+                continue
             send({"id": 99, "method": "item/commandExecution/requestApproval", "params": {}})  # declined
             send({"method": "item/completed", "params": {"item": {"type": "agentMessage",
                   "text": "%s turn %d model %s: %s" % (thread, threads[thread][0], threads[thread][1], text[-12:])}}})

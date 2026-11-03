@@ -14,9 +14,10 @@ function finish(mode, text, output) {
   if (mode !== "continue") return output;
   // Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
   // end ("I " then "in fact" is not one).
+  const wordGoesOn = (at) => /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));  // "In" after "I", "We're" after "We"
   const echo = text.trim();
-  if (output.startsWith(text)) output = output.slice(text.length);
-  else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !/^[\p{L}\p{N}]/u.test(output.slice(echo.length))) {
+  if (output.startsWith(text) && !(/[\p{L}\p{N}]$/u.test(text) && wordGoesOn(text.length))) output = output.slice(text.length);
+  else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !wordGoesOn(echo.length)) {
     output = output.slice(echo.length);
   }
   output = output.trim();
@@ -27,7 +28,11 @@ function finish(mode, text, output) {
   if (!output) return "";
   // Chinese and Japanese take no spaces between words; Korean does, and an emoji is spaced as a word.
   const wide = WIDE;
-  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0]) ? "" : " ";
+  // No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
+  // goes on your last letter.
+  const opened = /[—(\[“‘]$/.test(text) || (text.endsWith('"') && (text.split('"').length - 1) % 2 === 1);
+  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0])
+    || opened || /^\p{M}/u.test(output) ? "" : " ";
   return text + joiner + output;
 }
 

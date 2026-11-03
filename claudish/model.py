@@ -76,14 +76,15 @@ CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile na
 LENGTH = "the answer ran past its length budget; use a shorter phrase"
 DECLINED = "Claude declined this; your wording is unchanged"
 # Claude models that refuse an effort setting (older than Haiku 4.5 included).
-NO_EFFORT = ("claude-3", "claude-haiku-4", "claude-sonnet-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0")
+NO_EFFORT = ("claude-3", "claude-haiku-4", "claude-sonnet-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0",
+             "claude-opus-4-2025", "claude-sonnet-4-2025")  # the dated 4.0 ids: claude-opus-4-20250514
 FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
 
 
 class Claude:
     """The Anthropic API (the default backend): typed text is sent to it."""
 
-    def __init__(self, model):
+    def __init__(self, model, timeout=0):
         import anthropic  # every installer has it; a checkout: pip install -e ".[claude]"
         from .keys import claude_credential, stored
         # Credentials come from ANTHROPIC_API_KEY, the key saved in cd_AI's settings (claudish/keys.py:
@@ -91,8 +92,9 @@ class Claude:
         # A stale suggestion is useless, so fail fast instead of retrying.
         self.credential = claude_credential()[0]  # what this client was made with (/health says it)
         saved = stored() if self.credential == "saved" else None
-        self.client = anthropic.Anthropic(timeout=10.0, max_retries=0, **({"api_key": saved} if saved else {}))
-        self.model = model
+        # The profile's timeout, where it is longer: a rewrite waits at least 10 s, a turn 60 s.
+        self.client = anthropic.Anthropic(timeout=max(10.0, timeout), max_retries=0, **({"api_key": saved} if saved else {}))
+        self.model, self.turn_timeout = model, max(60.0, timeout)
 
     def options(self, shaped=False):
         """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), the
@@ -126,7 +128,7 @@ class Claude:
                 options["tool_choice"] = {"type": "none"}
         try:
             # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
-            response = self.client.with_options(timeout=60.0).beta.messages.create(model=self.model, max_tokens=max_tokens,
+            response = self.client.with_options(timeout=self.turn_timeout).beta.messages.create(model=self.model, max_tokens=max_tokens,
                                                         system=system, messages=conversation,
                                                         **options)
         except TypeError as exc:
@@ -259,7 +261,7 @@ class Rewriter:
             rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {})
         return rewriter
 
-    def __init__(self, backend="llama", endpoint=MODEL_URL, max_tokens=64, model=None, api_key=None, timeout=3, templates=None,
+    def __init__(self, backend="llama", endpoint=MODEL_URL, max_tokens=2048, model=None, api_key=None, timeout=3, templates=None,
                  context=None, modes=None, command=None, bindings=(), tone=None):
         from . import modes as invocation
         self.backend = backend
@@ -317,7 +319,7 @@ class Rewriter:
         elif backend == "llama" and command:  # the local model's server, which the service runs
             from . import warm
             self.warm = warm.ModelServer(command, self.endpoint)
-        self.claude = Claude(model or CLAUDE_MODEL) if backend == "claude" else None
+        self.claude = Claude(model or CLAUDE_MODEL, timeout) if backend == "claude" else None
 
     @property
     def autocompletes(self):
@@ -585,7 +587,7 @@ class Rewriter:
                                           self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
                 output, usage = self.claude.rewrite(said, prompt, sent, box.image, spec["box"]["picture"],
-                                                    spec["max_tokens"] or 2048)
+                                                    spec["max_tokens"] or self.max_tokens)  # a mode with none: the same budget everywhere
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost

@@ -100,6 +100,8 @@ def defaults(override=None, tone=None):
         # or a tone's that does a different job), used as written.
         examples, parts = mode.get("examples", []), mode.get("parts", [])
         custom = "system" in (own.get(name) or {})
+        if custom:  # a wording of its own: only the examples and parts given with it, never the shipped ones
+            examples, parts = own[name].get("examples", []), own[name].get("parts", [])
         voice, length, system = mode.get("voice"), mode.get("length"), mode.get("system")
         persona = None
         if tone and not custom and tone in named:
@@ -133,10 +135,13 @@ def finish(mode, text, output):
         return output
     # Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
     # end ("I " then "in fact" is not one).
+    def word_goes_on(at):  # "In" after "I", "We're" after "We"
+        after = output[at:at + 2]
+        return after[:1].isalnum() or after[:1] in "'’" and after[1:2].isalpha()
     echo = text.strip()
-    if output.startswith(text):
+    if output.startswith(text) and not (text[-1:].isalnum() and word_goes_on(len(text))):
         output = output[len(text):]
-    elif echo and output.lower().startswith(echo.lower()) and not output[len(echo):len(echo) + 1].isalnum():
+    elif echo and output.lower().startswith(echo.lower()) and not word_goes_on(len(echo)):
         output = output[len(echo):]
     output = output.strip()
     # Or wrap all of it in quotes: a pair around the whole, not one that closes your open quote.
@@ -151,7 +156,11 @@ def finish(mode, text, output):
     # symbol) is spaced as a word.
     wide = any(unicodedata.east_asian_width(c) in "WFH" and not unicodedata.category(c).startswith("S")
                and "HANGUL" not in unicodedata.name(c, "") for c in (text[-1:] or " ", output[0]))
-    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide else " "
+    # No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
+    # goes on your last letter.
+    opened = text.endswith(("—", "(", "[", "“", "‘")) or text.endswith('"') and text.count('"') % 2 == 1
+    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide or opened \
+        or unicodedata.category(output[0]).startswith("M") else " "
     return text + joiner + output
 
 

@@ -290,7 +290,7 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual(len(model.sent), 1)  # the approval it would have asked is not read as a denial
         self.assertNotIn("question", [e["type"] for e in session.events])
 
-    def test_an_inserted_answer_stays_in_the_conversation_after_a_late_cancel(self):
+    def test_an_inserted_answer_stays_in_the_conversation(self):
         rewriter = Rewriter()
         rewriter.modes["instruct"]["candidates"] = 1
         conversation = rewriter.conversations.get("box")
@@ -301,12 +301,9 @@ class AskAndHelperTests(unittest.TestCase):
             while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
                 time.sleep(0.01)
             question = next(e for e in session.events if e["type"] == "question")
-            session.answer(question["id"], 0)  # Tab: Insert it
+            session.answer(question["id"], 0)  # Tab: Insert it (its follower does not cancel it: test_core)
             thread.join(5)
-            kept = len(conversation.messages)
-            session.cancel()  # the composition moved on: a follower's cancel after the end
-        self.assertTrue(kept)
-        self.assertEqual(len(conversation.messages), kept)
+        self.assertEqual(len(conversation.messages), 2)
 
     def test_the_model_asks_and_your_choice_goes_back(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Did you mean git status?",

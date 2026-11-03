@@ -57,6 +57,15 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(modes.finish("continue", "It works", "—mostly."), "It works—mostly.")
         self.assertEqual(modes.finish("continue", "Thanks for", "Thanks for the review."), "Thanks for the review.")
         self.assertEqual(modes.finish("continue", "Thanks", "  "), "")
+        # An echo is cut only at a word's end: "In" after "I" is not one.
+        self.assertEqual(modes.finish("continue", "I", "In fact, yes"), "I In fact, yes")
+        self.assertEqual(modes.finish("continue", "We", "We're aligned"), "We We're aligned")
+        # No space after an em dash, a bracket or a quote you opened, nor before a combining mark.
+        self.assertEqual(modes.finish("continue", "aligned—", "fully"), "aligned—fully")
+        self.assertEqual(modes.finish("continue", 'He said "', "hello"), 'He said "hello')
+        self.assertEqual(modes.finish("continue", 'He said "hi"', "again"), 'He said "hi" again')
+        self.assertEqual(modes.finish("continue", "(", "see below"), "(see below")
+        self.assertEqual(modes.finish("continue", "caf", "\u0301 time"), "caf\u0301 time")
         self.assertEqual(modes.finish("continue", "我今天", "去了商店。"), "我今天去了商店。")  # no space in CJK
         self.assertEqual(modes.finish("continue", "안녕하세요", "반갑습니다."), "안녕하세요 반갑습니다.")  # Korean spaces words
         self.assertEqual(modes.finish("continue", "Shipped it 🎉", "See you."), "Shipped it 🎉 See you.")  # an emoji too
@@ -195,6 +204,10 @@ class ModeTests(unittest.TestCase):
         proofread = Rewriter(max_tokens=64, tone="proofread")  # corrects, keeps your words
         self.assertIn("Keep their words", proofread.modes["rewrite"]["system"])
         self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
+        own = modes.defaults({"modes": {"rewrite": {"system": "Fix only the spelling."}}})["rewrite"]
+        self.assertEqual((own["examples"], own["parts"]), ([], []))  # not the shipped slop pairs
+        given = modes.defaults({"modes": {"rewrite": {"system": "Fix only the spelling.", "examples": [["teh", "the"]]}}})
+        self.assertEqual([m["content"] for m in given["rewrite"]["examples"]], ["teh", "the"])
         custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Translate to French."}}}, tone="plain")
         self.assertEqual(custom.modes["rewrite"]["system"], "Translate to French.")  # the profile's own words win
         self.assertIn("with the next words, in a plain voice", custom.modes["continue"]["system"])  # the tone, where it names nothing

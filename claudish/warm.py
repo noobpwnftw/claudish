@@ -353,15 +353,25 @@ class Codex(Warm):
                                  "effort": "low", "outputSchema": ANSWER}, deadline, collect)
         while not done:
             self.read(deadline, collect)
-        error = ((done[0].get("turn") or {}).get("error") or {})
-        if error and not texts:
-            raise RuntimeError("Codex: %s" % (error.get("message") or error))
+        turn = done[0].get("turn") or {}
+        error = turn.get("error") or {}
+        failed = error or turn.get("status") not in (None, "completed")
+        if failed and not (texts and shaped(texts[-1])):  # a note on the way is not the answer
+            raise RuntimeError("Codex: %s" % (error.get("message") or error or turn.get("status")))
         return texts[-1].strip() if texts else ""  # the final message: an earlier one is commentary
 
     def ready(self):
         self.served += 1
         if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then,
             self.retire()  # started by the next request (within its time), not before this answer
+
+
+def shaped(text):
+    """Whether a message is the answer the request's output schema asks for (a JSON object)."""
+    try:
+        return isinstance(json.loads(text), dict)
+    except ValueError:
+        return False
 
 
 def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):

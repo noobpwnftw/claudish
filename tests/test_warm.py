@@ -101,6 +101,10 @@ class CodexTests(unittest.TestCase):
             backend.ask("ok", 0.5)  # no process yet: it starts within this request's time
         self.assertLess(time.monotonic() - started, 2.5)
 
+    def test_a_failed_turn_is_an_error_not_its_note_on_the_way(self):
+        with self.assertRaisesRegex(RuntimeError, "stream disconnected"):
+            self.backend.ask("please fail", 5)
+
     def test_another_refusal_keeps_the_configured_model(self):
         self.backend.model = "limited"
         self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")  # this request only
