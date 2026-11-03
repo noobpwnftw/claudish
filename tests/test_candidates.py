@@ -226,6 +226,47 @@ class ReceiveTests(unittest.TestCase):
         state.submit()
         state.fail(state.revision, "timed out")
         self.assertEqual((state.escape(), state.text), ("back", "running late"))
+
+        def on_rewrite(follow_up):
+            state = Composition()
+            state.mode = "compose"
+            state.change("my own words")
+            state.tab()
+            state.offer(state.revision, "My very own words—truly.")
+            for char in follow_up:
+                state.insert(char)
+            state.enter()
+            state.submit()
+            return state
+        # Its drafts shown, a second follow-up, F8, words set aside at a question: still your words.
+        state = on_rewrite("shorter")
+        state.offer(state.revision, "Mine.", ["Mine.", "My words."])
+        self.assertEqual((state.escape(), state.text), ("back", "my own words"))
+        state = on_rewrite("shorter")
+        for char in " and friendlier":
+            state.insert(char)
+        state.enter()
+        state.submit()
+        self.assertEqual((state.escape(), state.text), ("back", "my own words"))
+        state = on_rewrite("shorter")
+        state.toggle_look()
+        self.assertEqual((state.escape(), state.text), ("back", "my own words"))
+        state = on_rewrite("shorter")
+        for char in "and kind":
+            state.insert(char)
+        state.ask(state.revision, {"id": "q", "text": "Formal?", "choices": [{"label": "Yes"}]}, "s")
+        self.assertEqual((state.escape(), state.text), ("back", "my own words and kind"))
+        # A failure keeps the cursor where it was in what stays (not inside é).
+        state = Composition()
+        state.mode = "compose"
+        state.change("fix it")
+        state.enter()
+        state.submit()
+        for char in "ok e\u0301 ":
+            state.insert(char)
+        state.arrow(-1)
+        state.fail(state.revision, "timed out")
+        self.assertEqual((state.reply, state.cursor), ("ok e\u0301", len("ok e\u0301")))
         # A held exchange that ends elsewhere (a helper took it) is not held any more.
         state = sent("hand it to claude")
         state.returned("A")

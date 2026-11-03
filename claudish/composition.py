@@ -642,8 +642,11 @@ class Composition:
             return "back"
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)
-        if self.origin and (self.working or self.failed or self.question):
-            self.change(self.origin)  # a follow-up on a rewrite: back to your words, as Esc on the rewrite is
+        if self.origin and self.text != self.origin:
+            # A follow-up on a rewrite: back to your words, as Esc on the rewrite is (with words set
+            # aside while a question was up, as for an instruction).
+            joined = " ".join(part for part in (self.origin.strip(), self.waiting.strip()) if part)
+            self.change(joined if self.waiting.strip() and len(joined) <= MAX_COMPOSITION else self.origin)
             self.editing = True
             return "back"
         if (self.candidates and self.asked == "instruct") or self.working or self.failed or self.question:
@@ -700,7 +703,7 @@ class Composition:
             # Before any answer, the first instruction goes with it: the new one replaces its
             # session, which the conversation does not keep, and the model would have only this.
             first = self.text.strip() if self.sent and not (drafts or self.converted) else ""
-            origin = self.text if self.converted else ""
+            origin = self.origin or (self.text if self.converted else "")  # the first follow-up's, for the next
             joined = " ".join(part for part in (first, self.reply.strip()) if part)  # one line, as typed
             self.change(joined if len(joined) <= MAX_COMPOSITION else self.reply.strip())  # too long together: alone
             self.about, self.origin = about, origin
@@ -773,8 +776,10 @@ class Composition:
         self.working, self.failed = False, True
         self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
         # Words set aside while a question was up come back to edit, as when it is answered.
-        self.reply, self.waiting = (self.reply + " " + self.waiting).strip(), ""
-        self.back = min(self.back, len(self.reply))  # stripped: the cursor stays in it
+        joined = self.reply + " " + self.waiting
+        at = len(self.reply) - self.back - (len(joined) - len(joined.lstrip()))  # the cursor, in what stays
+        self.reply, self.waiting = joined.strip(), ""
+        self.back = len(self.reply) - max(0, min(len(self.reply), at))
         self.error = failure(error)
         return True
 
@@ -958,7 +963,9 @@ class Composition:
             return False
         self.look = not self.look
         if not (self.answered and (self.reply or self.waiting)):  # a reply typed on the exchange stays: its next send
+            origin = self.origin
             self.change(self.text)
+            self.origin = origin  # a follow-up on a rewrite: still your words before it
         return True
 
     @exchange(needs="text")

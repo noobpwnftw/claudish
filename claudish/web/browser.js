@@ -5,6 +5,10 @@ const WLLAMA = "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js";
 
 const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm" };
 
+// The characters modes.finish joins without a space (wide, full-width or half-width, not a symbol,
+// not Hangul), generated from its rule; tests/test_web_finish.py checks they still match.
+const WIDE = /[\u{2329}-\u{232A}\u{3000}-\u{3003}\u{3005}-\u{3011}\u{3014}-\u{301F}\u{3021}-\u{302D}\u{3030}-\u{3035}\u{3038}-\u{303D}\u{3041}-\u{3096}\u{3099}-\u{309A}\u{309D}-\u{30FF}\u{3105}-\u{312F}\u{3192}-\u{3195}\u{31A0}-\u{31BF}\u{31F0}-\u{31FF}\u{3220}-\u{3229}\u{3251}-\u{325F}\u{3280}-\u{3289}\u{32B1}-\u{32BF}\u{3400}-\u{4DBF}\u{4E00}-\u{A48C}\u{F900}-\u{FAFF}\u{FE10}-\u{FE19}\u{FE30}-\u{FE52}\u{FE54}-\u{FE61}\u{FE63}\u{FE68}\u{FE6A}-\u{FE6B}\u{FF01}-\u{FF03}\u{FF05}-\u{FF0A}\u{FF0C}-\u{FF1B}\u{FF1F}-\u{FF3D}\u{FF3F}\u{FF41}-\u{FF5B}\u{FF5D}\u{FF5F}-\u{FF9F}\u{16FE0}-\u{16FE4}\u{16FF0}-\u{16FF1}\u{17000}-\u{187F7}\u{18800}-\u{18CD5}\u{18D00}-\u{18D08}\u{1AFF0}-\u{1AFF3}\u{1AFF5}-\u{1AFFB}\u{1AFFD}-\u{1AFFE}\u{1B000}-\u{1B122}\u{1B132}\u{1B150}-\u{1B152}\u{1B155}\u{1B164}-\u{1B167}\u{1B170}-\u{1B2FB}\u{20000}-\u{2FFFD}\u{30000}-\u{3FFFD}]/u;
+
 // Port of claudish.modes.finish: a continuation is joined onto the typed text.
 function finish(mode, text, output) {
   if (mode !== "continue") return output;
@@ -21,9 +25,8 @@ function finish(mode, text, output) {
       && (text.split('"').length - 1) % 2 === 0) output = output.slice(1, -1).trim();
   if (/[ \n]$/.test(text)) output = output.replace(/^[,;: ]+/, "");
   if (!output) return "";
-  // Chinese and Japanese take no spaces between words (as modes.finish: wide, full-width or
-  // half-width, not a symbol); Korean does, and an emoji is spaced as a word.
-  const wide = /(?![\p{S}\p{Script=Hangul}])[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}\p{Script=Yi}\u3000-\u303F\u30A0-\u30FF\uFF00-\uFFEF]/u;
+  // Chinese and Japanese take no spaces between words; Korean does, and an emoji is spaced as a word.
+  const wide = WIDE;
   const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0]) ? "" : " ";
   return text + joiner + output;
 }
