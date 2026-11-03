@@ -85,14 +85,14 @@ def main():
         argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
     args = parser.parse_args(argv)
     if args.command == "settings":
-        from .client import read_token, settings_url
+        from .client import port_of, read_token, settings_url
         for attempt in range(20):  # just installed, the service may still be starting
-            sent = read_token()
+            sent = read_token(port_of(args.url))
             try:
                 url = settings_url(args.url) + ("&first=1" if args.first else "")
                 break
             except HTTPError as exc:
-                if exc.code == 403 and read_token() != sent:  # a starting service listens, then writes its token
+                if exc.code == 403 and read_token(port_of(args.url)) != sent:  # a starting service listens, then writes its token
                     continue
                 sys.exit("cd_AI's service at %s answered %d: %s" % (args.url, exc.code, exc.reason))
             except OSError:
@@ -271,11 +271,11 @@ class reachable:
 
 def run_service(rewriter, port, reload, config_path, ready):
     """The service on port until Ctrl+C or SIGTERM (`claudish serve`). It binds
-    first, writes the token (the input methods' service, on PORT, only), calls ready(server), starts the model process and serves; at the end
+    first, writes its port's token, calls ready(server), starts the model process and serves; at the end
     the live conversations and the model process stop. A port in use returns at once."""
     import errno
     import secrets
-    from .client import PORT, write_token
+    from .client import write_token
     token = secrets.token_urlsafe(32)
     try:
         server = make_server(rewriter, port, token, reload=reload, config_path=config_path)
@@ -287,8 +287,7 @@ def run_service(rewriter, port, reload, config_path, ready):
         print("Port %s is in use: cd_AI is already running, or another program has it. "
               "Check with `claudish doctor`." % port, file=sys.stderr, flush=True)
         return
-    if port == PORT:  # only once the port is ours; a second service on another port leaves it alone
-        write_token(token)
+    write_token(token, server.server_address[1])  # once the port is ours; another port's service has its own
     ready(server)
     rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
     import signal

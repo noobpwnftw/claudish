@@ -17,11 +17,18 @@ async function call(path, body) {
     headers: Object.assign({"X-Claudish-Settings": token || ""}, body ? {"Content-Type": "application/json"} : {}),
     body: body ? JSON.stringify(body) : undefined,
   }).catch(() => { throw Object.assign(new Error("cd_AI's service does not answer"), {down: true}); });
+  // A 403: this window's token is gone (the service restarted), not a refusal to fix here.
+  if (response.status === 403) throw Object.assign(new Error(reopen()), {expired: true});
   const data = await response.json().catch(() => ({}));
   const said = data.said && data.said !== "the request failed" ? data.said : "";  // plain words when they say more
   if (!response.ok) throw new Error(said || data.error || `the service answered ${response.status}`);
   return data;
 }
+
+// A sentence from an error; cd_AI keeps its name as it is written.
+const sentence = (text) => (text.startsWith("cd_AI") ? text : text.charAt(0).toUpperCase() + text.slice(1)).replace(/\.?$/, ".");
+const typed = () => (shown && shown.claudish) || "claudish";  // how claudish is run on this computer
+const reopen = () => `this window has expired: open Settings again from cd_AI's menu (Settings…) or with \`${typed()} settings\``;
 
 function say(id, text, bad) {
   $(id).textContent = text || "";
@@ -57,7 +64,7 @@ function status(state) {
     return [`Ready: ${name} writes for you.`, "good"];
   }
   if (backend === "claude") return state.key === "missing" ? ["Add your Claude key below to start.", ""] : ["Ready: Claude writes for you.", "good"];
-  if (state.server_problem) return [state.server_problem.charAt(0).toUpperCase() + state.server_problem.slice(1) + ".", "bad"];
+  if (state.server_problem) return [sentence(state.server_problem), "bad"];
   if (backend === "openai" || backend === "llama") return [`Ready: ${state.model || "your model"} writes for you.`, "good"];
   if (backend === "none") return ["Pick a model below to start.", ""];
   return ["cd_AI is running.", ""];
@@ -71,20 +78,25 @@ async function recheck() {
   try {
     render(await call("/settings/state"));
   } catch (error) {
+    if (error.expired) return lost(error);
     lockTimer = setTimeout(recheck, 500);
   }
 }
 
-function down() {
-  // Like a config that does not read: only what fails, until the service answers again.
+function lost(error) {
+  // The service is gone, or this window's token is: only that, as for a config that does not read.
+  if (!error.down && !error.expired) return false;
   clearTimeout(healthTimer);
   clearTimeout(lockTimer);
-  $("status").textContent = "cd_AI's service is not running. Start it with `claudish service install`; this window comes back when it answers.";
+  $("status").textContent = error.expired ? sentence(error.message)
+    : `cd_AI's service is not running. Start it with \`${typed()} service install\`; this window comes back when it answers.`;
   $("status").className = "bad";
   $("controls").hidden = true;
   $("config-fix").hidden = true;
-  lockTimer = setTimeout(recheck, 500);
+  if (error.down) lockTimer = setTimeout(recheck, 500);
+  return true;
 }
+
 function showStatus(state) {
   const [line, kind] = status(state);
   $("status").textContent = line;
@@ -104,7 +116,7 @@ function followStartup(version) {
       showStatus(shown);
       followStartup(version);
     } catch (error) {
-      if (version === viewVersion) error.down ? down() : say("status", error.message, true);
+      if (version === viewVersion && !lost(error)) say("status", error.message, true);
     }
   }, 500);
 }
@@ -128,7 +140,7 @@ function render(state) {
   clearTimeout(lockTimer);
   if (locked(state)) lockTimer = setTimeout(recheck, 500);  // the fix applies when the file is saved
   $("config-fix").textContent = (problem ? `cd_AI cannot read its config: ${problem}. ` : "") +
-    `Fix it in ${state.config} (it applies when you save), or move that file aside and run claudish init.`;
+    `Fix it in ${state.config} (it applies when you save), or move that file aside and run ${typed()} init.`;
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
   $("try").hidden = false;  // the model in use; hidden while another is picked but not yet in use
@@ -210,7 +222,7 @@ async function sample(manual = false) {
     $("sample").textContent = `“${text}” → “${answer.text}”`;
   } catch (error) {
     if (version !== sampleVersion) return;
-    if (error.down) return down();
+    if (lost(error)) return;
     $("sample").textContent = `The model did not answer: ${error.message}.`;
   } finally {
     if (version === sampleVersion) {
@@ -241,12 +253,11 @@ async function change(body, message, done) {
     if (!keys) sample();
     return true;
   } catch (error) {
-    if (error.down) {
+    if (lost(error)) {
       say(message, "");
-      down();
       return false;
     }
-    say(message, error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".", true);
+    say(message, sentence(error.message), true);
     if (shown) showStatus(shown);
     return false;  // what you filled in stays, to correct
   }
@@ -306,7 +317,8 @@ async function start() {
   $("controls").hidden = locked(shown);
 }
 start().catch((error) => {
-  $("status").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1) + ".";
+  if (lost(error)) return;
+  $("status").textContent = sentence(error.message);
   $("status").className = "bad";
 });
 

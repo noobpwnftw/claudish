@@ -101,6 +101,11 @@ def key_state():
     return keys.claude_credential()[0] or "missing"
 
 
+def typed():
+    from .service import typed
+    return typed()
+
+
 def state(path=None):
     """What the window shows. Never the key itself: only whether there is one, and where."""
     path = path or config.default_path()
@@ -147,6 +152,7 @@ def state(path=None):
         "claude_code": None if claude_code() else NO_CLAUDE_CODE,  # what the Claude Code choice would say
         "codex": None if codex() else NO_CODEX,
         "command": (entry.get("command") or [None])[0] if choice in ("claude-code", "codex") else None,
+        "claudish": typed(),  # how the page names claudish's commands here
     }
 
 

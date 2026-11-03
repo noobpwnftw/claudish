@@ -18,6 +18,12 @@ from playwright.async_api import async_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def typed():
+    """How the page names claudish's commands: as the service, this interpreter, runs them."""
+    return subprocess.run([sys.executable, "-c", "from claudish.service import typed; print(typed())"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+
 def free_port():
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -172,7 +178,7 @@ async def check(args, home, port):
         # A config the service does not use, or a profile the window switches to: said, with the fix.
         await page.unroute_all()
         problem = "profile 'claude': unknown keys claude_model"
-        fix = "Fix it in %s (it applies when you save), or move that file aside and run claudish init." % config
+        fix = "Fix it in %s (it applies when you save), or move that file aside and run %s init." % (config, typed())
 
         async def refused(route):
             response = await route.fetch()
@@ -208,6 +214,12 @@ async def check(args, home, port):
         await page.unroute_all()
         await expect(page.locator("#config-fix")).to_be_hidden(timeout=4000)
         await expect(page.locator("#controls")).to_be_visible()
+        # The service restarted: this window's token is gone. Reopen, not "not running" forever.
+        await page.route("**/settings", lambda route: route.fulfill(status=403, json={"error": "the service token is required"}))
+        await page.get_by_text("Critic", exact=True).click()  # not the tone in use: a change
+        await expect(page.locator("#status")).to_contain_text("This window has expired: open Settings again")
+        await expect(page.locator("#controls")).to_be_hidden()
+        await page.unroute_all()
 
         reused = await browser.new_page()  # a ticket is good once
         await reused.goto(url)
@@ -249,7 +261,7 @@ def main():
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             for _ in range(50):
-                if Path(home, "claudish", "service-token").exists():
+                if Path(home, "claudish", "service-token-%d" % port).exists():  # its port's token
                     break
                 time.sleep(0.1)
             asyncio.run(check(args, home, port))

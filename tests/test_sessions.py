@@ -244,6 +244,7 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaises(Stop):
                 run_service(Rewriter("rules"), 0, None, None, ready)  # any port but the service's
             self.assertEqual(client.read_token(), first)
+            self.assertEqual(len(os.listdir(os.path.dirname(client.token_path()))), 2)  # its own, beside it
 
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)

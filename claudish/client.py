@@ -20,15 +20,21 @@ REACHED = threading.Event()
 PORT = 18765  # the service, on this computer only
 SERVICE = "http://127.0.0.1:%d" % PORT
 
-def token_path():
-    """The service's token: written by the service at start and sent by the input methods."""
+def token_path(port=PORT):
+    """The service's token: written by the service at start and sent by the input methods. A
+    second service on another port (`claudish serve --port`) has its own."""
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
-    return os.path.join(base, "claudish", "service-token")
+    return os.path.join(base, "claudish", "service-token" if port == PORT else "service-token-%d" % port)
 
 
-def read_token():
+def port_of(url):
+    from urllib.parse import urlsplit
+    return urlsplit(url).port or PORT
+
+
+def read_token(port=PORT):
     try:
-        with open(token_path()) as source:
+        with open(token_path(port)) as source:
             return source.read().strip()
     except OSError:
         return ""
@@ -50,26 +56,26 @@ def write_private(path, text):
     os.replace(temporary, path)
 
 
-def write_token(token=None):
-    """This service run's token (a new one when None), in its file."""
+def write_token(token=None, port=PORT):
+    """This service run's token (a new one when None), in its port's file."""
     import secrets
     token = token or secrets.token_urlsafe(32)
-    write_private(token_path(), token)
+    write_private(token_path(port), token)
     return token
 
 
 def settings_url(url=SERVICE):
     """The settings page of a running service, with a ticket in the fragment, which the page
     trades for its settings token. OSError when no service answers."""
-    request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers())
+    request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers(url))
     with OPENER.open(request, timeout=10) as response:  # a service just started at login is slow at first
         ticket = json.load(response)["ticket"]
     return "%s/settings#ticket=%s" % (url.rstrip("/"), ticket)
 
 
-def headers():
+def headers(url=SERVICE):
     sent = {"Content-Type": "application/json"}
-    token = read_token()
+    token = read_token(port_of(url))
     if token:
         sent["X-Claudish-Token"] = token
     return sent
@@ -85,7 +91,7 @@ def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=
     for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
         if value:
             body[key] = value
-    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"), headers=headers())
+    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"), headers=headers(endpoint))
     with OPENER.open(request, timeout=timeout) as response:
         return json.load(response)
 
@@ -93,7 +99,7 @@ def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=
 def call(endpoint, path, body=None, timeout=10):
     """A JSON request to the local service: POST with a body, else GET."""
     data = json.dumps(body).encode("utf-8") if body is not None else None
-    request = Request(endpoint + path, data=data, headers=headers())
+    request = Request(endpoint + path, data=data, headers=headers(endpoint))
     with OPENER.open(request, timeout=timeout) as response:
         return json.load(response)
 
