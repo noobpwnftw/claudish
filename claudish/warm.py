@@ -48,6 +48,17 @@ class Lines:
             raise TimeoutError from None
 
 
+def with_own_folder(command):
+    """The environment, with the command's folder first on PATH: an npm install's claude or codex
+    is a node script, and its node is beside it (Homebrew's bin, an nvm version's bin), which a
+    login service's PATH lacks."""
+    folder = os.path.dirname(os.path.expanduser(command))
+    path = os.environ.get("PATH", "")
+    if not folder or folder in path.split(os.pathsep):
+        return None  # the service's own environment
+    return dict(os.environ, PATH=folder + os.pathsep + path if path else folder)
+
+
 class Warm:
     """What both share: a state, a lock (one request at a time), the CLI process, start and stop."""
     name = "the model"
@@ -109,9 +120,10 @@ class Warm:
         request that needs it gives up (Codex's handshake)."""
         import subprocess
         self.kill()
-        self.spawn(self.argv(), self.name, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        argv = self.argv()
+        self.spawn(argv, self.name, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                    stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                   bufsize=1, cwd=self.cwd)
+                   bufsize=1, cwd=self.cwd, env=with_own_folder(argv[0]))
 
     def alive(self):
         process = self.process

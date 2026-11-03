@@ -18,6 +18,7 @@ import time
 import uuid
 
 from .modes import TEMPLATES
+from .warm import with_own_folder
 
 PARTIAL_EVERY = 0.15  # seconds between partial-draft events
 
@@ -69,7 +70,7 @@ class AgentProcess:
             session += ["--mcp-config", self.config_file]  # last: it takes several values
         self.process = subprocess.Popen(self.command + session, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                        bufsize=1)
+                                        bufsize=1, env=with_own_folder(self.command[0]))
         self.started = True
         self.stderr = []
         threading.Thread(target=lambda process=self.process: self.stderr.extend(process.stderr), daemon=True).start()

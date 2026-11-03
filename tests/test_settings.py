@@ -486,3 +486,20 @@ class ProxyTests(unittest.TestCase):
             self.assertEqual(proxies("https://api.openai.com"), [{"https": "http://proxy.example:3128"}])
             for url in ("http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"):
                 self.assertFalse(any(proxies(url)), url)  # none, or an empty one
+
+
+class CliPlacesTests(unittest.TestCase):
+    def test_an_nvm_install_is_found_newest_first_and_runs_with_its_node(self):
+        from claudish import warm
+        with tempfile.TemporaryDirectory() as home:
+            for version in ("v18.20.1", "v22.3.0"):
+                folder = Path(home, ".nvm/versions/node", version, "bin")
+                folder.mkdir(parents=True)
+                (folder / "claude").write_text("#!/usr/bin/env node\n")
+                (folder / "claude").chmod(0o755)
+            with patch("shutil.which", return_value=None), patch.object(Path, "home", return_value=Path(home)):
+                found = settings.command_path("claude", ".vscode*/none/claude*")
+            self.assertEqual(found, str(Path(home, ".nvm/versions/node/v22.3.0/bin/claude")))
+            with patch.dict(os.environ, {"PATH": "/usr/bin:/bin"}):
+                self.assertEqual(warm.with_own_folder(found)["PATH"], str(Path(found).parent) + ":/usr/bin:/bin")
+                self.assertIsNone(warm.with_own_folder("/usr/bin/claude"))  # already on PATH

@@ -35,6 +35,8 @@ def command_path(name, extension_glob):
     places = [home / ".local/bin" / name, home / ".local/bin" / (name + ".exe"), home / (".%s/local" % name) / name,
               home / (".%s/bin" % name) / name, Path("/usr/local/bin") / name, Path("/opt/homebrew/bin") / name,
               home / ".npm-global/bin" / name, npm / (name + ".cmd")]
+    places += sorted((Path(p) for p in glob.glob(str(home / ".nvm/versions/node/*/bin" / name))),
+                     key=version_order, reverse=True)  # nvm's npm: the newest node first
     places += sorted((Path(p) for p in glob.glob(str(home / extension_glob))  # the command, not its helpers
                       if Path(p).name in (name, name + ".exe")), key=version_order, reverse=True)
     return next((str(p) for p in places if p.is_file() and os.access(p, os.X_OK)), None)
