@@ -603,6 +603,11 @@ class ClaudishEngine(IBus.Engine):
         if pill and screen().shell:
             screen().publish(None, "", pill, lasting=True)
 
+    def do_focus_in(self):
+        """An IBus without focus ids (before 1.5.27): this engine's input context is the text box."""
+        if getattr(self, "own_path", None):
+            self.do_focus_in_id(self.own_path, "")
+
     def do_focus_out(self):
         trace("focus-out")
         if self.composition.for_model:  # an instruction's exchange: held for this text box, its work going on
@@ -650,9 +655,13 @@ def main():
     engines = iter(range(1, 1 << 30))
 
     def create(factory, name):
-        # has_focus_id makes IBus report which program has focus (do_focus_in_id).
-        return ClaudishEngine(engine_name=name, connection=bus.get_connection(), has_focus_id=True,
-                              object_path="/org/freedesktop/IBus/Engine/Claudish/%d" % next(engines))
+        path = "/org/freedesktop/IBus/Engine/Claudish/%d" % next(engines)
+        try:  # has_focus_id makes IBus (1.5.27+) report which program has focus (do_focus_in_id)
+            return ClaudishEngine(engine_name=name, connection=bus.get_connection(), has_focus_id=True, object_path=path)
+        except TypeError:  # an older IBus (Ubuntu 22.04's 1.5.26): plain focus-in, an engine per input context
+            engine = ClaudishEngine(engine_name=name, connection=bus.get_connection(), object_path=path)
+            engine.own_path = path
+            return engine
 
     factory.connect("create-engine", create)
     bus.request_name("org.freedesktop.IBus.Claudish", 0)
