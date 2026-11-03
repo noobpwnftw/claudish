@@ -398,6 +398,7 @@ class SessionPollingTests(unittest.TestCase):
         could start another beside it. A missed poll is retried; then the session is cancelled."""
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling = {}, set()
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
         worker.conversation, worker.revisions, worker.wanted = "c", {}, None
         worker.results = collections.deque()
@@ -424,11 +425,45 @@ class SessionPollingTests(unittest.TestCase):
         self.assertEqual(calls[-1], "/sessions/k/cancel")
         self.assertEqual(worker.results[-1], (1, {"error": "timed out", "session": "k"}))  # the instruction says so
 
+    def test_a_session_whose_shown_answer_you_inserted_is_not_cancelled(self):
+        """Tab inserts the shown answer and the composition moves on: the follower stops, and the
+        session ends by itself, so the conversation keeps what went in."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling = {}, set()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results, worker.wanted = "c", {}, collections.deque(), None
+        calls, polls = [], []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            if path.endswith("/answer") or path.endswith("/cancel"):
+                return {"ok": True}
+            polls.append(path)
+            if len(polls) == 1:
+                return {"events": [{"seq": 0, "type": "question", "id": "question-1", "insert": "It is the linker."}],
+                        "done": False}
+            worker.answer("k", "question-1", 0)  # Tab: Insert it
+            with worker.condition:
+                worker.wanted = set()  # the commit's new revision: this one is no longer wanted
+            return {"events": [], "done": False}
+        with patch.object(client, "call", call):
+            worker.session(1, "what does this mean", "app")
+            for _ in range(200):
+                if "/sessions/k/answer" in calls and len(polls) >= 2:
+                    break
+                time.sleep(0.01)
+            time.sleep(0.1)
+        self.assertNotIn("/sessions/k/cancel", calls)
+
     def test_a_follow_ups_session_is_wanted_before_the_adapter_polls(self):
         """Owner: a follow-up stuck at working. Its revision is new at Shift+Enter; the follower
         looked before the adapter's poll updated wanted, and cancelled the session it had started."""
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling = {}, set()
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
         worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
         worker.wanted = {4}  # the adapter has not polled since the follow-up's revision, 5
@@ -453,6 +488,7 @@ class SessionPollingTests(unittest.TestCase):
         typed later went to the dead session, and the panel stayed at working."""
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling = {}, set()
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
         worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
         worker.wanted = {5, 3}  # on screen: 5 (continue); held: 3, the exchange
@@ -484,6 +520,7 @@ class SessionPollingTests(unittest.TestCase):
         """Codex: a failed send was swallowed after the panel had moved on; the service went on waiting."""
         from claudish import client
         worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling = {}, set()
         worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
         worker.results, worker.revisions = collections.deque(), {"k": 7}
         calls = []

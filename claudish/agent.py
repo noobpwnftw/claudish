@@ -168,13 +168,30 @@ class ClaudeCodeDriver:
         if self.own:
             self.agent.close()
 
+    def watch(self, session, over):
+        """The turn's time limit, which your waiting does not count: while a question waits for
+        you its own limit runs instead (QUESTION_SECONDS, as for the model's questions). What it
+        says comes before the cancel, which would read as Esc."""
+        from .conversation import QUESTION_SECONDS
+        used, last, asked = 0.0, time.monotonic(), None
+        while not over.wait(0.25):
+            now = time.monotonic()
+            if self.pending or self.asks:
+                asked = asked or now
+                if now - asked > QUESTION_SECONDS:
+                    session.emit("error", text="no answer, so the instruction stopped")
+                    return self.cancel()
+            else:
+                asked = None
+                used += now - last
+                if used > self.timeout:
+                    session.emit("error", text="the agent took longer than %d s" % self.timeout)
+                    return self.cancel()
+            last = now
+
     def turn(self, session, prompt):
-        def too_long():  # said before the cancel, which would read as Esc
-            session.emit("error", text="the agent took longer than %d s" % self.timeout)
-            self.cancel()
-        timer = threading.Timer(self.timeout, too_long)
-        timer.daemon = True
-        timer.start()
+        over = threading.Event()
+        threading.Thread(target=self.watch, args=(session, over), daemon=True).start()
         self.send({"type": "user", "message": {"role": "user", "content": prompt + self.context}, "parent_tool_use_id": None})
         draft, last = "", 0.0
         process = self.ran = self.agent.process
@@ -217,7 +234,7 @@ class ClaudeCodeDriver:
                         session.emit("error", text=text or "the agent stopped: %s" % message.get("subtype"))
                     return
         finally:
-            timer.cancel()
+            over.set()
         if not session.done and not self.cancelled:  # the process ended mid-turn; the next turn resumes it
             tail = "".join(self.agent.stderr).strip()[-300:]
             session.emit("error", text="the agent exited without a result" + (": " + tail if tail else ""))

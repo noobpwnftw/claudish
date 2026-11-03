@@ -266,6 +266,48 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(len(model.sent), 1)  # not asked again with "the user answered: cancelled"
 
+    def test_esc_while_the_model_works_asks_nothing_and_calls_it_no_more(self):
+        import os
+        import tempfile
+        from claudish.sessions import Session
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        rewriter.helper = ["claude", "{prompt}"]
+        model = Scripted(answer(calls=[("helper__claude", {"task": "fix"})]), answer("a draft"))
+        holder = {}
+
+        def chat(payload, headers, image=None, timeout=None):
+            out = model(payload, headers, image, timeout)
+            holder["session"].cancel()  # Esc while the model call was out
+            return out
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home, "XDG_RUNTIME_DIR": home}), \
+                patch("claudish.handoff.shutil.which", return_value="/bin/claude"), patch.object(rewriter, "chat", chat):
+            driver = ModelDriver(rewriter, rewriter.conversations.get("box"))
+            session = holder["session"] = Session(driver)
+            thread = threading.Thread(target=lambda: driver.run(session, "have claude fix it"))
+            thread.start()
+            thread.join(10)
+        self.assertEqual(len(model.sent), 1)  # the approval it would have asked is not read as a denial
+        self.assertNotIn("question", [e["type"] for e in session.events])
+
+    def test_an_inserted_answer_stays_in_the_conversation_after_a_late_cancel(self):
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        conversation = rewriter.conversations.get("box")
+        model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize."})]))
+        with patch.object(rewriter, "chat", model):
+            session, thread = run(ModelDriver(rewriter, conversation), "what does this error mean")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            question = next(e for e in session.events if e["type"] == "question")
+            session.answer(question["id"], 0)  # Tab: Insert it
+            thread.join(5)
+            kept = len(conversation.messages)
+            session.cancel()  # the composition moved on: a follower's cancel after the end
+        self.assertTrue(kept)
+        self.assertEqual(len(conversation.messages), kept)
+
     def test_the_model_asks_and_your_choice_goes_back(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Did you mean git status?",
                                                        "choices": ["Yes", "No, git stash"]})]), answer("git stash"))

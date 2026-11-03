@@ -20,7 +20,7 @@ KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs
 # A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
 # it may take far longer than a suggestion while typing (the profile's timeout, if longer).
 TURN_TIMEOUT = 60
-QUESTION_SECONDS = 300  # a question nobody answers, as for an agent's (agent.py)
+QUESTION_SECONDS = 300  # a question nobody answers (an agent's too: agent.py)
 # How a model's own question is shown, and the choice labels only Claudish's own questions use.
 MODEL_ASKS = "The model asks: "
 MODEL_SAYS = "The model says: "
@@ -233,8 +233,9 @@ class ModelDriver:
         approval: nothing highlighted until ↓, which lands on its safe choice, listed first; a
         reflexive key approves nothing). label and body: how the panel shows it (who asks, then
         what)."""
-        if self.cancelled:
-            return 1, "cancelled"
+        from .tools import Cancelled
+        if self.cancelled:  # Esc while the model worked: no question, and no more model calls
+            raise Cancelled("cancelled")
         self.counter += 1
         key = "question-%d" % self.counter
         waiter = [threading.Event(), None]
@@ -242,7 +243,6 @@ class ModelDriver:
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
                      label=label, body=text if body is None else body, code=code, read=read,
                      **({"insert": insert} if insert is not None else {}))
-        from .tools import Cancelled
         if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the instruction ends, as on Esc
             self.pending.pop(key, None)
             self.cancel()

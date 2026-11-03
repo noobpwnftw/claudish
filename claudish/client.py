@@ -140,6 +140,8 @@ class Suggestions:
         self.boxes = collections.OrderedDict()  # a text box -> its conversation (use_conversation)
         self.offline = False  # the service did not answer its last check: True, or "initializing"
         self.revisions = {}  # an agent session's id -> the instruction's revision (its answers' errors go there)
+        self.inserts = {}  # an agent session's id -> its shown answer's question (Tab inserts it)
+        self.settling = set()  # sessions whose shown answer was inserted: they end by themselves
         # The revisions the composition still shows (Composition.follow sets them): the current one and
         # a held exchange's. A session for another one is over for the person: it is cancelled.
         self.wanted = None
@@ -190,8 +192,9 @@ class Suggestions:
             self.condition.notify()
         if session and text.strip():
             # Its own thread: it never waits behind a rewrite or a suggestion still on its way.
-            threading.Thread(target=self._start, args=(revision, text, app, look, before, after, purpose, draft),
-                             daemon=True).start()
+            # The box's conversation as you sent it: a focus change before the thread runs is another box's.
+            threading.Thread(target=self._start, args=(revision, text, app, look, before, after, purpose, draft,
+                                                       self.conversation), daemon=True).start()
 
     def _start(self, revision, *request):
         try:
@@ -210,6 +213,11 @@ class Suggestions:
         """Answer an agent's question; off the input thread, so a key press never waits."""
         body = {"question": question}
         body.update({"text": text} if text is not None else {"choice": choice})
+
+        if choice == 0 and self.inserts.get(session) == question:
+            # The shown answer, inserted: the composition moves on, and the session ends by itself
+            # (its follower must not cancel it, or the conversation would forget what went in).
+            self.settling.add(session)
 
         def send():
             error = "the answer did not reach cd_AI's service"
@@ -270,10 +278,11 @@ class Suggestions:
                 return True
             return False
 
-    def session(self, revision, text, app, look=False, before="", after="", purpose=None, draft=""):
+    def session(self, revision, text, app, look=False, before="", after="", purpose=None, draft="", conversation=None):
         """Run an instruction as a turn in this text box's conversation (an HTTPError says why the
         service refused it)."""
-        body = {"text": text, "conversation": self.conversation, "look": look, "before": before, "after": after}
+        body = {"text": text, "conversation": conversation or self.conversation, "look": look, "before": before,
+                "after": after}
         if purpose:
             body["purpose"] = purpose
         if app:
@@ -291,6 +300,8 @@ class Suggestions:
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
             del self.revisions[old]
+            self.inserts.pop(old, None)
+            self.settling.discard(old)
         # Followed beside the requests: a held exchange's agent goes on while continue suggests.
         threading.Thread(target=self._follow_session, args=(revision, key), daemon=True).start()
 
@@ -304,6 +315,8 @@ class Suggestions:
         after, missed = 0, 0
         while True:
             with self.condition:
+                if key in self.settling:
+                    return True  # its shown answer was inserted: it ends by itself
                 if self.closed or (self.wanted is not None and revision not in self.wanted):
                     break  # edited, committed, Esc, or a new instruction: the agent stops
             try:
@@ -319,6 +332,8 @@ class Suggestions:
                 self._cancel(key)
                 raise
             with self.condition:  # taken back during the poll: not kept, though it may have answered
+                if key in self.settling:
+                    return True
                 if self.wanted is not None and revision not in self.wanted:
                     break
             for event in data["events"]:
@@ -332,6 +347,8 @@ class Suggestions:
                 elif kind == "error":
                     self.deliver(revision, {"error": event["text"], "session": key}, always=True)
                 elif kind in ("progress", "partial", "question"):  # as the adapters see them, beside suggestions
+                    if kind == "question" and "insert" in event:
+                        self.inserts[key] = event["id"]
                     self.deliver(revision, {kind: event if kind == "question" else event["text"], "session": key},
                                  always=True)
             if data["done"]:

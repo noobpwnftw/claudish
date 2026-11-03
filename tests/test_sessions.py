@@ -298,7 +298,6 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(([e["type"] for e in events], done), (["question", "result"], True))
 
 
-
 class AnswerTests(unittest.TestCase):
     def test_the_same_answer_again_is_taken_once(self):
         """Codex: an answer the service took, whose reply was lost, came again; the service said
