@@ -289,6 +289,8 @@ class ClaudishTextService(TextService):
         if document and document != getattr(self, "last_document", None):
             if self.state.for_model:  # an instruction's exchange, left in the other text box: held for it
                 self.state.leave(self.last_document)
+            elif self.state.live and self.state.text:  # continue's context and suggestion were the other box's
+                self.drop_live()
             if self.worker:
                 self.worker.use_conversation(document)  # this box's own, also when you come back to it
             self.last_document = document
@@ -351,6 +353,9 @@ class ClaudishTextService(TextService):
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
             # Backspace, Enter, and navigation are the app's (the context follows here).
             if event.keyCode in (0x09, 0x1B):
+                if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
+                    self.drop_live()
+                    return False
                 return bool(self.state.ghost)
             if event.isPrintableChar():
                 return True
@@ -364,6 +369,12 @@ class ClaudishTextService(TextService):
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
         taking = event.keyCode == 0x09 and bool(self.selection())  # Tab on a selection: your words
         return event.isPrintableChar() or bool(self.state.text) or restoring or taking
+
+    def caret_stayed(self):
+        """Whether the text before the caret is still what continue typed (a click in the same field
+        sends no key: macOS looks at the caret for the same reason). True without the text (a stock PIME)."""
+        before = self.around()[0].replace("\r", "")
+        return not before or before.endswith(self.state.text.replace("\r", "")[-32:])
 
     def selection(self):
         """The app's selected text when nothing is composed (Claudish's PIME sends it), if it fits."""

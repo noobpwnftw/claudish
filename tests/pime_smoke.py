@@ -181,6 +181,13 @@ def main():
             assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
             worker_class.return_value.poll.return_value = None
             assert key(9)["commitString"] == " Hello—truly."
+            # A click moved the caret (no key): a suggestion made for the old spot is not Tab's to take.
+            key(ord("!"), ord("!"))
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Again."})
+            key(ord("!"), ord("!"), "onKeyUp")
+            worker_class.return_value.poll.return_value = None
+            assert service.state.ghost.strip() == "Again.", service.state.ghost
+            assert key(9, method="filterKeyDown", textBefore="Total: ")["return"] is False and not service.state.ghost
             shift_tap()  # compose, starting empty: the words are in the app already
             for char in "as is":
                 key(ord(char.upper()), ord(char))
