@@ -621,6 +621,25 @@ class MacOSAdapterTests(unittest.TestCase):
             self.assertFalse(self.key(53, "\x1b"))
         self.assertEqual((self.controller.state.text, self.client.marked, self.module.PANEL.visible), ("", "", False))
 
+    def test_a_suggestion_asked_for_before_a_click_is_not_shown_where_the_caret_went(self):
+        client = TextClient("First line.\nSecond line here.")
+        client.mark_at = 11  # the end of the first line
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            for char in " The ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49 if char == " " else 0,
+                                                                modifierFlags=lambda: 0, characters=lambda: char), client)
+            client.mark_at = len(client.text)  # a click at the end (no key reaches the input method)
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "results are in."})
+            fresh.poll()
+            tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
+            self.assertFalse(fresh.handleEvent_client_(tab, client))  # Tab is the app's: nothing was offered here
+            self.assertNotIn("results are in.", client.text)
+        finally:
+            fresh.inputControllerWillClose()
+
     def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
         client = TextClient("keep this word")
         client.chosen = (5, 4)  # "this", selected in the app
