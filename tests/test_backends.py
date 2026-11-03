@@ -122,6 +122,15 @@ class EndpointBackendTests(unittest.TestCase):
             request = opener.return_value.open.call_args_list[-1].args[0]  # the chat request (a nameless model asks /v1/models first)
             return opener.call_args.args, request, json.loads(request.data)
 
+    def test_a_schema_answer_without_a_draft_offers_nothing(self):
+        for content in ('{"drafts": [""]}', '{"drafts": []}', "{}"):
+            reply = {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+            rewriter = Rewriter("llama", "http://127.0.0.1:9", model="m")
+            with patch("claudish.model.build_opener") as opener:
+                opener.return_value.open.side_effect = lambda *args, **kwargs: BytesIO(json.dumps(reply).encode())
+                with self.assertRaisesRegex(RuntimeError, "offered nothing"):  # not the JSON as a draft
+                    rewriter.rewrite("ok")
+
     def test_a_server_that_starts_after_the_service_is_asked_for_its_model_again(self):
         rewriter = Rewriter("openai", "http://localhost:11434/")
         rewriter.opener = MagicMock()

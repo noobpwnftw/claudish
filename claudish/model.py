@@ -659,7 +659,9 @@ class Rewriter:
         candidates = []
         for output in outputs:
             found = shapes.drafts(output)
-            if found is None:  # a plain answer (no schema on this backend): read through the quirks
+            if found is None and self.shaped() and shapes.is_object(output):
+                found = []  # the schema's answer with no draft in it ({"drafts": [""]}): nothing offered
+            elif found is None:  # a plain answer (no schema on this backend): read through the quirks
                 found = [quirks.plain(text, output) or ""]
             for draft in found:
                 draft = box.fit(mode, self.finish(mode, text, draft))

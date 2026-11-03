@@ -107,6 +107,14 @@ def as_message(content, index=0):
     return {"role": "assistant", "content": content}
 
 
+def is_object(content):
+    """Whether an answer is a JSON object: held to the schema, it is an answer even without drafts."""
+    try:
+        return isinstance(content, dict) or isinstance(json.loads(content or ""), dict)
+    except ValueError:
+        return False
+
+
 def drafts(content):
     """The drafts in an answer, or None when it is not one (a backend without a schema)."""
     if isinstance(content, dict):
