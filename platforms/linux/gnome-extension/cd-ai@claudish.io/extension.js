@@ -56,8 +56,10 @@ export default class CdAiExtension extends Extension {
             try {
                 Main.layoutManager.addTopChrome(actor, {affectsInputRegion: false});
             } catch (e) {
-                // GNOME 50 has no affectsInputRegion (an unknown option throws before the actor is
-                // added): a chrome actor that is not reactive takes no input there.
+                // GNOME 50 has no affectsInputRegion: the unknown option throws once the actor is
+                // added but before it is tracked. Taken out, it is added again without it (a chrome
+                // actor that is not reactive takes no input there).
+                actor.get_parent()?.remove_child(actor);
                 Main.layoutManager.addTopChrome(actor);
             }
         }
