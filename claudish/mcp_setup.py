@@ -137,10 +137,10 @@ def context_test(app, profile=None, show=False):
     shown = marks()
     name, settings, _, context = config.resolve(profile=profile)
     # Which AI answers there: the app's binding, then that profile's choice per mode; the context is
-    # what that profile consults (its own, and its bindings for the app), as the service does.
+    # what that profile consults (its own, and the service profile's bindings for the app), as the service does.
     answering = next((b.profile for b in settings.get("bindings") or [] if b.matches(app) and b.profile), None) or name
     _, routed, _, context = config.resolve(profile=answering) if answering != name else (None, settings, None, context)
-    bindings = [b for b in routed.get("bindings") or [] if b.matches(app)]
+    bindings = [b for b in settings.get("bindings") or [] if b.matches(app)]  # the service's: a routed profile gets them
     providers = [("profile %s" % answering, p) for p in (context.providers if context else [])] + \
                 [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
     print("App %r, profile %r: %d binding(s) match, %d provider(s) would be consulted"

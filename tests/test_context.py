@@ -155,6 +155,18 @@ class BindingTests(unittest.TestCase):
             self.assertEqual(error.exception.code, 400)
 
 
+    def test_a_routed_profile_keeps_its_own_context_limit(self):
+        (self.root / "notes.md").write_text("x" * 200, encoding="utf-8")
+        path = self.root / "config.json"
+        path.write_text(json.dumps({"profile": "main", "profiles": {
+            "main": {"backend": "rules", "bindings": [{"app": "mail*", "profile": "mail",
+                                                      "context": [{"type": "file", "path": "notes.md"}]}]},
+            "mail": {"backend": "rules", "max_context_chars": 50}}}), encoding="utf-8")
+        name, settings, templates, context = config.resolve(path)
+        main = Rewriter.from_settings(settings, templates, context, name)
+        main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
+        self.assertEqual([len(text) for _, text in main.route("mailapp").sections("mailapp")], [50])
+
     def test_an_apps_context_keeps_to_the_profiles_limit(self):
         (self.root / "notes.md").write_text("x" * 3000, encoding="utf-8")
         path = self.root / "config.json"

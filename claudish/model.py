@@ -241,6 +241,7 @@ class Rewriter:
         rewriter.session_command = settings.get("session_command")
         rewriter.summon = settings.get("summon", "Shift+Enter")
         rewriter.hints = settings.get("hints", True)
+        rewriter.max_context_chars = settings.get("max_context_chars", 6000)
         if settings.get("tools"):
             if settings["backend"] not in LOOPS:
                 raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
@@ -393,7 +394,8 @@ class Rewriter:
         if not (self.context or extra):
             return []
         from .context import Context
-        return (self.context or Context()).sections(extra)
+        # The profile's own limit, also over the service's bindings a routed profile gets.
+        return (self.context or Context(max_chars=getattr(self, "max_context_chars", 6000))).sections(extra)
 
     def box(self, mode, app=None, purpose=None, before="", after="", look=False, screen=None, trusted=True):
         """The text box this request is for, with what its mode calls for observed. screen: a

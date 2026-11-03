@@ -131,8 +131,6 @@ def resolve(path=None, profile=None, overrides=None):
         if not all(isinstance(spec, dict) for spec in settings["context"]):
             raise ValueError("profile %r: context must be a list of objects" % name)
         context = Context(settings["context"], base, settings["max_context_chars"], servers)
-    elif settings["bindings"]:  # the apps' context only: within the profile's limit too
-        context = Context((), base, settings["max_context_chars"], servers)
     settings["bindings"] = [Binding(spec, base, servers) for spec in settings["bindings"] or []]
     for binding in settings["bindings"]:
         if binding.profile and binding.profile not in known:
