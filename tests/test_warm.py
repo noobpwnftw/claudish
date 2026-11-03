@@ -41,6 +41,17 @@ class ClaudeCodeTests(unittest.TestCase):
         self.assertEqual(backend.ask("rewrite: ok", 5), "seen 1: rewrite: ok")
         self.assertLess(time.monotonic() - started, 1.5)  # not the 2.5 s the used one takes to end
 
+    def test_after_a_failed_request_it_warms_up_again_by_itself(self):
+        self.backend.start()
+        ready(self.backend)
+        with self.assertRaises(RuntimeError):
+            self.backend.ask("die", 5)  # the process ends mid-request
+        deadline = time.monotonic() + 5
+        while self.backend.state != "warm" and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertEqual(self.backend.state, "warm")  # not "restarting" until the next request
+        self.assertTrue(self.backend.alive())
+
     def test_a_dead_process_is_replaced_and_a_slow_one_times_out(self):
         self.backend.start()
         ready(self.backend)

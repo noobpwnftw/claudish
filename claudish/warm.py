@@ -143,9 +143,14 @@ class Warm:
             self.lock.release()
 
     def failed(self):
+        """A request failed: this process is not reused. A fresh one warms up in the background
+        (after the request, which holds the lock), as at the service's start: the settings say
+        restarting, then warm, or why it failed."""
         with self.lifecycle:
             self.kill(force=True)
             self.state = "stopped" if self.stopped.is_set() else "restarting"
+        if not self.stopped.is_set():
+            threading.Thread(target=self.warm_up, daemon=True).start()
 
     def stop(self):
         self.stopped.set()
