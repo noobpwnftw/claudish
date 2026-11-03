@@ -155,6 +155,16 @@ class BindingTests(unittest.TestCase):
             self.assertEqual(error.exception.code, 400)
 
 
+    def test_an_apps_context_keeps_to_the_profiles_limit(self):
+        (self.root / "notes.md").write_text("x" * 3000, encoding="utf-8")
+        path = self.root / "config.json"
+        path.write_text(json.dumps({"profiles": {"p": {"backend": "rules", "max_context_chars": 100, "bindings": [
+            {"app": "slack*", "context": [{"type": "file", "path": "notes.md"}]}]}}}), encoding="utf-8")
+        name, settings, templates, context = config.resolve(path)
+        rewriter = Rewriter.from_settings(settings, templates, context, name)
+        self.assertEqual([len(text) for _, text in rewriter.sections("slack")], [100])  # not the default 6000
+
+
 class MCPContextTests(unittest.TestCase):
     """Real stdio MCP round trips; skipped unless the optional MCP SDK is installed."""
 
