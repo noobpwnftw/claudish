@@ -87,7 +87,7 @@ MODES = ("compose", "continue")
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
-HOLDS = 4  # text boxes with an exchange held at once (the service runs as many sessions)
+HOLDS = 3  # text boxes with an exchange held at once: with the one on screen, the service's 4 sessions
 # The panel stays shorter than a screen (G64): about this many rows of text at about ROW characters.
 # Past it, drafts other than the highlighted one show their first two rows, and a text taller than
 # the panel shows its first rows and an ellipsis. Tab still takes the whole text.
