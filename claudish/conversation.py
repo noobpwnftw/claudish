@@ -237,11 +237,14 @@ class ModelDriver:
         session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
                      label=label, body=text if body is None else body, code=code, read=read,
                      **({"insert": insert} if insert is not None else {}))
+        from .tools import Cancelled
         if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the instruction ends, as on Esc
             self.pending.pop(key, None)
-            self.cancel()  # a model told "no answer" asks again; the loop stops at its next call
+            self.cancel()
             session.emit("error", text="no answer, so the instruction stopped")
-            return 1, "no answer"
+            raise Cancelled("no answer")  # not told to the model, which would only be asked again
+        if self.cancelled:  # Esc: the turn stops here, with no more model calls
+            raise Cancelled("cancelled")
         return waiter[1] or (1, "cancelled")
 
     def show(self, session, arguments, box):

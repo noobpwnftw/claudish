@@ -158,12 +158,17 @@ class Toolbox:
                                 progress(summary)
                             try:
                                 result = str(callers[function["name"]](arguments))[:8000]
-                            except Finished:
+                            except (Finished, Cancelled):
                                 raise
                             except Exception as exc:  # a failed tool is information for the model
                                 result = "error: %s" % (exc,)
                     messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
         raise RuntimeError("the tool loop did not finish")
+
+
+class Cancelled(RuntimeError):
+    """The instruction was stopped (Esc, or a question nobody answered): the loop ends, and the
+    model is not asked again."""
 
 
 class Finished(RuntimeError):

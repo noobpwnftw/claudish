@@ -192,7 +192,6 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(session.events[-1]["text"], "cancelled")
 
-
     def test_an_instruction_cancelled_while_the_model_works_is_not_remembered(self):
         """Esc, then another instruction: a late answer to the first must not join the conversation."""
         started, release = threading.Event(), threading.Event()
@@ -242,6 +241,22 @@ class AskAndHelperTests(unittest.TestCase):
                 session.answer(question["id"], choice)
             thread.join(5)
         return asked, session.events[-1]
+
+    def test_esc_on_the_models_question_stops_the_turn(self):
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        model = Scripted(answer(calls=[("user__ask", {"question": "Which branch?", "choices": ["main", "dev"]})]),
+                         answer("Deleted dev."))
+        with patch.object(rewriter, "chat", model):
+            driver = ModelDriver(rewriter, rewriter.conversations.get("box"))
+            session, thread = run(driver, "delete the branch")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+                time.sleep(0.01)
+            session.cancel()
+            thread.join(15)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(model.sent), 1)  # not asked again with "the user answered: cancelled"
 
     def test_the_model_asks_and_your_choice_goes_back(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Did you mean git status?",
