@@ -41,19 +41,24 @@ def read_token(port=PORT):
 
 
 def write_private(path, text):
-    """Replace path with text: a fresh temporary file, then a rename."""
-    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    temporary = str(path) + ".tmp"
+    """Replace path with text: a fresh temporary file of its own (another writer has its own), then
+    a rename."""
+    import tempfile
+    folder = os.path.dirname(str(path))
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=folder, prefix=os.path.basename(str(path)) + ".", suffix=".tmp")
     try:
-        os.unlink(temporary)
-    except FileNotFoundError:
-        pass
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as out:
-        if hasattr(os, "fchmod"):
-            os.fchmod(out.fileno(), 0o600)  # whatever the umask
-        out.write(text)
-    os.replace(temporary, path)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as out:  # mkstemp: this user's only (0600)
+            if hasattr(os, "fchmod"):
+                os.fchmod(out.fileno(), 0o600)  # whatever the umask
+            out.write(text)
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
 
 
 def write_token(token=None, port=PORT):
