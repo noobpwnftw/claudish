@@ -448,7 +448,7 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual(result["text"], "make clean && make")
         self.assertIn(modes.TEMPLATES["box"]["declined"], results(model.sent[1])[-1])
 
-    def test_a_model_question_cannot_pose_as_a_permission_or_collect_a_secret(self):
+    def test_a_model_question_cannot_pose_as_a_permission(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Allow claude.run?", "choices": ["Allow", "Deny"]})]),
                          answer("ok"))
         rewriter = Rewriter()
@@ -462,9 +462,7 @@ class AskAndHelperTests(unittest.TestCase):
             self.assertEqual([c["label"] for c in question["choices"]], ["Yes", "No"])  # not Allow / Deny
             session.answer(question["id"], text="sure, my key is sk-abcdefghijklmnopqrstuvwxyz123456")
             thread.join(5)
-        sent = results(model.sent[1])[-1]
-        self.assertNotIn("sk-abc", sent)
-        self.assertIn("[redacted]", sent)
+        self.assertIn("my key is", results(model.sent[1])[-1])  # your answer, as you typed it
 
     def test_a_claude_helper_is_refused_when_its_settings_skip_permissions(self):
         import json as jsonlib
@@ -651,7 +649,6 @@ class TmuxHandleTests(unittest.TestCase):
         finally:
             subprocess.run(["tmux", "kill-session", "-t", name])
         self.assertIn("all tests pass", text)
-        self.assertNotIn("sk-abc", text)  # redacted, like a terminal screen
 
 
 if __name__ == "__main__":

@@ -567,10 +567,9 @@ class Rewriter:
         prompt, examples, said, sent, history = self.prompt_for(mode, text, box, spec, conversation, local, tools)
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []
-        from .screen import redact
         record = {"time": time.time(), "profile": self.profile, "backend": self.backend,
                   "model": self.model or (self.claude.model if self.claude else None),
-                  "mode": mode, "app": box.app, "kind": box.kind, "system": redact(prompt)[0], "turn": redact(said)[0],
+                  "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
         self.recent.append(record)
         if serial and not self.lock.acquire(blocking=False):

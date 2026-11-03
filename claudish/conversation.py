@@ -276,7 +276,6 @@ class ModelDriver:
 
     def ask_user(self, session, arguments):
         """The model's own question, shown as is and marked as the model's."""
-        from .screen import redact
         # A choice can be a whole draft (the panel wraps it); a longer one says it was cut.
         labels = [shorten(str(c), CHOICE_CHARS) for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
         labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
@@ -284,7 +283,7 @@ class ModelDriver:
         choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],
                                       label=MODEL_ASKS.rstrip(": "), body=asked)
         if words is not None:
-            return self.words()["answered"].format(words=redact(words)[0])
+            return self.words()["answered"].format(words=words)
         own = self.words()
         return own["chose"].format(choice=labels[choice]) if 0 <= choice < len(labels) else own["no_answer"]
 

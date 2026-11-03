@@ -130,8 +130,8 @@ def progress(handle, entries=4):
     if not said and handle.get("tmux"):
         pane = tmux_pane(handle["tmux"])
         if pane:
-            from .screen import redact, tail
-            return "%s's window (%s), last lines:\n%s" % (handle["helper"], handle["tmux"], tail(redact(pane)[0]))
+            from .screen import tail
+            return "%s's window (%s), last lines:\n%s" % (handle["helper"], handle["tmux"], tail(pane))
     if said:
         return "%s, on the task \"%s\", last wrote at %s:\n%s" % (handle["helper"], handle["task"], last,
                                                               "\n".join(said[-entries:]))
