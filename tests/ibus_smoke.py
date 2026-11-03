@@ -167,6 +167,11 @@ try:
         assert engine.do_process_key_event(keyval, 0, 0)
     assert engine.composition.text == "café", engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    engine.do_process_key_event(IBus.keyval_from_name("Multi_key"), 0, 0)
+    engine.do_reset()  # a click: the Compose key's wait ends with it
+    engine.do_process_key_event(ord("'"), 0, 0)
+    assert "´" not in engine.composition.drawn, engine.composition.drawn
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # An accent left waiting goes with the composition (a reset: a click, a focus change), not onto
     # the next letter.
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)

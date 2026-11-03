@@ -335,6 +335,7 @@ class ClaudishEngine(IBus.Engine):
 
     def finish(self, suggested=False):
         self.dead = None  # an accent waiting for its letter goes with the composition
+        self.composing = False  # and a Compose key waiting for its next
         if self.composition.live:  # nothing is held back in continue mode: just start over
             self.composition.change("")
             self.changed()
@@ -560,6 +561,7 @@ class ClaudishEngine(IBus.Engine):
         """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose
         keeps what you see, as typed."""
         kept = self.composition.toggle()
+        self.composing = False  # a Compose key waiting belongs to the old mode
         self.suggestions.schedule(self.composition.revision, "")  # what was asked belongs to the old mode
         if kept:
             self.commit_text(IBus.Text.new_from_string(kept))
@@ -672,6 +674,7 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_out(self):
         trace("focus-out")
         self.focused = False
+        self.composing = False  # a Compose key waiting goes with the focus
         if self.timer is not None:  # another box's engine polls now; results wait in the worker
             GLib.source_remove(self.timer)
             self.timer = None
@@ -697,6 +700,7 @@ class ClaudishEngine(IBus.Engine):
                 pass
 
     def do_reset(self):
+        self.composing = False
         trace("reset")
         if self.composition.for_model:  # a click in the field: the exchange is held, as on a focus change
             self.composition.leave(getattr(self, "context", None))
