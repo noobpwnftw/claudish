@@ -95,6 +95,7 @@ class WindowsChecks(unittest.TestCase):
     def test_another_accounts_launcher_is_not_this_ones(self):
         results = self.run_checks(["mei\\cd_AI\\Launcher"])  # fast user switching: pipes are machine-wide
         self.assertEqual(results["Launcher"][0], "fail")
+        self.assertEqual(self.run_checks(["JimDocker\\cd_AI\\Launcher"])["Launcher"][0], "fail")  # not a suffix
 
     def test_a_pime_launcher_is_not_cd_ais(self):
         results = self.run_checks(["Docker\\PIME\\Launcher"])  # PIME's own, beside cd_AI
