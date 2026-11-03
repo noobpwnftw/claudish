@@ -7,6 +7,7 @@ the prompt and Enter runs it there. In any other text box it is asked about firs
 ("Send this task to claude?"), and on yes the helper opens in a new terminal window. Helpers that
 skip their own permission prompts are refused.
 """
+import json
 import os
 import re
 import shutil
@@ -170,8 +171,10 @@ def codex_said(handle):
             break
         try:
             with open(path, encoding="utf-8") as source:
-                if handle["note"] not in source.read(200000):
-                    continue
+                head = source.read(200000)
+            # The note's path as the session's JSON writes it (a Windows path's backslashes doubled).
+            if handle["note"] not in head and json.dumps(handle["note"])[1:-1] not in head:
+                continue
         except OSError:
             continue
         said, last = [], None

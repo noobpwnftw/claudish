@@ -46,6 +46,23 @@ class ProgressTests(unittest.TestCase):
             said, last = handoff.claude_said({"helper": "claude", "session": "s1", "cwd": ""})
         self.assertEqual((said, last), (["Fixed: round(..., 2). The test passes."], "2026-10-25T13:36:00Z"))
 
+    def test_a_codex_handoff_is_found_whatever_the_notes_path(self):
+        """A Windows path is in Codex's session JSON with its backslashes doubled."""
+        import json
+        import os
+        import tempfile
+        import time
+        for note in (r"C:\Users\me\AppData\Local\Temp\claudish-handoff\h-1234abcd.md", "/run/user/1000/h-1234abcd.md"):
+            with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}):
+                day = os.path.join(home, ".codex", "sessions", "2026", "11", "03")
+                os.makedirs(day)
+                with open(os.path.join(day, "rollout-x.jsonl"), "w", encoding="utf-8") as out:
+                    for role, text in (("user", handoff.arguments(["codex", "{prompt}"], note)[1]), ("assistant", "On it")):
+                        out.write(json.dumps({"type": "response_item", "timestamp": "t1", "payload": {
+                            "type": "message", "role": role, "content": [{"type": "output_text", "text": text}]}}) + "\n")
+                said = handoff.codex_said({"helper": "codex", "note": note, "started": time.time()})
+            self.assertEqual(said, (["On it"], "t1"), note)
+
 
 if __name__ == "__main__":
     unittest.main()
