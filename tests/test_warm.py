@@ -32,6 +32,15 @@ class ClaudeCodeTests(unittest.TestCase):
         self.assertEqual(self.backend.ask("rewrite: ok", 5), "seen 1: rewrite: ok")
         self.assertEqual(self.backend.ask("rewrite: hi", 5), "seen 1: rewrite: hi")  # not "seen 2"
 
+    def test_an_answer_does_not_wait_for_the_used_process_to_end(self):
+        backend = warm.ClaudeCode([sys.executable, FAKE, "claude", "--slow-exit"])
+        self.addCleanup(backend.stop)
+        backend.start()
+        ready(backend)
+        started = time.monotonic()
+        self.assertEqual(backend.ask("rewrite: ok", 5), "seen 1: rewrite: ok")
+        self.assertLess(time.monotonic() - started, 1.5)  # not the 2.5 s the used one takes to end
+
     def test_a_dead_process_is_replaced_and_a_slow_one_times_out(self):
         self.backend.start()
         ready(self.backend)
@@ -73,6 +82,14 @@ class CodexTests(unittest.TestCase):
         self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")
         self.assertIsNone(self.backend.model)
 
+    def test_a_start_within_a_request_keeps_to_its_time(self):
+        backend = warm.Codex([sys.executable, FAKE, "codex", "--slow-start"])
+        self.addCleanup(backend.stop)
+        started = time.monotonic()
+        with self.assertRaisesRegex(RuntimeError, "longer than"):
+            backend.ask("ok", 0.5)  # no process yet: it starts within this request's time
+        self.assertLess(time.monotonic() - started, 2.5)
+
     def test_another_refusal_keeps_the_configured_model(self):
         self.backend.model = "limited"
         self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")  # this request only
@@ -87,9 +104,9 @@ class CodexTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "longer than"):
             self.backend.ask("slow one", 0.5)
         self.backend.restart_after = 1
-        process = self.backend.process if self.backend.alive() else None
         self.backend.ask("one", 5)
-        self.assertIsNot(self.backend.process, process)
+        self.assertIsNone(self.backend.process)  # retired after its answer, not restarted before it
+        self.assertTrue(self.backend.ask("two", 5).startswith("t1 turn 1"))  # the next request's fresh process
 
 
 class RewriterTests(unittest.TestCase):

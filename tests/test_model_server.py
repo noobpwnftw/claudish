@@ -142,6 +142,7 @@ class ModelServerTests(unittest.TestCase):
                 self.assertIs(fresh.warm, routed)  # taken up, not a second server on its port
             finally:
                 fresh.stop_model()
+                routed.thread.join(5)  # not left checking its address while the interpreter ends
                 server.shutdown()
                 server.server_close()
 

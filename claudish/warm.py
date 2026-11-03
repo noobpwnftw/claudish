@@ -98,8 +98,9 @@ class Warm:
             self.process = spawn(*args, **kwargs)
             self.lines = Lines(self.process.stdout)
 
-    def launch(self):
-        """The CLI (argv), replacing the one running, its output read as lines."""
+    def launch(self, deadline=None):
+        """The CLI (argv), replacing the one running, its output read as lines; deadline: when the
+        request that needs it gives up (Codex's handshake)."""
         import subprocess
         self.kill()
         self.spawn(self.argv(), self.name, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -113,6 +114,7 @@ class Warm:
     def ask(self, prompt, timeout):
         """One rewrite, as its own conversation; RuntimeError with words for the panel. It waits
         for another request (an instruction, the warm-up) no longer than its own timeout."""
+        deadline = time.monotonic() + timeout
         if not self.lock.acquire(timeout=timeout):
             raise RuntimeError("%s is busy; keep typing or retry" % self.name)
         try:
@@ -120,8 +122,8 @@ class Warm:
                 self.check_running()
                 if not self.alive():
                     self.state = "restarting"
-                    self.launch()
-                text = self.exchange(prompt, timeout)
+                    self.launch(deadline)  # within this request's time, not a handshake's own
+                text = self.exchange(prompt, max(0.0, deadline - time.monotonic()))
             except TimeoutError:
                 self.failed()  # a stuck one is not reused
                 raise RuntimeError("%s took longer than %g s" % (self.name, timeout))
@@ -157,6 +159,13 @@ class Warm:
             name = os.path.basename(program).lower()
             program = (settings.codex() if name.startswith("codex") else settings.claude_code()) or program
         return program
+
+    def retire(self):
+        """The process that answered goes, ended in the background: the answer does not wait for it."""
+        with self.lifecycle:
+            process, self.process = self.process, None
+        if process is not None:
+            threading.Thread(target=lambda: end_input(process), daemon=True).start()
 
     def kill(self, force=False):
         with self.lifecycle:
@@ -220,7 +229,9 @@ class ClaudeCode(Warm):
                 return (event.get("result") or "").strip()
 
     def ready(self):
-        """This process answered once; the next request gets a fresh one, started now."""
+        """This process answered once; the next request gets a fresh one, started now (the used
+        one ends meanwhile)."""
+        self.retire()
         self.launch()
 
     def why(self):
@@ -247,10 +258,12 @@ class Codex(Warm):
         off = [part for feature in self.FEATURES_OFF for part in ("--disable", feature)]
         return [self.binary()] + self.command[1:] + ["app-server"] + off
 
-    def launch(self):
+    def launch(self, deadline=None):
         super().launch()
         self.served = 0
-        self.call("initialize", {"clientInfo": {"name": "claudish", "version": "0.1"}}, time.monotonic() + 30)
+        handshake = time.monotonic() + 30
+        self.call("initialize", {"clientInfo": {"name": "claudish", "version": "0.1"}},
+                  min(handshake, deadline) if deadline else handshake)
         self.send({"jsonrpc": "2.0", "method": "initialized"})
 
     def send(self, message):
@@ -324,8 +337,8 @@ class Codex(Warm):
 
     def ready(self):
         self.served += 1
-        if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then
-            self.launch()
+        if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then,
+            self.retire()  # started by the next request (within its time), not before this answer
 
 
 def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):
@@ -354,7 +367,8 @@ class ModelServer:
     def start(self):
         self.stopped.clear()
         self.state = "starting"
-        threading.Thread(target=self.run, daemon=True).start()
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
 
     def answers(self):
         from urllib.request import ProxyHandler, build_opener
@@ -413,6 +427,16 @@ class ModelServer:
             end(process)
         if self.state != "stopped" and not self.state.startswith("failed"):
             self.state = "stopped"
+
+
+def end_input(process):
+    """A CLI that answered: the end of its input ends it; killed if it does not."""
+    try:
+        process.stdin.close()
+        process.wait(3)
+    except Exception:
+        process.kill()
+        process.wait(3)
 
 
 def end(process):

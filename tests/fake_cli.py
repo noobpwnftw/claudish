@@ -4,7 +4,8 @@
   python fake_cli.py codex app-server ...   Codex's JSON-RPC app server
 
 Each answer says how many requests this process (or thread) has seen, so tests can tell whether
-requests stay independent. A prompt containing "slow" takes 3 s; "die" ends the process."""
+requests stay independent. A prompt containing "slow" takes 3 s; "die" ends the process. --slow-exit: Claude Code takes
+2.5 s to end after its input; --slow-start: Codex's handshake takes 3 s."""
 import itertools
 import json
 import sys
@@ -24,6 +25,8 @@ def claude():
             print(json.dumps({"type": "system", "subtype": "init"}), flush=True)
         print(json.dumps({"type": "result", "subtype": "success", "is_error": False,
                           "result": "seen %d: %s" % (seen, content[-12:])}), flush=True)
+    if "--slow-exit" in sys.argv:  # a CLI that takes its time to end after its input does
+        time.sleep(2.5)
 
 
 def codex():
@@ -35,6 +38,8 @@ def codex():
         message = json.loads(line)
         method, ident, params = message.get("method"), message.get("id"), message.get("params") or {}
         if method == "initialize":
+            if "--slow-start" in sys.argv:
+                time.sleep(3)
             send({"id": ident, "result": {"userAgent": "fake"}})
         elif method == "thread/start":
             if params.get("model") == "nope":
