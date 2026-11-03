@@ -11,8 +11,11 @@ INSTALL = Path(__file__).resolve().parents[1] / "platforms/linux/install.py"
 @unittest.skipIf(os.name == "nt", "the IBus installer is Linux-only")
 class LinuxInstallTests(unittest.TestCase):
     def run_install(self, home, *args, **env):
-        environment = {k: v for k, v in os.environ.items() if k not in ("IBUS_COMPONENT_PATH", "XDG_CONFIG_HOME")}
-        environment.update(HOME=home, **env)
+        environment = {k: v for k, v in os.environ.items()
+                       if k not in ("IBUS_COMPONENT_PATH", "XDG_CONFIG_HOME", "DBUS_SESSION_BUS_ADDRESS")}
+        # Settings in memory: through the session's dconf, gsettings writes this machine's real
+        # enabled extensions whatever HOME says.
+        environment.update(HOME=home, GSETTINGS_BACKEND="memory", **env)
         return subprocess.run([sys.executable, str(INSTALL), *args], env=environment, capture_output=True, text=True)
 
     def test_user_install_adds_search_path_and_uninstalls_cleanly(self):
