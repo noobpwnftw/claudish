@@ -20,8 +20,8 @@ from . import config, keys
 from .modes import TEMPLATES
 
 CHOICES = {"claude": "claude", "claude-code": "claude-code", "codex": "codex", "server": "server"}  # choice -> profile
-NO_CLAUDE_CODE = "claude was not found: install Claude Code, then log in"
-NO_CODEX = "codex was not found: install Codex, then log in"
+NO_CLAUDE_CODE = "the claude command was not found: install Claude Code, then log in"
+NO_CODEX = "the codex command was not found: install Codex, then log in"
 
 
 def command_path(name, extension_glob):
@@ -136,7 +136,8 @@ def state(path=None):
         "profile": name, "choice": choice,
         "key": key_state(), "key_where": keys.where(), "key_env": keys.claude_credential()[1],
         "server": {"url": server.get("model_url", ""), "model": server.get("model") or "",
-                   "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing"},
+                   "key": "saved" if keys.server_key(server.get("model_url", "")) else "missing",
+                   "key_where": keys.where(keys.server_name(server.get("model_url", "")))},
         "config_problem": problem,
         "config_locked": locked,
         "tone": tone, "own_words": tone not in named,

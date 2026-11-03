@@ -156,7 +156,7 @@ class SettingsTests(Home):
     def test_claude_code_for_a_claude_subscription(self):
         with patch.object(settings, "claude_code", return_value=None):
             self.assertEqual(settings.state()["claude_code"], settings.NO_CLAUDE_CODE)
-            with self.assertRaisesRegex(ValueError, "claude was not found"):  # not switched to what cannot answer
+            with self.assertRaisesRegex(ValueError, "claude command was not found"):  # not switched to what cannot answer
                 settings.apply({"choice": "claude-code"})
         self.assertFalse(self.path.exists())
         with patch.object(settings, "claude_code", return_value="/opt/claude/bin/claude"):
@@ -181,7 +181,7 @@ class SettingsTests(Home):
     def test_codex_for_a_chatgpt_subscription(self):
         with patch.object(settings, "codex", return_value=None):
             self.assertEqual(settings.state()["codex"], settings.NO_CODEX)
-            with self.assertRaisesRegex(ValueError, "codex was not found"):  # not switched to what cannot answer
+            with self.assertRaisesRegex(ValueError, "codex command was not found"):  # not switched to what cannot answer
                 settings.apply({"choice": "codex"})
         self.assertFalse(self.path.exists())
         with patch.object(settings, "codex", return_value="/opt/codex/bin/codex"):
@@ -228,6 +228,9 @@ class SettingsTests(Home):
         self.assertFalse(self.path.exists())
         with patch.object(settings, "check_server", return_value=None):
             state = settings.apply({"server": {"url": "http://127.0.0.1:1234/", "model": "gemma-4"}, "choice": "server"})
+        where = state["server"].pop("key_where")  # its own file (or the Keychain), not Claude's
+        if sys.platform != "darwin":  # both are in the Keychain there
+            self.assertNotEqual(where, state["key_where"])
         self.assertEqual((state["choice"], state["server"]), ("server", {"url": "http://127.0.0.1:1234", "model": "gemma-4", "key": "missing"}))
         self.assertEqual(self.written()["profile"], "server")
         self.assertEqual(config.resolve()[1]["model_url"], "http://127.0.0.1:1234")

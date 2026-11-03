@@ -195,7 +195,7 @@ async def check(args, home, port):
         await page.route("**/settings/state", stale)
         await page.reload()
         await expect(page.locator("#status")).to_have_text("cd_AI is running.")
-        await expect(page.locator("#config-fix")).to_have_text("cd_AI cannot read its config: %s. %s" % (problem, fix))
+        await expect(page.locator("#config-fix")).to_have_text("A model you can pick here does not read: %s. %s" % (problem, fix))
         await expect(page.locator("#controls")).to_be_visible()  # only picking that model fails
         await page.unroute_all()
         await page.route("**/settings/state", refused)

@@ -26,7 +26,8 @@ async function call(path, body) {
 }
 
 // A sentence from an error; cd_AI keeps its name as it is written.
-const sentence = (text) => (text.startsWith("cd_AI") ? text : text.charAt(0).toUpperCase() + text.slice(1)).replace(/\.?$/, ".");
+// A sentence from an error; cd_AI's name and an address keep their case.
+const sentence = (text) => (/^(cd_AI|https?:)/.test(text) ? text : text.charAt(0).toUpperCase() + text.slice(1)).replace(/\.?$/, ".");
 const typed = () => (shown && shown.claudish) || "claudish";  // how claudish is run on this computer
 const reopen = () => `this window has expired: open Settings again from cd_AI's menu (Settings…) or with \`${typed()} settings\``;
 
@@ -63,14 +64,15 @@ function status(state) {
     if (model === "starting" || model === "restarting") return [`${model === "starting" ? "Starting" : "Restarting"} ${name}…`, ""];
     return [`Ready: ${name} writes for you.`, "good"];
   }
-  if (backend === "claude") return state.key === "missing" ? ["Add your Claude key below to start.", ""] : ["Ready: Claude writes for you.", "good"];
+  if (backend === "claude") return state.key === "missing" ? [locked(state) ? "No Claude key yet." : "Add your Claude key below to start.", ""]
+    : ["Ready: Claude writes for you.", "good"];
   if (state.server_problem) return [sentence(state.server_problem), "bad"];
   if (backend === "openai" || backend === "llama") return [`Ready: ${state.model || "your model"} writes for you.`, "good"];
   if (backend === "none") return ["Pick a model below to start.", ""];
   return ["cd_AI is running.", ""];
 }
 
-let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer, lockTimer, started = false;
+let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer, lockTimer, toneTimer, started = false;
 // Every change would be refused while the config in use does not read: the file comes first.
 const locked = (state) => Boolean((state.service || {}).problem || state.config_locked);
 
@@ -89,7 +91,7 @@ function lost(error) {
   clearTimeout(healthTimer);
   clearTimeout(lockTimer);
   $("status").textContent = error.expired ? sentence(error.message)
-    : `cd_AI's service is not running. Start it with \`${typed()} service install\`; this window comes back when it answers.`;
+    : `cd_AI's service is not running. Start it with \`${typed()} service install\`, then open Settings again.`;
   $("status").className = "bad";
   $("controls").hidden = true;
   $("config-fix").hidden = true;
@@ -139,7 +141,7 @@ function render(state) {
   if (started) $("controls").hidden = locked(state);  // only what fails, and how to fix it
   clearTimeout(lockTimer);
   if (locked(state)) lockTimer = setTimeout(recheck, 500);  // the fix applies when the file is saved
-  $("config-fix").textContent = (problem ? `cd_AI cannot read its config: ${problem}. ` : "") +
+  $("config-fix").textContent = (problem ? `A model you can pick here does not read: ${problem}. ` : "") +
     `Fix it in ${state.config} (it applies when you save), or move that file aside and run ${typed()} init.`;
   for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
   $("claude").hidden = state.choice !== "claude";
@@ -155,7 +157,7 @@ function render(state) {
   $("key-state").classList.toggle("good", state.key !== "missing");
   if (document.activeElement !== $("url")) $("url").value = state.server.url;
   if (document.activeElement !== $("model")) $("model").value = state.server.model;
-  $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.key_where}` : "";
+  $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.server.key_where}` : "";
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   tones(state);
   for (const radio of document.getElementsByName("summon")) radio.checked = radio.value === state.summon;
@@ -175,6 +177,7 @@ function tones(state) {
     words.setAttribute("aria-label", TONE_WORDS);
     words.addEventListener("change", () => words.value.trim() && change({tone: words.value}, "tone-message", "Tone saved."));
     words.addEventListener("focus", () => { own.querySelector("input[type=radio]").checked = true; });
+    words.addEventListener("blur", () => { if (!words.value.trim() && shown) tones(shown); });  // nothing saved: the tone in use
     own.querySelector("span").append(words);
     group.replaceChildren(...rows, own);
   }
@@ -192,7 +195,8 @@ function toneRow(value, title, about) {
   radio.name = "tone";
   radio.value = value;
   radio.addEventListener("change", () => {
-    if (value) change({tone: value}, "tone-message", `${title} it is.`);
+    clearTimeout(toneTimer);  // ↑↓ through the list: only where it stops is saved (and tried)
+    if (value) toneTimer = setTimeout(() => change({tone: value}, "tone-message", `${title} it is.`), 400);
     else $("own-words").focus();
   });
   const text = document.createElement("span");
@@ -265,7 +269,9 @@ async function change(body, message, done) {
 
 document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
   if (radio.value === "claude") {
-    change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.");
+    change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.").then((done) => {
+      if (done && shown && shown.key === "missing") say("model-message", "");  // nothing writes yet: the status says what to add
+    });
   } else if (radio.value === "claude-code" || radio.value === "codex") {
     $("claude").hidden = $("server").hidden = true;
     const name = radio.value === "codex" ? "Codex" : "Claude Code";
