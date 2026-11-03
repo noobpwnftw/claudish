@@ -15,10 +15,11 @@ from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
 # Dead keys (an accent, then the letter it goes on): IBus hands the engine the keysym, so composing
-# them is the engine's job, as IBusEngineSimple does. keysym name -> (combining mark, spacing accent).
+# them is the engine's job, as IBusEngineSimple does. keysym name -> its spacing accent (a key of composition.ACCENTS).
 DEAD_KEYS = {"dead_grave": "`", "dead_acute": "´", "dead_circumflex": "^", "dead_tilde": "~", "dead_macron": "¯",
              "dead_breve": "˘", "dead_abovedot": "˙", "dead_diaeresis": "¨", "dead_abovering": "˚",
-             "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}  # their accents
+             "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}
+DEAD_BY_ACCENT = {accent: name for name, accent in DEAD_KEYS.items()}
 
 
 # By keyval: IBus names some keys otherwise (dead_tilde is dead_perispomeni to IBus 1.5.29).
@@ -44,9 +45,11 @@ def key_name(keyval):
     return DEAD_BY_KEYVAL.get(keyval) or IBus.keyval_name(keyval) or ""
 
 
-def with_accent(dead, char):
-    """The character a dead key and the next key make (composition.accented)."""
-    return accented(DEAD_KEYS[dead], char)
+# Held with a key, these make it a shortcut: the app's, and the composition ends.
+SHORTCUT_MASK = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
+                 IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)
+STEPS = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
+         IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -110,7 +113,7 @@ class Screen:
 
     def call(self, connection, sender, path, interface, method, parameters, invocation):
         if method == "Focus":
-            before, self.focus = getattr(self, "focus", None), tuple(parameters.unpack())  # (app, window)
+            before, self.focus = self.focus, tuple(parameters.unpack())  # (app, window)
             trace("window", self.focus[0])
             invocation.return_value(None)
             if self.on_focus is not None:  # the same window again: its class came, the window did not change
@@ -172,6 +175,9 @@ class ClaudishEngine(IBus.Engine):
         self.drawn = None  # the panel as last shown, redrawn when the state's description changes
         self.timer = GLib.timeout_add(40, self.poll)
         self.focused = True  # until IBus says otherwise: an engine may start in a box that has focus
+        # The client's object path, GNOME's shared one, a Compose key's sequence, and the path IBus
+        # 1.5.26 (no focus ids) gives this engine.
+        self.context = self.shared = self.sequence = self.own_path = None
 
     def poll(self):
         if self.composition.follow(self.suggestions):  # the service stopped or came back
@@ -256,16 +262,24 @@ class ClaudishEngine(IBus.Engine):
             self.suggestions.schedule(self.composition.revision, "")
         self.render()
 
-    def around_caret(self):
-        """(before, after): the app's text around the caret, when the client shares it (IBus
-        surrounding text; GTK refreshes it before each key event). Empty when it does not."""
+    def surrounding(self):
+        """(text, cursor, anchor): the app's text around the caret, when the client shares it (IBus
+        surrounding text; GTK refreshes it before each key event), else None. Asking also makes
+        IBus fetch it fresh: it answers a later read from its cache."""
         if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
-            return "", ""
+            return None
         try:
-            text, cursor, _anchor = self.get_surrounding_text()
+            text, cursor, anchor = self.get_surrounding_text()
         except Exception:  # not every client implements it
+            return None
+        return (text.get_text() if text else ""), cursor, anchor
+
+    def around_caret(self):
+        """(before, after): the app's text around the caret; empty when the client does not share it."""
+        found = self.surrounding()
+        if not found:
             return "", ""
-        value = text.get_text() if text else ""
+        value, cursor, _anchor = found
         return value[:cursor], value[cursor:]
 
     def take_selection(self):
@@ -273,13 +287,10 @@ class ClaudishEngine(IBus.Engine):
         typed it; then Tab rewrites it, Shift+Enter sends it. Nothing is deleted: input replaces a
         selection, as typing does (Qt removes it as the composition starts, then would apply a
         deletion's offset from the new caret). True when taken."""
-        if not getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
+        found = self.surrounding()
+        if not found:
             return None
-        try:
-            text, cursor, anchor = self.get_surrounding_text()
-        except Exception:
-            return None
-        value = text.get_text() if text else ""
+        value, cursor, anchor = found
         trace("selection", "cursor", cursor, "anchor", anchor, "length", len(value))
         start, end = min(cursor, anchor), max(cursor, anchor)
         if not self.composition.selectable(value[start:end]):  # long or multi-line: Tab is the app's
@@ -307,7 +318,7 @@ class ClaudishEngine(IBus.Engine):
             return True
         char = IBus.keyval_to_unicode(keyval)
         if self.dead and typeable(char):
-            combined, self.dead = with_accent(self.dead, char), None
+            combined, self.dead = accented(self.composition.accent, char), None
             self.live_commit(combined)  # é goes in, not the e the key would type
             return True
         if keyval == IBus.KEY_Tab:
@@ -359,11 +370,9 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             self.refresh_surrounding()
             return
-        if self.composition.for_model and not suggested:
-            # A shortcut or another key ends the composition: the instruction is not text for the
-            # app; its exchange is held for this text box, its work going on, as on a focus change.
-            self.composition.leave(getattr(self, "context", None))
-            self.render()
+        # A shortcut or another key ends the composition: the instruction is not text for the app;
+        # its exchange is held for this text box, its work going on, as on a focus change.
+        if not suggested and self.hold():
             return
         text = self.composition.commit(suggested)
         if text:
@@ -416,22 +425,19 @@ class ClaudishEngine(IBus.Engine):
 
     @property
     def dead(self):
-        """The dead key whose accent waits for its letter (drawn in the composition), or None: gone
-        with the composition's accent, which every change clears (a focus change, a reset, a Shift
-        tap, a result), so it never lands on a letter typed later."""
-        name = getattr(self, "_dead", None)
-        return name if name and self.composition.accent == DEAD_KEYS[name] else None
+        """The dead key whose accent waits for its letter (the composition's accent, drawn there), or
+        None: every change clears the accent (a focus change, a reset, a Shift tap, a result), so it
+        never lands on a letter typed later."""
+        return DEAD_BY_ACCENT.get(self.composition.accent)
 
     @dead.setter
     def dead(self, name):
-        self._dead = name
         self.composition.accent = DEAD_KEYS[name] if name else ""
 
     def do_process_key_event(self, keyval, keycode, state):
         # A Shift tap switches mode (continue <-> compose), as Shift switches English and pinyin.
         if keyval in (IBus.KEY_Shift_L, IBus.KEY_Shift_R) and not self.sensitive:
-            chord = bool(state & (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
-                                  IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK))
+            chord = bool(state & SHORTCUT_MASK)
             if not state & IBus.ModifierType.RELEASE_MASK:
                 self.shift.press(time.monotonic(), chord)
             elif self.shift.release(time.monotonic(), chord):
@@ -453,12 +459,10 @@ class ClaudishEngine(IBus.Engine):
             self.render()
             if keyval == IBus.KEY_BackSpace:
                 return True  # Backspace cancels the accent, and nothing else
-        modifiers = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
-                     IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)
-        if state & modifiers:
+        if state & SHORTCUT_MASK:
             self.finish()
             return False
-        if getattr(self, "sequence", None) is not None:  # the Compose key's sequence takes it first
+        if self.sequence is not None:  # the Compose key's sequence takes it first
             handled = self.compose_next(keyval)
             if handled is not None:
                 return handled
@@ -499,7 +503,7 @@ class ClaudishEngine(IBus.Engine):
                 self.render()
             return action != "pass"
         if keyval == IBus.KEY_Tab:
-            if not self.composition.live and not self.composition.text and self.take_selection():
+            if not self.composition.text and self.take_selection():  # (continue returned above)
                 self.render()  # a selection: your words now, as if typed
                 return True
             action = self.composition.tab()
@@ -558,9 +562,7 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             return True
         plain = not state & (IBus.ModifierType.SHIFT_MASK | IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK)
-        steps = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
-                 IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
-        if keyval in steps and plain and self.composition.arrow(steps[keyval]):
+        if keyval in STEPS and plain and self.composition.arrow(STEPS[keyval]):
             self.sequence = None  # a Compose key waiting is for the key right after it
             self.changed()  # ← → move in what you type, as a CJK composition does
             return True
@@ -583,7 +585,7 @@ class ClaudishEngine(IBus.Engine):
             return True
         char = IBus.keyval_to_unicode(keyval)
         if self.dead and char:
-            char, self.dead = with_accent(self.dead, char), None  # no such letter: the accent, then the key
+            char, self.dead = accented(self.composition.accent, char), None  # no such letter: the accent, then the key
         if char and all(typeable(each) for each in char):  # not Delete's DEL, nor another control
             return self.type_in(char)
         self.finish()
@@ -701,16 +703,15 @@ class ClaudishEngine(IBus.Engine):
         """GNOME on Wayland: another window has focus in the one input context every app shares.
         An exchange out is held for the window it was in; typed words are IBus's to commit. same:
         the window you are in, named again (its class set late): only its app is taken up."""
-        if not (getattr(self, "shared", None) and self.focused):
+        if not (self.shared and self.focused):
             return
-        if self.composition.for_model and not same:
-            self.composition.leave(getattr(self, "context", None))
-            self.render()
+        if not same:
+            self.hold()
         self.do_focus_in_id(self.shared, "gnome-shell")
 
     def do_focus_in(self):
         """An IBus without focus ids (before 1.5.27): this engine's input context is the text box."""
-        if getattr(self, "own_path", None):
+        if self.own_path:
             self.do_focus_in_id(self.own_path, "")
 
     def do_focus_out(self):
@@ -722,31 +723,30 @@ class ClaudishEngine(IBus.Engine):
             self.timer = None
         if screen().shell:
             screen().end_toast()  # a pill (held exchange) belongs to the box it was shown at, which is left
-        if self.composition.for_model:  # an instruction's exchange: held for this text box, its work going on
-            self.composition.leave(getattr(self, "context", None))
-            self.render()
+        if self.hold():
             return
         # IBus commits the visible preedit (words you were typing) through PreeditFocusMode.COMMIT.
         self.do_reset()
+
+    def hold(self):
+        """An instruction's exchange is held for this text box, its work going on. True when held."""
+        if not self.composition.for_model:
+            return False
+        self.composition.leave(self.context)
+        self.render()
+        return True
 
     def do_disable(self):
         self.finish()
 
     def refresh_surrounding(self):
-        """Ask the client for fresh surrounding text now; IBus answers a later read from its cache,
-        so asking only when a key arrives returns stale text."""
-        if getattr(self, "client_capabilities", 0) & IBus.Capabilite.SURROUNDING_TEXT:
-            try:
-                self.get_surrounding_text()
-            except Exception:
-                pass
+        """Ask the client for fresh surrounding text now: asking only when a key arrives returns stale text."""
+        self.surrounding()
 
     def do_reset(self):
         self.sequence = None
         trace("reset")
-        if self.composition.for_model:  # a click in the field: the exchange is held, as on a focus change
-            self.composition.leave(getattr(self, "context", None))
-            self.render()
+        if self.hold():  # a click in the field: the exchange is held, as on a focus change
             return
         self.composition.change("")
         self.changed()
