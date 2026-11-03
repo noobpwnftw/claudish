@@ -144,7 +144,7 @@ def failure(error):
 # What Shift+Esc does not take back from a held exchange: where the caret is now (a field, a
 # terminal) and the service's state (keys, hints, offline), besides the hold itself.
 KEPT_ON_RESTORE = ("holds", "here", "issued", "summon", "hints", "offline", "terminal", "quiet",
-                   "inside", "dropped", "dropped_reply", "dropped_at")
+                   "inside", "dropped", "dropped_reply", "dropped_at", "dropped_box")
 
 def rows_of(text):
     """About how many panel rows a text takes."""
@@ -235,6 +235,7 @@ class Composition:
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
         self.dropped_at = 0.0  # when: words dropped after a hold come back before it
         self.dropped_reply = False
+        self.dropped_box = None  # the text box they were dropped in: Shift+Esc brings them back there
         self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
         self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes it: a draft or a choice)
         self.about = ""  # a follow-up's draft: the one in view (highlighted) when it was sent, not yet inserted
@@ -611,6 +612,7 @@ class Composition:
             return "dismiss"  # the adapter answers Dismiss; nothing is inserted
         if self.answered and self.reply:
             self.dropped, self.dropped_reply, self.dropped_at = self.reply, True, time.monotonic()  # Shift+Esc brings it back
+            self.dropped_box = self.here
             self.reply = ""  # what you typed goes; the exchange stays open
             self.back = 0
             return "clear"
@@ -627,6 +629,7 @@ class Composition:
             self.editing = True  # the instruction is back at the caret; Esc again drops it
             return "back"
         self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
+        self.dropped_box = self.here
         self.change("")
         return "drop"
 
@@ -635,13 +638,13 @@ class Composition:
         what Esc dropped (an instruction to edit, or a reply); "" when there is none (the key is the
         app's)."""
         self.expire()
-        newer = self.dropped and self.dropped_at > self.held_at  # what the toast just offered (here)
+        newer = self.dropped_here() and self.dropped_at > self.held_at  # what the toast just offered (here)
         if self.held is not None and not self.text and not self.live and not newer:
             held, self.held = self.held, None  # the exchange you left, back as it was
             # The exchange comes back; this field and the service's state stay as they are now.
             self.__dict__.update({k: v for k, v in held.__dict__.items() if k not in KEPT_ON_RESTORE})
             return self.reply or self.text
-        if self.live or not self.dropped:
+        if self.live or not self.dropped_here():
             return ""
         if self.dropped_reply and self.answered and not self.reply:  # a reply you cleared, back at the caret
             self.reply, self.dropped = self.dropped, ""
@@ -1037,7 +1040,12 @@ class Composition:
     def restorable(self):
         """Whether Shift+Esc has something to bring back (a held exchange past HELD_SECONDS has none)."""
         self.expire()
-        return self.held is not None or bool(self.dropped)
+        return self.held is not None or self.dropped_here()
+
+    def dropped_here(self):
+        """Whether Esc's dropped words are this text box's, and not older than a held exchange may
+        be (else Shift+Esc is the app's)."""
+        return bool(self.dropped) and self.dropped_box == self.here and time.monotonic() - self.dropped_at <= HELD_SECONDS
 
     @property
     def held(self):

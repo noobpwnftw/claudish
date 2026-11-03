@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 from io import BytesIO
 from unittest.mock import patch
@@ -202,6 +203,22 @@ class ReceiveTests(unittest.TestCase):
         state.change("")
         state.returned("chat")
         self.assertEqual(state.restore(), "thank Ana")
+
+    def test_dropped_words_come_back_in_their_box_and_not_forever(self):
+        from unittest.mock import patch
+        from claudish import composition
+        state = Composition()
+        state.mode = "compose"
+        state.returned("mail")
+        state.change("draft for Alice")
+        self.assertEqual(state.escape(), "drop")
+        state.returned("chat")  # another box: Shift+Esc there is the app's
+        self.assertFalse(state.restorable())
+        self.assertEqual(state.restore(), "")
+        state.returned("mail")
+        with patch.object(composition.time, "monotonic", return_value=time.monotonic() + composition.HELD_SECONDS + 1):
+            self.assertFalse(state.restorable())  # a day later: the app's too
+        self.assertEqual(state.restore(), "draft for Alice")
 
     def test_words_dropped_after_a_hold_come_back_before_it(self):
         state = Composition()
