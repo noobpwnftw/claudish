@@ -486,7 +486,8 @@ class ClaudishTextService(TextService):
                 self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
             keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
             return getattr(self, "switching", False)
-        return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() or
+        # A shortcut's key-up goes where its key-down went (to the app): only typing's are continue's.
+        return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() and not self.shortcut(event) or
                                            event.keyCode == 0x09 and not event.isKeyDown(0x10) and self.state.asked == "rewrite"
                                            and self.state.working))
 

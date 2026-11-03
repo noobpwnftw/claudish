@@ -88,6 +88,7 @@ def main():
             assert service.state.mode == "continue"
             typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
             assert typed == "ls -la", typed
+            assert key(ord("C"), ord("c"), "filterKeyUp", modifiers=(0x11,))["return"] is False  # Ctrl+C's key-up: the app's
             for _ in range(2):  # TSF's test, then the key itself: the same answer, and the suggestion goes
                 reply = key(0x08, method="filterKeyDown")
                 assert reply["return"] is False and reply.get("ghost") == "" and service.state.text == "", reply
