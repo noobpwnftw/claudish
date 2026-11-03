@@ -212,8 +212,13 @@ def main():
             profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
             rewriter.problem = config.plainly(exc)
         except ImportError:
+            # As with a config problem: still an input method, and the settings window opens (to
+            # pick Claude Code, say); a login service that exited would only be started again.
             from .doctor import SDK_FIX
-            parser.error("the claude backend needs the Anthropic SDK: " + SDK_FIX)
+            problem = "the claude backend needs the Anthropic SDK: " + SDK_FIX
+            print("cd_AI has no model: %s" % problem, file=sys.stderr, flush=True)
+            profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
+            rewriter.problem = problem
         run_service(rewriter, args.port, lambda: build()[2],
                     Path(args.config) if args.config else config.default_path(),
                     lambda server: print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (

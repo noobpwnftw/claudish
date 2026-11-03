@@ -374,6 +374,9 @@ def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):
             "-ngl", str(gpu_layers), "-t", "4", "-np", "1"] + extra
 
 
+TIMED_OUT = "failed: the local model did not answer within 120 s"
+
+
 class ModelServer:
     """A local model's server (a llama profile's "command": llama-server's argv), run by the service
     like the CLIs above: started with it, started again when it ends, and stopped when the service
@@ -432,7 +435,7 @@ class ModelServer:
                 self.state = "failed: the local model ended as it started (exit %s)" % process.returncode
                 return
             if not self.answers():
-                self.state = "failed: the local model did not answer within 120 s"
+                self.state = TIMED_OUT
                 self.stop()
                 return
             self.state = "warm"
@@ -441,6 +444,16 @@ class ModelServer:
                 return
             self.state = "restarting"
             time.sleep(1)
+
+    def retry(self):
+        """A request found it failed: one that took too long to load starts again (the next load
+        reads the model from the disk cache); one that ended as it started, or a port in use, would
+        only fail again."""
+        with self.guard:
+            if self.state != TIMED_OUT:
+                return
+            self.state = "starting"
+        self.start()
 
     def stop(self):
         with self.guard:

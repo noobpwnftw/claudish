@@ -53,6 +53,17 @@ class ModelServerTests(unittest.TestCase):
         self.assertEqual(server.state, "failed: the local model ended as it started (exit 3)")
         self.assertEqual(started.call_count, 1)
 
+    def test_a_model_that_loaded_too_slowly_starts_again_at_the_next_request(self):
+        server = warm.ModelServer([sys.executable, "-c", "pass"], "http://127.0.0.1:9")
+        with patch.object(server, "start") as start:
+            server.state = "failed: the local model ended as it started (exit 3)"
+            server.retry()  # would only fail again
+            start.assert_not_called()
+            server.state = warm.TIMED_OUT
+            server.retry()
+            server.retry()  # a second request meanwhile: one start
+            start.assert_called_once_with()
+
     def test_stopped_while_it_starts_it_is_not_left_running(self):
         started, spawn = [], warm.spawn
 

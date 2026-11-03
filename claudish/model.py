@@ -521,6 +521,8 @@ class Rewriter:
         """(the first choice, usage) from /v1/chat/completions; timeout: seconds, else the profile's."""
         if self.opener is None:  # built once
             self.opener = opener_for(self.endpoint)
+        if self.warm:
+            self.warm.retry()  # a local model that loaded too slowly starts again
         if "model" not in payload and self.backend == "openai":
             named = self.server_model(headers)
             if named:
