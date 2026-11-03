@@ -322,6 +322,52 @@ index 4e3c48e..2ba0913 100644
          }
  
          categoryMgr->Release();
+diff --git a/src/KeyEvent.cpp b/src/KeyEvent.cpp
+index 80cdd48..fc59652 100644
+--- a/src/KeyEvent.cpp
++++ b/src/KeyEvent.cpp
+@@ -29,18 +29,16 @@ KeyEvent::KeyEvent(UINT type, WPARAM wp, LPARAM lp):
+     if(!::GetKeyboardState(keyStates_)) // get state of all keys
+         ::memset(keyStates_, 0, sizeof(keyStates_));
+ 
+-    // try to convert the key event to an ASCII character
+-    // ToAscii API tries to convert Ctrl + printable characters to
+-    // ASCII 0x00 - 0x31 non-printable escape characters, which we don't want
+-    // So here is a hack: pretend that Ctrl key is not pressed
+-    WORD result[2] = {0, 0};
+-    BYTE ctrlState = keyStates_[VK_CONTROL];
+-    keyStates_[VK_CONTROL] = 0;
+-    if(::ToAscii(keyCode_, scanCode(), keyStates_, result, 0) == 1)
+-        charCode_ = (UINT)result[0];
+-    else
+-        charCode_ = 0;
+-    keyStates_[VK_CONTROL] = ctrlState;
++    // The character the key types. Ctrl + a printable key would give a control character, so Ctrl is
++    // left out, but not with Alt: Ctrl+Alt is how AltGr arrives (@ and the euro sign on a German layout).
++    // Claudish: ToUnicode, not ToAscii (the euro sign is not an ANSI byte), with flag 0x4: this runs twice per
++    // key, and must not change the dead-key state the app's TranslateMessage needs.
++    BYTE states[256];
++    ::memcpy(states, keyStates_, sizeof(states));
++    if (!(states[VK_MENU] & 0x80))
++        states[VK_CONTROL] = states[VK_LCONTROL] = states[VK_RCONTROL] = 0;
++    WCHAR result[4] = {0};
++    charCode_ = (::ToUnicode(keyCode_, scanCode(), states, result, 4, 0x4) == 1) ? (UINT)result[0] : 0;
+ }
+ 
+ KeyEvent::~KeyEvent(void) {
+diff --git a/src/KeyEvent.h b/src/KeyEvent.h
+index fd320b7..a5dcc74 100644
+--- a/src/KeyEvent.h
++++ b/src/KeyEvent.h
+@@ -57,7 +57,7 @@ public:
+ 
+     unsigned char scanCode() const {
+         // bits 16-23
+-        return (unsigned char)(lParam_ & 0xff0000);
++        return (unsigned char)((lParam_ >> 16) & 0xff);  // Claudish: was always 0
+     }
+ 
+     bool isExtended() const {
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
 index 581f89f..2fefebb 100644
 --- a/src/MessageWindow.cpp
