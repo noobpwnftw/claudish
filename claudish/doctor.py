@@ -247,9 +247,24 @@ def check_ime_windows():
 SDK_FIX = '%s -m pip install -e ".[claude]" in the checkout' % sys.executable
 
 
+def macos_enabled():
+    """Whether Text Input Sources has cd_AI enabled; None when it cannot be asked (a checkout's
+    Python without the bundle's sources module)."""
+    try:
+        import sources  # the bundle's platforms/macos/sources.py
+        return any(sources.prop(source, "kTISPropertyInputSourceIsEnabled")
+                   for source in sources.sources("org.claudish.inputmethod.Claudish"))
+    except Exception:
+        return None
+
+
 def check_ime_macos():
     bundle = Path.home() / "Library/Input Methods/Claudish.app"
     if bundle.is_dir():
+        if macos_enabled() is False:  # installed, but not in Input Sources (Don't Allow, or removed there)
+            return [("Input method", "fail", "installed, but not enabled in Input Sources",
+                     "`claudish register` (macOS asks to allow it), or System Settings → Keyboard → Input "
+                     "Sources → + → English → cd_AI")]
         return [("Input method", "ok", "installed (%s)" % bundle, None)]
     return [("Input method", "fail", "Claudish.app is not installed",
              "install cd_AI.pkg again (in a checkout: python3 platforms/macos/build.py --install), then log out and back in")]

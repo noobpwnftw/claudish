@@ -63,6 +63,17 @@ class LinuxChecks(unittest.TestCase):
         self.assertEqual(self.run_checks()["Input method"][0], "fail")
 
 
+class MacChecks(unittest.TestCase):
+    def test_installed_but_not_enabled_is_said(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, "home", return_value=Path(home)):
+            Path(home, "Library/Input Methods/Claudish.app").mkdir(parents=True)
+            for enabled, status in ((False, "fail"), (True, "ok"), (None, "ok")):  # None: cannot ask
+                with patch.object(doctor, "macos_enabled", return_value=enabled):
+                    found = doctor.check_ime_macos()[0]
+                self.assertEqual(found[1], status, found)
+            self.assertIn("claudish register", found[3] or "claudish register")
+
+
 class WindowsChecks(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
