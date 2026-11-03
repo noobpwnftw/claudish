@@ -176,6 +176,23 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_an_instruction_refused_after_a_shift_tap_still_says_why(self):
+        refused = threading.Event()
+
+        def session(revision, text, *rest):
+            refused.wait(2)
+            raise RuntimeError("too many agent sessions; finish or cancel one")
+        worker = Suggestions(debounce=0.01)
+        worker.session = session
+        try:
+            worker.schedule(1, "translate it", "instruct", immediate=True)
+            worker.schedule(1, "", "rewrite")  # a Shift tap meanwhile: a newer (empty) request
+            refused.set()
+            self.assertEqual(poll_until(worker)[1]["error"], "too many agent sessions; finish or cancel one")
+        finally:
+            worker.close()
+            worker.thread.join(1)
+
     def test_each_text_box_keeps_its_conversation_when_you_come_back(self):
         from claudish import client
         worker = Suggestions(endpoint="http://127.0.0.1:9")

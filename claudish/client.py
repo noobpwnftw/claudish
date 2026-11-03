@@ -192,7 +192,9 @@ class Suggestions:
         try:
             self.session(revision, *request)
         except Exception as exc:
-            self.deliver(revision, said(exc))
+            # The instruction's own failure, like its session's events: a Shift tap or a focus change
+            # meanwhile (a newer request, or none) does not drop it, and a held exchange gets it.
+            self.deliver(revision, dict(said(exc), session=None), always=True)
 
     def poll(self):
         """The oldest unread (revision, data), or None."""
