@@ -121,12 +121,17 @@ def finish(mode, text, output):
     """The candidate to offer for the model's output: continue's next words joined to your text."""
     if mode != "continue":
         return output
-    # Small models sometimes echo the text, or its last words, before continuing it.
+    # Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
+    # end ("I " then "in fact" is not one).
+    echo = text.strip()
     if output.startswith(text):
         output = output[len(text):]
-    elif text.strip() and output.lower().startswith(text.strip().lower()):
-        output = output[len(text.strip()):]
-    output = output.strip().strip('"').strip()
+    elif echo and output.lower().startswith(echo.lower()) and not output[len(echo):len(echo) + 1].isalnum():
+        output = output[len(echo):]
+    output = output.strip()
+    # Or wrap all of it in quotes: a pair around the whole, not one that closes your open quote.
+    if len(output) > 2 and output[0] == output[-1] == '"' and '"' not in output[1:-1] and text.count('"') % 2 == 0:
+        output = output[1:-1].strip()
     if text.endswith((" ", "\n")):
         output = output.lstrip(",;: ")  # "hello " + ", how are you" reads "hello how are you"
     if not output:

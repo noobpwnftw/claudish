@@ -63,6 +63,10 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(modes.finish("continue", "hello ", "Hello, how are you today?"), "hello how are you today?")
         self.assertEqual(modes.finish("continue", "Dear Sam,", '"I hope this finds you well."'),
                          "Dear Sam, I hope this finds you well.")
+        # Not an echo or a wrapping: the continuation's own first letters and quotes stay.
+        self.assertEqual(modes.finish("continue", "I ", "in fact, we are thrilled."), "I in fact, we are thrilled.")
+        self.assertEqual(modes.finish("continue", "A ", "As a team, we ship."), "A As a team, we ship.")
+        self.assertEqual(modes.finish("continue", 'She said "we are ', 'ready to launch."'), 'She said "we are ready to launch."')
 
     def test_continue_never_offers_its_examples_or_what_is_already_there(self):
         examples = modes.defaults()["continue"]["examples"]
