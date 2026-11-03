@@ -89,6 +89,12 @@ def main():
             typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
             assert typed == "ls -la", typed
             assert key(ord("C"), ord("c"), "filterKeyUp", modifiers=(0x11,))["return"] is False  # Ctrl+C's key-up: the app's
+            service.state.mode = "compose"
+            service.state.change("abc")
+            for code in (0x90, 0x91, 0xE7):  # NumLock, ScrollLock, VK_PACKET: never taken (a replay would undo or lose them)
+                assert key(code, method="filterKeyDown")["return"] is False, hex(code)
+            service.state.change("")
+            service.state.mode = "continue"
             for _ in range(2):  # TSF's test, then the key itself: the same answer, and the suggestion goes
                 reply = key(0x08, method="filterKeyDown")
                 assert reply["return"] is False and reply.get("ghost") == "" and service.state.text == "", reply

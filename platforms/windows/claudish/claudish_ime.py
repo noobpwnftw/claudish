@@ -346,7 +346,9 @@ class ClaudishTextService(TextService):
         self.shift.other()
         self.switching = False
         self.hideMessage()  # a key ends a toast: it was said where the caret was
-        if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C):
+        # Modifiers, the lock keys (a replay would toggle them back) and VK_PACKET (a character another
+        # program sends, which a replay would not carry) are the system's, never taken.
+        if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C, 0x90, 0x91, 0xE7):
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
