@@ -343,6 +343,12 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             with rebuilding:
                 # The folder's config files as they were (a first save writes templates.json too).
                 before = {each: each.read_bytes() for each in path.parent.glob("*.json*") if each.is_file()}
+                # And the keys it may save (the Keychain on macOS): put back with the files.
+                from . import keys
+                api = data.get("server") if isinstance(data.get("server"), dict) else {}
+                names = (["anthropic"] if data.get("key") else []) + \
+                    ([keys.server_name(api["url"])] if api.get("key") and isinstance(api.get("url"), str) else [])
+                saved = {name: keys.stored(name) for name in names}
                 try:
                     shown = settings.apply(data, config_path)
                 except ValueError as exc:
@@ -356,6 +362,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                                 each.unlink(missing_ok=True)
                         for each, content in before.items():
                             each.write_bytes(content)
+                        for name, key in saved.items():
+                            keys.store(key, name) if key else keys.forget(name)
                         stamps[0] = stamp()  # put back as the service runs it: nothing to take up
                     try:
                         swap()

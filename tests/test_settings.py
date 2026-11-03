@@ -399,6 +399,22 @@ class ServiceTests(Home):
         self.assertIn("nothing changed", answer["error"])
         self.assertEqual(self.path.read_bytes(), before)
 
+    def test_a_key_saved_with_a_change_that_is_undone_is_put_back_too(self):
+        if sys.platform == "darwin":
+            self.skipTest("the key files of Linux and Windows; never the real Keychain")
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text(json.dumps(config.STARTER))
+        self.server_reload[0] = lambda: (_ for _ in ()).throw(ValueError("environment variable NOPE is not set"))
+        with patch.object(settings, "accepted_key", side_effect=lambda key: key):
+            for earlier in (None, "sk-ant-earlier"):
+                keys.forget()
+                if earlier:
+                    keys.store(earlier)
+                status, answer = self.call("/settings", {"key": "sk-ant-new"})
+                self.assertEqual(status, 400)
+                self.assertIn("nothing changed", answer["error"])
+                self.assertEqual(keys.stored(), earlier)  # not the new one
+
     def test_a_slow_model_change_keeps_a_concurrent_tone_change(self):
         from concurrent.futures import ThreadPoolExecutor, TimeoutError
         config.write_starter()

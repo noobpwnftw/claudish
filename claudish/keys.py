@@ -71,6 +71,14 @@ def store(key, name="anthropic"):
                    check=True, capture_output=True, timeout=10)
 
 
+def forget(name="anthropic"):
+    """Remove the key saved for this provider, if there is one."""
+    if sys.platform != "darwin":
+        key_file(name).unlink(missing_ok=True)
+        return
+    subprocess.run([SECURITY, "delete-generic-password", "-s", SERVICE, "-a", name], capture_output=True, timeout=10)
+
+
 def server_name(url):
     """A model API's key is saved for its address: it goes to no other."""
     return "server " + url.strip().rstrip("/")
