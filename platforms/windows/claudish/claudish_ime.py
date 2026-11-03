@@ -257,7 +257,7 @@ class ClaudishTextService(TextService):
         if self.state.for_model:
             self.state.leave(getattr(self, "last_document", None))
         if self.worker and (self.state.holds or self.state.dropped):
-            park(foreground(), self.state, self.worker)  # something to come back to
+            park(getattr(self, "owner", None) or foreground(), self.state, self.worker)  # something to come back to
             self.worker = None
             self.state = Composition()
         elif self.worker:
@@ -269,6 +269,8 @@ class ClaudishTextService(TextService):
     def adopt_parked(self):
         """At the first request after activation: this window's parked exchange and worker, if any."""
         window = foreground()
+        if window:  # this instance's app: in front at its first request (keys come only to it)
+            self.owner = window
         if self.adopted_from == window:
             return
         self.adopted_from = window
@@ -706,7 +708,8 @@ class ClaudishTextService(TextService):
             # here takes it up.
             self.state.leave(getattr(self, "last_document", None))
             if self.worker:
-                park(foreground(), self.state, self.worker)
+                # Its own app's: the one in front now may be where the click went.
+                park(getattr(self, "owner", None) or foreground(), self.state, self.worker)
             return
         self.state.change("")
         if self.worker:

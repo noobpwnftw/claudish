@@ -376,6 +376,18 @@ def main():
             taken = third.handleRequest({"method": "filterKeyDown", "seqNum": 1, "charCode": 0x1B, "keyCode": 0x1B,
                                          "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": states})
             assert taken["return"] and third.worker is parked_worker and third.state.held is not None, taken
+            # An exchange is parked under its own app, not the one the click went to (in front by then).
+            import pime_claudish.claudish_ime as ime
+            with patch.object(ime, "foreground", return_value=100):  # Notepad, typing
+                notepad = ClaudishTextService(None)
+                notepad.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                notepad.follow_document()
+            notepad.state.change("write it up")
+            notepad.state.submit()
+            with patch.object(ime, "foreground", return_value=200):  # Word, clicked into
+                notepad.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
+            ime.PARKED.pop(100)
             # Back in a text box after a focus change: what waits there says so when the app has the
             # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
             back = ClaudishTextService(None)
