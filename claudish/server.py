@@ -1,3 +1,4 @@
+import collections
 import hmac
 import json
 import re
@@ -44,7 +45,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
     import secrets
     token = token or secrets.token_urlsafe(32)
 
-    tickets, settings_tokens = {}, set()  # the settings window's: a ticket (one use, a minute), then a token
+    # The settings windows': a ticket (one use, a minute), then a token; the newest windows' only.
+    tickets, settings_tokens = {}, collections.deque(maxlen=16)
 
     def swap():
         """The settings window's changes, from the next request on: every handler reads `rewriter`."""
@@ -399,7 +401,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             if expires < clock.monotonic():
                 return self.reply(403, {"error": "this settings link has expired: open settings again"})
             session = secrets.token_urlsafe(32)
-            settings_tokens.add(session)
+            settings_tokens.append(session)
             return self.reply(200, {"token": session})
 
         def do_POST(self):
