@@ -185,7 +185,11 @@ def is_local(settings):
 def step_service(settings):
     status, detail = service.managed()
     if status == "ok":
-        return "done", detail, None
+        try:
+            doctor.fetch_json(doctor.SERVICE + "/health")
+            return "done", detail, None
+        except Exception:
+            pass  # set to start at login, and not running (stopped, or it failed): installed again, it starts
     if status == "skip":
         return "skip", detail, None
     try:

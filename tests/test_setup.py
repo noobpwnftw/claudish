@@ -147,10 +147,18 @@ class SetupTests(unittest.TestCase):
         self.model.parent.mkdir(parents=True)
         self.model.write_text("")
         self.llama.installed = lambda: self.home / ".tools/llama-server"
-        self.managed = ("ok", "systemd user unit (active)")
+        self.managed = ("ok", "systemd user unit (enabled)")
         self.backend = ("ok", "Claude via the Anthropic SDK", None)
-        with patch("claudish.setup.doctor.check_ime_linux", return_value=[("Input method", "ok", "registered", None)]):
+        with patch("claudish.setup.doctor.check_ime_linux", return_value=[("Input method", "ok", "registered", None)]), \
+                patch("claudish.setup.doctor.fetch_json", return_value={"service": "cd_AI"}):
             self.assertEqual(set(self.states().values()) - {"skip"}, {"done"})
+
+    def test_a_service_set_to_start_at_login_but_stopped_is_started(self):
+        config.write_starter()
+        self.managed = ("ok", "systemd user unit (enabled)")  # /health does not answer (setUp)
+        self.backend = ("ok", "Claude via the Anthropic SDK", None)
+        self.quiet("claude", yes=True)
+        self.service_run.assert_called_once_with("install")
 
     def test_a_hosted_profile_downloads_nothing_and_runs_serve(self):
         config.write_starter()

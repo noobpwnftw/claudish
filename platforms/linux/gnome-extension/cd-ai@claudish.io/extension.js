@@ -110,7 +110,9 @@ export default class CdAiExtension extends Extension {
         const service = this._ibus._panelService || null;  // the shell's own; a new one when IBus restarts
         if (service === this._service)
             return;
-        this._unwatchPanelService();
+        // The one watched was destroyed with its IBus (its handlers with it): nothing to disconnect.
+        this._service = null;
+        this._relativeId = 0;
         if (!service)
             return;
         try {
@@ -125,11 +127,9 @@ export default class CdAiExtension extends Extension {
         } catch (e) {}  // an IBus without the relative signal
     }
 
-    _unwatchPanelService() {
-        try {
-            if (this._relativeId)
-                this._service.disconnect(this._relativeId);
-        } catch (e) {}  // that service is gone with its IBus
+    _unwatchPanelService() {  // at disable: the service watched is the live one, or gone
+        if (this._relativeId && this._service && this._service === this._ibus._panelService)
+            this._service.disconnect(this._relativeId);
         this._service = null;
         this._relativeId = 0;
     }

@@ -76,22 +76,26 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         old.stop_model()
         # One nothing routes to any more (a binding or a mode's route removed): stopped now, not at
         # the next reload (a local model holds its memory meanwhile).
-        def routes(each):  # a binding's profile, and a mode's: one bound to may route on (its own modes)
-            return {b.profile for b in each.bindings if b.profile} | \
-                {spec["profile"] for spec in each.modes.values() if spec.get("profile")}
-        reachable, seen, waiting = set(), {fresh.profile}, routes(fresh)
-        while waiting and fresh.loader:
-            name = waiting.pop()
-            if name in seen:
-                continue
-            seen.add(name)
-            try:
-                other = fresh.loader(name)
-            except Exception:
-                continue
-            if other.warm:
-                reachable.add(warm_key(other.warm))
-            waiting |= routes(other) - seen
+        # As route() goes: the service's bindings and its own modes, then a bound profile's modes.
+        def modes_of(each):
+            return {spec["profile"] for spec in each.modes.values() if spec.get("profile")}
+        reachable, loaded = set(), {}
+
+        def load(name):
+            if name not in loaded:
+                try:
+                    loaded[name] = fresh.loader(name) if fresh.loader and name != fresh.profile else None
+                except Exception:
+                    loaded[name] = None
+                if loaded[name] is not None and loaded[name].warm:
+                    reachable.add(warm_key(loaded[name].warm))
+            return loaded[name]
+        for name in modes_of(fresh):
+            load(name)
+        for name in {b.profile for b in fresh.bindings if b.profile}:
+            bound = load(name)
+            for routed in modes_of(bound) if bound is not None else ():
+                load(routed)
         for key in [key for key in fresh.adoptable if key not in reachable]:
             fresh.adoptable.pop(key).stop()
         stamps[0] = read
