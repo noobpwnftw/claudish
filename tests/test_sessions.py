@@ -130,6 +130,15 @@ class ServiceTests(unittest.TestCase):
         self.assertRegex(self.until(self.turn("count"), "result")["text"], r"^turn 2 ")
         self.assertIs(agent.process, process)
 
+    def test_a_turn_past_its_time_says_so(self):
+        from claudish import agent
+        with patch.object(agent.ClaudeCodeDriver.__init__, "__defaults__", (1,) + agent.ClaudeCodeDriver.__init__.__defaults__[1:]):
+            session = self.turn("slow task")
+            self.assertEqual(self.until(session, "error")["text"], "the agent took longer than 1 s")
+        from claudish.composition import failure
+        for said in ("the agent took longer than 1 s", "the instruction had ended (no answer in time, or it was stopped)"):
+            self.assertEqual(failure(said), said)  # the panel says it as it is
+
     def test_an_agent_that_exited_is_resumed_by_session_id(self):
         self.until(self.turn("count"), "result")
         agent = self.rewriter.conversations.get("box").agent

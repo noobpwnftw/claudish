@@ -167,7 +167,10 @@ class ClaudeCodeDriver:
             self.agent.close()
 
     def turn(self, session, prompt):
-        timer = threading.Timer(self.timeout, self.cancel)
+        def too_long():  # said before the cancel, which would read as Esc
+            session.emit("error", text="the agent took longer than %d s" % self.timeout)
+            self.cancel()
+        timer = threading.Timer(self.timeout, too_long)
         timer.daemon = True
         timer.start()
         self.send({"type": "user", "message": {"role": "user", "content": prompt + self.context}, "parent_tool_use_id": None})

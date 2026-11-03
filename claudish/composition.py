@@ -100,7 +100,8 @@ ROW = 60
 OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no answer, so the instruction stopped",
              "too many agent sessions", "the model offered nothing",
              "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended
-             "Claude declined", "Claude returned no text", "the model returned no text")
+             "Claude declined", "Claude returned no text", "the model returned no text",
+             "the agent ", "the instruction had ended", "text must be")  # an agent session's, the service's checks
 
 
 def failure(error):
