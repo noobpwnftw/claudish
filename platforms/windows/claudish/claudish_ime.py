@@ -77,6 +77,12 @@ def release(worker):
         worker.close()
 
 
+def gone(attributes):
+    worker = attributes.get("worker")
+    if worker is not None and not any(parked[1] is worker for parked in PARKED.values()):
+        release(worker)
+
+
 def expire():
     from .composition import HELD_SECONDS
     for window, (_, worker, when) in list(PARKED.items()):
@@ -200,6 +206,9 @@ class ClaudishTextService(TextService):
     def __init__(self, client):
         super().__init__(client)
         INSTANCES.add(self)
+        # PIME drops an instance whose app's connection closed without onDeactivate: its worker ends
+        # with it (its threads, its conversations), unless it is parked for the next one here.
+        weakref.finalize(self, gone, self.__dict__)
         self.state = Composition()
         if LAST_MODE[0] and LAST_MODE[0] != self.state.mode:
             self.state.mode = LAST_MODE[0]  # back to cd_AI from another input method: the same mode

@@ -395,6 +395,14 @@ def main():
                 notepad.handleRequest({"method": "onCompositionTerminated", "forced": True})
             assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
             ime.PARKED.pop(100)
+            # PIME drops an instance (its app's connection closed) with no onDeactivate: its worker ends.
+            dropped = ClaudishTextService(None)
+            dropped.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            dropped_worker = dropped.worker
+            del dropped
+            import gc
+            gc.collect()
+            dropped_worker.close.assert_called()
             # An answer that comes while another app is in front is not drawn over it, and shows on return.
             with patch.object(ime, "foreground", return_value=100):
                 word = ClaudishTextService(None)
