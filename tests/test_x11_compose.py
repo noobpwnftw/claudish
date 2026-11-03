@@ -30,3 +30,25 @@ class ComposeTableTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ComposeFileFormTests(unittest.TestCase):
+    def test_includes_escapes_keysym_results_and_a_longer_sequence_of_your_own(self):
+        with tempfile.TemporaryDirectory() as folder:
+            system, own, extra = Path(folder, "Compose"), Path(folder, ".XCompose"), Path(folder, "extra")
+            system.write_text('<Multi_key> <o> <c> : "\\u00a9"\n<Multi_key> <period> <period> : ellipsis\n',
+                              encoding="utf-8")
+            extra.write_text('<Multi_key> <z> <z> : "zed"\n', encoding="utf-8")
+            own.write_text('include "%L"\ninclude "' + str(extra) + '"\n'
+                           r'<Multi_key> <m> <d> : "\342\200\224"' + "\n"
+                           '<Multi_key> <o> <c> <x> : "longer"\n'
+                           '<Multi_key> <U01a1> : "horn"\n', encoding="utf-8")
+            with patch.object(x11_compose, "SYSTEM", (str(system),)), \
+                    patch.dict(os.environ, {"XCOMPOSEFILE": str(own)}):
+                compose = x11_compose.Compose(key=lambda name: {"ellipsis": "\u2026", "period": "."}.get(name, name))
+        self.assertEqual(compose.step(["z", "z"]), ("text", "zed"))  # an included file
+        self.assertEqual(compose.step(["m", "d"]), ("text", "\u2014"))  # UTF-8 bytes in octal
+        self.assertEqual(compose.step([".", "."]), ("text", "\u2026"))  # a keysym's own character
+        self.assertEqual(compose.step(["o", "c"]), ("wait", None))  # replaced by your longer one
+        self.assertEqual(compose.step(["o", "c", "x"]), ("text", "longer"))
+        self.assertEqual(compose.step(["\u01a1"]), ("text", "horn"))  # <U01a1>, any case: the character

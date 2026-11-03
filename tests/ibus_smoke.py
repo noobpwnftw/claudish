@@ -176,6 +176,17 @@ try:
             assert engine.do_process_key_event(ord(key), 0, 0)
         assert engine.composition.text == "x" + made, engine.composition.text
         engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Keys IBus names otherwise than the files: Compose ' ơ (U+01A1, ohorn in the table) is ớ.
+    engine.do_process_key_event(IBus.keyval_from_name("Multi_key"), 0, 0)
+    engine.do_process_key_event(ord("'"), 0, 0)
+    assert engine.do_process_key_event(0x10001A1, 0, 0)
+    assert engine.composition.text == "\u1edb", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # The dead tilde (dead_perispomeni to IBus): ñ.
+    engine.do_process_key_event(IBus.keyval_from_name("dead_tilde"), 0, 0)
+    engine.do_process_key_event(ord("n"), 0, 0)
+    assert engine.composition.text == "\u00f1", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # Backspace takes back the Compose key (as GTK's), and deletes nothing.
     for char in "don":
         engine.do_process_key_event(ord(char), 0, 0)

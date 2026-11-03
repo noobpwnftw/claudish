@@ -21,14 +21,27 @@ DEAD_KEYS = {"dead_grave": "`", "dead_acute": "´", "dead_circumflex": "^", "dea
              "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}  # their accents
 
 
+# By keyval: IBus names some keys otherwise (dead_tilde is dead_perispomeni to IBus 1.5.29).
+DEAD_BY_KEYVAL = {IBus.keyval_from_name(name): name for name in DEAD_KEYS}
 COMPOSER = []  # the Compose key's table (claudish/x11_compose.py), read at its first use
+
+
+def compared(keyval):
+    """A key as the Compose table compares it: the character it types, else its keyval (the files
+    and IBus name keys differently: <U01A1>, ohorn and U+01A1 are one key)."""
+    return IBus.keyval_to_unicode(keyval) or keyval
 
 
 def composer():
     if not COMPOSER:
         from claudish.x11_compose import Compose
-        COMPOSER.append(Compose())
+        COMPOSER.append(Compose(key=lambda name: (lambda keyval: None if keyval in (0, IBus.KEY_VoidSymbol)
+                                                  else compared(keyval))(IBus.keyval_from_name(name))))
     return COMPOSER[0]
+
+
+def key_name(keyval):
+    return DEAD_BY_KEYVAL.get(keyval) or IBus.keyval_name(keyval) or ""
 
 
 def with_accent(dead, char):
@@ -372,7 +385,7 @@ class ClaudishEngine(IBus.Engine):
 
     def compose_key(self, keyval):
         """The key's name; None for the Compose key (taken: its sequence waits for what follows)."""
-        name = IBus.keyval_name(keyval) or ""
+        name = key_name(keyval)
         if name == "Multi_key":
             self.sequence = []
             return None
@@ -388,10 +401,10 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_Escape:
             self.sequence = None
             return True
-        name = IBus.keyval_name(keyval) or ""
-        kind, text = composer().step(self.sequence + [name])
+        key = compared(keyval)
+        kind, text = composer().step(self.sequence + [key])
         if kind == "wait":
-            self.sequence.append(name)
+            self.sequence.append(key)
             return True
         self.sequence = None
         if kind == "text":
@@ -434,7 +447,7 @@ class ClaudishEngine(IBus.Engine):
             return False
         if keyval in MODIFIER_KEYS:
             return False
-        if self.dead and (IBus.keyval_name(keyval) or "") not in DEAD_KEYS \
+        if self.dead and key_name(keyval) not in DEAD_KEYS \
                 and not typeable(IBus.keyval_to_unicode(keyval)):
             self.dead = None  # an accent waiting for its letter: any other key cancels it, as GTK's does
             self.render()
