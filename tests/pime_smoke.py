@@ -219,6 +219,7 @@ def main():
             assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
             last = worker_class.return_value.schedule.call_args.args
             assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
+            assert key(ord("!"), ord("!"), "filterKeyDown")["return"]  # every key reaches filterKeyDown first
             assert key(ord("!"), ord("!"))["commitString"] == "!"
             assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
             assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
@@ -239,6 +240,14 @@ def main():
             worker_class.return_value.poll.return_value = None
             assert service.state.ghost.strip() == "Again.", service.state.ghost
             assert key(9, method="filterKeyDown", textBefore="Total: ")["return"] is False and not service.state.ghost
+            # One that came while nothing drew it (the timer had stopped): Tab is the app's, not for text unseen.
+            key(ord("!"), ord("!"), "filterKeyDown")
+            key(ord("!"), ord("!"))
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Unseen."})
+            assert key(9, method="filterKeyDown")["return"] is False
+            worker_class.return_value.poll.return_value = None
+            # A key-up whose key-down went to the app (Ctrl let go first) stays the app's.
+            assert key(ord("C"), ord("c"), "filterKeyUp")["return"] is False
             shift_tap()  # compose, starting empty: the words are in the app already
             for char in "as is":
                 key(ord(char.upper()), ord(char))

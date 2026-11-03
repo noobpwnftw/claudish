@@ -220,6 +220,9 @@ class ClaudishTextService(TextService):
         self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
         self.worker = None
         self.adopted_from = UNSEEN
+        self.last_document = None  # the text box of the last request (follow_document)
+        self.taken_keys = set()  # continue's key-downs taken: their key-ups are taken too, only theirs
+        self.drawn_ghost = ""  # the suggestion last drawn: Tab and Esc are cd_AI's only for one you see
 
     def onActivate(self):
         keylog("onActivate", id(self), "parked=%s" % list(PARKED))
@@ -275,6 +278,9 @@ class ClaudishTextService(TextService):
             self.worker = None
             self.state = Composition()
         elif self.worker:
+            for window, parked in list(PARKED.items()):  # parked at a click, and taken up again since
+                if parked[1] is self.worker:
+                    del PARKED[window]
             self.worker.close()
             self.worker = None
         self.state.change("")
@@ -282,6 +288,9 @@ class ClaudishTextService(TextService):
 
     def adopt_parked(self):
         """At the first request after activation: this window's parked exchange and worker, if any."""
+        for each, parked in list(PARKED.items()):  # parked at a click while this instance went on with it:
+            if parked[0] is self.state:  # this instance's, not a copy for the next one to take
+                del PARKED[each]
         window = foreground()
         if window:  # this instance's app: in front at its first request (keys come only to it)
             self.owner = window
@@ -385,8 +394,9 @@ class ClaudishTextService(TextService):
                 if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
                     self.drop_live()
                     return False
-                return bool(self.state.ghost)
+                return bool(self.state.ghost) and self.state.ghost == self.drawn_ghost  # one you see
             if event.isPrintableChar():
+                self.taken_keys.add(event.keyCode)
                 return True
             # Backspace, Enter, navigation: the app's. The context starts over from the app's text at
             # the next key (this runs twice per key, in TSF's test and again for the key itself, so
@@ -435,11 +445,15 @@ class ClaudishTextService(TextService):
             # Your words are in the app already; the suggestion is cd_AI's own grey text after the
             # caret, and Tab takes it.
             self.setCompositionString("")
-            self.setGhost("" if self.state.inside else self.state.ghost)
+            if self.state.ghost and not self.caret_stayed():  # a click moved the caret: not drawn over text
+                self.state.dismiss()
+            self.drawn_ghost = "" if self.state.inside else self.state.ghost
+            self.setGhost(self.drawn_ghost)
             self.setPanel(None)
             self.setCandidateList([])
             self.setShowCandidates(False)
             return
+        self.drawn_ghost = ""
         self.setGhost("")
         # A sent instruction is not text for the app: if the app ends the composition (a focus change),
         # Claudish's PIME clears it; words still being typed stay, as a CJK preedit does.
@@ -517,11 +531,12 @@ class ClaudishTextService(TextService):
             keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
             return getattr(self, "switching", False)
         # A shortcut's key-up goes where its key-down went (to the app): only typing's are continue's.
-        return bool(self.keyboardOpen and (self.state.live and event.isPrintableChar() and not self.shortcut(event) or
+        return bool(self.keyboardOpen and (event.keyCode in self.taken_keys or
                                            event.keyCode == 0x09 and not event.isKeyDown(0x10) and self.state.asked == "rewrite"
                                            and self.state.working))
 
     def onKeyUp(self, event):
+        self.taken_keys.discard(event.keyCode)
         self.poll_results()
         if getattr(self, "switching", False):
             self.switching = False
