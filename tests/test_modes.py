@@ -140,6 +140,19 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(load(Path(modes.__file__).with_name("templates.json")), modes.TEMPLATES)
         self.assertEqual(set(modes.defaults()), {"rewrite", "continue", "instruct"})
 
+    def test_a_templates_file_changes_only_what_it_names_of_a_tone(self):
+        from claudish.modes import load
+        shipped = modes.TEMPLATES["tones"]["named"]["critic"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "t.json")
+            path.write_text(json.dumps({"tones": {"named": {"critic": {"modes": {"rewrite": {"voice": "sharper"},
+                                                                                     "continue": {"examples": []}}}}}}))
+            critic = modes.merged(load(path))["tones"]["named"]["critic"]  # examples alone load: a shipped mode
+        self.assertEqual(critic["modes"]["rewrite"]["voice"], "sharper")
+        self.assertEqual(critic["modes"]["rewrite"]["examples"], shipped["modes"]["rewrite"]["examples"])
+        self.assertEqual(critic["modes"]["instruct"], shipped["modes"]["instruct"])
+        self.assertEqual((critic["about"], critic["modes"]["continue"]["examples"]), (shipped["about"], []))
+
     def test_a_profile_can_reword_the_box_too(self):
         rewriter = Rewriter(max_tokens=64, templates={"box": {"at_caret": "Write it for the caret."}})
         _, payload = self.call(rewriter, "decline politely", "instruct", before="Hi Sam,")

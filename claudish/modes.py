@@ -24,8 +24,9 @@ def load(path):
             raise ValueError('%s: tone %r takes only "about", "persona" and "modes"' % (where, name))
         if not isinstance(tone.get("persona", ""), str):
             raise ValueError('%s: tone %r: "persona" is text' % (where, name))
-        for mode_name, mode in (tone.get("modes") or {}).items():
-            check_mode("%s, tone %r," % (where, name), mode_name, mode, False)
+        shipped = ((TEMPLATES["tones"]["named"].get(name) or {}).get("modes") or {})
+        for mode_name, mode in (tone.get("modes") or {}).items():  # a shipped tone's mode may name only part
+            check_mode("%s, tone %r," % (where, name), mode_name, mode, mode_name in shipped)
     return data
 
 
@@ -53,15 +54,21 @@ def check_mode(where, name, mode, known):
 
 
 def merged(override=None):
-    """The shipped templates with a profile's over them, mode by mode and key by key."""
+    """The shipped templates with a profile's over them, mode by mode and key by key (a named
+    tone's too: changing its rewrite's voice keeps the rest of it)."""
     words = copy.deepcopy(TEMPLATES)
     for section in ("modes", "tones", "box"):
-        for key, value in ((override or {}).get(section) or {}).items():
-            if isinstance(value, dict) and isinstance(words[section].get(key), dict):
-                words[section][key] = dict(words[section][key], **value)
-            else:
-                words[section][key] = value
+        over(words[section], (override or {}).get(section) or {})
     return words
+
+
+def over(words, override):
+    """override's keys over words', objects within objects merged; text and lists replaced."""
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(words.get(key), dict):
+            over(words[key], value)
+        else:
+            words[key] = copy.deepcopy(value)
 
 
 def messages(pairs, frame=None):
