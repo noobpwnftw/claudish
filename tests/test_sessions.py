@@ -376,6 +376,25 @@ class RoutingTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_malformed_requests_are_answered_not_dropped(self):
+        import http.client
+        server = make_server(Rewriter("rules"), 0)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+        try:
+            for body, headers in (("[" * 20000, {}),  # nested past the parser's recursion
+                                  (json.dumps({"text": "hi"}), {"X-Claudish-Token": b"\xe9t\xe9"})):  # not ASCII
+                connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+                connection.putrequest("POST", "/suggest")
+                for name, value in dict({"Content-Type": "application/json", "Content-Length": str(len(body))},
+                                        **headers).items():
+                    connection.putheader(name, value)
+                connection.endheaders(body.encode())
+                self.assertIn(connection.getresponse().status, (200, 400))  # a reply, not a closed connection
+                connection.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_a_routed_profile_that_cannot_run_is_answered_not_dropped(self):
         main = Rewriter("rules")
         main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))

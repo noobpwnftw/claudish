@@ -1,5 +1,6 @@
 import hmac
 import json
+import re
 import sys
 from pathlib import Path
 from importlib.resources import files
@@ -25,6 +26,14 @@ def checked_purpose(purpose):
 def _config_default():
     from .config import default_path
     return default_path()
+
+
+def same(sent, known):
+    """A token compared in constant time; one with characters a header should not have is wrong."""
+    try:
+        return hmac.compare_digest(sent, known)
+    except TypeError:
+        return False
 
 
 def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
@@ -130,12 +139,12 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
 
         def trusted(self):
             """Sent by an input method."""
-            return hmac.compare_digest(self.headers.get("X-Claudish-Token") or "", token)
+            return same(self.headers.get("X-Claudish-Token") or "", token)
 
         def settings_trusted(self):
             """The settings page's token, or the service token."""
             sent = self.headers.get("X-Claudish-Settings") or ""
-            return self.trusted() or any(hmac.compare_digest(sent, known) for known in list(settings_tokens))
+            return self.trusted() or any(same(sent, known) for known in list(settings_tokens))
 
         def valid_host(self):
             return self.headers.get("Host") in (
@@ -160,7 +169,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                 return self.reply(413, {"error": "invalid body size"})
             try:
                 data = json.loads(self.rfile.read(size))
-            except (ValueError, UnicodeError, OSError):  # not JSON, or a body shorter than it said
+            except (ValueError, UnicodeError, OSError, RecursionError):  # not JSON (or nested too deep), or a body shorter than it said
                 data = None
             if not isinstance(data, dict):
                 return self.reply(400, {"error": "expected a JSON object"})
@@ -233,7 +242,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             its agent (claudish textbox-mcp). With the conversation's token."""
             conversation = rewriter.conversations.find(key)
             token = self.headers.get("X-Claudish-Token") or ""
-            if conversation is None or not hmac.compare_digest(token, conversation.token):
+            if conversation is None or not same(token, conversation.token):
                 return self.reply(404, {"error": "no such conversation"})
             try:
                 if data.get("op") == "read":
@@ -242,7 +251,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     text = conversation.textbox.search(data.get("query", ""))
                 else:
                     return self.reply(400, {"error": "op is read or search"})
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, OverflowError) as exc:  # Infinity as an offset
                 return self.reply(400, {"error": str(exc)})
             return self.reply(200, {"text": text})
 
@@ -255,7 +264,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             if session is None:
                 return self.reply(404, {"error": "no such session"})
             after = query[len("after="):] if query.startswith("after=") else "0"
-            events, done = session.wait(int(after) if after.isdigit() else 0, timeout=1.0)
+            events, done = session.wait(int(after) if re.fullmatch("[0-9]{1,9}", after) else 0, timeout=1.0)
             return self.reply(200, {"events": events, "done": done})
 
         def do_GET(self):
