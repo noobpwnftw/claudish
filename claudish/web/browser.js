@@ -8,13 +8,21 @@ const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/w
 // Port of claudish.modes.finish: a continuation is joined onto the typed text.
 function finish(mode, text, output) {
   if (mode !== "continue") return output;
-  // Small models sometimes echo the text, or its last words, before continuing it.
+  // Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
+  // end ("I " then "in fact" is not one).
+  const echo = text.trim();
   if (output.startsWith(text)) output = output.slice(text.length);
-  else if (text.trim() && output.toLowerCase().startsWith(text.trim().toLowerCase())) output = output.slice(text.trim().length);
-  output = output.trim().replace(/^"|"$/g, "").trim();
+  else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !/^[\p{L}\p{N}]/u.test(output.slice(echo.length))) {
+    output = output.slice(echo.length);
+  }
+  output = output.trim();
+  // Or wrap all of it in quotes: a pair around the whole, not one that closes your open quote.
+  if (output.length > 2 && output[0] === '"' && output.endsWith('"') && !output.slice(1, -1).includes('"')
+      && (text.split('"').length - 1) % 2 === 0) output = output.slice(1, -1).trim();
   if (/[ \n]$/.test(text)) output = output.replace(/^[,;: ]+/, "");
   if (!output) return "";
-  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) ? "" : " ";
+  const wide = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303F\uFF00-\uFF60]/u;  // CJK: no spaces
+  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0]) ? "" : " ";
   return text + joiner + output;
 }
 
