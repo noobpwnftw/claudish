@@ -14,7 +14,8 @@ function finish(mode, text, output) {
   if (mode !== "continue") return output;
   // Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
   // end ("I " then "in fact" is not one).
-  const wordGoesOn = (at) => /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));  // "In" after "I", "We're" after "We"
+  // "In" after "I", "We're" after "We"; never after a Chinese or Japanese character
+  const wordGoesOn = (at) => !WIDE.test(text.slice(-1) || " ") && /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));
   const echo = text.trim();
   if (output.startsWith(text) && !(/[\p{L}\p{N}]$/u.test(text) && wordGoesOn(text.length))) output = output.slice(text.length);
   else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !wordGoesOn(echo.length)) {

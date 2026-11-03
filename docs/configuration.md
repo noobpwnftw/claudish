@@ -449,7 +449,8 @@ same shape and names only what it changes, mode by mode and key by key:
 
 Name it in a profile (`"templates": "words.json"`, relative to the config file)
 or pass `claudish serve --templates words.json`. A mode's own `system` replaces its job and voice
-and is used as written in every box, without the `plain` one. A tone of your own goes under
+and is used as written in every box, without the `plain` one, with only the `examples` and `parts`
+given beside it (none of the shipped ones). A tone of your own goes under
 `"tones"`, and a profile picks it by name (`"tone": "pirate"`); a tone gives a `voice` (and a
 `length`) for each mode, and the shipped job does the rest:
 

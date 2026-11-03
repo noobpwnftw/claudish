@@ -233,8 +233,10 @@ class Suggestions:
                 except Exception:
                     time.sleep(0.5)
             # The service never took it: the session ends, and the instruction says so (the summon
-            # key asks again), whatever else is pending.
-            self._cancel(session)
+            # key asks again), whatever else is pending. An inserted answer is in the text already,
+            # and kept: its session is not cancelled.
+            if session not in self.settling:
+                self._cancel(session)
             revision = self.revisions.get(session)
             if revision is not None:
                 self.deliver(revision, {"error": error, "session": session}, always=True)

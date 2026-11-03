@@ -71,8 +71,14 @@ class Session:
         self.driver.answer(question, choice, text)
 
     def cancel(self):
-        # Esc as the answer arrived takes the turn back (its follower cancels); an answer you
-        # inserted is not cancelled (claudish/client.py: settling).
+        # Esc as the answer arrived takes the turn back (its follower cancels), and stops nothing
+        # more: an agent shared by the conversation may run the next instruction by now. An answer
+        # you inserted is not cancelled (claudish/client.py: settling).
+        if self.done:
+            take_back = getattr(self.driver, "take_back", None)
+            if take_back:
+                take_back()
+            return
         self.cancelled = True  # before the driver stops, so its end reads as cancelled
         self.driver.cancel()
         self.emit("error", text="cancelled")

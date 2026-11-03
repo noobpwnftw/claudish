@@ -297,6 +297,20 @@ class SessionTests(unittest.TestCase):
         events, done = session.wait(0, 0)
         self.assertEqual(([e["type"] for e in events], done), (["question", "result"], True))
 
+    def test_a_cancel_after_the_end_takes_the_turn_back_and_stops_nothing(self):
+        class Driver:
+            calls = []
+
+            def cancel(self):
+                self.calls.append("cancel")  # an agent's interrupt: the next instruction's, by now
+
+            def take_back(self):
+                self.calls.append("take back")
+        session = Session(Driver())
+        session.emit("result", text="done")
+        session.cancel()  # Esc as the answer arrived
+        self.assertEqual(Driver.calls, ["take back"])
+
 
 class AnswerTests(unittest.TestCase):
     def test_the_same_answer_again_is_taken_once(self):

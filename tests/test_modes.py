@@ -60,6 +60,7 @@ class ModeTests(unittest.TestCase):
         # An echo is cut only at a word's end: "In" after "I" is not one.
         self.assertEqual(modes.finish("continue", "I", "In fact, yes"), "I In fact, yes")
         self.assertEqual(modes.finish("continue", "We", "We're aligned"), "We We're aligned")
+        self.assertEqual(modes.finish("continue", "我今天", "我今天去了商店。"), "我今天去了商店。")  # no word ends there
         # No space after an em dash, a bracket or a quote you opened, nor before a combining mark.
         self.assertEqual(modes.finish("continue", "aligned—", "fully"), "aligned—fully")
         self.assertEqual(modes.finish("continue", 'He said "', "hello"), 'He said "hello')

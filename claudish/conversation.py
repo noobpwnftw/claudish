@@ -334,10 +334,15 @@ class ModelDriver:
         self.kept = list(turn)
         self.conversation.remember(self.kept)
 
+    def take_back(self):
+        """The finished turn's answer was not taken (Esc as it arrived): the conversation forgets it."""
+        if self.kept:
+            self.conversation.forget(self.kept)
+            self.kept = []
+
     def cancel(self):
         self.cancelled = True
-        if self.kept:  # Esc as the answer arrived: the conversation does not keep it either
-            self.conversation.forget(self.kept)
+        self.take_back()  # Esc as the answer arrived: the conversation does not keep it either
         for waiter in self.pending.values():
             waiter[1] = (1, "cancelled")
             waiter[0].set()

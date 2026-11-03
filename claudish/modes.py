@@ -135,9 +135,15 @@ def finish(mode, text, output):
         return output
     # Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
     # end ("I " then "in fact" is not one).
-    def word_goes_on(at):  # "In" after "I", "We're" after "We"
+    import unicodedata
+
+    def is_wide(c):  # Chinese and Japanese: no spaces between words (Korean has them; an emoji is a symbol)
+        return unicodedata.east_asian_width(c) in "WFH" and not unicodedata.category(c).startswith("S") \
+            and "HANGUL" not in unicodedata.name(c, "")
+
+    def word_goes_on(at):  # "In" after "I", "We're" after "We"; never after a Chinese or Japanese character
         after = output[at:at + 2]
-        return after[:1].isalnum() or after[:1] in "'’" and after[1:2].isalpha()
+        return not is_wide(text[-1:] or " ") and (after[:1].isalnum() or after[:1] in "'’" and after[1:2].isalpha())
     echo = text.strip()
     if output.startswith(text) and not (text[-1:].isalnum() and word_goes_on(len(text))):
         output = output[len(text):]
@@ -151,11 +157,9 @@ def finish(mode, text, output):
         output = output.lstrip(",;: ")  # "hello " + ", how are you" reads "hello how are you"
     if not output:
         return ""
-    import unicodedata
     # Chinese and Japanese take no spaces between words; Korean does, and an emoji (wide, but a
     # symbol) is spaced as a word.
-    wide = any(unicodedata.east_asian_width(c) in "WFH" and not unicodedata.category(c).startswith("S")
-               and "HANGUL" not in unicodedata.name(c, "") for c in (text[-1:] or " ", output[0]))
+    wide = any(is_wide(c) for c in (text[-1:] or " ", output[0]))
     # No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
     # goes on your last letter.
     opened = text.endswith(("—", "(", "[", "“", "‘")) or text.endswith('"') and text.count('"') % 2 == 1
