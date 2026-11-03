@@ -162,6 +162,7 @@ try:
     # An accent left waiting goes with the composition (a reset: a click, a focus change), not onto
     # the next letter.
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.focus_mode() == IBus.PreeditFocusMode.CLEAR  # alone, it is not committed when focus goes
     engine.do_reset()
     engine.do_process_key_event(ord("e"), 0, 0)
     assert engine.composition.text == "e", engine.composition.text

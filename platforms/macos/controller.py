@@ -534,9 +534,12 @@ class ClaudishInputController(IMKInputController):
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")
         self.hide_panel()
+        self.state.accent = ""  # a waiting accent is never committed
         if text and client is not None:
             # Inserting replaces the client's existing marked text.
             client.insertText_replacementRange_(text, (NSNotFound, 0))
+        elif client is not None:
+            unmark(client)  # nothing to insert: a waiting accent marked alone goes
         if self.state.text and client is not None:  # words that stay are the next composition, marked
             self.changed(client)
 

@@ -289,6 +289,11 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
+    def test_a_waiting_accent_is_not_left_on_a_commit(self):
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e, nothing else composed
+        self.controller.commitComposition_(None)  # a click elsewhere
+        self.assertEqual((self.client.marked, self.client.commits), ("", []))
+
     def test_option_keys_and_a_lone_accent_are_the_apps(self):
         option = 1 << 19
         self.assertTrue(self.key(14, "´", option))  # Option+e with nothing composed: the accent, marked
