@@ -157,6 +157,17 @@ def main():
             assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello-world@"
             key(0x08)
             assert service.state.text == "hello-world"
+            # TSF gives AltGr's key to no input method: the app puts the character into the composition
+            # itself, and Claudish's PIME sends it as typed there (an Alt code too).
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "typed": "€"})
+            assert reply["compositionString"] == "hello-world€" and "commitString" not in reply, reply
+            key(0x08)
+            # A dead key is Windows': its accent waits for the next key, and nothing is committed.
+            assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
+            assert key(ord("E"), 0xE9, "filterKeyDown")["return"]
+            assert key(ord("E"), 0xE9)["compositionString"] == "hello-worldé"
+            key(0x08)
+            assert service.state.text == "hello-world"
             # Tab asks for the rewrite and commits nothing; a Shift tap keeps your words as typed.
             assert "commitString" not in key(9)
             reply = shift_tap()

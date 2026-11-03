@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..7c3c275 100644
+index 0c7a8d5..c4a9e01 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -59,7 +59,15 @@ index 0c7a8d5..7c3c275 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -96,11 +105,78 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -81,6 +90,7 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
+ 	request["repeatCount"] = keyEvent.repeatCount();
+ 	request["scanCode"] = keyEvent.scanCode();
+ 	request["isExtended"] = keyEvent.isExtended();
++	request["isDead"] = keyEvent.isDead();  // Claudish
+ 	json keyStates = json::array();
+ 	const BYTE* states = keyEvent.keyStates();
+ 	for (int i = 0; i < 256; ++i) {
+@@ -96,11 +106,78 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	}
  	bool success = jsonValueOr<bool>(msg, "success", false);
  	if (success) {
@@ -138,7 +146,7 @@ index 0c7a8d5..7c3c275 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +208,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +209,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -154,7 +162,7 @@ index 0c7a8d5..7c3c275 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -170,6 +255,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
+@@ -170,6 +256,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
  				textService_->updateMessageWindow(session);
  			}
  			textService_->endComposition(session->context());
@@ -162,7 +170,7 @@ index 0c7a8d5..7c3c275 100644
  		}
  	}
  }
-@@ -188,6 +274,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -188,6 +275,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  			if (textService_->isComposing() && !textService_->showingCandidates()) {
  				// when the composition buffer is empty and we are not showing the candidate list, end composition.
  				textService_->setCompositionString(session, L"", 0);
@@ -177,7 +185,7 @@ index 0c7a8d5..7c3c275 100644
  				endComposition = true;
  			}
  		}
-@@ -196,6 +290,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -196,6 +291,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->startComposition(session->context());
  			}
  			textService_->setCompositionString(session, compositionString.c_str(), compositionString.length());
@@ -185,7 +193,7 @@ index 0c7a8d5..7c3c275 100644
  		}
  		// FIXME: update the position of candidate and message window when the composition string is changed.
  		if (textService_->candidateWindow_ != nullptr) {
-@@ -329,6 +424,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +425,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  
  		updateComposition(msg, session, endComposition);
  
@@ -202,7 +210,7 @@ index 0c7a8d5..7c3c275 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +450,108 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +451,144 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -287,10 +295,46 @@ index 0c7a8d5..7c3c275 100644
 +	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
 +}
 +
++// Claudish: text the app put into the composition itself (an AltGr character, an Alt code: TSF gives
++// those keys to no input method). Added at the cursor, it goes to the input method as typed there;
++// any other change ends the composition and the text stays, as a new composition string would
++// write over it.
++void Client::addOutsideText(json& request, Ime::EditSession* session) {
++	if (!textService_->isComposing() || lastComposition_.empty()) {
++		return;
++	}
++	std::wstring now = textService_->compositionString(session);
++	const std::wstring& was = lastComposition_;
++	if (now == was) {
++		return;
++	}
++	size_t prefix = 0;
++	while (prefix < now.size() && prefix < was.size() && now[prefix] == was[prefix])
++		++prefix;
++	if (prefix > 0 && IS_HIGH_SURROGATE(now[prefix - 1]))
++		--prefix;
++	size_t suffix = 0;
++	while (suffix < now.size() - prefix && suffix < was.size() - prefix
++			&& now[now.size() - 1 - suffix] == was[was.size() - 1 - suffix])
++		++suffix;
++	if (suffix > 0 && IS_LOW_SURROGATE(now[now.size() - suffix]))
++		--suffix;
++	if (prefix + suffix == was.size()) {
++		request["typed"] = utf16ToUtf8(now.substr(prefix, now.size() - prefix - suffix).c_str());
++		lastComposition_ = now;
++	}
++	else {
++		onCompositionTerminated(true);  // the input method forgets its words: they are in the text
++		textService_->endComposition(session->context());
++		lastComposition_.clear();
++	}
++}
++
 +void Client::addSurroundingText(json& request, Ime::EditSession* session) {
 +	if (session == nullptr) {
 +		return;
 +	}
++	addOutsideText(request, session);
 +	std::wstring before, after, selected;
 +	if (textService_->surroundingText(session, before, after, 8000, &selected)) {  // composition.py AROUND
 +		request["textBefore"] = utf16ToUtf8(before.c_str());
@@ -311,7 +355,7 @@ index 0c7a8d5..7c3c275 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +559,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +596,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -325,7 +369,7 @@ index 0c7a8d5..7c3c275 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +568,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +605,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -343,7 +387,7 @@ index 0c7a8d5..7c3c275 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -442,6 +656,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+@@ -442,6 +693,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
  
  	json req = createRpcRequest("filterKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -363,27 +407,27 @@ index 0c7a8d5..7c3c275 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -455,9 +682,19 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -455,14 +719,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  	if (!ensureConnected()) {
  		return false;
  	}
-+	// Claudish: text the app or the system put into the composition (an Alt code typed while
-+	// composing, which reaches no input method): it stays, and the composition ends there; a new
-+	// composition string would have written over it.
-+	if (textService_->isComposing() && !lastComposition_.empty()
-+			&& textService_->compositionString(session) != lastComposition_) {
-+		onCompositionTerminated(true);  // the input method forgets its words: they are in the text
-+		textService_->endComposition(session->context());
-+		lastComposition_.clear();
-+	}
- 
+-
  	json req = createRpcRequest("onKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
 +	addSurroundingText(req, session);
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -490,6 +727,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+ 	if (handleRpcResponse(ret, session)) {
+-		return jsonValueOr<bool>(ret, "return", false);
++		bool taken = jsonValueOr<bool>(ret, "return", false);
++		if (taken)
++			keyEvent.useDeadKeyState();  // Claudish: a waiting accent goes with the key it was for
++		return taken;
+ 	}
+ 	return false;
+ }
+@@ -490,6 +757,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -391,7 +435,7 @@ index 0c7a8d5..7c3c275 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +767,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +797,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -420,7 +464,7 @@ index 0c7a8d5..7c3c275 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1057,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1087,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -430,7 +474,7 @@ index 0c7a8d5..7c3c275 100644
  	return pipeName;
  }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
-index feb9813..aa6584a 100644
+index feb9813..e0378b2 100644
 --- a/PIMETextService/PIMEClient.h
 +++ b/PIMETextService/PIMEClient.h
 @@ -92,6 +92,14 @@ public:
@@ -448,7 +492,7 @@ index feb9813..aa6584a 100644
  private:
  	void startAsyncConnect();
  	static std::wstring getPipeName(const wchar_t* baseName);
-@@ -119,6 +127,12 @@ private:
+@@ -119,6 +127,13 @@ private:
  	void updateKeyboardStatus(nlohmann::json& msg);
  	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
  	void updateUI(nlohmann::json& data);
@@ -457,11 +501,12 @@ index feb9813..aa6584a 100644
 +	// "textBefore"/"textAfter"/"textSelected": the text around the composition or the caret, and
 +	// the selection; "inputScopes": the kind of field.
 +	void addSurroundingText(nlohmann::json& request, Ime::EditSession* session);
++	void addOutsideText(nlohmann::json& request, Ime::EditSession* session);
 +	static void CALLBACK onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
  	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
  
  private:
-@@ -128,7 +142,12 @@ private:
+@@ -128,7 +143,12 @@ private:
  	std::shared_ptr<AsyncConnector> connector_;
  	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
  	unsigned int nextSeqNum_;
@@ -732,10 +777,18 @@ index 303cf17..a50bd9e 100644
  
  	HMENU popupMenu_{nullptr};
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..dc08444 100644
+index 400c374..47f3822 100644
 --- a/python/textService.py
 +++ b/python/textService.py
-@@ -90,12 +90,20 @@ class TextService:
+@@ -40,6 +40,7 @@ class KeyEvent:
+         self.repeatCount = msg["repeatCount"]
+         self.scanCode = msg["scanCode"]
+         self.isExtended = msg["isExtended"]
++        self.isDead = msg.get("isDead", False)  # Claudish: a dead key, its accent waiting for the next key
+         self.keyStates = msg["keyStates"]
+ 
+     def isKeyDown(self, code):
+@@ -90,12 +91,20 @@ class TextService:
              self.checkConfigChange()  # check if configurations are changed
  
          self.updateStatus(msg)
@@ -756,7 +809,7 @@ index 400c374..dc08444 100644
          elif method == "filterKeyUp":
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyUp(keyEvent)
-@@ -121,6 +129,8 @@ class TextService:
+@@ -121,6 +130,8 @@ class TextService:
          elif method == "onCompositionTerminated":
              forced = msg["forced"]
              self.onCompositionTerminated(forced)
@@ -765,7 +818,7 @@ index 400c374..dc08444 100644
          elif method == "onActivate":
              self.isActivated = True
              self.keyboardOpen = msg["isKeyboardOpen"]
-@@ -147,6 +157,9 @@ class TextService:
+@@ -147,6 +158,9 @@ class TextService:
      def onDeactivate(self):
          pass
  
@@ -775,7 +828,7 @@ index 400c374..dc08444 100644
      def filterKeyDown(self, keyEvent):
          return False
  
-@@ -176,6 +189,15 @@ class TextService:
+@@ -176,6 +190,15 @@ class TextService:
          self.commitString = ""
          self.compositionString = ""
  
@@ -791,7 +844,7 @@ index 400c374..dc08444 100644
      def onKeyboardStatusChanged(self, opened):
          pass
  
-@@ -249,6 +271,25 @@ class TextService:
+@@ -249,6 +272,25 @@ class TextService:
          self.showCandidates = show
          self.currentReply["showCandidates"] = show
  

@@ -365,6 +365,10 @@ class ClaudishTextService(TextService):
         # program sends, which a replay would not carry) are the system's, never taken.
         if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C, 0x90, 0x91, 0xE7) + SIDED_KEYS:
             return False
+        # A dead key is Windows' too: its accent waits for the next key, which brings the accented
+        # letter (é from ´ then e), and the composition goes on.
+        if getattr(event, "isDead", False):
+            return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
             if self.state.live:  # nothing is held back in continue mode
@@ -714,7 +718,17 @@ class ClaudishTextService(TextService):
     def handleRequest(self, msg):
         if msg.get("method") != "onCompositionTerminated":
             self.committed = False  # a commit of this request ends the composition: see below
+        if msg.get("typed"):
+            self.type_outside(msg["typed"])
         return super().handleRequest(msg)
+
+    def type_outside(self, text):
+        """What the app put into the composition at the cursor itself (an AltGr character, an Alt
+        code: TSF gives those keys to no input method), as if it was typed (Claudish's PIME)."""
+        for char in text:
+            if not self.state.insert(char):  # full: what is before the cursor goes in
+                self.setCommitString(self.state.make_room(char))
+        self.publish()
 
     def setCommitString(self, text):
         self.committed = True
