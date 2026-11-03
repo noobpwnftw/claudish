@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from claudish import modes
+from claudish.keys import claude_credential
 from claudish.model import Rewriter
 from claudish.server import make_server
 from serving import serving
@@ -105,9 +106,11 @@ class ClaudeBackendTests(unittest.TestCase):
         for backend in ("claude", "rules"):
             with serving(Rewriter(backend)) as server:
                 with urlopen("http://127.0.0.1:%s/health" % server.server_port) as reply:
-                    self.assertEqual(json.load(reply), {"service": "cd_AI", "backend": backend, "routes": {},
-                                                       "profile": None, "modes": ["rewrite", "continue", "instruct"],
-                                                       "timeout": 3, "keys": {"summon": "Shift+Enter"}, "hints": True})
+                    health = json.load(reply)
+                    self.assertIs(health.pop("key", None), {"claude": bool(claude_credential()[0])}.get(backend))
+                    self.assertEqual(health, {"service": "cd_AI", "backend": backend, "routes": {},
+                                              "profile": None, "modes": ["rewrite", "continue", "instruct"],
+                                              "timeout": 3, "keys": {"summon": "Shift+Enter"}, "hints": True})
 
 
 class EndpointBackendTests(unittest.TestCase):

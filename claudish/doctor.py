@@ -45,6 +45,14 @@ def check_config(state):
     return "ok", "profile %r (backend %s) from %s" % (name, settings["backend"], path), None
 
 
+def service_has_no_key():
+    """True when cd_AI's running service answers that it has no Claude key."""
+    try:
+        return fetch_json(SERVICE + "/health").get("key") is False
+    except Exception:  # not running: setup's service step says what it needs
+        return False
+
+
 def check_backend(state):
     settings = state.get("settings")
     if settings is None:
@@ -69,6 +77,10 @@ def check_backend(state):
             if claude_code():  # a Claude subscription works through it, without an API key
                 fix = "with a Claude subscription, pick Claude Code in cd_AI's settings (`claudish settings`); or " + fix
             return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", fix
+        source, variable = claude_credential()
+        if source == "environment" and service_has_no_key():
+            return "warn", "the Claude key is in %s here, and cd_AI's service does not have it" % variable, \
+                "save it with `claudish key` (a variable exported in a terminal does not reach a service started at login)"
         from .model import CLAUDE_MODEL
         return "ok", "Claude via the Anthropic SDK (%s)" % (settings.get("model") or CLAUDE_MODEL), None
     if backend in ("claude-code", "codex"):

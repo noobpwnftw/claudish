@@ -182,6 +182,18 @@ class ClaudeKeyChecks(unittest.TestCase):
             self.assertIn("pick Codex", self.check(None)[2])
 
 
+    def test_a_key_in_this_shell_only_is_not_the_services(self):
+        settings = {"backend": "claude", "model": "claude-opus-5-5"}
+        with patch.dict(sys.modules, {"anthropic": sys.modules.get("anthropic") or type(sys)("anthropic")}), \
+                patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-ant-shell"}):
+            for health, status in (({"backend": "claude", "key": False}, "warn"), ({"backend": "claude", "key": True}, "ok"),
+                                   (OSError("refused"), "ok")):  # not running: setup's service step says it
+                with patch.object(doctor, "fetch_json", side_effect=[health]):
+                    found = doctor.check_backend({"settings": settings})
+                self.assertEqual(found[0], status, found)
+            self.assertIn("claudish key", found[2] or "claudish key")
+
+
 class WarmBackendChecks(unittest.TestCase):
     """Claude Code and Codex, kept running by the service: their CLI, and their state in /health."""
 

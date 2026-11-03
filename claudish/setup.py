@@ -196,8 +196,10 @@ def step_service(settings):
     except Exception:
         pass
     what = "`claudish serve`"
-    if settings.get("api_key_env"):
-        what += "; it will need %s in the service manager's environment, not just your shell" % settings["api_key_env"]
+    from .keys import claude_credential
+    needed = settings.get("api_key_env") or settings["backend"] == "claude" and claude_credential()[1]
+    if needed:  # a variable of this shell only; `claudish key` saves a Claude key for the service
+        what += "; it will need %s in the service manager's environment, not just your shell" % needed
     return "todo", "start %s at every login" % what, lambda: service.run("install")
 
 

@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
 from .client import PORT
 from .composition import AROUND, MAX_COMPOSITION
+from .keys import claude_credential
 
 
 TEXTBOX_LIMIT = 200_000  # an instruction's text box, each side of the caret (the model sees a window)
@@ -294,6 +295,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     "keys": {"summon": rewriter.summon},
                     "hints": rewriter.hints,
                     **({"problem": rewriter.problem} if rewriter.problem else {}),
+                    # Whether this service has a Claude key: a terminal's variable may not reach it.
+                    **({"key": bool(claude_credential()[0])} if rewriter.backend == "claude" else {}),
                     **({"model": rewriter.model_state} if rewriter.model_state else {})}
 
         def post_settings(self):
