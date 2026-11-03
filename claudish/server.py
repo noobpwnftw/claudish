@@ -41,6 +41,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
     def swap():
         """The settings window's changes, from the next request on: every handler reads `rewriter`."""
         nonlocal rewriter
+        from .model import warm_key
         fresh = reload()
         fresh.url = rewriter.url
         # What is running goes on: sessions, each text box's conversation, the recent requests.
@@ -49,11 +50,14 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         same = (old.warm and fresh.warm and type(old.warm) is type(fresh.warm)
                 and (old.warm.command, old.warm.configured) == (fresh.warm.command, fresh.warm.configured)
                 and not old.warm.state.startswith("failed"))  # picked again after a failure: a new start
+        fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
+        routed = fresh.adoptable.pop(warm_key(fresh.warm), None) if fresh.warm and not same else None
         if same:  # the same model process goes on (a tone or a binding changed)
             fresh.warm, old.warm = old.warm, None
+        elif routed is not None:  # a profile it routed to is now the one in use: its process goes on
+            fresh.warm = routed
         else:
             fresh.start_model()
-        fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
         rewriter = fresh
         server.rewriter = fresh
         old.stop_model()

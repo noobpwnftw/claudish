@@ -103,6 +103,58 @@ class ModelServerTests(unittest.TestCase):
             fresh.stop_model()
         self.assertEqual(process_warm.state, "stopped")  # the service's stop ends it
 
+    def test_a_port_another_server_has_fails_and_is_not_started_again(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        class Health(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+        other = ThreadingHTTPServer(("127.0.0.1", 0), Health)  # a llama-server left running
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        url = "http://127.0.0.1:%d" % other.server_port
+        try:
+            server = warm.ModelServer([sys.executable, "-c", "raise SystemExit(1)"], url)
+            with patch.object(warm, "spawn", wraps=warm.spawn) as started:
+                server.start()
+                time.sleep(0.5)
+            self.assertTrue(server.state.startswith("failed: something already answers at %s" % url), server.state)
+            self.assertEqual(started.call_count, 0)
+        finally:
+            other.shutdown()
+            other.server_close()
+
+    def test_the_routed_local_model_becoming_the_one_in_use_goes_on(self):
+        from claudish.model import Rewriter
+        from claudish.server import make_server
+        command = [sys.executable, "-c", "import time; time.sleep(30)"]
+        local = lambda: Rewriter("llama", "http://127.0.0.1:9", command=command)
+        main = Rewriter("rules")
+        main.profile, main.loader = "main", lambda name: local()
+        routed = main.load("local").warm
+        routed.start()
+        fresh = local()
+        fresh.profile = "local"
+        import os
+        import tempfile
+        from urllib.request import urlopen
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            try:
+                os.utime(path, ns=(1, 1))  # an edit made "local" the profile in use
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertIs(fresh.warm, routed)  # taken up, not a second server on its port
+            finally:
+                fresh.stop_model()
+                server.shutdown()
+                server.server_close()
+
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
         self.assertEqual(argv[:7], ["/x/llama-server", "-m", "/m/gemma.gguf", "--host", "127.0.0.1", "--port", "18766"])

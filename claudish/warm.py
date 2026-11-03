@@ -369,6 +369,9 @@ class ModelServer:
         failed: started again it would only fail again."""
         import subprocess
         while not self.stopped.is_set():
+            if self.answers():  # another server has the port (one left running): this one could not listen
+                self.state = "failed: something already answers at %s (a llama-server still running?)" % self.url
+                return
             try:
                 process = spawn([os.path.expanduser(part) for part in self.command], "the local model",
                                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
