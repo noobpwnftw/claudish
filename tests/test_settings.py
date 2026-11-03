@@ -239,6 +239,38 @@ class SettingsTests(Home):
                 settings.apply({"server": server})
 
     @unittest.skipIf(sys.platform == "darwin", "the Keychain on macOS")
+    def test_a_key_with_a_stray_space_a_hand_edit_meanwhile_and_a_bad_request_save_nothing_wrong(self):
+        sent = []
+
+        def models(url, key=None):
+            sent.append(key)
+            return ["m1"] if key == "sk-good" else settings.UNAUTHORIZED
+        with patch.object(settings, "server_models", models):
+            settings.apply({"server": {"url": "https://api.example.com", "model": "m1", "key": "sk-good "},
+                            "choice": "server"})  # the key as pasted, with a space after it
+            self.assertNotIn("sk-good ", sent)  # checked as it is saved: stripped
+            # Another setting refused: the server key is not saved either.
+            with self.assertRaises(ValueError):
+                settings.apply({"server": {"url": "https://api.example.com", "model": "m1", "key": "sk-other"},
+                                "summon": "bad"})
+            self.assertEqual(keys.server_key("https://api.example.com"), "sk-good")
+
+            def edited_meanwhile(url, key=None):  # the check takes seconds; config.json is edited by hand
+                data = json.loads(self.path.read_text())
+                data["hints"] = False
+                self.path.write_text(json.dumps(data))
+                os.utime(self.path, ns=(1, 1))  # a different time, whatever the clock's resolution
+                return ["m1"]
+        with patch.object(settings, "server_models", edited_meanwhile):
+            with self.assertRaisesRegex(ValueError, "changed while"):
+                settings.apply({"server": {"url": "https://api.example.com", "model": "m1"}, "choice": "server",
+                                "tone": "critic"})
+        self.assertIs(self.written()["hints"], False)  # the edit by hand stays
+        self.assertNotIn("critic", self.path.read_text())
+        self.assertIn("plain letter", settings.server_problem("http://x", settings.KEY_CHARACTERS))
+        self.assertIn("not with a list of models", settings.server_problem("http://x", settings.NOT_MODELS))
+
+    @unittest.skipIf(sys.platform == "darwin", "the Keychain on macOS")
     def test_another_model_api_with_its_key_saved_for_its_address_only(self):
         sent = []
 

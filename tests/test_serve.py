@@ -24,6 +24,18 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Anthropic SDK", served[0].unavailable)
         self.assertIsNone(served[0].problem)  # the config reads: the settings window does not lock
 
+    def test_a_templates_path_of_another_computers_home_is_a_config_problem(self):
+        served = []
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text('{"profile": "rules", "profiles": {"rules": {"backend": "rules",'
+                            ' "templates": "~nobody-on-this-computer-zz/words.json"}}}')
+            with patch.object(sys, "argv", ["claudish", "serve", "--config", str(path)]), \
+                    patch.object(cli, "run_service", lambda rewriter, *rest: served.append(rewriter)), \
+                    patch("sys.stderr"):
+                cli.main()
+        self.assertIn("home folder", served[0].problem)
+
 
 if __name__ == "__main__":
     unittest.main()

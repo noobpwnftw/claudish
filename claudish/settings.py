@@ -181,6 +181,8 @@ def check_key(key):
 
 LOADING = "loading"  # server_models: the server answers, and is still loading its model
 UNAUTHORIZED = "unauthorized"  # server_models: it wants a (valid) API key
+KEY_CHARACTERS = "key characters"  # server_models: the key has characters an HTTP header cannot carry
+NOT_MODELS = "not models"  # server_models: it answered, but not with a model list
 
 
 def server_models(url, key=None):
@@ -199,6 +201,10 @@ def server_models(url, key=None):
         return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
     except HTTPError as exc:
         return LOADING if exc.code == 503 else UNAUTHORIZED if exc.code in (401, 403) else exc.code
+    except UnicodeError:  # before it was sent: a pasted key with a non-ASCII character
+        return KEY_CHARACTERS
+    except (ValueError, AttributeError):  # an answer that is not the JSON model list (a web page)
+        return NOT_MODELS
     except Exception:
         return None
 
@@ -226,6 +232,10 @@ def server_problem(url, models, model=None, key=None):
         return "%s answered %d to %s/v1/models%s" % (url, models, url.rstrip("/"), hint)
     if models == LOADING:
         return "the server at %s is still loading its model: try again in a moment" % url
+    if models == KEY_CHARACTERS:
+        return "the key has a character that is not a plain letter, digit or symbol: paste it again"
+    if models == NOT_MODELS:
+        return "%s answered, but not with a list of models at %s/v1/models" % (url, url.rstrip("/"))
     if model and models and model not in models:
         return "the server has no model %r; it has: %s" % (model, ", ".join(models))
     return None
@@ -247,6 +257,7 @@ def apply(changes, path=None):
     if not isinstance(changes, dict) or not set(changes) <= {"choice", "key", "server", "tone", "summon", "hints"}:
         raise ValueError("unknown setting")
     path = path or config.default_path()
+    before = path.stat().st_mtime_ns if path.is_file() else None
     data = read(path)
     profiles = data.setdefault("profiles", {})
     if "key" in changes:
@@ -276,12 +287,9 @@ def apply(changes, path=None):
         raise ValueError("unknown choice")
     if changes.get("choice") == "server" or ("server" in changes and in_use(data) == "server"):
         server = profiles.get("server") or config.STARTER["profiles"]["server"]
-        problem = check_server(server["model_url"], server.get("model"), changes.get("server", {}).get("key")
-                               if isinstance(changes.get("server"), dict) else None)
+        problem = check_server(server["model_url"], server.get("model"), server_key if "server" in changes else None)
         if problem:  # switching to a server that is not there would leave every rewrite failing
             raise ValueError(problem)
-    if "server" in changes and server_key:  # accepted by the server: saved for its address only
-        keys.store(server_key, keys.server_name(profiles["server"]["model_url"]))
     for choice, find, missing in (("claude-code", claude_code, NO_CLAUDE_CODE), ("codex", codex, NO_CODEX)):
         if changes.get("choice") == choice:
             command = find()
@@ -312,6 +320,11 @@ def apply(changes, path=None):
         data.pop("hints", None)
         if not changes["hints"]:
             data["hints"] = False
+    # The checks take seconds (a server, Anthropic): a hand edit meanwhile is not written over.
+    if (path.stat().st_mtime_ns if path.is_file() else None) != before:
+        raise ValueError("config.json changed while this was being saved (an edit by hand?): nothing was saved, try again")
+    if "server" in changes and server_key:  # accepted by the server: saved for its address only
+        keys.store(server_key, keys.server_name(profiles["server"]["model_url"]))
     if "key" in changes:  # saved once everything else is accepted
         keys.store(changes["key"])
     if set(changes) - {"key"} or not path.is_file():

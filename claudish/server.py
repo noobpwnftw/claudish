@@ -52,6 +52,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         """The settings window's changes, from the next request on: every handler reads `rewriter`."""
         nonlocal rewriter
         from .model import warm_key
+        read = stamp()  # before the files are read: an edit while the old model stops is still new
         fresh = reload()
         fresh.url = rewriter.url
         # What is running goes on: sessions, each text box's conversation, the recent requests.
@@ -73,7 +74,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         rewriter = fresh
         server.rewriter = fresh
         old.stop_model()
-        stamps[0] = stamp()
+        stamps[0] = read
 
     def stamp():
         """When the config folder's JSON files (config.json, templates.json) and the templates files
@@ -87,13 +88,13 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             profiles = json.loads(path.read_text(encoding="utf-8-sig")).get("profiles") or {}
             watched.update(path.parent / Path(entry["templates"]).expanduser() for entry in profiles.values()
                            if isinstance(entry, dict) and isinstance(entry.get("templates"), str))
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError, AttributeError, RuntimeError):  # RuntimeError: ~nobody/ in a path
             pass  # a config that does not read: its own file's change is enough
         found = []
         for each in watched:
             try:
                 found.append((str(each), each.stat().st_mtime_ns))
-            except OSError:
+            except (OSError, ValueError):  # ValueError: a NUL in a path
                 pass
         return tuple(sorted(found))
 

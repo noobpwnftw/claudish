@@ -110,7 +110,11 @@ def resolve(path=None, profile=None, overrides=None):
         settings["command"] = [os.path.expanduser(part) for part in command]
     templates = None
     if settings["templates"]:
-        templates_path = Path(settings["templates"]).expanduser()
+        try:
+            templates_path = Path(settings["templates"]).expanduser()
+        except RuntimeError:  # ~someone/ of a user this computer does not have
+            raise ValueError("the templates file %r names a home folder this computer does not have"
+                             % settings["templates"]) from None
         if not templates_path.is_absolute() and not (overrides or {}).get("templates"):
             templates_path = base / templates_path  # Paths in a profile are relative to the file.
         templates = invocation.load(templates_path)
