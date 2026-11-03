@@ -519,9 +519,11 @@ class ClaudishEngine(IBus.Engine):
         plain = not state & (IBus.ModifierType.SHIFT_MASK | IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK)
         steps = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end"}
         if keyval in steps and plain and self.composition.arrow(steps[keyval]):
+            self.composing = False  # a Compose key waiting is for the key right after it
             self.changed()  # ← → move in what you type, as a CJK composition does
             return True
         if keyval == IBus.KEY_Delete and plain and self.composition.delete():  # forward delete, at the cursor
+            self.composing = False
             self.changed()
             return True
         name = self.compose_key(keyval)
