@@ -76,15 +76,22 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         old.stop_model()
         # One nothing routes to any more (a binding or a mode's route removed): stopped now, not at
         # the next reload (a local model holds its memory meanwhile).
-        reachable = set()
-        for name in {b.profile for b in fresh.bindings if b.profile} | \
-                {spec["profile"] for spec in fresh.modes.values() if spec.get("profile")}:
+        def routes(each):  # a binding's profile, and a mode's: one bound to may route on (its own modes)
+            return {b.profile for b in each.bindings if b.profile} | \
+                {spec["profile"] for spec in each.modes.values() if spec.get("profile")}
+        reachable, seen, waiting = set(), {fresh.profile}, routes(fresh)
+        while waiting and fresh.loader:
+            name = waiting.pop()
+            if name in seen:
+                continue
+            seen.add(name)
             try:
-                other = fresh.loader(name) if fresh.loader and name != fresh.profile else None
+                other = fresh.loader(name)
             except Exception:
                 continue
-            if other is not None and other.warm:
+            if other.warm:
                 reachable.add(warm_key(other.warm))
+            waiting |= routes(other) - seen
         for key in [key for key in fresh.adoptable if key not in reachable]:
             fresh.adoptable.pop(key).stop()
         stamps[0] = read
@@ -238,7 +245,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             if session is None:
                 return self.reply(404, {"error": "no such session"})
             if parts[2] == "cancel":
-                session.cancel()
+                session.cancel(keep=data.get("keep") is True)
                 return self.reply(200, {"ok": True})
             if parts[2] != "answer":
                 return self.reply(404, {"error": "not found"})

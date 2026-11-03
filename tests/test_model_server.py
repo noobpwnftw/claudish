@@ -187,6 +187,44 @@ class ModelServerTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
 
+    def test_a_model_process_a_routed_profile_routes_on_to_goes_on_through_a_reload(self):
+        from claudish.context import Binding
+        from claudish.model import Rewriter
+        from claudish.server import make_server
+        import os
+        import tempfile
+        from urllib.request import urlopen
+        command = [sys.executable, "-c", "import time; time.sleep(30)"]
+
+        def loader(name):
+            if name == "big":  # bound to terminals; its own continue goes to "small"
+                big = Rewriter("rules", modes={"continue": {"profile": "small"}})
+                big.profile, big.loader = "big", loader
+                return big
+            small = Rewriter("llama", "http://127.0.0.1:9", command=command)
+            small.profile = "small"
+            return small
+
+        def build():
+            main = Rewriter("rules", bindings=[Binding({"app": "term*", "profile": "big"})])
+            main.profile, main.loader = "main", loader
+            return main
+        main, fresh = build(), build()
+        process = main.route("terminal", "continue").warm
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+            try:
+                os.utime(path, ns=(1, 1))
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertIs(fresh.route("terminal", "continue").warm, process)  # not stopped, not started cold
+            finally:
+                fresh.stop_model()
+                server.shutdown()
+                server.server_close()
+
     def test_a_new_local_model_command_starts_once_the_old_server_has_gone(self):
         import os
         import socket

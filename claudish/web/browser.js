@@ -15,7 +15,9 @@ function finish(mode, text, output) {
   // Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
   // end ("I " then "in fact" is not one).
   // "In" after "I", "We're" after "We"; never after a Chinese or Japanese character
-  const wordGoesOn = (at) => !WIDE.test(text.slice(-1) || " ") && /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));
+  const last = Array.from(text).pop() || " ";  // a whole character: 𠮷 is two UTF-16 units
+  const wordGoesOn = (at) => !WIDE.test(last) && !WIDE.test(Array.from(output.slice(at))[0] || " ")
+    && /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));
   const echo = text.trim();
   if (output.startsWith(text) && !(/[\p{L}\p{N}]$/u.test(text) && wordGoesOn(text.length))) output = output.slice(text.length);
   else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !wordGoesOn(echo.length)) {
@@ -32,7 +34,7 @@ function finish(mode, text, output) {
   // No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
   // goes on your last letter.
   const opened = /[—(\[“‘]$/.test(text) || (text.endsWith('"') && (text.split('"').length - 1) % 2 === 1);
-  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0])
+  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(last) || wide.test(Array.from(output)[0])
     || opened || /^\p{M}/u.test(output) ? "" : " ";
   return text + joiner + output;
 }

@@ -233,10 +233,9 @@ class Suggestions:
                 except Exception:
                     time.sleep(0.5)
             # The service never took it: the session ends, and the instruction says so (the summon
-            # key asks again), whatever else is pending. An inserted answer is in the text already,
-            # and kept: its session is not cancelled.
-            if session not in self.settling:
-                self._cancel(session)
+            # key asks again), whatever else is pending. An inserted answer is in the text already:
+            # kept if it reached the service (the session ended), else its session waits no more.
+            self._cancel(session, keep=session in self.settling)
             revision = self.revisions.get(session)
             if revision is not None:
                 self.deliver(revision, {"error": error, "session": session}, always=True)
@@ -358,9 +357,9 @@ class Suggestions:
         self._cancel(key)
         return True
 
-    def _cancel(self, key):
+    def _cancel(self, key, keep=False):
         try:
-            call(self.endpoint, "/sessions/%s/cancel" % key, {}, timeout=5)
+            call(self.endpoint, "/sessions/%s/cancel" % key, {"keep": True} if keep else {}, timeout=5)
         except Exception:
             pass
 

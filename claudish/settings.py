@@ -187,7 +187,8 @@ NOT_MODELS = "not models"  # server_models: it answered, but not with a model li
 
 def server_models(url, key=None):
     """The models an OpenAI-compatible server at url has, LOADING while it is still loading one
-    (llama.cpp answers 503 then), the HTTP status of another refusal, or None when nothing answers
+    (llama.cpp answers 503 then), the HTTP status of another refusal, NOT_MODELS for an answer that
+    is not a model list, KEY_CHARACTERS for a key a header cannot carry, or None when nothing answers
     there. key: its API key, if any (by default the one saved for this address)."""
     from urllib.error import HTTPError
     from urllib.request import Request
@@ -195,18 +196,22 @@ def server_models(url, key=None):
     key = key or keys.server_key(url)
     headers = {"Authorization": "Bearer " + key} if key else {}
     try:
+        (key or "").encode("latin-1")  # what an HTTP header can carry
+    except UnicodeError:
+        return KEY_CHARACTERS  # a pasted key with a character such as a non-breaking hyphen
+    try:
         with opener_for(url).open(Request(url.rstrip("/") + "/v1/models", headers=headers),
-                                                 timeout=5) as response:
-            listing = json.load(response)
-        return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
+                                  timeout=5) as response:
+            body = response.read(4 << 20)
     except HTTPError as exc:
         return LOADING if exc.code == 503 else UNAUTHORIZED if exc.code in (401, 403) else exc.code
-    except UnicodeError:  # before it was sent: a pasted key with a non-ASCII character
-        return KEY_CHARACTERS
-    except (ValueError, AttributeError):  # an answer that is not the JSON model list (a web page)
-        return NOT_MODELS
-    except Exception:
+    except Exception:  # nothing there, or an address that cannot be asked
         return None
+    try:  # it answered: a model list, or something else (a web page)
+        listing = json.loads(body)
+        return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
+    except (ValueError, AttributeError, TypeError):
+        return NOT_MODELS
 
 
 def listed(url, key=None):

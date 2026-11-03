@@ -14,7 +14,7 @@ const finish = new Function(src.slice(src.indexOf("const WIDE"), src.indexOf("\\
                             + "; return finish;")();
 console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([text, output]) => finish("continue", text, output))));
 """
-CASES = [["我今天", "我今天去了商店。"], ["日本", "日本語を勉強"], ["I", "In fact, yes"], ["We", "We're aligned"], ["aligned\u2014", "fully"], ['He said "', "hello"],
+CASES = [["東京でiPhone", "東京でiPhoneを買った。"], ["\U00020bb7", "\U00020bb7野家"], ["我今天", "我今天去了商店。"], ["日本", "日本語を勉強"], ["I", "In fact, yes"], ["We", "We're aligned"], ["aligned\u2014", "fully"], ['He said "', "hello"],
          ["(", "see below"], ["caf", "\u0301 time"], ["I ", "in fact, we are thrilled."], ["A ", "As a team, we ship."], ['She said "we are ', 'ready to launch."'],
          ["Dear Sam,", '"I hope this finds you well."'], ["hello ", "Hello, how are you today?"],
          ["Thanks for", "Thanks for the review."], ["我今天", "去了商店。"], ["It works", "—mostly."], ["Thanks", "  "],

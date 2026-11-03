@@ -308,6 +308,8 @@ class SessionTests(unittest.TestCase):
                 self.calls.append("take back")
         session = Session(Driver())
         session.emit("result", text="done")
+        session.cancel(keep=True)  # an inserted answer whose reply was lost: kept
+        self.assertEqual(Driver.calls, [])
         session.cancel()  # Esc as the answer arrived
         self.assertEqual(Driver.calls, ["take back"])
 

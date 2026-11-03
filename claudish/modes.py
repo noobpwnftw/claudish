@@ -143,7 +143,8 @@ def finish(mode, text, output):
 
     def word_goes_on(at):  # "In" after "I", "We're" after "We"; never after a Chinese or Japanese character
         after = output[at:at + 2]
-        return not is_wide(text[-1:] or " ") and (after[:1].isalnum() or after[:1] in "'’" and after[1:2].isalpha())
+        return not is_wide(text[-1:] or " ") and not is_wide(after[:1] or " ") \
+            and (after[:1].isalnum() or after[:1] in "'’" and after[1:2].isalpha())
     echo = text.strip()
     if output.startswith(text) and not (text[-1:].isalnum() and word_goes_on(len(text))):
         output = output[len(text):]
