@@ -39,6 +39,7 @@ try:
     # A dead key in continue: its accent waits at the caret, then goes on the letter.
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
     assert engine.composition.accent == "´"
+    assert engine.focus_mode() == IBus.PreeditFocusMode.CLEAR  # the accent alone: not typed when focus goes
     assert engine.do_process_key_event(ord("e"), 0, 0) and commits == ["é"], commits
     assert engine.composition.text == "ls -laé" and not engine.composition.accent
     commits.clear()

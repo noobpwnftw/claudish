@@ -207,8 +207,10 @@ class ClaudishEngine(IBus.Engine):
         a CJK input method's are; a sent instruction (or a reply to the model) is cleared, held with
         its exchange for Shift+Esc."""
         state = self.composition
-        # A waiting accent alone is not typed text: it goes with the focus, as the OS's own does.
-        return IBus.PreeditFocusMode.CLEAR if state.for_model or not state.shown else IBus.PreeditFocusMode.COMMIT
+        # A waiting accent alone is not typed text: it goes with the focus, as the OS's own does (in
+        # continue, your words are in the app already: the preedit is never typed text).
+        return IBus.PreeditFocusMode.CLEAR if state.for_model or state.live or not state.shown \
+            else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.composition.caret_after(self.around_caret()[1] if self.composition.live else "")
