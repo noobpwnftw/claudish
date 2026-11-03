@@ -6,6 +6,7 @@ or "skip" (not applicable here).
 import json
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -178,12 +179,12 @@ def check_ime_linux():
     component = user if user.is_file() else system if system.is_file() else None
     if component is None:
         return [("Input method", "fail", "the Claudish IBus component is not registered",
-                 "/usr/bin/python3 %s   (then log out and back in)" % INSTALL_PY)]
+                 "/usr/bin/python3 %s   (then log out and back in)" % shlex.quote(str(INSTALL_PY)))]
     text = component.read_text(encoding="utf-8", errors="replace")
     engine = text.split('&quot;')[1] if '&quot;' in text else ""
     if engine and not Path(engine).is_file():
         results.append(("Input method", "fail", "the registered engine %s no longer exists (moved checkout?)" % engine,
-                        "/usr/bin/python3 %s" % INSTALL_PY))
+                        "/usr/bin/python3 %s" % shlex.quote(str(INSTALL_PY))))
     else:
         results.append(("Input method", "ok", "registered (%s)" % component, None))
     if component == user:
@@ -194,11 +195,11 @@ def check_ime_linux():
                 results.append(("IBus search path", "warn",
                                 "set up in %s; it takes effect at your next login" % environment,
                                 "log out and back in; if your session ignores environment.d: "
-                                "sudo /usr/bin/python3 %s --system" % INSTALL_PY))
+                                "sudo /usr/bin/python3 %s --system" % shlex.quote(str(INSTALL_PY))))
             else:
                 results.append(("IBus search path", "fail",
                                 "this session's IBUS_COMPONENT_PATH does not include %s, so IBus cannot see Claudish" % user.parent,
-                                "/usr/bin/python3 %s, then log out and back in" % INSTALL_PY))
+                                "/usr/bin/python3 %s, then log out and back in" % shlex.quote(str(INSTALL_PY))))
         else:
             results.append(("IBus search path", "ok", "includes the user component directory", None))
     try:
@@ -237,7 +238,7 @@ def check_ime_windows():
         results.append(("Launcher", "ok", "serving its pipe", None))
     else:
         results.append(("Launcher", "fail", "cd_AI's launcher is not running",
-                        "start \"%s\" or sign out and back in" % (pime / "PIMELauncher.exe")))
+                        "start \"\" \"%s\" or sign out and back in" % (pime / "PIMELauncher.exe")))
     return results
 
 

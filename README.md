@@ -27,8 +27,8 @@ Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 Tap Shift to switch. Enter keeps your words as typed. [Keys and modes](docs/using.md).
 
 cd_AI ships no model. Claude is the default; Claude Code, Codex, any OpenAI-compatible server or
-an agent CLI work too, and [`claudish setup --profile local`](docs/install.md#the-claudish-command)
-downloads Gemma 4 E4B; continue suggests with it, or with a model a profile routes continue to.
+an agent CLI work too, and [`claudish setup --profile local`](docs/install.md#the-model)
+downloads Gemma 4 E4B (on Linux, or from a source checkout); continue suggests with it, or with a model a profile routes continue to.
 Context: files, commands and MCP servers, per app.
 
 ## Tones and templates
@@ -64,7 +64,7 @@ another model API, and pick a tone. Use **Try a rewrite** in Settings, then type
   Then log out and back in, and add **English → Claudish** in **Settings → Keyboard → Input
   Sources**.
 
-A local model instead: `claudish setup --profile local`. Details, uninstalling, and building from
+A local model instead, on Linux or from a source checkout: `claudish setup --profile local`. Details, uninstalling, and building from
 source: [docs/install.md](docs/install.md).
 
 

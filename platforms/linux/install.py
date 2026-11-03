@@ -11,6 +11,7 @@ draws cd_AI's panel and suggestion at the caret; it draws nothing unless cd_AI i
 import argparse
 import ast
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -113,7 +114,8 @@ def main():
         ENVIRONMENT.parent.mkdir(parents=True, exist_ok=True)
         ENVIRONMENT.write_text(component_path_setting(), encoding="utf-8")
         print("Added the user component directory to IBus's search path in", ENVIRONMENT)
-        print("If your session does not read environment.d, use `sudo %s --system` instead." % sys.argv[0])
+        print("If your session does not read environment.d, use `sudo /usr/bin/python3 %s --system` instead."
+              % shlex.quote(str(Path(__file__).resolve())))
         if shutil.which("gnome-shell"):
             if set_extension(True):
                 print("Installed and enabled the GNOME Shell extension", EXTENSION, "(it draws cd_AI's panel)")
