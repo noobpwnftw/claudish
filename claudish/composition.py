@@ -876,13 +876,18 @@ class Composition:
         self.edit(self.text[:at] + char + self.text[at:], self.back)
         return True
 
-    def make_room(self):
-        """The composition is full (insert said False): what is before the cursor goes in (returned,
-        for the adapter to commit), and the rest stays your composition, the cursor at its start,
-        so the next key lands where you are."""
+    def make_room(self, char):
+        """The composition is full (insert said False) and char was typed: what is before the cursor
+        goes in (returned, for the adapter to commit), and char lands where you are, before the rest,
+        which stays your composition. At its start, char and all of it go in, in that order."""
         at = len(self.text) - self.back
-        head, tail = (self.text[:at], self.text[at:]) if at else (self.text, "")
+        if not at:
+            head = char + self.text
+            self.edit("", 0)
+            return head
+        head, tail = self.text[:at], self.text[at:]
         self.edit(tail, len(tail))
+        self.insert(char)
         return head
 
     def backspace(self):

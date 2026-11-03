@@ -642,8 +642,7 @@ class ClaudishTextService(TextService):
         elif event.isPrintableChar():
             char = chr(event.charCode)
             if not self.state.insert(char):  # full: what is before the cursor goes in
-                self.setCommitString(self.state.make_room())
-                self.state.insert(char)
+                self.setCommitString(self.state.make_room(char))
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             # What is for the model never goes in: the exchange is held, as on a focus change.

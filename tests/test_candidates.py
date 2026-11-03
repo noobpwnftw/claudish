@@ -262,9 +262,12 @@ class ReceiveTests(unittest.TestCase):
         for _ in range(5):
             state.arrow(-1)
         self.assertFalse(state.insert("x"))  # full (512): what is before the cursor goes in
-        self.assertEqual(len(state.make_room()), 507)
-        state.insert("x")
+        self.assertEqual(len(state.make_room("x")), 507)
         self.assertEqual(state.text, "xWORLD")
+        state.change("a" * 511 + "Z")
+        state.arrow("home")
+        self.assertFalse(state.insert("X"))  # at its start: X, then all of it, in that order
+        self.assertEqual((state.make_room("X"), state.text), ("X" + "a" * 511 + "Z", ""))
         self.assertFalse(Composition.selectable("a paragraph\n"))  # a triple click's newline
         state.change("hello")
         self.assertTrue(state.arrow("home"))

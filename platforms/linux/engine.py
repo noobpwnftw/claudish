@@ -335,9 +335,8 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(text))
             return True
         for char in text:
-            if not self.composition.insert(char):
-                self.commit_text(IBus.Text.new_from_string(self.composition.make_room()))
-                self.composition.insert(char)
+            if not self.composition.insert(char):  # full: what is before the cursor goes in
+                self.commit_text(IBus.Text.new_from_string(self.composition.make_room(char)))
         self.changed()
         return True
 

@@ -703,7 +703,6 @@ class ClaudishInputController(IMKInputController):
             return True
         for char in text:
             if not self.state.insert(char):  # full: what is before the cursor goes in
-                client.insertText_replacementRange_(self.state.make_room(), (NSNotFound, 0))
-                self.state.insert(char)
+                client.insertText_replacementRange_(self.state.make_room(char), (NSNotFound, 0))
         self.changed(client)
         return True
