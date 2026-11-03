@@ -301,8 +301,10 @@ class ClaudishInputController(IMKInputController):
         if not ghost or self.state.inside:  # text after the caret on its line: nothing to cover it with
             OVERLAY.hide()
             return
-        if client is not None and self.around_caret(client)[0] != getattr(self, "asked_before", ""):
-            # A click moved the caret while it was asked for (no key says so): not for this spot.
+        before = self.around_caret(client)[0].replace("\r", "") if client is not None else ""
+        if before and not before.endswith(self.state.text.replace("\r", "")[-32:]):
+            # A click moved the caret while it was asked for (no key says so): the text before it is
+            # no longer what continue typed, so the suggestion is not for this spot (as on Windows).
             self.state.dismiss()
             OVERLAY.hide()
             return
@@ -449,9 +451,7 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def changed(self, client):
         self.state.field(terminal=is_terminal(self.app(client)))  # a terminal's command line is not prose
-        before, after = self.around_caret(client) if self.state.live else ("", "")
-        after = self.state.caret_after(after)
-        self.asked_before = before  # where continue asks from: its answer is for this spot only
+        after = self.state.caret_after(self.around_caret(client)[1] if self.state.live else "")
         trace("changed", self.state.mode, "asks" if self.state.automatic else "waits")
         if self.worker is not None and self.state.automatic:  # continue: what follows the caret too
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=self.app(client),

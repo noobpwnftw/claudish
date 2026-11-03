@@ -727,6 +727,7 @@ class MacOSAdapterTests(unittest.TestCase):
                                           characters=lambda: "o")
             fresh.handleEvent_client_(event, client)
             self.assertEqual(fresh.state.text, "Thanks for the review o")  # the app's text, then the key
+            client.text, client.mark_at = "Thanks for the review ", 22  # the o deleted: as continue now has it
             fresh.state.change("Thanks for the review ")
             fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
             fresh.changed(client)
