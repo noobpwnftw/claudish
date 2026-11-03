@@ -72,12 +72,15 @@ class Warm:
 
     def warm_up(self):
         with self.lock:
+            started = time.monotonic()
             try:
                 self.check_running()
                 self.launch()
                 self.exchange(self.words["ready"], 60)
                 self.finish()
             except Exception as exc:
+                if isinstance(exc, TimeoutError):  # no network, or a handshake that never came
+                    exc = "no answer within %d s" % round(time.monotonic() - started)
                 with self.lifecycle:
                     self.kill(force=True)
                     self.state = "stopped" if self.stopped.is_set() else "failed: %s" % (exc,)

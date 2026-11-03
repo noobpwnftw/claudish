@@ -781,6 +781,8 @@ class Composition:
         # Words set aside while a question was up come back to edit, as when it is answered.
         joined = self.reply + " " + self.waiting
         at = len(self.reply) - self.back - (len(joined) - len(joined.lstrip()))  # the cursor, in what stays
+        if not self.reply:
+            at = len(joined)  # nothing typed since: at the end of the words that come back
         self.reply, self.waiting = joined.strip(), ""
         self.back = len(self.reply) - max(0, min(len(self.reply), at))
         self.error = failure(error)

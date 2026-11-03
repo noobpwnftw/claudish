@@ -365,10 +365,6 @@ class ClaudishTextService(TextService):
         # program sends, which a replay would not carry) are the system's, never taken.
         if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C, 0x90, 0x91, 0xE7) + SIDED_KEYS:
             return False
-        # A dead key is Windows' too: its accent waits for the next key, which brings the accented
-        # letter (é from ´ then e), and the composition goes on.
-        if getattr(event, "isDead", False):
-            return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
             if self.state.live:  # nothing is held back in continue mode
@@ -377,6 +373,10 @@ class ClaudishTextService(TextService):
             # Mid-composition, take the key so onKeyDown commits the wording. Left to TSF, the
             # composition was discarded (Ctrl+A lost the typed text).
             return bool(self.state.text)
+        # A dead key is Windows' too: its accent waits for the next key, which brings the accented
+        # letter (é from ´ then e), and the composition goes on.
+        if getattr(event, "isDead", False):
+            return False
         if self.state.live:
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
@@ -393,6 +393,11 @@ class ClaudishTextService(TextService):
             # it changes nothing that a second run would change again).
             if event.keyCode not in (0x10, 0x14, 0x77):
                 self.drop_live()
+            return False
+        # An accent that does not combine with this key, then the key's own character ('t after ' on
+        # US-International): the app types both into the composition, and Claudish's PIME sends them
+        # as typed.
+        if getattr(event, "charCount", 1) > 1:
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()

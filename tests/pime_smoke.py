@@ -164,6 +164,15 @@ def main():
             key(0x08)
             # A dead key is Windows': its accent waits for the next key, and nothing is committed.
             assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
+            # The accent does not combine with t: the app types both, and they come back as typed.
+            assert key(ord("T"), 0, "filterKeyDown", charCount=2)["return"] is False
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "typed": "´t"})
+            assert reply["compositionString"] == "hello-world´t" and "commitString" not in reply, reply
+            key(0x08)
+            key(0x08)
+            # Ctrl with a dead key is a shortcut: the words are committed, the key replayed.
+            assert key(0xDD, method="filterKeyDown", modifiers=(0x11,), isDead=True)["return"] is True
+            assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
             assert key(ord("E"), 0xE9, "filterKeyDown")["return"]
             assert key(ord("E"), 0xE9)["compositionString"] == "hello-worldé"
             key(0x08)

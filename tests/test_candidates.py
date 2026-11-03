@@ -357,6 +357,8 @@ class ReceiveTests(unittest.TestCase):
         state.ask(state.revision, {"id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}]}, "s")
         state.fail(state.revision, "timed out")
         self.assertEqual(state.reply, "also cc bob")
+        state.insert("!")  # the cursor is at their end
+        self.assertEqual(state.reply, "also cc bob!")
 
     def test_tab_on_a_failed_instruction_does_not_rewrite_it(self):
         state = Composition()

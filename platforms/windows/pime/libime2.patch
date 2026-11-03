@@ -323,10 +323,10 @@ index 4e3c48e..2ba0913 100644
  
          categoryMgr->Release();
 diff --git a/src/KeyEvent.cpp b/src/KeyEvent.cpp
-index 80cdd48..cfcf55e 100644
+index 80cdd48..07f2d5c 100644
 --- a/src/KeyEvent.cpp
 +++ b/src/KeyEvent.cpp
-@@ -29,18 +29,23 @@ KeyEvent::KeyEvent(UINT type, WPARAM wp, LPARAM lp):
+@@ -29,18 +29,22 @@ KeyEvent::KeyEvent(UINT type, WPARAM wp, LPARAM lp):
      if(!::GetKeyboardState(keyStates_)) // get state of all keys
          ::memset(keyStates_, 0, sizeof(keyStates_));
  
@@ -351,9 +351,8 @@ index 80cdd48..cfcf55e 100644
 +    if (!(states[VK_MENU] & 0x80))
 +        states[VK_CONTROL] = states[VK_LCONTROL] = states[VK_RCONTROL] = 0;
 +    WCHAR result[4] = {0};
-+    int count = ::ToUnicode(keyCode_, scanCode(), states, result, 4, 0x4);
-+    charCode_ = (count == 1) ? (UINT)result[0] : 0;
-+    isDead_ = count < 0;
++    charCount_ = ::ToUnicode(keyCode_, scanCode(), states, result, 4, 0x4);
++    charCode_ = (charCount_ == 1) ? (UINT)result[0] : 0;
 +}
 +
 +void KeyEvent::useDeadKeyState() const {
@@ -363,16 +362,22 @@ index 80cdd48..cfcf55e 100644
  
  KeyEvent::~KeyEvent(void) {
 diff --git a/src/KeyEvent.h b/src/KeyEvent.h
-index fd320b7..df2b53a 100644
+index fd320b7..971a047 100644
 --- a/src/KeyEvent.h
 +++ b/src/KeyEvent.h
-@@ -46,6 +46,15 @@ public:
+@@ -46,6 +46,21 @@ public:
          return (charCode_ != 0);
      }
  
 +    // Claudish: a dead key (its accent waits for the next key, which brings the accented letter).
 +    bool isDead() const {
-+        return isDead_;
++        return charCount_ < 0;
++    }
++
++    // Claudish: how many characters the key types: 2 for a waiting accent that does not combine
++    // with it, then its own; -1 for a dead key.
++    int charCount() const {
++        return charCount_;
 +    }
 +
 +    // Claudish: a key the input method took never reaches the app's TranslateMessage, where a
@@ -382,7 +387,7 @@ index fd320b7..df2b53a 100644
      LPARAM lParam() const {
          return lParam_;
      }
-@@ -57,7 +66,7 @@ public:
+@@ -57,7 +72,7 @@ public:
  
      unsigned char scanCode() const {
          // bits 16-23
@@ -391,11 +396,11 @@ index fd320b7..df2b53a 100644
      }
  
      bool isExtended() const {
-@@ -81,6 +90,7 @@ private:
+@@ -81,6 +96,7 @@ private:
      UINT type_;
      UINT keyCode_;
      UINT charCode_;
-+    bool isDead_;
++    int charCount_;
      LPARAM lParam_;
      BYTE keyStates_[256];
  };

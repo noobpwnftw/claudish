@@ -206,7 +206,7 @@ class LifecycleTests(unittest.TestCase):
             with self.subTest(backend=backend.name), patch.object(backend, "exchange", side_effect=TimeoutError):
                 backend.warm_up()
                 self.assertFalse(backend.alive())
-                self.assertTrue(backend.state.startswith("failed:"))
+                self.assertTrue(backend.state.startswith("failed: no answer within"), backend.state)  # not "failed: "
 
     def test_stop_interrupts_an_inflight_request(self):
         for backend in self.backends():
