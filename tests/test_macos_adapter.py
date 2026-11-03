@@ -640,6 +640,24 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
+    def test_a_suggestion_shows_when_the_app_changed_what_was_typed(self):
+        client = TextClient("First line.")
+        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            for char in " teh ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49 if char == " " else 0,
+                                                                modifierFlags=lambda: 0, characters=lambda: char), client)
+            # The app changed it as typed (autocorrect, smart quotes): continue's own text is not its suffix.
+            client.text = client.text.replace("teh", "the")
+            fresh.changed(client)  # the next look, as the key's own does
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "results are in."})
+            fresh.poll()
+            self.assertEqual(self.module.OVERLAY.text, "results are in.")  # the caret did not move: shown
+        finally:
+            fresh.inputControllerWillClose()
+
     def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
         client = TextClient("keep this word")
         client.chosen = (5, 4)  # "this", selected in the app
