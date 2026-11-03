@@ -410,6 +410,9 @@ def main():
             again.state.change("decline politely")
             again.state.submit()
             again.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            import gc
+            del again  # PIME drops the closed instance: no longer live
+            gc.collect()
             third = ClaudishTextService(None)
             third.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
             third.keyboardOpen = True

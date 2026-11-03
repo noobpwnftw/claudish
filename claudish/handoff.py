@@ -131,7 +131,7 @@ def progress(handle, entries=4):
         pane = tmux_pane(handle["tmux"])
         if pane:
             from .screen import redact, tail
-            return "%s's window (%s), last lines:\n%s" % (handle["helper"], handle["tmux"], redact(tail(pane))[0])
+            return "%s's window (%s), last lines:\n%s" % (handle["helper"], handle["tmux"], tail(redact(pane)[0]))
     if said:
         return "%s, on the task \"%s\", last wrote at %s:\n%s" % (handle["helper"], handle["task"], last,
                                                               "\n".join(said[-entries:]))

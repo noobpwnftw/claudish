@@ -176,7 +176,8 @@ slow, so the profile's `timeout` applies (`/health` reports it).
 ## Apps: bindings
 
 The input method knows which app has focus. On Linux, IBus reports the program
-(`gtk3-im:thunderbird` arrives as `thunderbird`). On macOS it is the bundle identifier
+(`gtk3-im:thunderbird` arrives as `thunderbird`); in GNOME on Wayland it is the window's app id
+(`org.gnome.Terminal`, `org.mozilla.Thunderbird`). On macOS it is the bundle identifier
 (`com.apple.Terminal`); on Windows, the program file (`notepad.exe`). A binding
 matches apps by a case-insensitive glob and sets, for them, which profile answers
 (its backend, tone, tools and helper) and context the model gets there every time:
@@ -184,9 +185,9 @@ matches apps by a case-insensitive glob and sets, for them, which profile answer
 ```json
 {"profile": "claude", "profiles": {
   "claude": {"backend": "claude", "bindings": [
-    {"app": "thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
-    {"app": "slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
-    {"app": "gnome-terminal-server", "profile": "agent"}]},
+    {"app": "*thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
+    {"app": "*slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
+    {"app": "*terminal*", "profile": "agent"}]},
   "proofread": {"backend": "claude", "tone": "proofread"},
   "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
 ```

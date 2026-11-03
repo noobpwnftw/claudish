@@ -302,6 +302,8 @@ class ClaudishTextService(TextService):
         keylog("adopt", id(self), window, "found=%s" % (parked is not None))
         if parked is None or parked[1] is self.worker:
             return
+        if any(other is not self and getattr(other, "state", None) is parked[0] for other in list(INSTANCES)):
+            return  # parked at a click by an instance that goes on with it (another window of this app)
         del PARKED[window]
         state, worker, _ = parked
         if self.worker is not None:
@@ -445,8 +447,9 @@ class ClaudishTextService(TextService):
             # Your words are in the app already; the suggestion is cd_AI's own grey text after the
             # caret, and Tab takes it.
             self.setCompositionString("")
-            if self.state.ghost and not self.caret_stayed():  # a click moved the caret: not drawn over text
-                self.state.dismiss()
+            if self.state.ghost and not self.caret_stayed():  # a click (or the app's autocorrect) moved the text:
+                self.drop_live()  # not drawn over it, and continue starts again from the app's text
+                return
             self.drawn_ghost = "" if self.state.inside else self.state.ghost
             self.setGhost(self.drawn_ghost)
             self.setPanel(None)
@@ -787,6 +790,7 @@ class ClaudishTextService(TextService):
         """The app has the keyboard again (Claudish's PIME sends it in an edit session): an exchange
         held for this text box says so at once, rather than at the next key."""
         keylog("onSetFocus", getattr(self, "document", None))
+        self.taken_keys.clear()  # a key held while focus went: its key-up went elsewhere
         self.follow_document()
         self.field()  # this request carries the field's scopes: a key in a password field is not ours
         self.poll_results()  # what came while the app was in the background: the pill says it

@@ -934,15 +934,14 @@ class Composition:
         goes in (returned, for the adapter to commit), and char lands where you are, before the rest,
         which stays your composition. At its start, char and all of it go in, in that order."""
         at = len(self.text) - self.back
+        self.origin = ""  # what you typed goes into the app: no follow-up to go back from
         if not at:
             head = char + self.text
             self.edit("", 0)
-            self.origin = ""  # what you typed is in the app now: no follow-up to go back from
             return head
         head, tail = self.text[:at], self.text[at:]
         self.edit(tail, len(tail))
         self.insert(char)
-        self.origin = ""
         return head
 
     def backspace(self):

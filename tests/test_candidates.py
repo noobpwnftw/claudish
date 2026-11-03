@@ -1050,6 +1050,18 @@ class ModeFeelTests(unittest.TestCase):
         for _ in "shorter":
             emptied.backspace()
         self.assertEqual((emptied.text, emptied.origin), ("teh cat", ""))
+        full = Composition()  # a full follow-up after F8: its words go into the app, the old words do not come back
+        full.mode = "compose"
+        full.change("teh cat")
+        full.tab()
+        full.offer(full.revision, "The cat.")
+        for char in "a" * 512:
+            full.insert(char)
+        full.enter()
+        full.submit()
+        full.toggle_look()
+        self.assertFalse(full.insert("y"))
+        self.assertEqual((full.make_room("y"), full.text), ("a" * 512, "y"))
 
     def test_a_follow_up_on_a_rewrite_review_round(self):
         """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus

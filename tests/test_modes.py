@@ -234,6 +234,19 @@ class ModeTests(unittest.TestCase):
         self.assertNotIn("s3cret", text)
         self.assertIn("DB_PASSWORD=[redacted]", text)
         self.assertIn("fix token refresh", text)  # words about tokens are not tokens
+        for secret, gone in (("postgres://admin:hunter2secret@db/prod", "hunter2"), ("mysql -u root -pS3cretPass!", "S3cret"),
+                             ("curl -u alice:Sup3rS3cret https://x", "Sup3r"), ("--token abcdefghijklmnop1234", "abcdef"),
+                             ("-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBF\n-----END PGP PRIVATE KEY BLOCK-----", "lQOYBF"),
+                             ("glpat-abcdefghijklmnopqrst", "glpat")):
+            self.assertNotIn(gone, screen.redact(secret)[0], secret)
+        for plain in ("max_tokens: 4096 and tokens: 12", "Password:\n$ ls -la", "a basic internationalization guide",
+                      "mkdir -p /tmp/x"):
+            self.assertEqual(screen.redact(plain)[0], plain)  # ordinary text stays as it is
+        # Redacted whole, then cut: a key longer than the lines kept does not leak its body.
+        key = "-----BEGIN RSA PRIVATE KEY-----\n" + "\n".join("MIIG" + "A" * 60 for _ in range(45)) + "\n-----END RSA PRIVATE KEY-----"
+        with patch.object(screen, "read_atspi", return_value="$ cat id_rsa\n" + key + "\n$ "), \
+                patch.object(screen.sys, "platform", "linux"):
+            self.assertNotIn("MIIG", screen.read("gnome-terminal-server"))
         # At a password prompt the screen is not sent (what you compose there would be the secret).
         with patch.object(screen, "read_atspi", return_value="$ sudo apt update\n[sudo] password for ana: "), \
                 patch.object(screen.sys, "platform", "linux"):
