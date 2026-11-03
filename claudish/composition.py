@@ -1,5 +1,6 @@
 """Platform-neutral IME state. Keep compatible with PIME's Python 3.6+."""
 import copy
+import itertools
 import time
 import unicodedata
 
@@ -154,7 +155,7 @@ def failure(error):
 
 # What Shift+Esc does not take back from a held exchange: where the caret is now (a field, a
 # terminal) and the service's state (keys, hints, offline), besides the hold itself.
-KEPT_ON_RESTORE = ("holds", "here", "issued", "summon", "hints", "offline", "terminal", "quiet",
+KEPT_ON_RESTORE = ("holds", "here", "summon", "hints", "offline", "terminal", "quiet",
                    "inside", "dropped", "dropped_reply", "dropped_at", "dropped_box")
 
 def rows_of(text):
@@ -199,6 +200,11 @@ def blank(**shown):
                  "replying": False, "nudge": False, "column": False}, **shown)
 
 
+# Revisions from one counter, for every composition and the held copies of its exchanges: a held
+# exchange's own change never takes one the screen (or another box) is using.
+REVISIONS = itertools.count(1)
+
+
 def exchange(method=None, needs="working"):
     """A result for an exchange: the held one's goes to it (it goes on, out of sight); one for an
     older revision, or once nothing is waiting (needs: working, or a continue suggestion's text), is
@@ -210,6 +216,8 @@ def exchange(method=None, needs="working"):
         held = self.route(revision)
         if held is not None:
             getattr(held, method.__name__)(revision, *args, **kwargs)
+            if not held.for_model:  # it ended there (a helper took the task): nothing left to bring back
+                self.holds = {box: kept for box, kept in self.holds.items() if kept[0] is not held}
             return False
         if revision != self.revision or not getattr(self, needs):
             return False
@@ -225,7 +233,6 @@ class Composition:
         self.candidate = ""
         self.candidates = []  # every reading offered; candidate is the first
         self.revision = 0
-        self.issued = 0  # the last revision ever used: a held exchange coming back never reuses one
         self.mode = MODES[0]
         self.asked = None  # compose: what the pending or shown result is ("rewrite" or "instruct")
         self.working = False  # a rewrite or an instruction was asked for and its result is pending
@@ -307,8 +314,7 @@ class Composition:
         self.error = ""
         if not text:
             self.look = False  # one instruction at a time; never carried to the next
-        self.issued = max(self.issued, self.revision) + 1
-        self.revision = self.issued
+        self.revision = next(REVISIONS)
 
     @property
     def automatic(self):
@@ -365,7 +371,7 @@ class Composition:
     @property
     def cursor(self):
         """Where the cursor is in what the composition shows (← and → move it; at its end by default)."""
-        return len(self.shown) - (self.back if (self.reply or not self.answered) else 0)
+        return max(0, len(self.shown) - (self.back if (self.reply or not self.answered) else 0))
 
     def arrow(self, step):
         """← (-1), → (1), Home ("home") or End ("end") in what you are typing, as a CJK input method
@@ -636,7 +642,10 @@ class Composition:
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)
         if (self.candidates and self.asked == "instruct") or self.working or self.failed or self.question:
-            self.change(self.text)  # a new revision: a late answer for the old one is ignored
+            # A new revision: a late answer for the old one is ignored. Words set aside while a
+            # question was up go with the instruction you are back at, as an early follow-up does.
+            joined = " ".join(part for part in (self.text.strip(), self.waiting.strip()) if part)
+            self.change(joined if self.waiting.strip() and len(joined) <= MAX_COMPOSITION else self.text)
             self.editing = True  # the instruction is back at the caret; Esc again drops it
             return "back"
         self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
@@ -759,6 +768,7 @@ class Composition:
         self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
         # Words set aside while a question was up come back to edit, as when it is answered.
         self.reply, self.waiting = (self.reply + " " + self.waiting).strip(), ""
+        self.back = min(self.back, len(self.reply))  # stripped: the cursor stays in it
         self.error = failure(error)
         return True
 
@@ -941,7 +951,8 @@ class Composition:
         if self.live or not self.text:
             return False
         self.look = not self.look
-        self.change(self.text)
+        if not (self.answered and (self.reply or self.waiting)):  # a reply typed on the exchange stays: its next send
+            self.change(self.text)
         return True
 
     @exchange(needs="text")

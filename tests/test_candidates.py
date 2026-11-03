@@ -186,6 +186,43 @@ class ReceiveTests(unittest.TestCase):
             state.insert(char)
         self.assertEqual((state.enter(), state.text, state.about), ("submit", "shorter", "Sorry, Bob."))
 
+    def test_the_fuzzers_findings(self):
+        """Found by a random walk over the composition (round 8)."""
+        def sent(words):
+            state = Composition()
+            state.mode = "compose"
+            state.change(words)
+            state.enter()
+            state.submit()
+            return state
+        # A failure after a reply that loses its trailing space: the cursor stays in it (not -1).
+        state = sent("fix it")
+        for char in "and this ":
+            state.insert(char)
+        state.arrow("home")
+        state.fail(state.revision, "timed out")
+        self.assertTrue(0 <= state.cursor <= len(state.shown) and state.drawn_cursor >= 0)
+        # Esc on a question: the words set aside while it worked go with the instruction.
+        state = sent("fix it")
+        for char in "also the tests":
+            state.insert(char)
+        state.ask(state.revision, {"id": "q", "text": "Run them?", "choices": [{"label": "Yes"}]}, "s")
+        self.assertEqual((state.escape(), state.text), ("back", "fix it also the tests"))
+        # F8 with a reply typed keeps it, and the exchange.
+        state = sent("fix it")
+        for char in "and the docs":
+            state.insert(char)
+        self.assertTrue(state.toggle_look())
+        self.assertEqual((state.reply, state.working), ("and the docs", True))
+        # A held exchange that ends elsewhere (a helper took it) is not held any more.
+        state = sent("hand it to claude")
+        state.returned("A")
+        held = state.revision
+        state.leave("A")
+        state.done(held)  # a helper took the task
+        state.returned("A")
+        self.assertEqual((state.holds, state.held_pill()), ({}, None))
+
     def test_each_text_box_keeps_its_own_held_exchange(self):
         state = Composition()
         state.mode = "compose"
