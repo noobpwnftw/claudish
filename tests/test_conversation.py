@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from claudish import modes
 from claudish.conversation import Conversations, ModelDriver
 from claudish.model import Rewriter
 from claudish.sessions import Session
@@ -177,7 +178,7 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(len(question["choices"]), 2)  # no "for this conversation"
             session.answer(question["id"], text="not main, ever")
             thread.join(15)
-        self.assertEqual(results(model.sent[1])[-1], "denied by the user: not main, ever")
+        self.assertEqual(results(model.sent[1])[-1], "The user declined this tool call: not main, ever")
         self.assertEqual(session.events[-1]["text"], "Left main alone.")
 
     def test_cancel_releases_a_waiting_question(self):
@@ -357,7 +358,7 @@ class AskAndHelperTests(unittest.TestCase):
             asked, result = self.drive(model, [0], helper=["claude", "{prompt}"])  # 1 on screen: No
         launch.assert_not_called()
         self.assertEqual(result["text"], "make clean && make")
-        self.assertIn("denied by the user", results(model.sent[1])[-1])
+        self.assertIn(modes.TEMPLATES["box"]["declined"], results(model.sent[1])[-1])
 
     def test_a_model_question_cannot_pose_as_a_permission_or_collect_a_secret(self):
         model = Scripted(answer(calls=[("user__ask", {"question": "Allow claude.run?", "choices": ["Allow", "Deny"]})]),

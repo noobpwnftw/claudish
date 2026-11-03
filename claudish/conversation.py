@@ -122,7 +122,7 @@ class ModelDriver:
         box = rewriter.box("instruct", self.app, self.purpose, self.before, self.after, self.look, self.screen)
         box.draft = self.draft
         self.conversation.textbox = Textbox(self.before, self.after)
-        local = dict(self.conversation.textbox.tools() if box.clipped() else {})
+        local = dict(self.conversation.textbox.tools(rewriter.modes["instruct"]["box"]["textbox"]) if box.clipped() else {})
         local.update(self.own_tools(session, box))
         remembers = rewriter.loops() or rewriter.warm is not None  # Claude Code, Codex: earlier turns in one message
         self.handed = self.drafted = self.settled = None

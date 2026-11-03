@@ -390,6 +390,10 @@
     "the_call": "the call",
     "handoff": "Read the handoff note at {note} and work on the task in it.",
     "denied": "The user's profile denies this tool.",
+    "invalid_call": "error: unknown tool or invalid arguments",
+    "cli": {"about": "Claude Code's system prompt and Codex's base instructions (cd_AI's own prompt is the message), and the warm-up.",
+            "system": "Do exactly what the user's message asks. Output only the result, nothing else.",
+            "ready": "Reply with the single word: ready"},
     "declined": "The user declined this tool call.",
     "own": {
       "about": "Claudish's own tools for an instruction, their results, and what a settled turn says it did.",
@@ -412,7 +416,10 @@
     "textbox": {
       "instructions": "The text box the user is typing in, where your answer will be inserted at the caret. Read or search it when the instruction refers to its content.",
       "read": "Read part of the text box the user is writing in. Offsets are characters; the result says where the caret is.",
-      "search": "Find where words or a phrase occur in the text box; read around a result with read."
+      "search": "Find where words or a phrase occur in the text box; read around a result with read.",
+      "read_here": "Read part of the text box the user is writing in (the context shows only the text around the caret). Offsets are characters.",
+      "search_here": "Find where words or a phrase occur in the text box the user is writing in; read around a result with textbox__read.",
+      "agent": "The textbox tools (read, search) see all of it."
     },
     "output": "Output only the text itself: no preamble, notes, or quotes."
   }

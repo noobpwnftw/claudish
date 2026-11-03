@@ -63,7 +63,7 @@ class Toolbox:
         """name -> (trusted tools, denied tools): the same rule for an agent's permission requests."""
         return {name: (trust, deny) for name, trust, deny, _ in self.servers}
 
-    def run(self, ask, messages, approve=None, progress=None, local=None):
+    def run(self, ask, messages, approve=None, progress=None, local=None, words=None):
         """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).
         approve(server, tool, arguments, kind) -> (allowed, reason) is asked before each write or
         destructive call; without it those tools are not offered. progress(text) hears each call.
@@ -71,7 +71,11 @@ class Toolbox:
         tools served by Claudish itself (the text box, questions to the user, helpers): read-only
         unless kind says "write", and then asked about like any write, in the words of question
         (a function of the arguments) when given. MCP servers need the SDK; local tools do not.
+        words: what a refused or a broken call's result says (templates.json box, the profile's).
         Returns (the answer's content, consulted, messages with the tool calls and results appended)."""
+        if words is None:
+            from .modes import TEMPLATES
+            words = TEMPLATES["box"]
         from contextlib import ExitStack
         consulted, kinds, callers, offered, questions = [], {}, {}, [], {}
         spent = 0.0  # model and tool time; waiting for your answer does not count
@@ -137,7 +141,7 @@ class Toolbox:
                     except ValueError:
                         arguments = None
                     if kind is None or not isinstance(arguments, dict):
-                        result = "error: unknown tool or invalid arguments"
+                        result = words["invalid_call"]
                     else:
                         summary = "%s.%s(%s)" % (server, tool, ", ".join(
                             "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items()))
@@ -147,7 +151,7 @@ class Toolbox:
                             allowed, reason = (approve(server, tool, arguments, kind, question(arguments))
                                                if question else approve(server, tool, arguments, kind))
                         if not allowed:
-                            result = "denied by the user" + (": " + reason if reason else "")
+                            result = words["declined"].rstrip(".") + ": " + reason if reason else words["declined"]
                         else:
                             consulted.append(summary)
                             if progress:

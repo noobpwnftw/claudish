@@ -17,10 +17,12 @@ import time
 from .children import spawn
 from .shapes import ANSWER
 
+from .modes import TEMPLATES
+
 # The model's whole instruction is cd_AI's own prompt, sent as the message; this only keeps the
-# CLI from adding an agent's habits around it.
-NEUTRAL = "Do exactly what the user's message asks. Output only the result, nothing else."
-READY = "Reply with the single word: ready"
+# CLI from adding an agent's habits around it (templates.json box.cli).
+NEUTRAL = TEMPLATES["box"]["cli"]["system"]
+READY = TEMPLATES["box"]["cli"]["ready"]
 
 
 class Lines:

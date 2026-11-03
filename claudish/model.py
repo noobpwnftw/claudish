@@ -427,11 +427,12 @@ class Rewriter:
             words = self.modes["instruct"]["box"]
             context = box.describe("instruct", retrieval=bool(textbox), words=words)
             if textbox and (box.before or box.after):
-                context += " The textbox tools (read, search) see all of it."
+                context += " " + words["textbox"]["agent"]
             if box.observations:
                 context += "\n\n" + box.material("", words).strip()
             policy = self.toolbox.policy() if self.toolbox else {}
-            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy)
+            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy,
+                                    words=self.modes["instruct"]["box"])
         from .conversation import ModelDriver
         return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose, screen)
 
@@ -772,7 +773,7 @@ class Rewriter:
         if tools:
             from .tools import Toolbox
             first, called, with_tools = (self.toolbox or Toolbox([], {})).run(
-                ask, messages, approve=approve, progress=progress, local=local)
+                ask, messages, approve=approve, progress=progress, local=local, words=spec["box"])
         else:
             again = {"temperature": 0.9, "seed": 100 + take} if take else {}
             first = (ask(messages, None, **again).get("content") or "").strip()

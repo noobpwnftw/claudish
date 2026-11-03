@@ -133,11 +133,12 @@ class AgentProcess:
 class ClaudeCodeDriver:
     """One turn: the conversation's agent process, its events, and its permission questions."""
 
-    def __init__(self, command, timeout=300, agent=None, context="", policy=None):
+    def __init__(self, command, timeout=300, agent=None, context="", policy=None, words=None):
         self.agent = agent or AgentProcess(command)
         self.own = agent is None  # a process of its own (no conversation): closed after the turn
         self.timeout = timeout
         self.context = context  # the text box around the caret, sent with the instruction
+        self.words = words or TEMPLATES["box"]  # what a denied or declined call says (the profile's)
         self.policy = policy or {}  # profile tool servers: name -> (trusted tools, denied tools)
         self.pending = {}  # question id (request_id) -> the tool input to allow unchanged
         self.asks = {}  # request_id -> the agent's own questions (AskUserQuestion) and the answers so far
@@ -232,7 +233,7 @@ class ClaudeCodeDriver:
         trust, deny = self.policy.get(server, ((), ()))
         if (body.get("tool_name") or "").startswith("mcp__") and tool in deny:
             self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                       "response": {"behavior": "deny", "message": TEMPLATES["box"]["denied"]}}})
+                       "response": {"behavior": "deny", "message": self.words["denied"]}}})
             return
         if (body.get("tool_name") or "").startswith("mcp__textbox__") or \
                 ((body.get("tool_name") or "").startswith("mcp__") and tool in trust):
@@ -292,7 +293,7 @@ class ClaudeCodeDriver:
         if text is None and choice == 1:  # Allow, listed after the safe choice
             decision = {"behavior": "allow", "updatedInput": tool_input}
         else:  # Deny, or free text: the user's words go back to the agent as the reason
-            decision = {"behavior": "deny", "message": text or TEMPLATES["box"]["declined"]}
+            decision = {"behavior": "deny", "message": text or self.words["declined"]}
         self.send({"type": "control_response", "response": {
             "subtype": "success", "request_id": question, "response": decision}})
 

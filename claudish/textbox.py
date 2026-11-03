@@ -44,17 +44,15 @@ class Textbox:
             last = spot
         return "\n".join(found)
 
-    def tools(self):
-        """Local tools for claudish.tools.Toolbox.run."""
+    def tools(self, words):
+        """Local tools for claudish.tools.Toolbox.run, described in words (templates.json box.textbox)."""
         return {
             "textbox__read": (
-                "Read part of the text box the user is writing in (the context shows only the text "
-                "around the caret). Offsets are characters.",
+                words["read_here"],
                 {"type": "object", "properties": {"start": {"type": "integer"}, "length": {"type": "integer"}}},
                 lambda arguments: self.read(arguments.get("start", 0), arguments.get("length", 2000))),
             "textbox__search": (
-                "Find where words or a phrase occur in the text box the user is writing in; read around "
-                "a result with textbox__read.",
+                words["search_here"],
                 {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
                 lambda arguments: self.search(arguments.get("query", ""))),
         }
