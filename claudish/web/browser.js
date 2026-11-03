@@ -21,7 +21,9 @@ function finish(mode, text, output) {
       && (text.split('"').length - 1) % 2 === 0) output = output.slice(1, -1).trim();
   if (/[ \n]$/.test(text)) output = output.replace(/^[,;: ]+/, "");
   if (!output) return "";
-  const wide = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303F\uFF00-\uFF60]/u;  // CJK: no spaces
+  // Chinese and Japanese take no spaces between words (as modes.finish: wide, full-width or
+  // half-width, not a symbol); Korean does, and an emoji is spaced as a word.
+  const wide = /(?![\p{S}\p{Script=Hangul}])[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3000-\u303F\uFF00-\uFFEF]/u;
   const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || wide.test(text.slice(-1) || " ") || wide.test(output[0]) ? "" : " ";
   return text + joiner + output;
 }

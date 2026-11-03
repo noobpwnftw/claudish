@@ -16,7 +16,8 @@ console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([text, output]) => f
 """
 CASES = [["I ", "in fact, we are thrilled."], ["A ", "As a team, we ship."], ['She said "we are ', 'ready to launch."'],
          ["Dear Sam,", '"I hope this finds you well."'], ["hello ", "Hello, how are you today?"],
-         ["Thanks for", "Thanks for the review."], ["我今天", "去了商店。"], ["It works", "—mostly."], ["Thanks", "  "]]
+         ["Thanks for", "Thanks for the review."], ["我今天", "去了商店。"], ["It works", "—mostly."], ["Thanks", "  "],
+         ["Shipped it 🎉", "See you tomorrow."], ["Great", "👍 thanks"], ["ｱｲｳ", "test"], ["ok", "ﾃｽﾄ"], ["안녕하세요", "반갑습니다."]]
 
 
 @unittest.skipUnless(shutil.which("node"), "needs Node.js")

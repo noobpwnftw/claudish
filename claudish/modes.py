@@ -147,7 +147,10 @@ def finish(mode, text, output):
     if not output:
         return ""
     import unicodedata
-    wide = any(unicodedata.east_asian_width(c) in "WF" for c in (text[-1:] or " ", output[0]))  # CJK: no spaces
+    # Chinese and Japanese take no spaces between words; Korean does, and an emoji (wide, but a
+    # symbol) is spaced as a word.
+    wide = any(unicodedata.east_asian_width(c) in "WFH" and not unicodedata.category(c).startswith("S")
+               and not unicodedata.name(c, "").startswith("HANGUL") for c in (text[-1:] or " ", output[0]))
     joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide else " "
     return text + joiner + output
 

@@ -58,6 +58,8 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(modes.finish("continue", "Thanks for", "Thanks for the review."), "Thanks for the review.")
         self.assertEqual(modes.finish("continue", "Thanks", "  "), "")
         self.assertEqual(modes.finish("continue", "我今天", "去了商店。"), "我今天去了商店。")  # no space in CJK
+        self.assertEqual(modes.finish("continue", "안녕하세요", "반갑습니다."), "안녕하세요 반갑습니다.")  # Korean spaces words
+        self.assertEqual(modes.finish("continue", "Shipped it 🎉", "See you."), "Shipped it 🎉 See you.")  # an emoji too
         self.assertEqual(modes.finish("instruct", "say hi", "Hello—truly."), "Hello—truly.")
         # An echo of the text's last words (any case), quotes, and stray punctuation after a space.
         self.assertEqual(modes.finish("continue", "hello ", "Hello, how are you today?"), "hello how are you today?")
