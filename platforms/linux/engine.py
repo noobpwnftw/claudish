@@ -21,6 +21,11 @@ DEAD_KEYS = {"dead_grave": "`", "dead_acute": "´", "dead_circumflex": "^", "dea
              "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}  # their accents
 
 
+# The Compose key, then one of these: the dead key it stands for (Compose ' e is é, as IBus's own does).
+COMPOSE = {"'": "dead_acute", '"': "dead_diaeresis", "`": "dead_grave", "^": "dead_circumflex", "~": "dead_tilde",
+           ",": "dead_cedilla", "-": "dead_macron"}
+
+
 def with_accent(dead, char):
     """The character a dead key and the next key make (composition.accented)."""
     return accented(DEAD_KEYS[dead], char)
@@ -259,7 +264,9 @@ class ClaudishEngine(IBus.Engine):
     def live_key(self, keyval):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
         state = self.composition
-        name = IBus.keyval_name(keyval) or ""
+        name = self.compose_key(keyval)
+        if name is None:
+            return True
         if name in DEAD_KEYS:  # an accent waits for its letter, as in compose (drawn at the caret)
             if self.dead:  # the same one again types it alone; another takes its place
                 accent, self.dead = DEAD_KEYS[self.dead], (None if name == self.dead else name)
@@ -345,6 +352,18 @@ class ClaudishEngine(IBus.Engine):
                 self.commit_text(IBus.Text.new_from_string(self.composition.make_room(char)))
         self.changed()
         return True
+
+    def compose_key(self, keyval):
+        """The key's name, the Compose key's next key as the dead key it stands for; None for the
+        Compose key itself (taken: it waits for what follows)."""
+        name = IBus.keyval_name(keyval) or ""
+        if name == "Multi_key":
+            self.composing = True
+            return None
+        if getattr(self, "composing", False):
+            self.composing = False
+            return COMPOSE.get(IBus.keyval_to_unicode(keyval), name)
+        return name
 
     @property
     def dead(self):
@@ -493,7 +512,9 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_Delete and plain and self.composition.delete():  # forward delete, at the cursor
             self.changed()
             return True
-        name = IBus.keyval_name(keyval) or ""
+        name = self.compose_key(keyval)
+        if name is None:
+            return True
         if name in DEAD_KEYS:  # an accent waits for its letter
             if self.dead:
                 char = DEAD_KEYS[self.dead] if name == self.dead else None

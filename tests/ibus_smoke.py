@@ -160,6 +160,13 @@ try:
     engine.do_process_key_event(ord("e"), 0, 0)
     assert engine.composition.text == "e", engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # The Compose key: Compose ' e is é, in the composition, as a dead key's is.
+    for char in "caf":
+        engine.do_process_key_event(ord(char), 0, 0)
+    for keyval in (IBus.keyval_from_name("Multi_key"), ord("'"), ord("e")):
+        assert engine.do_process_key_event(keyval, 0, 0)
+    assert engine.composition.text == "café", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # An accent left waiting goes with the composition (a reset: a click, a focus change), not onto
     # the next letter.
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
