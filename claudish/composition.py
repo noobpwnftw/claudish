@@ -18,8 +18,10 @@ PROSE = (None, "name", "alpha")
 
 
 # A dead key's accent, as it types alone, and the mark it puts on the next letter.
-ACCENTS = {"`": "\u0300", "´": "\u0301", "^": "\u0302", "~": "\u0303", "¯": "\u0304", "˘": "\u0306",
-           "˙": "\u0307", "¨": "\u0308", "˚": "\u030a", "˝": "\u030b", "ˇ": "\u030c", "¸": "\u0327", "˛": "\u0328"}
+# (macOS gives Option+i and Option+n as the spacing modifier letters ˆ and ˜, not ^ and ~.)
+ACCENTS = {"`": "\u0300", "´": "\u0301", "^": "\u0302", "ˆ": "\u0302", "~": "\u0303", "˜": "\u0303",
+           "¯": "\u0304", "˘": "\u0306", "˙": "\u0307", "¨": "\u0308", "˚": "\u030a", "˝": "\u030b",
+           "ˇ": "\u030c", "¸": "\u0327", "˛": "\u0328"}
 
 
 def accented(accent, char):

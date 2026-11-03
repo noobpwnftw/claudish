@@ -49,6 +49,7 @@ MODE_TOAST = False  # macOS says the new input mode at the caret itself; cd_AI's
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
 PANEL = OVERLAY = TOAST = None  # one panel, overlay and toast for the server, shared by its controllers
+TOAST_TIMER = [None]  # the shared toast's hide timer: another text box's toast (or pill) replaces it
 
 
 def unpack(rect):
@@ -354,18 +355,19 @@ class ClaudishInputController(IMKInputController):
         if client is None or spec is None:  # nothing to say (hints off)
             return
         TOAST.show(self.caret(client, start=True), spec)
-        if getattr(self, "toast_timer", None) is not None:
-            self.toast_timer.invalidate()  # a newer toast gets its own two seconds
-            self.toast_timer = None
+        if TOAST_TIMER[0] is not None:
+            TOAST_TIMER[0].invalidate()  # a newer toast gets its own two seconds, a pill none (any text box's)
+            TOAST_TIMER[0] = None
         if lasting:  # a pill: until a key or a focus change ends it
             return
-        self.toast_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+        TOAST_TIMER[0] = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
             2.0, self, "hideToast:", None, False)
 
     @objc.signature(b"v@:@")
     def hideToast_(self, timer):
-        self.toast_timer = None
-        TOAST.hide()
+        if TOAST_TIMER[0] is timer or TOAST_TIMER[0] is None:
+            TOAST_TIMER[0] = None
+            TOAST.hide()
 
     @objc.python_method
     def hide_panel(self):
@@ -494,7 +496,7 @@ class ClaudishInputController(IMKInputController):
                 return True  # Backspace cancels the accent, and nothing else
             if chars and all(typeable(char) for char in chars):
                 chars = accented(accent, chars[0]) + chars[1:]  # é, not the e the key would type
-        if key == 48 and not flags & NSEventModifierFlagShift:  # Tab (Shift+Tab is the app's)
+        if key == 48 and not flags & (NSEventModifierFlagShift | NSEventModifierFlagOption):  # Tab (Shift+Tab, Option+Tab: the app's)
             ghost = state.take_ghost()
             if not ghost:
                 return False  # no suggestion: Tab is the app's
@@ -617,9 +619,9 @@ class ClaudishInputController(IMKInputController):
             return True
         if accent and not self.state.text:
             unmark(client)  # the accent alone was marked: it goes before the key does (Esc, Return, an arrow)
-        if key in (36, 76, 51) and flags & NSEventModifierFlagOption:
-            # Option+Return (a newline in chat apps) and Option+Backspace (delete a word) are the app's,
-            # as Alt with them is on Linux and Windows: your words go in first.
+        if key in (36, 76, 51, 48) and flags & NSEventModifierFlagOption:
+            # Option+Return (a newline in chat apps), Option+Backspace (delete a word) and Option+Tab (a
+            # tab in a table cell) are the app's, as Alt with them is on Linux and Windows: your words go in first.
             self.finish(client)
             return False
         shift = bool(flags & NSEventModifierFlagShift)

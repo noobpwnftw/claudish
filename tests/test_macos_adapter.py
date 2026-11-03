@@ -306,6 +306,12 @@ class MacOSAdapterTests(unittest.TestCase):
         self.type_text("hi")
         self.assertFalse(self.key(36, "\r", option))  # Option+Return: a newline, the app's
         self.assertEqual(self.client.commits, ["hello world", "hi"])
+        self.type_text("cell")
+        self.assertFalse(self.key(48, "\t", option))  # Option+Tab: a tab in a table cell, the app's
+        self.assertEqual((self.client.commits[-1], self.controller.state.working), ("cell", False))
+        self.assertTrue(self.key(45, "˜", option))  # Option+n on the U.S. layout: ˜ waits
+        self.assertTrue(self.key(45, "n"))
+        self.assertEqual(self.controller.state.text, "ñ")
 
     def test_shift_tab_commits_and_is_the_apps(self):
         self.type_text("draft")
