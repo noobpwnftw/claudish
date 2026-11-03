@@ -389,8 +389,10 @@ class ModelServer:
         self.stopped = threading.Event()
         self.guard = threading.Lock()  # the process, between run() and stop()
         self.process = None
+        self.ended = False  # stopped by its owner (the service, a settings switch): never retried
 
     def start(self):
+        self.ended = False
         self.stopped.clear()
         self.state = "starting"
         self.thread = threading.Thread(target=self.run, daemon=True)
@@ -435,8 +437,12 @@ class ModelServer:
                 self.state = "failed: the local model ended as it started (exit %s)" % process.returncode
                 return
             if not self.answers():
-                self.state = TIMED_OUT
-                self.stop()
+                with self.guard:  # with the stop, so retry() sees both or neither
+                    self.state = TIMED_OUT
+                    self.stopped.set()
+                    process, self.process = self.process, None
+                if process is not None:
+                    end(process)
                 return
             self.state = "warm"
             process.wait()
@@ -450,13 +456,14 @@ class ModelServer:
         reads the model from the disk cache); one that ended as it started, or a port in use, would
         only fail again."""
         with self.guard:
-            if self.state != TIMED_OUT:
+            if self.ended or self.state != TIMED_OUT:
                 return
             self.state = "starting"
         self.start()
 
     def stop(self):
         with self.guard:
+            self.ended = True
             self.stopped.set()
             process, self.process = self.process, None
         if process is not None:

@@ -63,6 +63,10 @@ class ModelServerTests(unittest.TestCase):
             server.retry()
             server.retry()  # a second request meanwhile: one start
             start.assert_called_once_with()
+            server.state = warm.TIMED_OUT
+            server.stop()  # its owner stopped it (a settings switch): a late request starts nothing
+            server.retry()
+            start.assert_called_once_with()
 
     def test_stopped_while_it_starts_it_is_not_left_running(self):
         started, spawn = [], warm.spawn
