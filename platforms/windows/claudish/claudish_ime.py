@@ -727,7 +727,10 @@ class ClaudishTextService(TextService):
         super().onKeyboardStatusChanged(opened)
         self.keyboardOpen = opened
         if not opened:  # as a focus change: your words go in, an open exchange is held
+            held = self.state.for_model
             words = self.state.leave(getattr(self, "last_document", None))
             if words:
                 self.setCommitString(words)
             self.changed()
+            if held:  # PIME ends the composition after this reply: the instruction is cleared, not kept
+                self.setClearOnEnd(True)

@@ -300,8 +300,15 @@ def main():
             reply = service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
             assert reply.get("commitString") == "ok" and not service.state.text, reply  # your words go in
             assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
-            # Requests carry the text around the caret, and an answer shows when it arrives.
+            # The keyboard closed with an instruction out: held, and cleared from the app's text.
             service.state.mode = "compose"
+            service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
+            service.state.change("make it formal")
+            service.state.submit()
+            reply = service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
+            assert reply.get("clearOnEnd") is True and service.state.held is not None, reply
+            service.state.held = None
+            # Requests carry the text around the caret, and an answer shows when it arrives.
             service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
             for char in "thanks":
                 key(ord(char.upper()), ord(char))
