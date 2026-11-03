@@ -75,6 +75,13 @@ class ClaudeBackendTests(unittest.TestCase):
         self.assertNotIn("fallbacks", self.sdk.calls[0])
         self.assertNotIn("betas", self.sdk.calls[0])
 
+    def test_the_modes_budget_is_sent(self):
+        rewriter = Rewriter("claude", templates={"modes": {"haiku": {"system": "Answer in a haiku.", "max_tokens": 60}}})
+        rewriter.rewrite("Ship it.", mode="haiku")
+        rewriter.rewrite("Ship it.", mode="continue")
+        self.assertEqual([call["max_tokens"] for call in self.sdk.calls],
+                         [60, modes.TEMPLATES["modes"]["continue"]["max_tokens"]])
+
     def test_refusal_truncation_and_empty_output_are_never_offered(self):
         rewriter = Rewriter("claude")
         for reply, message in [(response("", "refusal"), "declined"),

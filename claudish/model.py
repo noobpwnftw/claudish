@@ -117,7 +117,7 @@ class Claude:
                 options["tool_choice"] = {"type": "none"}
         try:
             # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
-            response = self.client.with_options(timeout=60.0).beta.messages.create(model=self.model, max_tokens=max(max_tokens, 1024),
+            response = self.client.with_options(timeout=60.0).beta.messages.create(model=self.model, max_tokens=max_tokens,
                                                         system=system, messages=conversation,
                                                         **options)
         except TypeError as exc:
@@ -136,12 +136,12 @@ class Claude:
         usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
         return {"message": reply, "finish_reason": finish}, usage
 
-    def rewrite(self, text, system, examples, image=None, intro=""):
-        """One request without tools: (the answer's content, usage)."""
+    def rewrite(self, text, system, examples, image=None, intro="", max_tokens=2048):
+        """One request without tools: (the answer's content, usage); max_tokens: the mode's budget."""
         options = self.options(shaped=True)
         try:
             response = self.client.beta.messages.create(
-                model=self.model, max_tokens=2048, system=system,
+                model=self.model, max_tokens=max_tokens, system=system,
                 messages=examples + [{"role": "user", "content": user_content(text, image, "claude", intro)}],
                 **options)
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
@@ -566,7 +566,8 @@ class Rewriter:
                 outputs = [self.warm.ask(one_message(prompt, sent, said, spec["box"]["one_message"], history),
                                           self.timeout)]
             elif self.claude and not (tools or history or conversation is not None):
-                output, usage = self.claude.rewrite(said, prompt, sent, box.image, spec["box"]["picture"])
+                output, usage = self.claude.rewrite(said, prompt, sent, box.image, spec["box"]["picture"],
+                                                    spec["max_tokens"] or 2048)
                 if not output:
                     raise RuntimeError("Claude returned no text")
                 outputs = [output]  # one request: alternatives would multiply the cost
