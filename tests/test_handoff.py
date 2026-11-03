@@ -24,6 +24,14 @@ class HelperDiscoveryTests(unittest.TestCase):
             line = handoff.line(["claude", "{prompt}"], "C:\\n.md")
             self.assertTrue(line.startswith(r"C:\\Users\\mei\\.local\\bin\\claude.exe "), line)
 
+    def test_on_windows_a_program_path_with_a_space_is_drafted_in_its_short_form(self):
+        with patch.object(handoff.shutil, "which", return_value=None), \
+             patch.object(handoff.os, "name", "nt"), \
+             patch.object(handoff, "short_path", return_value=r"C:\Users\JOHNSM~1\.local\bin\claude.exe"), \
+             patch.object(settings, "claude_code", return_value=r"C:\Users\John Smith\.local\bin\claude.exe"):
+            line = handoff.line(["claude", "{prompt}"], "C:\\n.md")
+        self.assertTrue(line.startswith(r"C:\Users\JOHNSM~1\.local\bin\claude.exe "), line)  # PowerShell runs it
+
     def test_a_program_found_nowhere_is_not_offered(self):
         with patch.object(handoff.shutil, "which", return_value=None), \
              patch.object(settings, "claude_code", return_value=None):

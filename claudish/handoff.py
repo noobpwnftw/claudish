@@ -225,11 +225,25 @@ def line(template, note, session=""):
     # A Windows service has your own PATH: a program it cannot find, your prompt cannot either (Claude
     # Code's installer leaves claude.exe off it), so the draft names it in full. Elsewhere your
     # shell's PATH has what a login service's lacks (~/.local/bin), and the name stays.
-    for argument in arguments(template, note, session, resolve=os.name == "nt"):
+    for index, argument in enumerate(arguments(template, note, session, resolve=os.name == "nt")):
         if UNSAFE.search(argument):
             return None
+        if index == 0 and os.name == "nt" and " " in argument:
+            argument = short_path(argument)  # quoted, PowerShell reads it as a string, not a command
         words.append('"%s"' % argument if " " in argument else argument)
     return " ".join(words)
+
+
+def short_path(path):
+    """Windows: the path's 8.3 form (no spaces: a command in PowerShell and cmd alike), or the path
+    itself where the volume has no short names."""
+    import ctypes
+    size = ctypes.windll.kernel32.GetShortPathNameW(path, None, 0)
+    if not size:
+        return path
+    buffer = ctypes.create_unicode_buffer(size)
+    ctypes.windll.kernel32.GetShortPathNameW(path, buffer, size)
+    return buffer.value or path
 
 
 def launch(template, note, launcher=None, session="", name=""):
