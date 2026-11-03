@@ -467,7 +467,10 @@ class ClaudishTextService(TextService):
 
     def onTimer(self):
         changed = self.poll_results()
-        if changed or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
+        away = getattr(self, "owner", None) and foreground() not in (None, self.owner)
+        if away:
+            pass  # another app is in front: nothing is drawn over it; onSetFocus shows it all on return
+        elif changed or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
             self.publish()  # an answer, a question, progress, or the pause for compose's keys
         # Still waiting: an instruction or rewrite that is working, or a suggestion not yet back.
         waiting = self.state.working or (not changed and time.monotonic() < getattr(self, "waiting_until", 0))
@@ -728,6 +731,8 @@ class ClaudishTextService(TextService):
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
             self.setToast(pill, PILL_SECONDS)
+        elif self.state.text:
+            self.publish()  # the panel as it is now (an answer that came meanwhile): Tab takes what you see
 
     def onKeyboardStatusChanged(self, opened):
         super().onKeyboardStatusChanged(opened)

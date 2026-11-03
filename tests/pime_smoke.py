@@ -395,6 +395,22 @@ def main():
                 notepad.handleRequest({"method": "onCompositionTerminated", "forced": True})
             assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
             ime.PARKED.pop(100)
+            # An answer that comes while another app is in front is not drawn over it, and shows on return.
+            with patch.object(ime, "foreground", return_value=100):
+                word = ClaudishTextService(None)
+                word.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                word.follow_document()
+            word.worker = MagicMock(offline=False, summon="Shift+Enter", **{"poll.return_value": None})
+            word.state.change("hello there")
+            word.state.tab()
+            word.worker.poll.return_value = (word.state.revision, {"text": "Greetings."})
+            with patch.object(ime, "foreground", return_value=200):  # Notepad is in front now
+                reply = word.handleRequest({"method": "onTimer", "seqNum": 9})
+            assert not reply.get("panel"), reply
+            word.worker.poll.return_value = None
+            with patch.object(ime, "foreground", return_value=100):
+                reply = word.handleRequest({"method": "onSetFocus"})
+            assert (reply.get("panel") or {}).get("body") == "Greetings.", reply
             # Back in a text box after a focus change: what waits there says so when the app has the
             # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
             back = ClaudishTextService(None)
