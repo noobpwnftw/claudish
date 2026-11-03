@@ -51,7 +51,8 @@ class ModelServerTests(unittest.TestCase):
                 time.sleep(0.05)
             time.sleep(1.2)  # a restart would have come by now
         self.assertEqual(server.state, "failed: the local model ended as it started (exit 3)")
-        self.assertEqual(started.call_count, 1)
+        # Its own starts only (another test's model thread may start one meanwhile).
+        self.assertEqual(sum(call.args[0][-1] == "raise SystemExit(3)" for call in started.call_args_list), 1)
 
     def test_a_model_that_loaded_too_slowly_starts_again_at_the_next_request(self):
         server = warm.ModelServer([sys.executable, "-c", "pass"], "http://127.0.0.1:9")

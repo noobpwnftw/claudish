@@ -414,9 +414,11 @@ class Composition:
         return True
 
     def edit(self, text, back):
-        """Your words changed at the cursor: a new composition, the cursor kept where it was."""
+        """Your words changed at the cursor: a new composition, the cursor kept where it was (and,
+        for a follow-up on a rewrite, your words before it)."""
+        origin = getattr(self, "origin", "")  # (none before the first change)
         self.change(text)
-        self.back = back
+        self.origin, self.back = origin, back
 
     def panel(self):
         """What the panel next to the caret shows, the same for every adapter and the demo
@@ -795,7 +797,12 @@ class Composition:
         and the instruction is finished."""
         # Words you typed meanwhile stay at the caret, a composition of their own (Shift+Enter
         # sends them as the next instruction in this conversation).
-        self.change((self.reply.strip() + " " + self.waiting).strip() if self.waiting else self.reply.strip())
+        typed = (self.reply.strip() + " " + self.waiting).strip() if self.waiting else self.reply.strip()
+        if self.origin and self.text != self.origin:  # a follow-up on a rewrite: back to your words, as Esc
+            # (past the cap too: words are kept over it rather than cut, as fail() keeps them)
+            self.change(" ".join(part for part in (self.origin.strip(), typed) if part))
+        else:
+            self.change(typed)
         return True
 
     @exchange
@@ -988,7 +995,10 @@ class Composition:
         if self.asked == "rewrite" and self.working:
             self.converted = True  # you asked with Tab: it shows in the panel as it arrives
         self.working = False
-        self.question, self.status = None, ""
+        self.question, self.status, self.queued = None, "", []  # the turn is over: its questions with it
+        if self.waiting:  # words set aside while a question was up come back, as when it is answered
+            self.reply, self.waiting = " ".join(p for p in (self.reply.strip(), self.waiting.strip()) if p), ""
+            self.back = 0
         if self.nudged == self._pending() and self.asked == "instruct":
             self.nudged = self._showing()  # Enter was pressed while they came, and nothing since
         return True
@@ -1049,6 +1059,7 @@ class Composition:
         if self.for_model:  # a sent instruction, or a follow-up typed on a rewrite: held, as it is
             held = copy.copy(self)
             held.holds = {}
+            held.accent = ""  # an accent waiting for its letter goes with the focus, not with the exchange
             box = self.here if app is None else app  # a Shift tap: held for the box you are in
             self.holds.pop(box, None)
             while len(self.holds) >= HOLDS:  # the oldest goes (its agent session with it)

@@ -995,6 +995,49 @@ class ModeFeelTests(unittest.TestCase):
         fresh.insert("!")
         self.assertEqual(fresh.text, "hi team!")
 
+    def test_fuzzer_round_16(self):
+        """A waiting accent held with an exchange; words set aside when drafts come while a question
+        shows; a follow-up on a rewrite that ends done, or edited after F8, keeps your words."""
+        held = Composition()
+        held.mode = "compose"
+        held.returned("A")
+        held.change("fix it")
+        held.enter()
+        held.submit()
+        held.accent = "\u00b4"  # a dead key, then focus goes
+        held.leave("A")
+        held.returned("A")
+        held.restore()
+        self.assertEqual(held.accent, "")  # not onto the next letter
+        aside = Composition()
+        aside.mode = "compose"
+        aside.change("fix the tests")
+        aside.enter()
+        aside.submit()
+        for char in "and the docs":
+            aside.insert(char)
+        aside.receive(aside.revision, {"question": {"id": "p1", "text": "Allow?", "body": "Allow?", "permission": True,
+                                                    "choices": [{"label": "Deny"}, {"label": "Allow"}]}, "session": "s"})
+        aside.receive(aside.revision, {"text": "Fixed.", "candidates": ["Fixed."], "session": "s"})
+        self.assertEqual((aside.reply, aside.waiting), ("and the docs", ""))
+        for ends in ("done", "f8"):
+            state = Composition()
+            state.mode = "compose"
+            state.change("running late")
+            state.tab()
+            state.offer(state.revision, "Running late—regrettably.")
+            for char in "shorter":
+                state.insert(char)
+            state.enter()
+            state.submit()
+            if ends == "done":
+                state.done(state.revision)
+                self.assertEqual(state.text, "running late")  # back to your words, as Esc
+            else:
+                state.toggle_look()
+                state.insert("!")
+                self.assertEqual((state.escape(), state.text), ("back", "running late"))
+
     def test_a_follow_up_on_a_rewrite_review_round(self):
         """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus
         change with a follow-up typed, a retried follow-up's draft."""
