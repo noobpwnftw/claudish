@@ -57,6 +57,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         elif routed is not None:  # a profile it routed to is now the one in use: its process goes on
             fresh.warm = routed
         else:
+            if old.warm:  # ended first: a local model's new server needs the port the old one has
+                old.warm.stop()
             fresh.start_model()
         rewriter = fresh
         server.rewriter = fresh

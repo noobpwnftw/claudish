@@ -146,6 +146,44 @@ class ModelServerTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
 
+    def test_a_new_local_model_command_starts_once_the_old_server_has_gone(self):
+        import os
+        import socket
+        import tempfile
+        from urllib.request import urlopen
+        from claudish.model import Rewriter
+        from claudish.server import make_server
+        slow = FAKE_LLAMA.replace("HTTPServer((", "import os, signal\nsignal.signal(signal.SIGTERM, lambda *a: "
+                                  "threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start())\nHTTPServer((")
+        slow = "import threading, time\n" + slow  # it answers a while after it is asked to end
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        url = "http://127.0.0.1:%d" % port
+        old = Rewriter("llama", url, command=[sys.executable, "-c", slow, str(port)])
+        old.start_model()
+        fresh = Rewriter("llama", url, command=[sys.executable, "-c", slow, str(port), "another model"])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(old, 0, reload=lambda: fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+            try:
+                deadline = time.monotonic() + 5
+                while old.model_state != "warm" and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                os.utime(path, ns=(1, 1))  # the edit gives the model another command
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=10).close()
+                deadline = time.monotonic() + 5
+                while fresh.model_state != "warm" and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                self.assertEqual(fresh.model_state, "warm")  # not "something already answers"
+            finally:
+                fresh.stop_model()
+                fresh.warm.thread.join(5)
+                server.shutdown()
+                server.server_close()
+
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
         self.assertEqual(argv[:7], ["/x/llama-server", "-m", "/m/gemma.gguf", "--host", "127.0.0.1", "--port", "18766"])
