@@ -599,6 +599,13 @@ class ClaudishInputController(IMKInputController):
         if accent and key == 51:
             self.changed(client)
             return True
+        if accent and not self.state.text:
+            unmark(client)  # the accent alone was marked: it goes before the key does (Esc, Return, an arrow)
+        if key in (36, 76, 51) and flags & NSEventModifierFlagOption:
+            # Option+Return (a newline in chat apps) and Option+Backspace (delete a word) are the app's,
+            # as Alt with them is on Linux and Windows: your words go in first.
+            self.finish(client)
+            return False
         shift = bool(flags & NSEventModifierFlagShift)
         if key in (36, 76) and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing

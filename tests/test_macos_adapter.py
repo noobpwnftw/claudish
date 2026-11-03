@@ -289,6 +289,19 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.commits, ["Hi-"])
         self.assertEqual(self.controller.state.mode, "compose")
 
+    def test_option_keys_and_a_lone_accent_are_the_apps(self):
+        option = 1 << 19
+        self.assertTrue(self.key(14, "´", option))  # Option+e with nothing composed: the accent, marked
+        self.assertEqual(self.client.marked, "´")
+        self.assertFalse(self.key(53))  # Esc: the accent goes, and the key is the app's
+        self.assertEqual(self.client.marked, "")
+        self.type_text("hello world")
+        self.assertFalse(self.key(51, "", option))  # Option+Backspace: delete a word, the app's
+        self.assertEqual(self.client.commits, ["hello world"])
+        self.type_text("hi")
+        self.assertFalse(self.key(36, "\r", option))  # Option+Return: a newline, the app's
+        self.assertEqual(self.client.commits, ["hello world", "hi"])
+
     def test_shift_tab_commits_and_is_the_apps(self):
         self.type_text("draft")
         self.assertFalse(self.key(48, "\x19", 1 << 17))  # Shift+Tab: back a field, as Linux and Windows do
