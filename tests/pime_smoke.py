@@ -100,6 +100,11 @@ def main():
             reply = key(9, modifiers=(0x10,))
             assert reply.get("commitString") == "draft" and not service.state.working, reply
             assert replayed.pop() == (9, [0x10])  # the app gets Shift+Tab
+            # The caret goes to PIME in characters (it makes TSF's UTF-16 offset itself): ← after an emoji.
+            service.state.change("\U0001F600 ab")
+            reply = key(0x25)
+            assert reply.get("compositionCursor") == 3, reply
+            key(0x1B)  # Esc: dropped
             # Tab on a selection with nothing composed: the selection becomes your words, as if just typed.
             words = "thanks for the help"
             assert key(9, method="filterKeyDown", textSelected=words)["return"] is True

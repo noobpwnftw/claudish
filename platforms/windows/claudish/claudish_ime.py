@@ -411,8 +411,8 @@ class ClaudishTextService(TextService):
         self.setClearOnEnd(self.state.for_model)
         shown = self.state.shown  # your words (a rewrite waits in the panel for Tab)
         self.setCompositionString(shown)
-        # TSF cursor offsets count UTF-16 code units; the cursor is where ← and → left it.
-        self.setCompositionCursor(len(shown[:self.state.cursor].encode("utf-16-le")) // 2)
+        # The cursor, where ← and → left it, in characters: PIME turns it into TSF's UTF-16 offset.
+        self.setCompositionCursor(self.state.cursor)
         panel = self.state.panel()
         self.setPanel(panel)
         # The rows also go to TSF's candidate list, for apps that draw candidates themselves.
