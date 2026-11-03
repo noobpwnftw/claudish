@@ -38,11 +38,12 @@ def typeable(char):
 
 
 def joins(char):
-    """A code point that belongs to the character before it: a combining mark, a variation
-    selector, a skin tone, a tag, or the joiner itself."""
+    """A code point that belongs to the character before it: a mark (combining, spacing as a
+    Devanagari vowel sign, or enclosing as a keycap's), a variation selector, a skin tone, a tag, or
+    the joiner itself."""
     point = ord(char)
-    return bool(unicodedata.combining(char)) or char in "\ufe0e\ufe0f\u200d" or 0x1F3FB <= point <= 0x1F3FF \
-        or 0xE0020 <= point <= 0xE007F
+    return unicodedata.category(char) in ("Mn", "Mc", "Me") or char in "\ufe0e\ufe0f\u200d" \
+        or 0x1F3FB <= point <= 0x1F3FF or 0xE0020 <= point <= 0xE007F or 0xE0100 <= point <= 0xE01EF
 
 
 def regional(char):

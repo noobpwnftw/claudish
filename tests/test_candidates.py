@@ -264,6 +264,10 @@ class ReceiveTests(unittest.TestCase):
             state.insert(char)
         state.backspace()
         self.assertEqual(state.text, "ok ")  # the emoji with its skin tone, as one
+        for cluster in ("1\ufe0f\u20e3", "\u845b\U000E0100", "a\u20dd", "\u0915\u0941", "\u0915\u093e"):
+            state.change("ok " + cluster)  # a keycap, an ideographic variant, an enclosing mark, Devanagari signs
+            state.backspace()
+            self.assertEqual(state.text, "ok ", repr(cluster))
         state.change("")
         for char in "a" * 507 + "WORLD":
             state.insert(char)
