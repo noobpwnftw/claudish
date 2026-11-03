@@ -328,10 +328,26 @@ class ClaudishEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(text))
         self.changed()  # after it: words that stay are the next composition
 
+    def type_in(self, text):
+        """What a key typed (an accent with it): to the app when it all passes (punctuation with
+        nothing composed), else into the composition; full, what is before the cursor goes in first."""
+        if all(self.composition.passes(char) for char in text):
+            self.commit_text(IBus.Text.new_from_string(text))
+            return True
+        for char in text:
+            if not self.composition.insert(char):
+                self.commit_text(IBus.Text.new_from_string(self.composition.make_room()))
+                self.composition.insert(char)
+        self.changed()
+        return True
+
     @property
     def dead(self):
-        """The dead key whose accent waits for its letter (drawn in the composition), or None."""
-        return getattr(self, "_dead", None)
+        """The dead key whose accent waits for its letter (drawn in the composition), or None: gone
+        with the composition's accent, which every change clears (a focus change, a reset, a Shift
+        tap, a result), so it never lands on a letter typed later."""
+        name = getattr(self, "_dead", None)
+        return name if name and self.composition.accent == DEAD_KEYS[name] else None
 
     @dead.setter
     def dead(self, name):
@@ -478,27 +494,16 @@ class ClaudishEngine(IBus.Engine):
                 char = DEAD_KEYS[self.dead] if name == self.dead else None
                 self.dead = None if char else name
                 if char:
-                    self.composition.insert(char)
-                    self.changed()
+                    return self.type_in(char)
             else:
                 self.dead = name
             self.render()  # the accent shows where it waits
             return True
         char = IBus.keyval_to_unicode(keyval)
         if self.dead and char:
-            char, self.dead = with_accent(self.dead, char), None
-            if len(char) > 1:  # no such letter: the accent, then the key
-                self.composition.insert(char[0])
-                char = char[1:]
-        if typeable(char) and self.composition.passes(char):  # not Delete's DEL, nor another control
-            self.commit_text(IBus.Text.new_from_string(char))
-            return True
-        if typeable(char):
-            if not self.composition.insert(char):  # full: what is before the cursor goes in
-                self.commit_text(IBus.Text.new_from_string(self.composition.make_room()))
-                self.composition.insert(char)
-            self.changed()
-            return True
+            char, self.dead = with_accent(self.dead, char), None  # no such letter: the accent, then the key
+        if char and all(typeable(each) for each in char):  # not Delete's DEL, nor another control
+            return self.type_in(char)
         self.finish()
         return False
 

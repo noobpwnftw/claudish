@@ -157,6 +157,18 @@ try:
     engine.do_process_key_event(ord("e"), 0, 0)
     assert engine.composition.text == "e", engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # An accent left waiting goes with the composition (a reset: a click, a focus change), not onto
+    # the next letter.
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    engine.do_reset()
+    engine.do_process_key_event(ord("e"), 0, 0)
+    assert engine.composition.text == "e", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # The accent and punctuation with nothing composed go to the app, as the punctuation alone would.
+    count = len(commits)
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.do_process_key_event(ord(","), 0, 0)
+    assert commits[count:] == ["´,"] and not engine.composition.text, (commits[count:], engine.composition.text)
     # Shift+Esc while composing brings nothing back, and drops nothing.
     for char in "keep me":
         engine.do_process_key_event(ord(char), 0, 0)
