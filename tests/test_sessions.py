@@ -227,6 +227,24 @@ class ServiceTests(unittest.TestCase):
                 self.assertEqual(os.stat(client.token_path()).st_mode & 0o777, 0o600)
             self.assertNotEqual(client.write_token(), first)
 
+    def test_a_second_service_on_another_port_leaves_the_token_alone(self):
+        import os
+        import tempfile
+        from claudish import client
+        from claudish.__main__ import run_service
+
+        class Stop(Exception):
+            pass
+
+        def ready(server):
+            server.server_close()
+            raise Stop
+        with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"XDG_CONFIG_HOME": home}):
+            first = client.write_token()
+            with self.assertRaises(Stop):
+                run_service(Rewriter("rules"), 0, None, None, ready)  # any port but the service's
+            self.assertEqual(client.read_token(), first)
+
     def test_requests_are_checked(self):
         self.assertEqual(self.call("/sessions", {"text": ""})[0], 400)
         self.assertEqual(self.call("/sessions/nope?after=0")[0], 404)

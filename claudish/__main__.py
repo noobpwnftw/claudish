@@ -271,11 +271,11 @@ class reachable:
 
 def run_service(rewriter, port, reload, config_path, ready):
     """The service on port until Ctrl+C or SIGTERM (`claudish serve`). It binds
-    first, writes the token, calls ready(server), starts the model process and serves; at the end
+    first, writes the token (the input methods' service, on PORT, only), calls ready(server), starts the model process and serves; at the end
     the live conversations and the model process stop. A port in use returns at once."""
     import errno
     import secrets
-    from .client import write_token
+    from .client import PORT, write_token
     token = secrets.token_urlsafe(32)
     try:
         server = make_server(rewriter, port, token, reload=reload, config_path=config_path)
@@ -287,7 +287,8 @@ def run_service(rewriter, port, reload, config_path, ready):
         print("Port %s is in use: cd_AI is already running, or another program has it. "
               "Check with `claudish doctor`." % port, file=sys.stderr, flush=True)
         return
-    write_token(token)  # only once the port is ours: the running service's token stays valid
+    if port == PORT:  # only once the port is ours; a second service on another port leaves it alone
+        write_token(token)
     ready(server)
     rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
     import signal
