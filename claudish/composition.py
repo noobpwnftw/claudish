@@ -42,8 +42,17 @@ def joins(char):
     Devanagari vowel sign, or enclosing as a keycap's), a variation selector, a skin tone, a tag, or
     the joiner itself."""
     point = ord(char)
-    return unicodedata.category(char) in ("Mn", "Mc", "Me") or char in "\ufe0e\ufe0f\u200d" \
-        or 0x1F3FB <= point <= 0x1F3FF or 0xE0020 <= point <= 0xE007F or 0xE0100 <= point <= 0xE01EF
+    category = unicodedata.category(char)
+    return category in ("Mn", "Me") or (category == "Mc" and point not in NOT_SPACING_MARKS) \
+        or char in "\ufe0e\ufe0f\u200d" or 0x1F3FB <= point <= 0x1F3FF or 0xE0020 <= point <= 0xE007F \
+        or 0xE0100 <= point <= 0xE01EF
+
+
+# Spacing marks Unicode's grapheme rules (UAX #29) count as characters of their own: Myanmar and Tai
+# vowel signs and tones, as the platforms' Backspace deletes them.
+NOT_SPACING_MARKS = {0x102B, 0x102C, 0x1038, *range(0x1062, 0x1065), *range(0x1067, 0x106E), 0x1083,
+                     *range(0x1087, 0x108D), 0x108F, *range(0x109A, 0x109D), 0x1A61, 0x1A63, 0x1A64, 0xAA7B,
+                     0xAA7D, 0x11720, 0x11721}
 
 
 def regional(char):

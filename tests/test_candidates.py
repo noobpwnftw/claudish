@@ -285,6 +285,9 @@ class ReceiveTests(unittest.TestCase):
             state.change("ok " + cluster)  # a keycap, an ideographic variant, an enclosing mark, Devanagari signs
             state.backspace()
             self.assertEqual(state.text, "ok ", repr(cluster))
+        state.change("\u1000\u102c")  # Myanmar: a vowel sign Unicode counts as its own character
+        state.backspace()
+        self.assertEqual(state.text, "\u1000")
         state.change("")
         for char in "a" * 507 + "WORLD":
             state.insert(char)
