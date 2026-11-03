@@ -227,7 +227,7 @@ class ClaudishEngine(IBus.Engine):
         # A waiting accent alone is not typed text: it goes with the focus, as the OS's own does (in
         # continue, your words are in the app already: the preedit is never typed text).
         return IBus.PreeditFocusMode.CLEAR if state.for_model or state.live or not state.shown \
-            else IBus.PreeditFocusMode.COMMIT
+            or getattr(self, "commits_itself", False) else IBus.PreeditFocusMode.COMMIT
 
     def changed(self):
         after = self.composition.caret_after(self.around_caret()[1] if self.composition.live else "")
@@ -633,6 +633,9 @@ class ClaudishEngine(IBus.Engine):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
         trace("focus-in", client)
+        # Qt's IBus module commits its own copy of the preedit when the box loses focus (a click):
+        # IBus committing it too typed the words twice.
+        self.commits_itself = client == "QIBusInputContext"
         self.shared = client == "gnome-shell" and object_path  # every app's context (GNOME on Wayland)
         if self.shared:
             screen().on_focus = self.window_changed
