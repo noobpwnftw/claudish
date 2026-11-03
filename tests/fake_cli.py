@@ -40,6 +40,9 @@ def codex():
             if params.get("model") == "nope":
                 send({"id": ident, "error": {"code": -32600, "message": "model not available"}})
                 continue
+            if params.get("model") == "limited":  # refused for another reason than the model
+                send({"id": ident, "error": {"code": -32000, "message": "rate limited, try again later"}})
+                continue
             thread = "t%d" % next(ids)
             threads[thread] = [0, params.get("model")]
             send({"id": ident, "result": {"thread": {"id": thread}}})

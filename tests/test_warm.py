@@ -73,6 +73,11 @@ class CodexTests(unittest.TestCase):
         self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")
         self.assertIsNone(self.backend.model)
 
+    def test_another_refusal_keeps_the_configured_model(self):
+        self.backend.model = "limited"
+        self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")  # this request only
+        self.assertEqual(self.backend.model, "limited")
+
     def test_death_timeout_and_restart_after_many(self):
         self.backend.start()
         ready(self.backend)

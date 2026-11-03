@@ -297,11 +297,12 @@ class Codex(Warm):
             params["model"] = self.model
         try:
             thread = self.call("thread/start", params, deadline)
-        except RuntimeError:
+        except RuntimeError as exc:
             if not self.model:
                 raise
-            self.model = None  # not offered on this account: Codex's default model instead
-            params.pop("model")
+            if "model" in str(exc).lower():
+                self.model = None  # not offered on this account: Codex's default model from now on
+            params.pop("model")  # another failure (a rate limit): this request only
             thread = self.call("thread/start", params, deadline)
         thread_id = thread["thread"]["id"]
         texts, done = [], []
