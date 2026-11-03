@@ -58,6 +58,7 @@ PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "em
 
 SCREEN_XML = """<node><interface name="io.claudish.Screen">
   <method name="Get"><arg type="s" direction="out"/></method>
+  <method name="Focus"><arg type="s" direction="in"/><arg type="s" direction="in"/></method>
   <signal name="Changed"><arg type="s"/></signal>
 </interface></node>"""
 
@@ -71,6 +72,9 @@ class Screen:
 
     def __init__(self):
         self.shell, self.state, self.shown, self.toasting = False, "{}", {}, False
+        # GNOME on Wayland gives IBus one input context for every app: the extension says which
+        # window (and app) has focus, and the engine in that context follows it (on_focus).
+        self.focus, self.on_focus = None, None
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
             info = Gio.DBusNodeInfo.new_for_xml(SCREEN_XML).interfaces[0]
@@ -87,6 +91,13 @@ class Screen:
         self.shell = present
 
     def call(self, connection, sender, path, interface, method, parameters, invocation):
+        if method == "Focus":
+            self.focus = tuple(parameters.unpack())  # (app, window)
+            trace("window", self.focus[0])
+            invocation.return_value(None)
+            if self.on_focus is not None:
+                self.on_focus()
+            return
         invocation.return_value(GLib.Variant("(s)", (self.state,)))
 
     def publish(self, panel=None, ghost="", toast=None, lasting=False):
@@ -621,6 +632,13 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
+        trace("focus-in", client)
+        self.shared = client == "gnome-shell" and object_path  # every app's context (GNOME on Wayland)
+        if self.shared:
+            screen().on_focus = self.window_changed
+            if screen().focus:  # the window the extension says has focus: the box and its app
+                app, window = screen().focus
+                self.app, object_path = app or self.app, "%s#%s" % (object_path, window)
         # One conversation per text box (its input context), as on Windows: earlier instructions,
         # context and approvals stay with the box they were made in, also when you come back to it.
         self.suggestions.use_conversation(object_path)
@@ -632,6 +650,16 @@ class ClaudishEngine(IBus.Engine):
         pill = self.composition.returned(self.context)  # back in the box where an exchange was held: a pill, no keys
         if pill and screen().shell:
             screen().publish(None, "", pill, lasting=True)
+
+    def window_changed(self):
+        """GNOME on Wayland: another window has focus in the one input context every app shares.
+        An exchange out is held for the window it was in; typed words are IBus's to commit."""
+        if not (getattr(self, "shared", None) and self.focused):
+            return
+        if self.composition.for_model:
+            self.composition.leave(getattr(self, "context", None))
+            self.render()
+        self.do_focus_in_id(self.shared, "gnome-shell")
 
     def do_focus_in(self):
         """An IBus without focus ids (before 1.5.27): this engine's input context is the text box."""

@@ -73,9 +73,36 @@ export default class CdAiExtension extends Extension {
             (connection, sender, path, iface, name, parameters) => this._show(parameters.deep_unpack()[0]));
         this._name = Gio.bus_own_name(Gio.BusType.SESSION, 'io.claudish.Shell', Gio.BusNameOwnerFlags.NONE,
             null, null, null);
+        // GNOME gives IBus one input context for every app: say which window has focus, so the
+        // engine keeps each window's exchange and conversation, and an app's bindings apply.
+        this._focusId = global.display.connect('notify::focus-window', () => this._focus());
+        this._focus();
+    }
+
+    _focus() {
+        const win = global.display.focus_window;
+        if (win !== this._focusWindow) {  // a window can get focus before its class is set: said again then
+            try {
+                if (this._classId)
+                    this._focusWindow.disconnect(this._classId);
+            } catch (e) {}  // that window is gone
+            this._focusWindow = win;
+            this._classId = win ? win.connect('notify::wm-class', () => this._focus()) : 0;
+        }
+        const app = win ? (win.get_wm_class() || '') : '';
+        Gio.DBus.session.call('io.claudish.Screen', '/io/claudish/Screen', 'io.claudish.Screen', 'Focus',
+            new GLib.Variant('(ss)', [app, win ? String(win.get_id()) : '']), null, Gio.DBusCallFlags.NO_AUTO_START,
+            -1, null, null);  // nothing to tell when the engine is not running
     }
 
     disable() {
+        global.display.disconnect(this._focusId);
+        try {
+            if (this._classId)
+                this._focusWindow.disconnect(this._classId);
+        } catch (e) {}
+        this._focusWindow = null;
+        this._classId = 0;
         Gio.bus_unown_name(this._name);
         Gio.DBus.session.signal_unsubscribe(this._signal);
         this._ibus.disconnect(this._cursorId);
