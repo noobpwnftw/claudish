@@ -392,6 +392,11 @@ class ModelServer:
         self.ended = False  # stopped by its owner (the service, a settings switch): never retried
 
     def start(self):
+        with self.guard:
+            self.begin()
+
+    def begin(self):
+        """Under the guard: a stop() meanwhile comes before or after, never between."""
         self.ended = False
         self.stopped.clear()
         self.state = "starting"
@@ -456,10 +461,8 @@ class ModelServer:
         reads the model from the disk cache); one that ended as it started, or a port in use, would
         only fail again."""
         with self.guard:
-            if self.ended or self.state != TIMED_OUT:
-                return
-            self.state = "starting"
-        self.start()
+            if not self.ended and self.state == TIMED_OUT:
+                self.begin()
 
     def stop(self):
         with self.guard:

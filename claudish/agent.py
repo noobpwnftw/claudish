@@ -173,16 +173,16 @@ class ClaudeCodeDriver:
         you its own limit runs instead (QUESTION_SECONDS, as for the model's questions). What it
         says comes before the cancel, which would read as Esc."""
         from .conversation import QUESTION_SECONDS
-        used, last, asked = 0.0, time.monotonic(), None
+        used, last, asked = 0.0, time.monotonic(), {}  # each question shown -> when
         while not over.wait(0.25):
             now = time.monotonic()
-            if self.pending or self.asks:
-                asked = asked or now
-                if now - asked > QUESTION_SECONDS:
+            shown = set(self.pending) | {(request, len(each["answers"])) for request, each in list(self.asks.items())}
+            asked = {question: asked.get(question, now) for question in shown}
+            if asked:
+                if now - min(asked.values()) > QUESTION_SECONDS:
                     session.emit("error", text="no answer, so the instruction stopped")
                     return self.cancel()
             else:
-                asked = None
                 used += now - last
                 if used > self.timeout:
                     session.emit("error", text="the agent took longer than %d s" % self.timeout)

@@ -670,6 +670,8 @@ class ClaudishTextService(TextService):
                 self.setCommitString("")
             self.publish()
             return True
+        elif key == 0x08 and getattr(event, "charCount", 1) > 1:
+            pass  # right after a dead key: Backspace takes back the accent (PIME uses it up), nothing else
         elif key == 0x08:
             self.state.backspace()
         elif key in STEPS and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \

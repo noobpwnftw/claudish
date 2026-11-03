@@ -171,6 +171,8 @@ def main():
             assert reply["compositionString"] == "hello-world´t" and "commitString" not in reply, reply
             key(0x08)
             key(0x08)
+            key(0x08, 0, charCount=2)  # Backspace right after a dead key: the accent goes, nothing else
+            assert service.state.text == "hello-world", service.state.text
             # Ctrl with a dead key is a shortcut: the words are committed, the key replayed.
             assert key(0xDD, method="filterKeyDown", modifiers=(0x11,), isDead=True)["return"] is True
             assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False

@@ -55,7 +55,7 @@ class ModelServerTests(unittest.TestCase):
 
     def test_a_model_that_loaded_too_slowly_starts_again_at_the_next_request(self):
         server = warm.ModelServer([sys.executable, "-c", "pass"], "http://127.0.0.1:9")
-        with patch.object(server, "start") as start:
+        with patch.object(server, "begin", side_effect=lambda: setattr(server, "state", "starting")) as start:
             server.state = "failed: the local model ended as it started (exit 3)"
             server.retry()  # would only fail again
             start.assert_not_called()
