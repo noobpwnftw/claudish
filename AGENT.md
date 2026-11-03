@@ -91,10 +91,10 @@ unblocked preparation without waiting for the owner. Keep the shared instruction
 
 `python scripts/check.py` is the merge gate: unit tests, compile, diff, the IBus and PIME smokes and
 the settings page, each under 5 s. A longer job (a VM build and install, an evaluation) runs once,
-on demand, in the background. Real typing on the Mac and Windows VMs is the owner's, by hand
-(owner, 2026-10-25): no automated clicks, keys or screenshots over VNC. Prepare the build, say what
-to try, and turn what the owner reports into fixes with regression tests. Linux typing can run in
-the short Docker rig. Never install services or input methods on the Spark itself.
+on demand, in the background. Real typing is checked by the maintainer (owner, 2026-11-02: "you can
+test it yourself"): after a fix to keys or composition, install the build on the Mac and Windows
+VMs and run their key rigs, and the Linux typing in the short Docker rig. Never install services or
+input methods on the Spark itself.
 
 ## Git
 
