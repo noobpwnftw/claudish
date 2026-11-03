@@ -13,6 +13,7 @@ from .server import make_server
 
 
 def main():
+    from .service import as_typed  # a hint's `claudish ...` commands, as they run here
     parser = argparse.ArgumentParser(prog="claudish", description="cd_AI — Claudish input method")
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve", help="Run the service the input methods talk to (the login service runs this)")
@@ -98,7 +99,6 @@ def main():
             except OSError:
                 time.sleep(0.5)
         else:
-            from .service import as_typed
             sys.exit(as_typed("cd_AI's service is not running, so there are no settings to open. "
                               "Start it with `claudish service install` (or `claudish serve`)."))
         if args.print:
@@ -159,7 +159,6 @@ def main():
             path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
         print("and %s: the words cd_AI says to a model, editable (claudish templates shows them)."
               % path.with_name("templates.json"))
-        from .service import as_typed
         print(as_typed("Pick the model in cd_AI's settings (`claudish settings`), or edit \"profile\" in the file;"
                        " a running service takes up an edit at its next request."))
         return

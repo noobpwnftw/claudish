@@ -118,6 +118,14 @@ class SettingsTests(Home):
         self.path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "model": "claude-sonnet-5-5"}}}))
         self.assertEqual(config.resolve(self.path)[1]["model"], "claude-sonnet-5-5")
 
+    def test_claudish_key_says_why_a_refused_key_is_not_saved(self):
+        from claudish.__main__ import main
+        with patch.object(sys, "argv", ["claudish", "key"]), patch("getpass.getpass", return_value="sk-ant-bad"), \
+                patch.object(settings, "accepted_key", side_effect=ValueError("Anthropic did not accept the key")):
+            with self.assertRaises(SystemExit) as ended:
+                main()
+        self.assertEqual(ended.exception.code, "Nothing saved: Anthropic did not accept the key.")
+
     def test_keys_of_older_configs_are_refused_by_name(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         for key in ("claude_model", "max_tokens", "hosted"):
