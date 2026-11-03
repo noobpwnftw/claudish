@@ -346,5 +346,25 @@ class RoutingTests(unittest.TestCase):
             thread.join()
         self.assertEqual(started, ["small"])
 
+    def test_a_routed_profile_that_cannot_run_is_answered_not_dropped(self):
+        main = Rewriter("rules")
+        main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))
+        main.route = lambda app, mode: (_ for _ in ()).throw(ImportError("No module named 'anthropic'"))
+        server = make_server(main, 0)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+        opener = build_opener(ProxyHandler({}))
+        try:
+            for path, body in (("/suggest", {"text": "Dear Bob,", "mode": "continue", "app": "thunderbird"}),
+                               ("/sessions", {"text": "reply", "app": "thunderbird"})):
+                request = Request("http://127.0.0.1:%d%s" % (server.server_port, path), json.dumps(body).encode(),
+                                  {"Content-Type": "application/json", "X-Claudish-Token": server.token})
+                with self.assertRaises(HTTPError) as raised:
+                    opener.open(request, timeout=5)
+                self.assertEqual(raised.exception.code, 503, path)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -197,8 +197,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                                                                             look, purpose, draft=draft)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
-                except RuntimeError as exc:
-                    return self.reply(503, {"error": str(exc)})
+                except Exception as exc:  # the profile it routes to cannot run (its SDK missing): said, not a dropped reply
+                    return self.reply(503, {"error": str(exc) or type(exc).__name__})
                 return self.reply(200, {"id": session.id})
             if len(parts) == 3 and parts[0] == "conversations" and parts[2] == "textbox":
                 return self.textbox(parts[1], data)
@@ -424,10 +424,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                 # What is around the caret, the app (which can mean reading a terminal) and window
                 # pictures come only from an input method.
                 return self.reply(403, {"error": "the service token is required"})
-            if mode == "continue" and not (rewriter.continues(app) if trusted else rewriter.autocompletes):
-                # Autocomplete runs at every pause: a hosted model only where a profile routes it.
-                return self.reply(503, {"error": "continue has no model of its own"})
             try:
+                if mode == "continue" and not (rewriter.continues(app) if trusted else rewriter.autocompletes):
+                    # Autocomplete runs at every pause: a hosted model only where a profile routes it.
+                    return self.reply(503, {"error": "continue has no model of its own"})
                 answerer = rewriter.route(app, mode) if trusted else rewriter  # which AI answers here
                 result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted)
             except Exception as exc:
