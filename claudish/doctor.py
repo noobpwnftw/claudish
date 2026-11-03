@@ -234,7 +234,8 @@ def check_ime_windows():
         pipes = os.listdir("\\\\.\\pipe\\")
     except OSError:
         pipes = []
-    if any(name.endswith("cd_AI\\Launcher") for name in pipes):
+    own = ("%s\\cd_AI\\Launcher" % os.environ.get("USERNAME", "")).lower()  # this account's (pipes are machine-wide)
+    if any(name.lower().endswith(own) for name in pipes):
         results.append(("Launcher", "ok", "serving its pipe", None))
     else:
         results.append(("Launcher", "fail", "cd_AI's launcher is not running",

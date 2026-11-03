@@ -73,12 +73,17 @@ class WindowsChecks(unittest.TestCase):
 
     def run_checks(self, pipes):
         with patch.object(sys, "executable", str(self.root / "python" / "python.exe")), \
+                patch.dict(os.environ, {"USERNAME": "Docker"}), \
                 patch("claudish.doctor.os.listdir", return_value=pipes):
             return by_name(doctor.check_ime_windows())
 
     def test_installed_and_its_launcher_serving_beside_a_pime(self):
         results = self.run_checks(["Docker\\PIME\\Launcher", "Docker\\cd_AI\\Launcher"])
         self.assertEqual({name: status for name, (status, _) in results.items()}, {"Input method": "ok", "Launcher": "ok"})
+
+    def test_another_accounts_launcher_is_not_this_ones(self):
+        results = self.run_checks(["mei\\cd_AI\\Launcher"])  # fast user switching: pipes are machine-wide
+        self.assertEqual(results["Launcher"][0], "fail")
 
     def test_a_pime_launcher_is_not_cd_ais(self):
         results = self.run_checks(["Docker\\PIME\\Launcher"])  # PIME's own, beside cd_AI
