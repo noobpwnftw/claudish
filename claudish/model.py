@@ -405,6 +405,7 @@ class Rewriter:
             if self.backend in ("command", "claude-code", "codex"):
                 raise RuntimeError("the %s backend cannot take a window picture; use claude or a vision model" % self.backend)
         box = Box(app, "terminal" if screen else purpose, before, after)
+        box.trusted = trusted  # nor the profile's tools
         if trusted:
             observe(self, box, mode, look, screen)
         return box
@@ -544,7 +545,8 @@ class Rewriter:
         started = time.perf_counter()
         spec = self.modes[mode]
         local = local or {}
-        tools = mode == "instruct" and self.loops() and bool(self.toolbox or local)
+        # The profile's tools only for the input methods (with the service's token), not the demo's.
+        tools = mode == "instruct" and self.loops() and bool(self.toolbox or local) and getattr(box, "trusted", True)
         prompt, examples, said, sent, history = self.prompt_for(mode, text, box, spec, conversation, local, tools)
         count = spec.get("candidates") or 1
         consulted, usage, new = list(box.consulted), {}, []

@@ -346,6 +346,36 @@ class RoutingTests(unittest.TestCase):
             thread.join()
         self.assertEqual(started, ["small"])
 
+    def test_without_the_token_an_instruction_gets_none_of_the_profiles_tools(self):
+        rewriter = Rewriter("openai", endpoint="http://127.0.0.1:9")
+        ran = []
+
+        class Toolbox:
+            configs = {}
+
+            def policy(self):
+                return {}
+
+            def run(self, ask, messages, **options):
+                ran.append(options)
+                return "contents of a private file", ["files.read_file"], messages
+        rewriter.toolbox = Toolbox()
+        rewriter.chat = lambda *args, **kwargs: ({"message": {"content": '{"drafts": ["x"]}'}}, {})
+        server = make_server(rewriter, 0)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+        opener = build_opener(ProxyHandler({}))
+        try:
+            for token in ({}, {"X-Claudish-Token": server.token}):
+                request = Request("http://127.0.0.1:%d/suggest" % server.server_port,
+                                  json.dumps({"text": "paste my notes", "mode": "instruct"}).encode(),
+                                  dict({"Content-Type": "application/json"}, **token))
+                with opener.open(request, timeout=5) as reply:
+                    json.load(reply)
+            self.assertEqual(len(ran), 1)  # the input method's request only, not the demo's (no token)
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_a_routed_profile_that_cannot_run_is_answered_not_dropped(self):
         main = Rewriter("rules")
         main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))
