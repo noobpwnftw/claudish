@@ -162,6 +162,21 @@ class ReceiveTests(unittest.TestCase):
         self.assertTrue(state.sent)  # the exchange is back
         self.assertEqual((state.terminal, state.hints), (True, False))  # where the caret is now, the config now
 
+    def test_a_follow_up_before_any_answer_goes_with_the_first_instruction(self):
+        state = Composition()
+        state.mode = "compose"
+        state.change("write an apology to Bob")
+        state.enter()
+        state.submit()
+        for char in " and mention Friday":  # typed while it works
+            state.insert(char)
+        self.assertEqual((state.enter(), state.text), ("submit", "write an apology to Bob and mention Friday"))
+        state.submit()
+        state.offer(state.revision, "Sorry, Bob.", ["Sorry, Bob.", "Apologies, Bob."])
+        for char in "shorter":  # on its drafts: about the one in view, alone
+            state.insert(char)
+        self.assertEqual((state.enter(), state.text, state.about), ("submit", "shorter", "Sorry, Bob."))
+
     def test_each_text_box_keeps_its_own_held_exchange(self):
         state = Composition()
         state.mode = "compose"

@@ -667,7 +667,10 @@ class Composition:
             # instruction in the same conversation, about the draft in view (not in the text yet).
             drafts = self.candidates or ([self.candidate] if self.candidate else [])
             about = drafts[self.highlight] if 0 <= self.highlight < len(drafts) else ""
-            self.change(self.reply.strip())
+            # Before any answer, the first instruction goes with it: the new one replaces its
+            # session, which the conversation does not keep, and the model would have only this.
+            first = self.text.strip() if self.sent and not (drafts or self.converted) else ""
+            self.change(" ".join(part for part in (first, self.reply.strip()) if part))  # one line, as typed
             self.about = about
             return "submit"
         if self.asked == "instruct" and self.candidate:
