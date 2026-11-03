@@ -474,3 +474,15 @@ class OpenTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProxyTests(unittest.TestCase):
+    def test_a_hosted_api_is_checked_through_the_proxy_rewrites_use(self):
+        from claudish.model import opener_for
+
+        def proxies(url):
+            return [h.proxies for h in opener_for(url).handlers if isinstance(h, ProxyHandler)]
+        with patch.dict(os.environ, {"https_proxy": "http://proxy.example:3128"}):
+            self.assertEqual(proxies("https://api.openai.com"), [{"https": "http://proxy.example:3128"}])
+            for url in ("http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"):
+                self.assertFalse(any(proxies(url)), url)  # none, or an empty one

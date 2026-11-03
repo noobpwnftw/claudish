@@ -11,17 +11,17 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit
 from urllib.error import HTTPError
-from urllib.request import ProxyHandler, Request, build_opener
+from urllib.request import Request
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL_PY = ROOT / "platforms/linux/install.py"  # the full path: these fixes run from anywhere
 from .client import SERVICE  # noqa: E402
+from .model import opener_for  # noqa: E402
 
 
 def fetch_json(url, timeout=2, key=None):
-    opener = build_opener(ProxyHandler({})) if urlsplit(url).hostname in ("127.0.0.1", "localhost") else build_opener()
+    opener = opener_for(url)
     request = Request(url, headers={"Authorization": "Bearer " + key} if key else {})
     with opener.open(request, timeout=timeout) as response:
         return json.load(response)

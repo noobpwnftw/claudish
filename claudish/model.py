@@ -63,6 +63,15 @@ def user_content(text, image, style, intro=""):
 
 
 from .config import MODEL_URL  # noqa: E402
+
+
+def opener_for(url):
+    """Loopback traffic never goes through HTTP_PROXY; a remote endpoint may need it. (Building one
+    loads the system CA bundle, about 12 ms.)"""
+    local = urlsplit(url).hostname in ("127.0.0.1", "localhost", "::1")
+    return build_opener(ProxyHandler({})) if local else build_opener()
+
+
 CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile names none
 LENGTH = "the answer ran past its length budget; use a shorter phrase"
 DECLINED = "Claude declined this; your wording is unchanged"
@@ -510,10 +519,8 @@ class Rewriter:
 
     def chat(self, payload, headers, image=None, timeout=None):
         """(the first choice, usage) from /v1/chat/completions; timeout: seconds, else the profile's."""
-        # Loopback traffic must not go through HTTP_PROXY; a remote endpoint may need it.
-        # Built once: build_opener() loads the system CA bundle, about 12 ms per call.
-        if self.opener is None:
-            self.opener = build_opener(ProxyHandler({})) if self.local else build_opener()
+        if self.opener is None:  # built once
+            self.opener = opener_for(self.endpoint)
         if "model" not in payload and self.backend == "openai":
             named = self.server_model(headers)
             if named:

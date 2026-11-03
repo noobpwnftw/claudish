@@ -186,11 +186,12 @@ def server_models(url, key=None):
     (llama.cpp answers 503 then), the HTTP status of another refusal, or None when nothing answers
     there. key: its API key, if any (by default the one saved for this address)."""
     from urllib.error import HTTPError
-    from urllib.request import Request, build_opener, ProxyHandler
+    from urllib.request import Request
+    from .model import opener_for
     key = key or keys.server_key(url)
     headers = {"Authorization": "Bearer " + key} if key else {}
     try:
-        with build_opener(ProxyHandler({})).open(Request(url.rstrip("/") + "/v1/models", headers=headers),
+        with opener_for(url).open(Request(url.rstrip("/") + "/v1/models", headers=headers),
                                                  timeout=5) as response:
             listing = json.load(response)
         return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
