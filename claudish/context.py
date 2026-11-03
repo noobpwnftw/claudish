@@ -187,12 +187,23 @@ def read_mcp(provider):
                     result = await session.read_resource(provider.resource)
                     return "\n".join(item.text for item in getattr(result, "contents", []) if getattr(item, "text", None))
 
-    try:
-        return anyio.run(fetch)
-    except TimeoutError:
-        raise
-    except Exception as exc:  # The SDK raises various types; a failed source must not break the rewrite.
-        raise RuntimeError("MCP %s: %s" % (provider.name, exc))
+    # On a thread of its own: the SDK's shutdown of a server that hangs takes seconds more after the
+    # timeout, which the request does not wait for (the server still ends, in the background).
+    import threading
+    done, outcome = threading.Event(), {}
+
+    def run():
+        try:
+            outcome["value"] = anyio.run(fetch)
+        except BaseException as exc:
+            outcome["error"] = exc
+        done.set()
+    threading.Thread(target=run, daemon=True).start()
+    if not done.wait(provider.timeout + 0.5) or isinstance(outcome.get("error"), TimeoutError):
+        raise TimeoutError("timed out after %g s" % provider.timeout)
+    if "error" in outcome:  # The SDK raises various types; a failed source must not break the rewrite.
+        raise RuntimeError("MCP %s: %s" % (provider.name, outcome["error"]))
+    return outcome["value"]
 
 
 def list_server(server, timeout=15):
