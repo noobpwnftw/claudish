@@ -26,8 +26,9 @@ profiles, and `"profile"` is the one cd_AI uses:
 `claudish serve` uses the file's `"profile"`. `--profile claude` picks another, and any flag
 overrides the profile's value. `model` names the model on every backend. A template path in a
 profile is relative to the config file. To take a key from the environment, name its variable with
-`api_key_env`. Unknown keys and wrong types are refused whenever the file is read, beside the
-profiles and in them. `/health` reports the active profile.
+`api_key_env`. Unknown keys and wrong types are refused: beside the profiles whenever the file is
+read, and in a profile when it is used (the one in use, or one a mode or an app goes to).
+`/health` reports the active profile.
 
 What a profile can hold, by purpose (each is optional but `backend`; the sections below say more):
 
