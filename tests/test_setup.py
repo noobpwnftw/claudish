@@ -114,6 +114,7 @@ class SetupTests(unittest.TestCase):
 
     def test_yes_runs_each_step_once_then_doctor(self):
         self.llama.install.side_effect = lambda *args: setattr(self.llama, "installed", lambda: self.home / ".tools/llama-server")
+        self.models.fetch.side_effect = lambda *args: self.model.parent.mkdir(parents=True) or self.model.write_text("")
         status, out = self.quiet("local", yes=True)
         self.assertEqual(status, 0, out)
         self.assertTrue(config.default_path().is_file())
@@ -126,6 +127,13 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(data["profiles"]["local"]["command"][:3], [str(self.home / ".tools/llama-server"), "-m", str(self.model)])
         self.assertIn("Log out and back in", out)
         setup.doctor.main.assert_called_once()
+
+    def test_a_skipped_model_is_not_run_from_the_profile(self):
+        self.llama.installed = lambda: self.home / ".tools/llama-server"
+        _, out = self.quiet("local", yes=True, skip=["model"])
+        self.assertIn("the model is not downloaded", out)
+        data = json.loads(config.default_path().read_text())
+        self.assertNotIn("command", data["profiles"].get("local", {}))  # the service would fail at every login
 
     def test_declining_or_no_terminal_skips_the_step(self):
         with patch("builtins.input", side_effect=EOFError):

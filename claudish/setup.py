@@ -167,6 +167,8 @@ def step_local(name, settings):
         server = download_llama.find_server()
         if not server:
             raise ValueError("llama-server was not found: `claudish setup --profile local` downloads it")
+        if not download_model.target("gemma").is_file():  # skipped (--skip model): the service would fail at every login
+            raise ValueError("the model is not downloaded: `claudish setup --profile local` downloads it")
         argv = llama_command(server, download_model.target("gemma"), urlsplit(settings["model_url"]).port or urlsplit(config.MODEL_URL).port)
         data = read(config.default_path())
         data.setdefault("profiles", {}).setdefault(name, dict(config.STARTER["profiles"]["local"]))["command"] = argv
