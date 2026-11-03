@@ -206,9 +206,9 @@ def read_mcp(provider):
     return outcome["value"]
 
 
-def list_server(server, timeout=15):
-    """{"tools": [(name, summary)], "resources": [uri]} for one mcp_servers entry."""
-    return read_mcp(Provider({"type": "mcp", "server": "_", "timeout": timeout}, Path.cwd(), {"_": server}, listing=True))
+def list_server(server, timeout=15, name="_"):
+    """{"tools": [(name, summary)], "resources": [uri]} for one mcp_servers entry (named in errors)."""
+    return read_mcp(Provider({"type": "mcp", "server": name, "timeout": timeout}, Path.cwd(), {name: server}, listing=True))
 
 
 class Context:

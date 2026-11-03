@@ -173,7 +173,7 @@ def codex_said(handle):
             with open(path, encoding="utf-8") as source:
                 head = source.read(200000)
             # The note's path as the session's JSON writes it (a Windows path's backslashes doubled).
-            if handle["note"] not in head and json.dumps(handle["note"])[1:-1] not in head:
+            if handle["note"] not in head and json.dumps(handle["note"], ensure_ascii=False)[1:-1] not in head:
                 continue
         except OSError:
             continue

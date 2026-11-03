@@ -6,6 +6,7 @@ their results; the text around the caret is sent fresh each turn. Conversations 
 and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
 (once per conversation if you allow it for the conversation), destructive tools ask every time.
 """
+import os
 import secrets
 import threading
 import time
@@ -215,7 +216,8 @@ class ModelDriver:
                  "description": own["helper_task"].format(helper=title)}}, "required": ["task"]},
                 # At a prompt its line is the draft, which you run: no question. A line that cannot be
                 # drafted there opens a window instead, which is asked about first, as elsewhere.
-                hand_over, "read" if box.kind == "terminal" and handoff.line(helper, "note.md", "session") else "write",
+                hand_over, "read" if box.kind == "terminal" and handoff.line(
+                    helper, os.path.join(handoff.notes_dir(), "h-00000000.md"), "session") else "write",  # its real folder
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 

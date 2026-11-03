@@ -119,7 +119,7 @@ def list_servers():
     status = 0
     for name, server in servers.items():
         try:
-            listing = list_server(server)
+            listing = list_server(server, name=name)
         except Exception as exc:
             print("%s %s: %s" % (shown["fail"], name, exc))
             status = 1

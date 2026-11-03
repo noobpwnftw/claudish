@@ -340,6 +340,19 @@ class AskAndHelperTests(unittest.TestCase):
             self.assertEqual(len(asked), 1)  # "Send this task to codex?" before any window
             self.assertEqual(launch.called, opened)
 
+    def test_at_a_terminal_a_notes_folder_a_shell_would_misread_also_asks_first(self):
+        import os
+        import tempfile
+        folder = os.path.join(tempfile.mkdtemp(), "O'Brien")  # %TEMP% under C:\Users\O'Brien
+        os.makedirs(folder)
+        model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the tests"})]), answer("ok"))
+        with patch("claudish.handoff.shutil.which", return_value="/bin/claude"), \
+                patch("claudish.handoff.launch", return_value=True) as launch, \
+                patch.dict(os.environ, {"XDG_RUNTIME_DIR": folder}):
+            asked, _ = self.drive(model, [0], helper=["claude", "{prompt}"], purpose="terminal", screen="$ ")
+        self.assertEqual(len(asked), 1)  # asked, answered No: no window
+        launch.assert_not_called()
+
     def test_a_helper_takes_the_task_after_a_yes_in_any_text_box(self):
         import os
         import tempfile

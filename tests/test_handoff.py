@@ -60,14 +60,15 @@ class ProgressTests(unittest.TestCase):
         import os
         import tempfile
         import time
-        for note in (r"C:\Users\me\AppData\Local\Temp\claudish-handoff\h-1234abcd.md", "/run/user/1000/h-1234abcd.md"):
+        for note in (r"C:\Users\me\AppData\Local\Temp\claudish-handoff\h-1234abcd.md", "/run/user/1000/h-1234abcd.md",
+                     r"C:\Users\张三\AppData\Local\Temp\h-1234abcd.md"):  # Codex writes non-ASCII as it is
             with tempfile.TemporaryDirectory() as home, patch.dict(os.environ, {"HOME": home}):
                 day = os.path.join(home, ".codex", "sessions", "2026", "11", "03")
                 os.makedirs(day)
                 with open(os.path.join(day, "rollout-x.jsonl"), "w", encoding="utf-8") as out:
                     for role, text in (("user", handoff.arguments(["codex", "{prompt}"], note)[1]), ("assistant", "On it")):
                         out.write(json.dumps({"type": "response_item", "timestamp": "t1", "payload": {
-                            "type": "message", "role": role, "content": [{"type": "output_text", "text": text}]}}) + "\n")
+                            "type": "message", "role": role, "content": [{"type": "output_text", "text": text}]}}, ensure_ascii=False) + "\n")
                 said = handoff.codex_said({"helper": "codex", "note": note, "started": time.time()})
             self.assertEqual(said, (["On it"], "t1"), note)
 
