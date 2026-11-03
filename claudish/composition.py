@@ -361,7 +361,8 @@ class Composition:
     @property
     def drawn(self):
         """What the composition draws: what it shows, and a dead key's accent waiting at the cursor
-        for its letter, as the OS's own input draws it (never committed)."""
+        for its letter, as the OS's own input draws it (never committed by Claudish; a Linux app
+        that keeps the preedit at a focus change keeps it with your words)."""
         at = self.cursor
         return self.shown[:at] + self.accent + self.shown[at:]
 

@@ -167,6 +167,24 @@ try:
         assert engine.do_process_key_event(keyval, 0, 0)
     assert engine.composition.text == "café", engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Its whole table (the system's X11 one): Compose o c is ©, Compose - - - an em dash.
+    for keys, made in ((("o", "c"), "©"), (("-", "-", "-"), "\u2014")):
+        for char in "x":
+            engine.do_process_key_event(ord(char), 0, 0)
+        engine.do_process_key_event(IBus.keyval_from_name("Multi_key"), 0, 0)
+        for key in keys:
+            assert engine.do_process_key_event(ord(key), 0, 0)
+        assert engine.composition.text == "x" + made, engine.composition.text
+        engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Backspace takes back the Compose key (as GTK's), and deletes nothing.
+    for char in "don":
+        engine.do_process_key_event(ord(char), 0, 0)
+    engine.do_process_key_event(IBus.keyval_from_name("Multi_key"), 0, 0)
+    engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
+    for char in "'t":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.composition.text == "don't", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     engine.do_process_key_event(IBus.keyval_from_name("Multi_key"), 0, 0)
     engine.do_reset()  # a click: the Compose key's wait ends with it
     engine.do_process_key_event(ord("'"), 0, 0)

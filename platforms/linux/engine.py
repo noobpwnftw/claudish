@@ -21,9 +21,14 @@ DEAD_KEYS = {"dead_grave": "`", "dead_acute": "´", "dead_circumflex": "^", "dea
              "dead_doubleacute": "˝", "dead_caron": "ˇ", "dead_cedilla": "¸", "dead_ogonek": "˛"}  # their accents
 
 
-# The Compose key, then one of these: the dead key it stands for (Compose ' e is é, as IBus's own does).
-COMPOSE = {"'": "dead_acute", '"': "dead_diaeresis", "`": "dead_grave", "^": "dead_circumflex", "~": "dead_tilde",
-           ",": "dead_cedilla", "-": "dead_macron"}
+COMPOSER = []  # the Compose key's table (claudish/x11_compose.py), read at its first use
+
+
+def composer():
+    if not COMPOSER:
+        from claudish.x11_compose import Compose
+        COMPOSER.append(Compose())
+    return COMPOSER[0]
 
 
 def with_accent(dead, char):
@@ -335,7 +340,7 @@ class ClaudishEngine(IBus.Engine):
 
     def finish(self, suggested=False):
         self.dead = None  # an accent waiting for its letter goes with the composition
-        self.composing = False  # and a Compose key waiting for its next
+        self.sequence = None  # and a Compose key's sequence
         if self.composition.live:  # nothing is held back in continue mode: just start over
             self.composition.change("")
             self.changed()
@@ -366,16 +371,35 @@ class ClaudishEngine(IBus.Engine):
         return True
 
     def compose_key(self, keyval):
-        """The key's name, the Compose key's next key as the dead key it stands for; None for the
-        Compose key itself (taken: it waits for what follows)."""
+        """The key's name; None for the Compose key (taken: its sequence waits for what follows)."""
         name = IBus.keyval_name(keyval) or ""
         if name == "Multi_key":
-            self.composing = True
+            self.sequence = []
             return None
-        if getattr(self, "composing", False):
-            self.composing = False
-            return COMPOSE.get(IBus.keyval_to_unicode(keyval), name)
         return name
+
+    def compose_next(self, keyval):
+        """A key while the Compose key's sequence waits, as GTK's: Backspace takes back its last
+        key, Esc ends it, and a key it cannot go on with ends it and is dropped; one that types
+        nothing (Enter, Tab, an arrow) then does its own (None)."""
+        if keyval == IBus.KEY_BackSpace:
+            self.sequence = self.sequence[:-1] if self.sequence else None
+            return True
+        if keyval == IBus.KEY_Escape:
+            self.sequence = None
+            return True
+        name = IBus.keyval_name(keyval) or ""
+        kind, text = composer().step(self.sequence + [name])
+        if kind == "wait":
+            self.sequence.append(name)
+            return True
+        self.sequence = None
+        if kind == "text":
+            if self.composition.live:
+                self.live_commit(text)
+                return True
+            return self.type_in(text)
+        return True if typeable(IBus.keyval_to_unicode(keyval)) else None
 
     @property
     def dead(self):
@@ -421,6 +445,10 @@ class ClaudishEngine(IBus.Engine):
         if state & modifiers:
             self.finish()
             return False
+        if getattr(self, "sequence", None) is not None:  # the Compose key's sequence takes it first
+            handled = self.compose_next(keyval)
+            if handled is not None:
+                return handled
         self.poll()
         if keyval == IBus.KEY_F8 and self.composition.toggle_look():
             self.render()
@@ -517,13 +545,14 @@ class ClaudishEngine(IBus.Engine):
             self.changed()
             return True
         plain = not state & (IBus.ModifierType.SHIFT_MASK | IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK)
-        steps = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end"}
+        steps = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
+                 IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
         if keyval in steps and plain and self.composition.arrow(steps[keyval]):
-            self.composing = False  # a Compose key waiting is for the key right after it
+            self.sequence = None  # a Compose key waiting is for the key right after it
             self.changed()  # ← → move in what you type, as a CJK composition does
             return True
-        if keyval == IBus.KEY_Delete and plain and self.composition.delete():  # forward delete, at the cursor
-            self.composing = False
+        if keyval in (IBus.KEY_Delete, IBus.KEY_KP_Delete) and plain and self.composition.delete():  # forward delete
+            self.sequence = None
             self.changed()
             return True
         name = self.compose_key(keyval)
@@ -563,7 +592,7 @@ class ClaudishEngine(IBus.Engine):
         """A Shift tap, or a pick from the indicator's menu: continue <-> compose. Leaving compose
         keeps what you see, as typed."""
         kept = self.composition.toggle()
-        self.composing = False  # a Compose key waiting belongs to the old mode
+        self.sequence = None  # a Compose key waiting belongs to the old mode
         self.suggestions.schedule(self.composition.revision, "")  # what was asked belongs to the old mode
         if kept:
             self.commit_text(IBus.Text.new_from_string(kept))
@@ -673,7 +702,7 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_out(self):
         trace("focus-out")
         self.focused = False
-        self.composing = False  # a Compose key waiting goes with the focus
+        self.sequence = None  # a Compose key waiting goes with the focus
         if self.timer is not None:  # another box's engine polls now; results wait in the worker
             GLib.source_remove(self.timer)
             self.timer = None
@@ -699,7 +728,7 @@ class ClaudishEngine(IBus.Engine):
                 pass
 
     def do_reset(self):
-        self.composing = False
+        self.sequence = None
         trace("reset")
         if self.composition.for_model:  # a click in the field: the exchange is held, as on a focus change
             self.composition.leave(getattr(self, "context", None))
