@@ -21,6 +21,8 @@ connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 engine = module.ClaudishEngine(connection=connection, object_path="/org/claudish/TestEngine")
 commits = []
 engine.commit_text = lambda text: commits.append(text.get_text())
+preedits = []  # (text, visible) as drawn
+engine.update_preedit_text_with_mode = lambda text, cursor, visible, mode: preedits.append((text.get_text() if visible else "", visible))
 try:
     def shift_tap():
         assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
@@ -169,6 +171,7 @@ try:
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
     assert engine.do_process_key_event(ord(","), 0, 0)
     assert commits[count:] == ["´,"] and not engine.composition.text, (commits[count:], engine.composition.text)
+    assert not preedits[-1][0], preedits[-1]  # not left drawn (a focus change would type it again)
     # Shift+Esc while composing brings nothing back, and drops nothing.
     for char in "keep me":
         engine.do_process_key_event(ord(char), 0, 0)

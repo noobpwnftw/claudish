@@ -333,6 +333,7 @@ class ClaudishEngine(IBus.Engine):
         nothing composed), else into the composition; full, what is before the cursor goes in first."""
         if all(self.composition.passes(char) for char in text):
             self.commit_text(IBus.Text.new_from_string(text))
+            self.changed()  # the accent it waited with is no longer drawn
             return True
         for char in text:
             if not self.composition.insert(char):  # full: what is before the cursor goes in
