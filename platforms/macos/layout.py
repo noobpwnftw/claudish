@@ -54,10 +54,13 @@ class Layout:
             self.release(source)
 
     def dead(self, key, flags):
-        """The dead-key state a key starts and its accent alone, or None when it is not dead."""
+        """The dead-key state a key starts and its accent alone; False when it is not dead, None
+        when the layout cannot say (no key data: then the U.S. Option map)."""
         result = self.translate(key, flags)
-        if not result or not result[1]:
+        if not result:
             return None
+        if not result[1]:
+            return False
         alone = self.translate(SPACE, 0, result[1])  # the accent, as a space after it types it
         return result[1], (alone[0] if alone and alone[0] else "")
 

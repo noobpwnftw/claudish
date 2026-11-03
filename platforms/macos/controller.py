@@ -491,9 +491,8 @@ class ClaudishInputController(IMKInputController):
     def dead_key(self, key, chars, flags):
         """(its accent, the layout's dead-key state) when the keyboard layout says this key is dead
         (Spanish ´, French ^, U.S. Option+e); where the layout cannot be read, the U.S. Option keys."""
-        reader = layout()
-        if reader is not None:
-            found = reader.dead(key, flags)
+        found = layout().dead(key, flags) if layout() is not None else None
+        if found is not None:
             return (found[1] or chars, found[0]) if found and (found[1] or chars) else None
         return (chars, 0) if flags & NSEventModifierFlagOption and chars in ACCENTS else None
 
@@ -603,7 +602,7 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def handle(self, event, client):
         if secure_input():  # a password field: straight in, nothing shown, nothing sent
-            if self.state.text or self.state.ghost:  # it came on while composing (Secure Keyboard Entry):
+            if self.state.text or self.state.ghost or self.state.accent:  # it came on while composing (Secure Keyboard Entry):
                 self.finish(client)  # your words go in first, as on a focus change; no suggestion stays
                 self.state.dismiss()
             self.hide_panel()

@@ -229,7 +229,7 @@ class Layout:
 
     def dead(self, key, flags):
         accent = self.DEAD.get((key, flags & (self.OPTION | self.SHIFT)))
-        return (ord(accent), accent) if accent else None
+        return (ord(accent), accent) if accent else False
 
     def translate(self, key, flags, state=0):
         """A dead key after it: the accent alone; a letter: None here (the event's own characters
