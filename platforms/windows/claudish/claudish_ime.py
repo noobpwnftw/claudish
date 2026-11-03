@@ -109,6 +109,8 @@ EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5
 
 
 MODIFIER_KEYS = (0x10, 0x11, 0x12, 0x5B)  # Shift, Ctrl, Alt, Windows
+# The left and right ones too: AltGr arrives as a key-down of left Ctrl (0xA2), then right Alt.
+SIDED_KEYS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5)
 
 
 def held_chord(event):
@@ -361,7 +363,7 @@ class ClaudishTextService(TextService):
         self.hideMessage()  # a key ends a toast: it was said where the caret was
         # Modifiers, the lock keys (a replay would toggle them back) and VK_PACKET (a character another
         # program sends, which a replay would not carry) are the system's, never taken.
-        if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C, 0x90, 0x91, 0xE7):
+        if event.keyCode in (0x11, 0x12, 0x14, 0x5B, 0x5C, 0x90, 0x91, 0xE7) + SIDED_KEYS:
             return False
         # AltGr arrives as Ctrl+Alt; a printable result is typing, not a shortcut.
         if self.shortcut(event):
@@ -556,7 +558,7 @@ class ClaudishTextService(TextService):
             else:
                 self.setCommitString(self.state.commit())
                 self.changed()
-            if key not in (0x11, 0x12, 0x5B, 0x5C):
+            if key not in (0x11, 0x12, 0x5B, 0x5C) + SIDED_KEYS:
                 replay(key, held(event))
             return True
         shift = event.isKeyDown(0x10)

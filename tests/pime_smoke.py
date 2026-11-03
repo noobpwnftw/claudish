@@ -149,7 +149,10 @@ def main():
                 key(ord(char.upper()), ord(char))
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True
             assert service.state.text == "hello-world"
-            # AltGr arrives as Ctrl+Alt; a printable result belongs in the phrase.
+            # AltGr arrives as Ctrl+Alt (left Ctrl's own key-down first, then right Alt's), and a
+            # printable result belongs in the phrase.
+            assert key(0xA2, method="filterKeyDown", modifiers=(0x11,))["return"] is False
+            assert key(0xA5, method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is False
             assert key(ord("Q"), ord("@"), "filterKeyDown", modifiers=(0x11, 0x12))["return"]
             assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello-world@"
             key(0x08)
