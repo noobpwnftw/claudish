@@ -121,6 +121,13 @@ class CodexTests(unittest.TestCase):
 
 
 class RewriterTests(unittest.TestCase):
+    def test_the_profiles_own_words_for_the_cli_are_sent(self):
+        from claudish.model import Rewriter
+        rewriter = Rewriter("claude-code", command=["claude"], templates={"box": {"cli": {"system": "Only the result."}}})
+        argv = rewriter.warm.argv()
+        self.assertEqual(argv[argv.index("--system-prompt") + 1], "Only the result.")
+        self.assertEqual(rewriter.warm.words["ready"], warm.CLI["ready"])  # the rest as shipped
+
     def test_the_profile_backend_runs_warm_and_says_so(self):
         from claudish.model import Rewriter
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"XDG_CONFIG_HOME": folder}):

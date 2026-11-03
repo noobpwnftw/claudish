@@ -214,7 +214,7 @@ class Unshaped(Exception):
 
 def warm_key(warm):
     """What makes two model processes the same one: their kind, command and model."""
-    return type(warm), tuple(warm.command), warm.configured
+    return type(warm), tuple(warm.command), warm.configured, json.dumps(getattr(warm, "words", None), sort_keys=True)
 
 
 class Rewriter:
@@ -301,7 +301,8 @@ class Rewriter:
             self.command = command
         if backend in ("claude-code", "codex"):
             from . import config, warm
-            self.warm = warm.make(backend, command, model, str(config.default_path().parent))
+            self.warm = warm.make(backend, command, model, str(config.default_path().parent),
+                                  self.modes["instruct"]["box"]["cli"])
         elif backend == "llama" and command:  # the local model's server, which the service runs
             from . import warm
             self.warm = warm.ModelServer(command, self.endpoint)

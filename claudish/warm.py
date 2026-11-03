@@ -19,10 +19,10 @@ from .shapes import ANSWER
 
 from .modes import TEMPLATES
 
-# The model's whole instruction is cd_AI's own prompt, sent as the message; this only keeps the
-# CLI from adding an agent's habits around it (templates.json box.cli).
-NEUTRAL = TEMPLATES["box"]["cli"]["system"]
-READY = TEMPLATES["box"]["cli"]["ready"]
+# The model's whole instruction is cd_AI's own prompt, sent as the message; the CLI's own
+# instruction only keeps it from adding an agent's habits around it (templates.json box.cli, the
+# profile's).
+CLI = TEMPLATES["box"]["cli"]
 
 
 class Lines:
@@ -53,8 +53,9 @@ class Warm:
     name = "the model"
     shaped = False  # its answers are held to claudish/shapes.py's schema
 
-    def __init__(self, command, model=None, cwd=None, restart_after=200):
+    def __init__(self, command, model=None, cwd=None, restart_after=200, words=None):
         self.command, self.model, self.cwd = list(command), model, cwd
+        self.words = words or CLI  # its system instruction and warm-up (templates.json box.cli)
         self.configured = model  # the profile's model (Codex may fall back to its own default)
         self.restart_after = restart_after
         self.state = "stopped"
@@ -74,7 +75,7 @@ class Warm:
             try:
                 self.check_running()
                 self.launch()
-                self.exchange(READY, 60)
+                self.exchange(self.words["ready"], 60)
                 self.finish()
             except Exception as exc:
                 with self.lifecycle:
@@ -198,14 +199,14 @@ class ClaudeCode(Warm):
 
     default_model = "haiku"  # with no "model" in the profile
 
-    def __init__(self, command, model=None, cwd=None, restart_after=200):
-        super().__init__(command, model or self.default_model, cwd, restart_after)
+    def __init__(self, command, model=None, cwd=None, restart_after=200, words=None):
+        super().__init__(command, model or self.default_model, cwd, restart_after, words)
 
     def argv(self):
         return [self.binary()] + self.command[1:] + [
             "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model, "--tools", "", "--strict-mcp-config", "--no-session-persistence",
-            "--setting-sources", "", "--disable-slash-commands", "--system-prompt", NEUTRAL,
+            "--setting-sources", "", "--disable-slash-commands", "--system-prompt", self.words["system"],
             "--json-schema", json.dumps(ANSWER)]
 
     def exchange(self, prompt, timeout):
@@ -257,8 +258,8 @@ class Codex(Warm):
 
     default_model = "gpt-6-luna"  # with no "model" in the profile
 
-    def __init__(self, command, model=None, cwd=None, restart_after=200):
-        super().__init__(command, model or self.default_model, cwd, restart_after)
+    def __init__(self, command, model=None, cwd=None, restart_after=200, words=None):
+        super().__init__(command, model or self.default_model, cwd, restart_after, words)
         self.counter = self.served = 0
 
     def argv(self):
@@ -312,7 +313,7 @@ class Codex(Warm):
     def exchange(self, prompt, timeout):
         deadline = time.monotonic() + timeout
         params = {"ephemeral": True, "sandbox": "read-only", "approvalPolicy": "never",
-                  "baseInstructions": NEUTRAL, "cwd": self.cwd or os.getcwd()}
+                  "baseInstructions": self.words["system"], "cwd": self.cwd or os.getcwd()}
         if self.model:
             params["model"] = self.model
         try:
@@ -456,5 +457,5 @@ def end(process):
             process.kill()
 
 
-def make(backend, command, model=None, cwd=None):
-    return (ClaudeCode if backend == "claude-code" else Codex)(command, model, cwd)
+def make(backend, command, model=None, cwd=None, words=None):
+    return (ClaudeCode if backend == "claude-code" else Codex)(command, model, cwd, words=words)

@@ -58,7 +58,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         fresh.sessions, fresh.conversations, fresh.recent = rewriter.sessions, rewriter.conversations, rewriter.recent
         old = rewriter
         same = (old.warm and fresh.warm and type(old.warm) is type(fresh.warm)
-                and (old.warm.command, old.warm.configured) == (fresh.warm.command, fresh.warm.configured)
+                and warm_key(old.warm) == warm_key(fresh.warm)  # its kind, command, model and words
                 and not old.warm.state.startswith("failed"))  # picked again after a failure: a new start
         fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
         routed = fresh.adoptable.pop(warm_key(fresh.warm), None) if fresh.warm and not same else None
