@@ -805,7 +805,7 @@ class Rewriter:
             from . import settings  # an update moved it (the CLI, or its VS Code extension's copy)
             command[0] = (settings.codex() if name.startswith("codex") else settings.claude_code()) or command[0]
         try:
-            done = subprocess.run(command, input=prompt, capture_output=True, text=True,
+            done = subprocess.run(command, input=prompt, capture_output=True, text=True, encoding="utf-8",
                                   errors="replace", timeout=self.timeout)
         except subprocess.TimeoutExpired:
             raise RuntimeError("the agent took longer than %g s" % self.timeout)
