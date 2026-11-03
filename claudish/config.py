@@ -206,9 +206,10 @@ def write_starter(path=None, profile=None):
 
 def save(data, path=None):
     """Write config data to path through a temporary file, so the running service never reads half
-    a file; a new config gets the starter's templates.json beside it."""
+    a file; a new config, or a starter profile added to one, gets the starter's templates.json beside it."""
     path = Path(path or default_path())
-    if not path.is_file():
+    profiles = data.get("profiles") if isinstance(data.get("profiles"), dict) else {}
+    if not path.is_file() or any(isinstance(p, dict) and p.get("templates") == "templates.json" for p in profiles.values()):
         write_starter_templates(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")

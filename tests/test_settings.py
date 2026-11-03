@@ -161,6 +161,15 @@ class SettingsTests(Home):
         name, resolved, _, _ = config.resolve()
         self.assertEqual((name, resolved["backend"]), ("claude-code", "claude-code"))  # kept running (claudish/warm.py)
 
+    def test_a_hand_written_config_without_templates_takes_a_starter_profile(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text(json.dumps({"profile": "mine", "profiles": {"mine": {"backend": "rules"}}}), encoding="utf-8")
+        with patch.object(settings, "claude_code", return_value="/opt/claude/bin/claude"):
+            settings.apply({"choice": "claude-code"})
+        name, resolved, _, _ = config.resolve()  # its templates.json is written beside it
+        self.assertEqual((name, resolved["backend"]), ("claude-code", "claude-code"))
+        self.assertTrue(self.path.with_name("templates.json").is_file())
+
     def test_codex_for_a_chatgpt_subscription(self):
         with patch.object(settings, "codex", return_value=None):
             self.assertEqual(settings.state()["codex"], settings.NO_CODEX)
