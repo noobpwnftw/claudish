@@ -155,11 +155,30 @@ class ReceiveTests(unittest.TestCase):
         state.change("decline politely")
         state.submit()
         state.leave("mail")
+        state.returned("mail")  # back in the box it was held for
         state.field(terminal=True)
         state.hints = False
         state.restore()
         self.assertTrue(state.sent)  # the exchange is back
         self.assertEqual((state.terminal, state.hints), (True, False))  # where the caret is now, the config now
+
+    def test_each_text_box_keeps_its_own_held_exchange(self):
+        state = Composition()
+        state.mode = "compose"
+        for box, words in (("mail", "reply to Sam"), ("chat", "thank Ana")):
+            state.returned(box)
+            state.change(words)
+            state.submit()
+            state.leave(box)
+        state.returned("notes")  # another box: neither is shown, nor brought back by Shift+Esc there
+        self.assertIsNone(state.held_pill())
+        self.assertEqual(state.restore(), "")
+        self.assertEqual(len(state.holds), 2)  # both still working
+        state.returned("mail")
+        self.assertEqual(state.restore(), "reply to Sam")
+        state.change("")
+        state.returned("chat")
+        self.assertEqual(state.restore(), "thank Ana")
 
     def test_words_dropped_after_a_hold_come_back_before_it(self):
         state = Composition()
@@ -167,6 +186,7 @@ class ReceiveTests(unittest.TestCase):
         state.change("do x")
         state.submit()
         state.leave("mail")  # the exchange is held
+        state.returned("mail")
         state.change("important words")
         self.assertEqual(state.escape(), "drop")  # the toast offers them back
         self.assertEqual(state.restore(), "important words")
@@ -831,7 +851,7 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(state.held.reply, "short")
         state = rewritten()
         self.assertEqual(state.leave("mail"), "")
-        self.assertEqual(state.held_pill()["status"], "a rewrite is ready")
+        self.assertEqual(state.returned("mail")["status"], "a rewrite is ready")
         self.assertEqual((state.restore(), state.text, state.candidate), ("short", "hello", "Greetings—truly."))
         failed = Composition()
         failed.mode = "compose"

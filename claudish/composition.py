@@ -87,6 +87,7 @@ MODES = ("compose", "continue")
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
+HOLDS = 4  # text boxes with an exchange held at once (the service runs as many sessions)
 # The panel stays shorter than a screen (G64): about this many rows of text at about ROW characters.
 # Past it, drafts other than the highlighted one show their first two rows, and a text taller than
 # the panel shows its first rows and an ellipsis. Tab still takes the whole text.
@@ -140,7 +141,7 @@ def failure(error):
 
 # What Shift+Esc does not take back from a held exchange: where the caret is now (a field, a
 # terminal) and the service's state (keys, hints, offline), besides the hold itself.
-KEPT_ON_RESTORE = ("held", "issued", "held_app", "held_at", "summon", "hints", "offline", "terminal", "quiet",
+KEPT_ON_RESTORE = ("holds", "here", "issued", "summon", "hints", "offline", "terminal", "quiet",
                    "inside", "dropped", "dropped_reply", "dropped_at")
 
 def rows_of(text):
@@ -235,8 +236,9 @@ class Composition:
         self.nudged = None  # Enter on the model's text: what the panel showed then (see nudge)
         self.highlight = 0  # the highlighted row (↑ and ↓ move it; Tab takes it: a draft or a choice)
         self.about = ""  # a follow-up's draft: the one in view (highlighted) when it was sent, not yet inserted
-        self.held = None  # a sent instruction's exchange, held when focus left the text box
-        self.held_app, self.held_at = None, 0.0
+        # Sent instructions' exchanges, held when focus left their text box: box -> [exchange, when].
+        self.holds = {}
+        self.here = None  # the text box focus is in (returned), whose held exchange shows
         self.selected = False  # an approval has a row highlighted (↓ first): only then does Tab answer it
         self.status = ""  # what the agent is doing, or its draft so far
         self.error = ""  # why the last request failed, in plain words
@@ -631,7 +633,7 @@ class Composition:
         what Esc dropped (an instruction to edit, or a reply); "" when there is none (the key is the
         app's)."""
         self.expire()
-        newer = self.dropped and self.dropped_at > self.held_at  # what the toast just offered
+        newer = self.dropped and self.dropped_at > self.held_at  # what the toast just offered (here)
         if self.held is not None and not self.text and not self.live and not newer:
             held, self.held = self.held, None  # the exchange you left, back as it was
             # The exchange comes back; this field and the service's state stay as they are now.
@@ -707,9 +709,9 @@ class Composition:
         """The worker's view of the service, copied each poll: the config's keys and hints, and
         whether it answers. True when that changed (offline or back)."""
         self.summon, self.hints = worker.summon, worker.hints
-        # What the worker's agent sessions are for: the exchange on screen and a held one.
+        # What the worker's agent sessions are for: the exchange on screen and the held ones.
         self.expire()
-        worker.wanted = {self.revision} | ({self.held.revision} if self.held is not None else set())
+        worker.wanted = {self.revision} | {held.revision for held, _ in self.holds.values()}
         changed, self.offline = self.offline != worker.offline, worker.offline
         return changed
 
@@ -991,8 +993,12 @@ class Composition:
             return ""
         if self.for_model:  # a sent instruction, or a follow-up typed on a rewrite: held, as it is
             held = copy.copy(self)
-            held.held = None
-            self.held, self.held_app, self.held_at = held, app, time.monotonic()
+            held.holds = {}
+            box = self.here if app is None else app  # a Shift tap: held for the box you are in
+            self.holds.pop(box, None)
+            while len(self.holds) >= HOLDS:  # the oldest goes (its agent session with it)
+                del self.holds[min(self.holds, key=lambda each: self.holds[each][1])]
+            self.holds[box] = [held, time.monotonic()]
             self.change("")
             return ""
         words = self.text
@@ -1002,7 +1008,8 @@ class Composition:
     def returned(self, app=None):
         """Focus came back: a passive pill if an exchange is held for this app ("3 drafts ready ·
         Shift+Esc open"); it takes no keys. None otherwise; a held exchange expires."""
-        return self.held_pill() if self.held is not None and app == self.held_app else None
+        self.here = app  # its held exchange, if any, is the one the pill and Shift+Esc are about
+        return self.held_pill() if self.held is not None else None
 
     def switched(self):
         """What a mode switch shows: back in compose with an exchange held (a Shift tap left it),
@@ -1021,12 +1028,36 @@ class Composition:
         self.expire()
         return self.held is not None or bool(self.dropped)
 
+    @property
+    def held(self):
+        """The exchange held for the text box you are in, or None."""
+        return self.holds.get(self.here, (None,))[0]
+
+    @held.setter
+    def held(self, exchange):
+        if exchange is None:
+            self.holds.pop(self.here, None)
+        else:
+            self.holds[self.here] = [exchange, time.monotonic()]
+
+    @property
+    def held_at(self):
+        return self.holds.get(self.here, (None, 0.0))[1]
+
+    @held_at.setter
+    def held_at(self, when):
+        if self.here in self.holds:
+            self.holds[self.here][1] = when
+
     def expire(self):
-        """A held exchange older than HELD_SECONDS goes (its agent session with it); True if it went."""
-        if self.held is not None and time.monotonic() - self.held_at > HELD_SECONDS:
-            self.held = None
-            return True
-        return False
+        """Held exchanges older than HELD_SECONDS go (their agent sessions with them); True if this
+        box's went."""
+        gone = False
+        for box, (_, when) in list(self.holds.items()):
+            if time.monotonic() - when > HELD_SECONDS:
+                del self.holds[box]
+                gone = gone or box == self.here
+        return gone
 
     def held_pill(self):
         """The held exchange's pill, or None (in continue Shift+Esc cannot open it; your words come first)."""
@@ -1041,8 +1072,8 @@ class Composition:
         return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open")])
 
     def route(self, revision):
-        """A result for the held exchange (its revision): applied there, not to what is on screen."""
-        return self.held if self.held is not None and revision == self.held.revision else None
+        """A result for a held exchange (its revision): applied there, not to what is on screen."""
+        return next((held for held, _ in self.holds.values() if held.revision == revision), None)
 
 
 class ShiftTap:

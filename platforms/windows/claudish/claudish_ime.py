@@ -247,10 +247,10 @@ class ClaudishTextService(TextService):
     def onDeactivate(self):
         """Another input method takes over: an open exchange is held, as on a focus change, and
         parked with its worker for the next cd_AI instance in this app (pause, not stop)."""
-        keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.for_model, self.state.held is not None))
+        keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.for_model, len(self.state.holds)))
         if self.state.for_model:
             self.state.leave(getattr(self, "last_document", None))
-        if self.worker and (self.state.held is not None or self.state.dropped):
+        if self.worker and (self.state.holds or self.state.dropped):
             park(foreground(), self.state, self.worker)  # something to come back to
             self.worker = None
             self.state = Composition()
