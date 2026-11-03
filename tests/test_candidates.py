@@ -1037,6 +1037,19 @@ class ModeFeelTests(unittest.TestCase):
                 state.toggle_look()
                 state.insert("!")
                 self.assertEqual((state.escape(), state.text), ("back", "running late"))
+        emptied = Composition()  # a follow-up after F8 deleted: your words show again, as a deleted reply's do
+        emptied.mode = "compose"
+        emptied.change("teh cat")
+        emptied.tab()
+        emptied.offer(emptied.revision, "The cat.")
+        for char in "shorter":
+            emptied.insert(char)
+        emptied.enter()
+        emptied.submit()
+        emptied.toggle_look()
+        for _ in "shorter":
+            emptied.backspace()
+        self.assertEqual((emptied.text, emptied.origin), ("teh cat", ""))
 
     def test_a_follow_up_on_a_rewrite_review_round(self):
         """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus

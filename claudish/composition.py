@@ -417,6 +417,9 @@ class Composition:
         """Your words changed at the cursor: a new composition, the cursor kept where it was (and,
         for a follow-up on a rewrite, your words before it)."""
         origin = getattr(self, "origin", "")  # (none before the first change)
+        if not text and origin:  # the follow-up deleted: your words before it show again, as when a reply is
+            self.change(origin)
+            return
         self.change(text)
         self.origin, self.back = origin, back
 
@@ -934,10 +937,12 @@ class Composition:
         if not at:
             head = char + self.text
             self.edit("", 0)
+            self.origin = ""  # what you typed is in the app now: no follow-up to go back from
             return head
         head, tail = self.text[:at], self.text[at:]
         self.edit(tail, len(tail))
         self.insert(char)
+        self.origin = ""
         return head
 
     def backspace(self):

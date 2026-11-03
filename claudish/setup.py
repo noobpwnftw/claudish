@@ -187,7 +187,8 @@ def step_service(settings):
     if status == "ok":
         try:
             doctor.fetch_json(doctor.SERVICE + "/health")
-            return "done", detail, None
+            if doctor.ours():
+                return "done", detail, None
         except Exception:
             pass  # set to start at login, and not running (stopped, or it failed): installed again, it starts
     if status == "skip":
