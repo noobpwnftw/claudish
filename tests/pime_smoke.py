@@ -396,10 +396,13 @@ def main():
             assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
             ime.PARKED.pop(100)
             # PIME drops an instance (its app's connection closed) with no onDeactivate: its worker ends.
-            dropped = ClaudishTextService(None)
+            import types
+            client = types.SimpleNamespace()  # PIME's server.Client: it holds the service, which holds it
+            dropped = ClaudishTextService(client)
+            client.service = dropped
             dropped.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
             dropped_worker = dropped.worker
-            del dropped
+            del dropped, client
             import gc
             gc.collect()
             dropped_worker.close.assert_called()
@@ -419,6 +422,13 @@ def main():
             with patch.object(ime, "foreground", return_value=100):
                 reply = word.handleRequest({"method": "onSetFocus"})
             assert (reply.get("panel") or {}).get("body") == "Greetings.", reply
+            word.state.change("hand it over")  # a helper takes the task, in a new window (in front)
+            word.state.submit()
+            word.worker.poll.return_value = (word.state.revision, {"done": "claude opened in a new window"})
+            with patch.object(ime, "foreground", return_value=200):
+                reply = word.handleRequest({"method": "onTimer", "seqNum": 10})
+            word.worker.poll.return_value = None
+            assert "toast" not in reply and not reply.get("showMessage"), reply  # not over that window
             # Back in a text box after a focus change: what waits there says so when the app has the
             # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
             back = ClaudishTextService(None)

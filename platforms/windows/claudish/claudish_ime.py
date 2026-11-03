@@ -77,8 +77,8 @@ def release(worker):
         worker.close()
 
 
-def gone(attributes):
-    worker = attributes.get("worker")
+def gone(box):
+    worker = box[0]
     if worker is not None and not any(parked[1] is worker for parked in PARKED.values()):
         release(worker)
 
@@ -207,8 +207,11 @@ class ClaudishTextService(TextService):
         super().__init__(client)
         INSTANCES.add(self)
         # PIME drops an instance whose app's connection closed without onDeactivate: its worker ends
-        # with it (its threads, its conversations), unless it is parked for the next one here.
-        weakref.finalize(self, gone, self.__dict__)
+        # with it (its threads, its conversations), unless it is parked for the next one here. The
+        # finalizer holds only the worker's box, nothing that leads back to the instance (PIME's
+        # client does), or the instance could never be collected.
+        self._worker = [None]
+        weakref.finalize(self, gone, self._worker)
         self.state = Composition()
         if LAST_MODE[0] and LAST_MODE[0] != self.state.mode:
             self.state.mode = LAST_MODE[0]  # back to cd_AI from another input method: the same mode
@@ -475,8 +478,8 @@ class ClaudishTextService(TextService):
         self.setTimer(TIMER_MS)
 
     def onTimer(self):
-        changed = self.poll_results()
         away = getattr(self, "owner", None) and foreground() not in (None, self.owner)
+        changed = self.poll_results(away)
         if away:
             pass  # another app is in front: nothing is drawn over it; onSetFocus shows it all on return
         elif changed or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
@@ -514,15 +517,16 @@ class ClaudishTextService(TextService):
         self.publish()
         return True
 
-    def poll_results(self):
-        """The worker's result, if any, in the composition: its kind when it changed what shows."""
+    def poll_results(self, away=False):
+        """The worker's result, if any, in the composition: its kind when it changed what shows.
+        away: another app is in front, where nothing is said (a helper's new window, often)."""
         # PIME replies are event-driven: poll on a key event, never mutate TSF off-thread.
         if self.worker:
             self.state.follow(self.worker)  # the config's keys, and whether the service answers
         result = self.worker.poll() if self.worker else None
         kind = self.state.receive(*result) if result else None
         toast = self.state.done_toast(result[1]["done"]) if kind == "done" else None
-        if toast:
+        if toast and not away:
             self.setToast(toast, 3)
         return kind
 
@@ -694,6 +698,14 @@ class ClaudishTextService(TextService):
             self.setCommitString(self.state.type_live(chr(event.charCode)))
         self.changed()
         return True
+
+    @property
+    def worker(self):
+        return self._worker[0]
+
+    @worker.setter
+    def worker(self, worker):
+        self._worker[0] = worker
 
     def handleRequest(self, msg):
         if msg.get("method") != "onCompositionTerminated":
