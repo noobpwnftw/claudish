@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..c683198 100644
+index 0c7a8d5..6e9e41a 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -63,7 +63,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
@@ -493,7 +493,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 286246a..910b8c4 100644
+index 286246a..764c74f 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -96,6 +96,21 @@ void TextService::onDeactivate() {
@@ -554,7 +554,7 @@ index 286246a..910b8c4 100644
          }
      }
  }
-@@ -348,6 +366,51 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,56 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -570,6 +570,11 @@ index 286246a..910b8c4 100644
 +		const RECT& work = monitor.rcWork;
 +		if (y + height > work.bottom && line.top - work.top > work.bottom - line.bottom)
 +			y = line.top - gap - height + window.bottomInset();
++		// Near the monitor's right edge, moved left to fit (never off the screen or onto the next one).
++		if (x + width > work.right)
++			x = work.right - width;
++		if (x < work.left)
++			x = work.left;
 +	}
 +	window.move(x, y);
 +}
@@ -606,7 +611,7 @@ index 286246a..910b8c4 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -371,14 +434,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +439,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -636,7 +641,7 @@ index 286246a..910b8c4 100644
      }
  }
  
-@@ -431,6 +505,7 @@ void TextService::closeClient() {
+@@ -431,6 +510,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
