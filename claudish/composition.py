@@ -671,7 +671,8 @@ class Composition:
             # Before any answer, the first instruction goes with it: the new one replaces its
             # session, which the conversation does not keep, and the model would have only this.
             first = self.text.strip() if self.sent and not (drafts or self.converted) else ""
-            self.change(" ".join(part for part in (first, self.reply.strip()) if part))  # one line, as typed
+            joined = " ".join(part for part in (first, self.reply.strip()) if part)  # one line, as typed
+            self.change(joined if len(joined) <= MAX_COMPOSITION else self.reply.strip())  # too long together: alone
             self.about = about
             return "submit"
         if self.asked == "instruct" and self.candidate:

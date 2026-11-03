@@ -171,6 +171,14 @@ class ReceiveTests(unittest.TestCase):
         for char in " and mention Friday":  # typed while it works
             state.insert(char)
         self.assertEqual((state.enter(), state.text), ("submit", "write an apology to Bob and mention Friday"))
+        long = Composition()
+        long.mode = "compose"
+        long.change("x" * 400)
+        long.enter()
+        long.submit()
+        for char in "y" * 300:
+            long.insert(char)
+        self.assertEqual((long.enter(), long.text), ("submit", "y" * 300))  # 701 together: the service takes 512
         state.submit()
         state.offer(state.revision, "Sorry, Bob.", ["Sorry, Bob.", "Apologies, Bob."])
         for char in "shorter":  # on its drafts: about the one in view, alone
