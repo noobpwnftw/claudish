@@ -137,6 +137,7 @@ class ClaudishEngine(IBus.Engine):
         self.purpose = None  # The field's kind as the app reports it ("terminal", "email", ...).
         self.drawn = None  # the panel as last shown, redrawn when the state's description changes
         self.timer = GLib.timeout_add(40, self.poll)
+        self.focused = True  # until IBus says otherwise: an engine may start in a box that has focus
 
     def poll(self):
         if self.composition.follow(self.suggestions):  # the service stopped or came back
@@ -589,6 +590,13 @@ class ClaudishEngine(IBus.Engine):
         elif action == "accept":  # a draft: inserted
             self.finish(True)
 
+    def resume(self):
+        """Focus in: the poll timer again (it stops while another box has focus), and what came meanwhile."""
+        self.focused = True
+        if self.timer is None:
+            self.timer = GLib.timeout_add(40, self.poll)
+            self.poll()
+
     def do_focus_in_id(self, object_path, client):
         # IBus 1.5.27+: client is "<im module>:<program>", for example "gtk3-im:firefox".
         self.app = None if client in ("", "fake") else client.split(":", 1)[-1]
@@ -596,6 +604,7 @@ class ClaudishEngine(IBus.Engine):
         # context and approvals stay with the box they were made in, also when you come back to it.
         self.suggestions.use_conversation(object_path)
         self.context = object_path
+        self.resume()
         self.update_quiet()
         self.refresh_surrounding()
         self.show_mode(register=True)
@@ -610,6 +619,12 @@ class ClaudishEngine(IBus.Engine):
 
     def do_focus_out(self):
         trace("focus-out")
+        self.focused = False
+        if self.timer is not None:  # another box's engine polls now; results wait in the worker
+            GLib.source_remove(self.timer)
+            self.timer = None
+        if screen().shell:
+            screen().end_toast()  # a pill (held exchange) belongs to the box it was shown at, which is left
         if self.composition.for_model:  # an instruction's exchange: held for this text box, its work going on
             self.composition.leave(getattr(self, "context", None))
             self.render()
@@ -640,8 +655,10 @@ class ClaudishEngine(IBus.Engine):
         self.refresh_surrounding()
 
     def do_destroy(self):
-        screen().publish()  # nothing at the caret
-        GLib.source_remove(self.timer)
+        if self.focused:  # another box's engine may be the one drawing now (X11: one engine per box)
+            screen().publish()  # nothing at the caret
+        if self.timer is not None:
+            GLib.source_remove(self.timer)
         self.suggestions.close()
         IBus.Engine.do_destroy(self)
 
