@@ -441,6 +441,50 @@ class ReceiveTests(unittest.TestCase):
         self.assertFalse(state.follow(worker))  # nothing changed
 
 
+class RetryTests(unittest.TestCase):
+    def test_a_retried_instruction_is_not_failed_by_the_one_before(self):
+        """Shift+Enter again after a failure: the failed session's late error (an answer that could
+        not be sent) once marked the retry failed as it worked."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("do it")
+        state.enter()
+        state.submit()
+        first = state.revision
+        state.receive(first, {"error": "the instruction had ended", "session": "s1"})
+        self.assertEqual(state.enter(), "submit")
+        state.submit()
+        self.assertNotEqual(state.revision, first)
+        state.receive(first, {"error": "cancelled", "session": "s1"})
+        self.assertEqual((state.working, state.failed), (True, False))
+
+    def test_a_failed_rewrite_leaves_the_cursor_where_you_put_it(self):
+        state = Composition()
+        state.mode = "compose"
+        for char in "hello world":
+            state.insert(char)
+        for _ in range(6):
+            state.arrow(-1)
+        self.assertEqual(state.tab(), "request")
+        state.receive(state.revision, {"error": "timed out"})
+        self.assertTrue(state.failed)
+        state.insert("X")
+        self.assertEqual(state.text, "helloX world")
+
+    def test_arrows_never_split_a_flag_in_an_odd_run(self):
+        state = Composition()
+        state.change("\U0001F1FA\U0001F1F8\U0001F1EB")  # 🇺🇸 and a lone 🇫
+        state.arrow("home")
+        state.arrow(1)
+        self.assertEqual(state.cursor, 2)  # past the flag
+        state.arrow(1)
+        state.arrow(-1)
+        self.assertEqual(state.cursor, 2)
+        state.arrow("end")
+        state.backspace()
+        self.assertEqual(state.text, "\U0001F1FA\U0001F1F8")  # the lone one only
+
+
 class HintsTests(unittest.TestCase):
     """"hints": false: no keys while you compose, no toasts; the panel while something is pending
     (working, or drafts, a rewrite, a question waiting on Tab) or went wrong."""

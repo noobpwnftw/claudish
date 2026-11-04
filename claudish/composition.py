@@ -62,21 +62,29 @@ def regional(char):
     return 0x1F1E6 <= ord(char) <= 0x1F1FF
 
 
+def run(text, at):
+    """How many regional indicators come right before at."""
+    count = 0
+    while at - count > 0 and regional(text[at - count - 1]):
+        count += 1
+    return count
+
+
 def step_back(text, at):
     """Where the visible character before at starts: an emoji with its skin tone or a family joined
     by ZWJ, a flag, a letter with its accents goes as one."""
     at -= 1
     while at > 0 and (joins(text[at]) or text[at - 1] == "\u200d"):
         at -= 1
-    if at > 0 and regional(text[at]) and regional(text[at - 1]):
-        at -= 1
+    if at > 0 and regional(text[at]) and regional(text[at - 1]) and run(text, at - 1) % 2 == 0:
+        at -= 1  # a flag is a pair, counted from the start of the run
     return max(at, 0)
 
 
 def step_forward(text, at):
     """Where the visible character at at ends (step_back's other direction)."""
     start, at = at, at + 1
-    if at < len(text) and regional(text[start]) and regional(text[at]):
+    if at < len(text) and regional(text[start]) and regional(text[at]) and run(text, start) % 2 == 0:
         at += 1
     while at < len(text) and (joins(text[at]) or text[at - 1] == "\u200d"):
         at += 1
@@ -645,6 +653,7 @@ class Composition:
         if not self.text.strip():
             return "wait"  # only spaces: nothing to rewrite (and nothing would answer)
         self.asked, self.working, self.failed = "rewrite", True, False
+        self.revision = next(REVISIONS)  # a retry too: a late answer to the failed one is not this one's
         return "request"
 
     def escape(self):
@@ -776,6 +785,7 @@ class Composition:
         self.asked, self.working, self.failed = "instruct", True, False
         self.converted, self.candidate, self.candidates = False, "", []  # a rewrite earlier is not this answer
         self.nudged = None
+        self.revision = next(REVISIONS)  # a retry too: what the failed one still sends is not this one's
 
     def follow(self, worker):
         """The worker's view of the service, copied each poll: the config's keys and hints, and
@@ -810,6 +820,9 @@ class Composition:
         self.working, self.failed = False, True
         self.question, self.status, self.queued = None, "", []  # a retry starts with no questions of this one
         # Words set aside while a question was up come back to edit, as when it is answered.
+        if not (self.reply or self.waiting):  # nothing typed since: the cursor stays where you put it
+            self.error = failure(error)
+            return True
         joined = self.reply + " " + self.waiting
         at = len(self.reply) - self.back - (len(joined) - len(joined.lstrip()))  # the cursor, in what stays
         if not self.reply:
