@@ -87,14 +87,6 @@ def substring(client, location, length):
 
 RETURN_KEYS = (36, 76)  # Return, keypad Enter
 NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
-TYPED_TAIL = 32  # continue's typed tail: the app's text before the caret still ends with it, or a click moved it
-
-
-def plain(text):
-    """Text as compared with the app's: its line ends and no-break spaces as plain ones."""
-    return text.replace("\r", "").replace("\xa0", " ")
-
-
 def marked(text):
     """The composition as the design draws it: one plain underline in the text colour (apps
     otherwise draw marked text their own way, an accent-coloured thick line in a text view)."""
@@ -356,8 +348,7 @@ class ClaudishInputController(IMKInputController):
             OVERLAY.hide()
             return
         before = self.around_caret(client)[0] if client is not None else ""
-        typed = plain(self.state.text)[-TYPED_TAIL:]
-        if before and before != getattr(self, "asked_before", before) and not plain(before).endswith(typed):
+        if before != getattr(self, "asked_before", before) and not self.state.caret_stayed(before):
             # A click moved the caret while it was asked for (no key says so): the text before it is
             # neither what it was when asked (the app may still be catching up after the key, as
             # Chromium's does) nor what continue typed (the app may have changed it: smart quotes,
@@ -597,7 +588,7 @@ class ClaudishInputController(IMKInputController):
             return False
         before = self.around_caret(client)[0]
         # A fresh start (a paste, a new field), or a click since (no key says so): from the app's text.
-        if not state.text or (before and not plain(before).endswith(plain(state.text)[-TYPED_TAIL:])):
+        if not state.text or not state.caret_stayed(before):
             state.change(before[-MAX_COMPOSITION:])
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))

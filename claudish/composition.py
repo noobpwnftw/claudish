@@ -83,6 +83,9 @@ def step_forward(text, at):
     return min(at, len(text))
 
 
+TYPED_TAIL = 32  # continue's typed tail: the app's text before the caret still ends with it, or a click moved it
+
+
 def plain(text):
     """Text as compared for continue's caret check: what apps change as you type (a no-break space
     after a word, Word's curly quotes) as typed."""
@@ -1047,7 +1050,7 @@ class Composition:
         sends no key on every platform, and Tab never takes a suggestion for another place. True
         when the app does not share its text."""
         before = plain(before)
-        return not before or before.endswith(plain(self.text)[-32:])
+        return not before or before.endswith(plain(self.text)[-TYPED_TAIL:])
 
     def take_ghost(self):
         """Tab in continue: the suggestion to commit, or "" (then Tab belongs to the app). Taking it
