@@ -107,6 +107,11 @@ def located(program):
     return (find and find()) or program
 
 
+def runs(program):
+    """Whether a program is a file this account can run."""
+    return os.path.isfile(program) and os.access(program, os.X_OK)
+
+
 def starter():
     return dict(config.STARTER, profiles={k: dict(v) for k, v in config.STARTER["profiles"].items()})
 
@@ -346,12 +351,16 @@ def apply(changes, path=None):
             raise ValueError(problem)
     for choice, find, missing in (("claude-code", claude_code, NO_CLAUDE_CODE), ("codex", codex, NO_CODEX)):
         if changes.get("choice") == choice:
+            entry = profiles.setdefault(choice, dict(config.STARTER["profiles"][choice]))
+            kept = entry.get("command")
+            if isinstance(kept, list) and kept and isinstance(kept[0], str) and runs(os.path.expanduser(kept[0])):
+                entry["backend"] = choice  # the profile's own command (a path, a wrapper with arguments) runs as it is
+                continue
             command = find()
             if not command:  # like a server that is not there: no switch to a model that cannot answer
                 raise ValueError(missing)
             # Kept running beside the service (claudish/warm.py); the full path, so the login service
             # finds it without the shell's PATH. Keep the profile's model, tone and other settings.
-            entry = profiles.setdefault(choice, dict(config.STARTER["profiles"][choice]))
             entry.update(backend=choice, command=[command])
     if "choice" in changes:
         name = CHOICES[changes["choice"]]

@@ -174,6 +174,47 @@ async def check(args, home, port):
         await expect(page.locator("input[name=choice][value=codex]")).to_be_checked()
         await page.unroute("**/settings", refused)
 
+        # "Your own API" picked and filled in, not yet used: another save leaves the form as it is.
+        if not await page.locator("input[name=hints][value=on]").is_checked():
+            await page.locator("input[name=hints][value=on]").check()
+            await expect(page.locator("#hints-message")).to_have_text("Hints show.")
+        await page.locator("input[name=choice][value=server]").check()
+        await page.locator("#url").fill("http://127.0.0.1:9999")
+        await page.locator("input[name=hints][value=off]").check()
+        await expect(page.locator("#hints-message")).to_have_text("The panel shows only what is pending.")  # saved
+        await expect(page.locator("#server")).to_be_visible()
+        await expect(page.locator("input[name=choice][value=server]")).to_be_checked()
+        await expect(page.locator("#url")).to_have_value("http://127.0.0.1:9999")
+        await page.locator("input[name=hints][value=on]").check()
+        await expect(page.locator("#hints-message")).to_have_text("Hints show.")
+        await page.locator("input[name=choice][value=codex]").check()  # picked back: the form closes
+        await expect(page.locator("#server")).to_be_hidden()
+
+        # A save that is refused puts its control back to what is saved.
+        async def no_hints(route):
+            if route.request.method == "POST" and "hints" in (route.request.post_data_json or {}):
+                await route.fulfill(status=400, json={"error": "config.json changed while this was being saved"})
+            else:
+                await subscription_state(route)
+        await page.route("**/settings", no_hints)
+        await page.locator("input[name=hints][value=off]").check()
+        await expect(page.locator("#hints-message")).to_contain_text("changed while this was being saved")
+        await expect(page.locator("input[name=hints][value=on]")).to_be_checked()
+        await page.unroute("**/settings", no_hints)
+
+        # Tones the config adds (the starter templates.json's "mine", after the first save) are listed.
+        async def more_tones(route):
+            response = await route.fetch()
+            data = await response.json()
+            data.update(choice=lifecycle["backend"], service=dict(lifecycle), command="/opt/codex/bin/codex")
+            data["tones"] = data["tones"] + [{"name": "mine", "about": "Your own."}]
+            await route.fulfill(response=response, json=data)
+        await page.route("**/settings", more_tones)
+        await page.locator("input[name=hints][value=off]").check()
+        await expect(page.get_by_text("Mine", exact=True)).to_be_visible()
+        await page.unroute("**/settings", more_tones)
+        await page.locator("input[name=hints][value=on]").check()
+
         # A late response from the previous model must not overwrite a newer example.
         pending, release = asyncio.Event(), asyncio.Event()
 

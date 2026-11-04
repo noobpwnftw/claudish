@@ -396,22 +396,27 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                 names = (["anthropic"] if data.get("key") else []) + \
                     ([keys.server_name(api["url"])] if api.get("key") and isinstance(api.get("url"), str) else [])
                 saved = {name: keys.stored(name) for name in names}
+
+                def put_back():
+                    for each in path.parent.glob("*.json*"):
+                        if each not in before:
+                            each.unlink(missing_ok=True)
+                    for each, content in before.items():
+                        each.write_bytes(content)
+                    for name, key in saved.items():
+                        keys.store(key, name) if key else keys.forget(name)
+                    stamps[0] = stamp()  # put back as the service runs it: nothing to take up
                 try:
                     shown = settings.apply(data, config_path)
                 except ValueError as exc:
                     return self.reply(400, {"error": str(exc)})
                 except Exception as exc:  # the keychain, the disk: said on the page, not a dropped connection
+                    try:  # a key saved before the step that failed goes back with the files
+                        put_back()
+                    except Exception:
+                        pass
                     return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
                 if reload is not None:
-                    def put_back():
-                        for each in path.parent.glob("*.json*"):
-                            if each not in before:
-                                each.unlink(missing_ok=True)
-                        for each, content in before.items():
-                            each.write_bytes(content)
-                        for name, key in saved.items():
-                            keys.store(key, name) if key else keys.forget(name)
-                        stamps[0] = stamp()  # put back as the service runs it: nothing to take up
                     try:
                         swap()
                     except Exception as exc:  # it would not start at the next login either: put it back

@@ -73,6 +73,7 @@ function status(state) {
   return ["cd_AI is running.", ""];
 }
 
+let picking = false;  // "Your own API" picked, not yet used: its form stays open through other saves
 let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer, lockTimer, toneTimer, started = false;
 // Every change would be refused while the config in use does not read: the file comes first.
 const locked = (state) => Boolean((state.service || {}).problem || state.config_locked);
@@ -144,11 +145,12 @@ function render(state) {
   if (locked(state)) lockTimer = setTimeout(recheck, 500);  // the fix applies when the file is saved
   $("config-fix").textContent = (problem ? `A model you can pick here does not read: ${problem}. ` : "") +
     `Fix it in ${state.config} (it applies when you save), or move that file aside and run ${typed()} init.`;
-  for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === state.choice;
-  $("claude").hidden = state.choice !== "claude";
-  $("try").hidden = false;  // the model in use; hidden while another is picked but not yet in use
-  $("server").hidden = state.choice !== "server";
-  $("other").hidden = !["local", "other"].includes(state.choice);
+  const choice = picking ? "server" : state.choice;
+  for (const radio of document.querySelectorAll("input[name=choice]")) radio.checked = radio.value === choice;
+  $("claude").hidden = choice !== "claude";
+  $("try").hidden = picking && state.choice !== "server";  // the model in use; hidden while another is picked but not yet in use
+  $("server").hidden = choice !== "server";
+  $("other").hidden = !["local", "other"].includes(choice);
   $("other").textContent = state.choice === "local"
     ? "cd_AI uses the local model that `claudish setup --profile local` set up. Pick one above to change that."
     : `cd_AI uses the profile “${state.profile}” from its config. Pick one above to change that.`;
@@ -156,8 +158,8 @@ function render(state) {
                                 profile: "Your `ant auth login` profile (a saved key goes first)",
                                 environment: `${state.key_env} in your environment (used before a saved key)`}[state.key];
   $("key-state").classList.toggle("good", state.key !== "missing");
-  if (document.activeElement !== $("url")) $("url").value = state.server.url;
-  if (document.activeElement !== $("model")) $("model").value = state.server.model;
+  if (!picking && document.activeElement !== $("url")) $("url").value = state.server.url;
+  if (!picking && document.activeElement !== $("model")) $("model").value = state.server.model;
   $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.server.key_where}` : "";
   $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
   tones(state);
@@ -167,7 +169,9 @@ function render(state) {
 
 function tones(state) {
   const group = $("tones");
-  if (!group.childElementCount) {
+  const names = state.tones.map((tone) => tone.name).join("\n");
+  if (group.dataset.names !== names) {  // the first time, and when templates.json names other tones
+    group.dataset.names = names;
     const rows = state.tones.map((tone) => toneRow(tone.name, tone.name[0].toUpperCase() + tone.name.slice(1), tone.about));
     const own = toneRow("", TONE_WORDS, "A few words, such as “plain and friendly”.");
     own.classList.add("own");
@@ -263,23 +267,21 @@ async function change(body, message, done) {
       return false;
     }
     say(message, sentence(error.message), true);
-    if (shown) showStatus(shown);
-    return false;  // what you filled in stays, to correct
+    if (shown) render(shown);  // the controls as saved (an API's fields stay, to correct)
+    return false;
   }
 }
 
 document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
+  picking = radio.value === "server";
   if (radio.value === "claude") {
     change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.").then((done) => {
       if (done && shown && shown.key === "missing") say("model-message", "");  // nothing writes yet: the status says what to add
-      if (!done && shown) render(shown);  // not switched: the radio goes back to what is in use
     });
   } else if (radio.value === "claude-code" || radio.value === "codex") {
     $("claude").hidden = $("server").hidden = true;
     const name = radio.value === "codex" ? "Codex" : "Claude Code";
-    change({choice: radio.value}, "model-message", `cd_AI now writes with ${name}.`).then((done) => {
-      if (!done && shown) render(shown);  // not switched: the radio goes back to what is in use
-    });
+    change({choice: radio.value}, "model-message", `cd_AI now writes with ${name}.`);  // refused: back to what is in use
   } else {  // an API must answer before cd_AI switches to it: fill it in first
     $("claude").hidden = true;
     $("server").hidden = false;
@@ -301,7 +303,14 @@ $("claude").addEventListener("submit", async (event) => {
 $("server").addEventListener("submit", (event) => {
   event.preventDefault();
   change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
-         "model-message", "cd_AI now writes with this API.").then((done) => { if (done) $("server-key").value = ""; });
+         "model-message", "cd_AI now writes with this API.").then((done) => {
+    if (done) {
+      picking = false;
+      $("server-key").value = "";
+      $("url").value = shown.server.url;  // as saved
+      $("model").value = shown.server.model;
+    }
+  });
 });
 $("try").addEventListener("submit", (event) => {
   event.preventDefault();

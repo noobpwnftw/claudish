@@ -207,6 +207,22 @@ class SettingsTests(Home):
                 self.assertEqual((profile["model"], profile["timeout"], profile["tone"], profile["read_terminal"]),
                                  ("chosen-model", 42, "critic", False))
 
+    def test_a_profiles_own_command_that_runs_is_kept(self):
+        """A path from the docs (not on PATH, not where cd_AI looks), or a wrapper with arguments:
+        switching to it is not refused, and it is not replaced by whatever `which` finds."""
+        with tempfile.TemporaryDirectory() as folder:
+            wrapper = Path(folder, "my-claude")
+            wrapper.write_text("#!/bin/sh\n")
+            wrapper.chmod(0o755)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({"profile": "claude", "profiles": {
+                "claude": {"backend": "claude"},
+                "claude-code": {"backend": "claude-code", "command": [str(wrapper), "--flag"]}}}))
+            with patch.object(settings, "claude_code", return_value=None):
+                state = settings.apply({"choice": "claude-code"})
+            self.assertEqual(state["choice"], "claude-code")
+            self.assertEqual(self.written()["profiles"]["claude-code"]["command"], [str(wrapper), "--flag"])
+
     def test_the_extension_copy_is_the_command_not_a_helper_beside_it(self):
         with tempfile.TemporaryDirectory() as home:
             folder = Path(home, ".vscode-server/extensions/openai.chatgpt-26.1/bin/linux-aarch64")
@@ -449,6 +465,21 @@ class ServiceTests(Home):
                 self.assertEqual(status, 400)
                 self.assertIn("nothing changed", answer["error"])
                 self.assertEqual(keys.stored(), earlier)  # not the new one
+
+    def test_a_key_saved_before_a_save_that_fails_is_put_back(self):
+        """config.json could not be written (Windows: an editor holds it): the key saved just before
+        goes back too, as the page says nothing was saved."""
+        if sys.platform == "darwin":
+            self.skipTest("the key files of Linux and Windows; never the real Keychain")
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text(json.dumps(config.STARTER))
+        keys.store("sk-ant-earlier")
+        with patch.object(settings, "accepted_key", side_effect=lambda key: key), \
+                patch.object(settings.config, "save", side_effect=PermissionError("in use")):
+            status, answer = self.call("/settings", {"key": "sk-ant-new", "tone": "bard"})
+        self.assertEqual(status, 500)
+        self.assertIn("could not save that", answer["error"])
+        self.assertEqual(keys.stored(), "sk-ant-earlier")
 
     def test_a_slow_model_change_keeps_a_concurrent_tone_change(self):
         from concurrent.futures import ThreadPoolExecutor, TimeoutError
