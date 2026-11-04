@@ -94,16 +94,18 @@ def main():
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding="utf-8"))
     try:
-        suggest("Warm up the model.", args.url)  # Excluded from results.
+        suggest("Warm up the model.", args.url, again=False)  # Excluded from results.
     except HTTPError:
         pass
     outputs = []
     for case in cases:
         start = time.perf_counter()
         try:
-            output, error = suggest(case["text"], args.url)["text"], None
+            output, error = suggest(case["text"], args.url, again=False)["text"], None
         except HTTPError as exc:
             output, error = None, json.load(exc).get("error", str(exc))
+        except OSError as exc:  # the service went away or timed out: this case failed, the run goes on
+            output, error = None, str(exc) or type(exc).__name__
         outputs.append((output, error, round((time.perf_counter() - start) * 1000, 2)))
     report = {"label": args.label, "slop": args.slop, **score(cases, outputs, args.slop)}
     if args.output:

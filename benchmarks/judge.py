@@ -112,11 +112,14 @@ def main():
                  for row in report["results"] if row.get("output")]
     started, rows = time.perf_counter(), []
     for pair in pairs:
-        verdict, reason = judge(args.model_url, pair["source"], pair["output"], task=args.task)
+        try:
+            verdict, reason = judge(args.model_url, pair["source"], pair["output"], task=args.task)
+        except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:  # one bad reply: that pair, not the run
+            verdict, reason = "error", "%s: %s" % (type(exc).__name__, exc)
         rows.append(dict(pair, verdict=verdict, reason=reason))
     summary = {"pairs": len(rows), "seconds": round(time.perf_counter() - started, 1),
                "verdicts": dict(Counter(row["verdict"] for row in rows))}
-    if args.calibrate:
+    if args.calibrate and rows:
         exact = sum(row["verdict"] == row["label"] for row in rows)
         best = TASKS[args.task]["labels"][0]  # "same", "slop", "good": the verdict that passes
         binary = sum((row["verdict"] == best) == (row["label"] == best) for row in rows)

@@ -50,7 +50,7 @@ def main():
         start = time.perf_counter()
         try:
             answer, error = rewriter.rewrite("fix", mode="instruct", app="gnome-terminal-server",
-                                             screen=screen(case, installed))["text"].strip(), None
+                                             screen=screen(case, installed), again=False)["text"].strip(), None
         except Exception as exc:
             answer, error = None, str(exc)
         wanted = case["fix"]

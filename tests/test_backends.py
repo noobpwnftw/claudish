@@ -168,6 +168,20 @@ class EndpointBackendTests(unittest.TestCase):
         self.assertEqual(sent[0]["temperature"], 0)
         self.assertEqual((sent[1]["temperature"], sent[1]["seed"]), (0.9, 101))
 
+    def test_a_measurements_repeats_stay_deterministic(self):
+        """claudish bench and the evaluations repeat texts (again=False): each is asked as the first
+        time, at temperature 0, and an IME's later repeat is still only its second take."""
+        rewriter = Rewriter("openai", "http://127.0.0.1:9")
+        sent = []
+        rewriter.chat = lambda payload, headers, image=None, timeout=None: (
+            sent.append(payload) or ({"message": {"content": "Take %d." % len(sent)}, "finish_reason": "stop"}, {}))
+        for _ in range(3):
+            rewriter.rewrite("ok", again=False)
+        self.assertEqual([payload["temperature"] for payload in sent], [0, 0, 0])
+        rewriter.rewrite("ok")
+        rewriter.rewrite("ok")
+        self.assertEqual((sent[4]["temperature"], sent[4]["seed"]), (0.9, 101))
+
     def test_remote_endpoint_sends_key(self):
         rewriter = Rewriter("openai", "https://models.example.com", model="any-model", api_key="k-123")
         handlers, request, _ = self.call(rewriter)

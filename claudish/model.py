@@ -545,17 +545,19 @@ class Rewriter:
         return data["choices"][0], data.get("usage", {})
 
     def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None,
-                context=True):
+                context=True, again=True):
         """One answer for a /suggest request (continue, rewrite, or instruct without a session).
         look: a picture of the focused window (instruct only; F8); before/after: the text box
         around the caret; purpose: the field's kind; screen: a terminal's last lines, given instead
-        of read; context: False for the demo's requests (no token): no observations."""
+        of read; context: False for the demo's requests (no token): no observations; again: False for a
+        measurement, whose repeats are not other takes (they stay deterministic)."""
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
         box = self.box(mode, app, purpose, before, after, look, screen, trusted=context)
-        return self.answer(mode, text, box)
+        return self.answer(mode, text, box, again=again)
 
-    def answer(self, mode, text, box, conversation=None, approve=None, progress=None, local=None, serial=True):
+    def answer(self, mode, text, box, conversation=None, approve=None, progress=None, local=None, serial=True,
+               again=True):
         """The one loop: describe the request, call the model with the tools this mode may use, run
         tool calls (asking through approve when policy says so), and fit the result to the box.
         serial: a request while typing, which fails fast instead of queueing behind another."""
@@ -598,7 +600,7 @@ class Rewriter:
                 outputs, usage, new, called = self.ask_model(mode, prompt, sent, history, said, box,
                                                              1 if self.claude else count,
                                                              tools, approve, progress, local, serial,
-                                                             take=self.take(mode, said))
+                                                             take=self.take(mode, said) if again else 0)
                 consulted += called
         except Exception as exc:
             from .tools import Finished
@@ -619,10 +621,10 @@ class Rewriter:
             if serial:
                 self.lock.release()
         if refused:  # the turn again without the shape; refused plain too, the schema was not why
-            if self.takes.get((mode, said)):
+            if again and self.takes.get((mode, said)):
                 self.takes[(mode, said)] -= 1  # the same take, asked again: not another one
             try:
-                return self.answer(mode, text, box, conversation, approve, progress, local, serial)
+                return self.answer(mode, text, box, conversation, approve, progress, local, serial, again)
             except HTTPError as exc:
                 if exc.code in SCHEMA_REFUSED:
                     self.schema = True

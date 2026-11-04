@@ -87,10 +87,13 @@ def headers(url=SERVICE):
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
 def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=False,
-            before="", after="", purpose=None):
+            before="", after="", purpose=None, again=True):
     """before/after: the text box around the caret (where the result goes); purpose: the field's
-    kind as the input method reports it ("terminal", "email", ...)."""
+    kind as the input method reports it ("terminal", "email", ...); again: False for a measurement,
+    whose repeated texts are answered as the first time, not as another take."""
     body = {"text": text, "mode": mode}
+    if not again:
+        body["again"] = False
     for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
         if value:
             body[key] = value

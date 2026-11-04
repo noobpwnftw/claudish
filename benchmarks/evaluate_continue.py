@@ -54,16 +54,18 @@ def main():
     args = parser.parse_args()
     cases = json.loads(args.cases.read_text(encoding="utf-8"))
     try:
-        suggest("Warm up the model ", args.url, mode="continue")  # Excluded from results.
+        suggest("Warm up the model ", args.url, mode="continue", again=False)  # Excluded from results.
     except HTTPError:
         pass
     rows = []
     for case in cases:
         start = time.perf_counter()
         try:
-            candidate, error = suggest(case["text"], args.url, mode="continue")["text"], None
+            candidate, error = suggest(case["text"], args.url, mode="continue", again=False)["text"], None
         except HTTPError as exc:
             candidate, error = "", json.load(exc).get("error", str(exc))
+        except OSError as exc:  # the service went away or timed out: this case failed, the run goes on
+            candidate, error = "", str(exc) or type(exc).__name__
         wall_ms = round((time.perf_counter() - start) * 1000, 2)
         # The service offers the whole line, the text then its continuation (modes.finish).
         offered = candidate[len(case["text"]):] if candidate.startswith(case["text"]) else candidate

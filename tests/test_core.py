@@ -365,6 +365,7 @@ class ServiceTests(unittest.TestCase):
         for body, headers, status in [
             ({"text": "x" * 513}, {}, 400),
             ([], {}, 400),
+            ({"text": "hello", "again": "no"}, {}, 400),
             ({"text": "hello"}, {"Origin": "http://example.com"}, 403),
         ]:
             req = Request(self.url + "/suggest", data=json.dumps(body).encode(),

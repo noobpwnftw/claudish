@@ -242,7 +242,7 @@ def main():
                    "Let's explore the options.", "The test failed because the file was missing."]
         try:
             with reachable(args.url):
-                suggest(samples[0], args.url)  # Warmup excluded from measured samples.
+                suggest(samples[0], args.url, again=False)  # Warmup excluded from measured samples.
         except HTTPError:
             pass
         results = []
@@ -250,7 +250,7 @@ def main():
             source = samples[index % len(samples)]
             start = time.perf_counter()
             try:
-                response = suggest(source, args.url)
+                response = suggest(source, args.url, again=False)
             except HTTPError as exc:
                 response = {"error": json.load(exc).get("error", str(exc))}
             results.append({"input": source,
