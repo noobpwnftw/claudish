@@ -175,21 +175,22 @@ function panel() {
                  status: null, busy: false, failed: null, replying: false};
   // Once the composition no longer shows your instruction (you type a reply), the panel says it.
   if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
-  const typing = sent() && state.reply ? {replying: true, on: -1, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]} : {};
-  if (state.working) return {...shown, status: state.asked === "rewrite" ? "rewriting" : "working", busy: true,
+  const typing = sent() && state.reply ? {replying: true, on: -1, tail: null, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]} : {};
+  if (state.working) return {...shown, status: state.asked === "rewrite" && !state.reply ? "rewriting" : "working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
   if (state.failed) return {...shown, tile: "warn", failed: state.error || "the request failed",  // Tab retries a rewrite
-                            foot: [[state.asked === "rewrite" ? "Tab" : "Shift+Enter", "retry"], ["Esc", "edit"]], ...typing};
+                            foot: [[state.asked === "rewrite" ? "Tab" : "Shift+Enter", "retry"],
+                                   ...(state.asked === "rewrite" ? [["Enter", "keep"]] : []), ["Esc", "edit"]], ...typing};
   if (state.asked === "instruct" && state.candidate) {
     const readings = state.candidates;
     return {...shown, rows: draftsShown(readings, state.highlight).map((text) => ({text, legend: null})), on: state.highlight,
             foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]],
-            nudge: nudge(), ...typing};
+            tail: "or type to change it", nudge: nudge(), ...typing};
   }
   if (state.converted) return {...shown, label: "Rewrite", body: shortened(state.candidate, PANEL_ROWS),
-                               foot: [["Tab", "insert"], ["Esc", "dismiss"]]};
+                               foot: [["Tab", "insert"], ["Esc", "dismiss"]], tail: "or type to change it"};
   // Composing: the keys show from the first key (what each Enter does must be known).
-  return {...shown, foot: [["Tab", "rewrite"], ["Shift+Enter", "ask"], state.editing ? ["Esc", "drop"] : ["Enter", "keep"]]};
+  return {...shown, foot: [["Tab", "rewrite"], ["Shift+Enter", "ask"], ["Enter", "keep"], ...(state.editing ? [["Esc", "drop"]] : [])]};
 }
 // The panel stays shorter than a screen, as composition.py keeps it (PANEL_ROWS rows of about ROW
 // characters): past it, drafts other than the highlighted one show two rows, a taller text its first
