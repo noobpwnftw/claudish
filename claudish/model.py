@@ -62,7 +62,7 @@ def user_content(text, image, style, intro=""):
     return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
-from .config import DEFAULTS, MODEL_URL  # noqa: E402
+from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL  # noqa: E402
 
 
 def opener_for(url):
@@ -72,7 +72,7 @@ def opener_for(url):
     return build_opener(ProxyHandler({})) if local else build_opener()
 
 
-CLAUDE_MODEL = "claude-opus-5-5"  # the claude backend's model when a profile names none
+CLAUDE_MODEL = DEFAULT_MODELS["claude"]  # the claude backend's model when a profile names none
 LENGTH = "the answer ran past its length budget; use a shorter phrase"
 DECLINED = "Claude declined this; your wording is unchanged"
 # Claude models that refuse an effort setting (older than Haiku 4.5 included).

@@ -15,6 +15,7 @@ import threading
 import time
 
 from .children import spawn
+from .config import DEFAULT_MODELS
 from .shapes import ANSWER
 
 from .modes import TEMPLATES
@@ -205,7 +206,7 @@ class ClaudeCode(Warm):
     name = "Claude Code"
     shaped = True
 
-    default_model = "haiku"  # with no "model" in the profile
+    default_model = DEFAULT_MODELS["claude-code"]  # with no "model" in the profile
 
     def __init__(self, command, model=None, cwd=None, restart_after=200, words=None):
         super().__init__(command, model or self.default_model, cwd, restart_after, words)
@@ -260,7 +261,7 @@ class Codex(Warm):
     FEATURES_OFF = ("apps", "plugins", "multi_agent", "image_generation", "computer_use", "browser_use",
                     "shell_tool", "skill_search", "tool_suggest", "hooks")
 
-    default_model = "gpt-6-luna"  # with no "model" in the profile
+    default_model = DEFAULT_MODELS["codex"]  # with no "model" in the profile
 
     def __init__(self, command, model=None, cwd=None, restart_after=200, words=None):
         super().__init__(command, model or self.default_model, cwd, restart_after, words)

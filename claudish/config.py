@@ -24,6 +24,8 @@ from . import modes as invocation
 
 BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
 MODEL_URL = "http://127.0.0.1:18766"  # the local model's server
+# Each backend's model when a profile names none, and the starter config's: one place to change them.
+DEFAULT_MODELS = {"claude": "claude-opus-5-5", "claude-code": "haiku", "codex": "gpt-6-luna"}
 DEFAULTS = {"backend": "none", "model_url": MODEL_URL, "model": None, "api_key_env": None,
             "timeout": 3, "templates": None,
             "context": None, "max_context_chars": 6000, "modes": None, "command": None,
@@ -157,10 +159,10 @@ STARTER = {
     ],
     "profile": "claude",
     "profiles": {
-        "claude": {"backend": "claude", "model": "claude-opus-5-5", "templates": "templates.json"},
-        "claude-code": {"backend": "claude-code", "command": ["claude"], "model": "haiku", "timeout": 30,
-                        "templates": "templates.json"},
-        "codex": {"backend": "codex", "command": ["codex"], "model": "gpt-6-luna", "timeout": 60,
+        "claude": {"backend": "claude", "model": DEFAULT_MODELS["claude"], "templates": "templates.json"},
+        "claude-code": {"backend": "claude-code", "command": ["claude"], "model": DEFAULT_MODELS["claude-code"],
+                        "timeout": 30, "templates": "templates.json"},
+        "codex": {"backend": "codex", "command": ["codex"], "model": DEFAULT_MODELS["codex"], "timeout": 60,
                   "templates": "templates.json"},
         "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
