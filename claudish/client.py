@@ -72,9 +72,7 @@ def write_token(token=None, port=PORT):
 def settings_url(url=SERVICE):
     """The settings page of a running service, with a ticket in the fragment, which the page
     trades for its settings token. OSError when no service answers."""
-    request = Request(url.rstrip("/") + "/settings/ticket", data=b"{}", headers=headers(url))
-    with OPENER.open(request, timeout=10) as response:  # a service just started at login is slow at first
-        ticket = json.load(response)["ticket"]
+    ticket = call(url.rstrip("/"), "/settings/ticket", {}, 10)["ticket"]  # (a service just started at login is slow)
     return "%s/settings#ticket=%s" % (url.rstrip("/"), ticket)
 
 
@@ -96,9 +94,7 @@ def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=
     for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
         if value:
             body[key] = value
-    request = Request(endpoint + "/suggest", data=json.dumps(body).encode("utf-8"), headers=headers(endpoint))
-    with OPENER.open(request, timeout=timeout) as response:
-        return json.load(response)
+    return call(endpoint, "/suggest", body, timeout)
 
 
 def call(endpoint, path, body=None, timeout=10):

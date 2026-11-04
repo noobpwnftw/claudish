@@ -247,19 +247,17 @@ class ClaudeCodeDriver:
             self.send({"type": "control_response", "response": {
                 "subtype": "error", "request_id": request_id, "error": "not supported by this host"}})
             return
-        server, _, tool = (body.get("tool_name") or "").partition("__")[2].partition("__")
+        name = body.get("tool_name") or ""
+        server, _, tool = name.partition("__")[2].partition("__")
         trust, deny = self.policy.get(server, ((), ()))
-        if (body.get("tool_name") or "").startswith("mcp__") and tool in deny:
-            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                       "response": {"behavior": "deny", "message": self.words["denied"]}}})
+        if name.startswith("mcp__") and tool in deny:
+            self.decide(request_id, {"behavior": "deny", "message": self.words["denied"]})
             return
-        if (body.get("tool_name") or "").startswith("mcp__textbox__") or \
-                ((body.get("tool_name") or "").startswith("mcp__") and tool in trust):
+        if name.startswith("mcp__textbox__") or (name.startswith("mcp__") and tool in trust):
             # Claudish's own read-only tools, and the ones the profile trusts: run without asking.
-            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                       "response": {"behavior": "allow", "updatedInput": body.get("input") or {}}}})
+            self.decide(request_id, {"behavior": "allow", "updatedInput": body.get("input") or {}})
             return
-        if body.get("tool_name") == "AskUserQuestion":
+        if name == "AskUserQuestion":
             # The agent asks you something itself: shown as is, its options as the choices (ask).
             self.asks[request_id] = {"input": body.get("input") or {}, "answers": {}}
             self.session = session
@@ -291,9 +289,7 @@ class ClaudeCodeDriver:
                                        for option in current.get("options") or [] if isinstance(option, dict)])
             return
         del self.asks[request_id]
-        self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                   "response": {"behavior": "allow",
-                                "updatedInput": dict(asked["input"], answers=asked["answers"])}}})
+        self.decide(request_id, {"behavior": "allow", "updatedInput": dict(asked["input"], answers=asked["answers"])})
 
     def answer(self, question, choice=None, text=None):
         request_id, _, index = str(question).rpartition("#")
@@ -312,8 +308,12 @@ class ClaudeCodeDriver:
             decision = {"behavior": "allow", "updatedInput": tool_input}
         else:  # Deny, or free text: the user's words go back to the agent as the reason
             decision = {"behavior": "deny", "message": text or self.words["declined"]}
+        self.decide(question, decision)
+
+    def decide(self, request_id, decision):
+        """The answer to the agent's can_use_tool request: allow or deny."""
         self.send({"type": "control_response", "response": {
-            "subtype": "success", "request_id": question, "response": decision}})
+            "subtype": "success", "request_id": request_id, "response": decision}})
 
     def cancel(self):
         self.cancelled = True
@@ -321,8 +321,7 @@ class ClaudeCodeDriver:
             self.answer(question, 0)
         for request_id in list(self.asks):  # and the agent's own question goes unanswered
             del self.asks[request_id]
-            self.send({"type": "control_response", "response": {"subtype": "success", "request_id": request_id,
-                       "response": {"behavior": "deny", "message": "The user cancelled."}}})
+            self.decide(request_id, {"behavior": "deny", "message": "The user cancelled."})
         if self.own:
             process = self.agent.process
             if process is not None and process.poll() is None:

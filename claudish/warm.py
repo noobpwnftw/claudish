@@ -194,14 +194,11 @@ class Warm:
         with self.lifecycle:
             process, self.process = self.process, None
             if process is not None and process.poll() is None:
-                try:
-                    if force:
-                        raise TimeoutError
-                    process.stdin.close()  # the end of its input: it ends
-                    process.wait(3)
-                except Exception:
+                if force:
                     process.kill()
                     process.wait(3)
+                else:
+                    end_input(process)  # the end of its input: it ends
             if process is not None and process.stdin is not None:
                 process.stdin.close()
 
@@ -231,11 +228,7 @@ class ClaudeCode(Warm):
             raise RuntimeError("Claude Code ended")
         deadline = time.monotonic() + timeout
         message = {"type": "user", "message": {"role": "user", "content": prompt}}
-        try:
-            process.stdin.write(json.dumps(message) + "\n")
-            process.stdin.flush()
-        except (OSError, ValueError):
-            raise RuntimeError("Claude Code ended: %s" % self.why())
+        write(process, message, lambda: "Claude Code ended: %s" % self.why())
         while True:
             line = lines.next(deadline)
             if line is None:
@@ -293,11 +286,7 @@ class Codex(Warm):
         process = self.process
         if process is None:
             raise RuntimeError("Codex ended")
-        try:
-            process.stdin.write(json.dumps(message) + "\n")
-            process.stdin.flush()
-        except (OSError, ValueError):
-            raise RuntimeError("Codex ended")
+        write(process, message, lambda: "Codex ended")
 
     def call(self, method, params, deadline, collect=None):
         """A request; its result. collect(notification) sees what arrives meanwhile."""
@@ -483,6 +472,15 @@ class ModelServer:
             end(process)
         if self.state != "stopped" and not self.state.startswith("failed"):
             self.state = "stopped"
+
+
+def write(process, message, ended):
+    """One JSON line to a CLI's input; RuntimeError(ended()) when it has gone."""
+    try:
+        process.stdin.write(json.dumps(message) + "\n")
+        process.stdin.flush()
+    except (OSError, ValueError):
+        raise RuntimeError(ended())
 
 
 def end_input(process):

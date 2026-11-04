@@ -15,6 +15,23 @@ TEXTBOX_LIMIT = 200_000  # an instruction's text box, each side of the caret (th
 BODY_LIMIT = 8 * TEXTBOX_LIMIT + 65536  # both sides, in UTF-8 and JSON escapes
 
 
+TEXT_ERROR = "text must be 1–%d characters" % MAX_COMPOSITION
+
+
+def checked_text(text):
+    """What you typed: not blank, at most a composition's length."""
+    if not (isinstance(text, str) and text.strip() and len(text) <= MAX_COMPOSITION):
+        raise ValueError(TEXT_ERROR)
+    return text
+
+
+def checked_app(app):
+    """The focused app as the adapter names it, or None."""
+    if app is not None and not (isinstance(app, str) and len(app) <= 200):
+        raise ValueError("app must be a short string")
+    return app
+
+
 def checked_purpose(purpose):
     """The field's kind as the input method reports it ("terminal", "email", ...), or None."""
     if purpose is not None and not (isinstance(purpose, str) and purpose.isidentifier() and len(purpose) <= 32):
@@ -214,10 +231,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                 text, app = data.get("text"), data.get("app")
                 conversation, look = data.get("conversation"), data.get("look", False)
                 before, after = data.get("before", ""), data.get("after", "")
-                if not (isinstance(text, str) and text.strip() and len(text) <= MAX_COMPOSITION):
-                    return self.reply(400, {"error": "text must be 1–512 characters"})
-                if app is not None and not (isinstance(app, str) and len(app) <= 200):
-                    return self.reply(400, {"error": "app must be a short string"})
+                try:
+                    checked_text(text), checked_app(app)
+                except ValueError as exc:
+                    return self.reply(400, {"error": str(exc)})
                 if conversation is not None and not (isinstance(conversation, str) and 0 < len(conversation) <= 64):
                     return self.reply(400, {"error": "conversation must be a short id"})
                 if not (isinstance(before, str) and isinstance(after, str) and len(before) <= TEXTBOX_LIMIT and len(after) <= TEXTBOX_LIMIT):
@@ -257,7 +274,7 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             if not isinstance(data.get("question"), str):
                 return self.reply(400, {"error": "question must be a question's id"})
             if text is not None and not (isinstance(text, str) and 0 < len(text) <= MAX_COMPOSITION):
-                return self.reply(400, {"error": "text must be 1–512 characters"})
+                return self.reply(400, {"error": TEXT_ERROR})
             try:
                 session.answer(data.get("question"), None if text is not None else choice, text)
             except ValueError as exc:
@@ -446,17 +463,13 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             if data is None:
                 return
             try:
-                text = data.get("text")
-                if not isinstance(text, str) or not text.strip() or len(text) > MAX_COMPOSITION:
-                    raise ValueError("text must be 1–512 characters")
+                text = checked_text(data.get("text"))
                 # Optional text around the caret, supplied by an adapter.
                 before, after = data.get("before", ""), data.get("after", "")
                 if not all(isinstance(s, str) and len(s) <= AROUND for s in (before, after)):
                     raise ValueError("before/after must be strings of at most %d characters" % AROUND)
                 mode = data.get("mode", "rewrite")
-                app = data.get("app")  # The focused app, reported by the adapter; selects bindings.
-                if app is not None and not (isinstance(app, str) and len(app) <= 200):
-                    raise ValueError("app must be a short string")
+                app = checked_app(data.get("app"))  # The focused app, reported by the adapter; selects bindings.
                 if not isinstance(mode, str) or mode not in rewriter.modes:
                     raise ValueError("unknown mode")
                 look = data.get("look", False)  # F8: the user asked for a picture of the focused window

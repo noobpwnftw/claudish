@@ -62,7 +62,7 @@ def user_content(text, image, style, intro=""):
     return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
-from .config import MODEL_URL  # noqa: E402
+from .config import DEFAULTS, MODEL_URL  # noqa: E402
 
 
 def opener_for(url):
@@ -126,46 +126,41 @@ class Claude:
             if used:
                 options["tools"] = [{"name": name, "input_schema": {"type": "object", "properties": {}}} for name in used]
                 options["tool_choice"] = {"type": "none"}
-        try:
-            # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
-            response = self.client.with_options(timeout=self.turn_timeout).beta.messages.create(model=self.model, max_tokens=max_tokens,
-                                                        system=system, messages=conversation,
-                                                        **options)
-        except TypeError as exc:
-            if "authentication" not in str(exc):
-                raise
-            raise RuntimeError(NO_CREDENTIALS) from exc
-        if response.stop_reason == "refusal":
-            raise RuntimeError(DECLINED)
-        reply = {"content": "".join(block.text for block in response.content if block.type == "text").strip()}
+        # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
+        response, text, usage = self.create(self.client.with_options(timeout=self.turn_timeout), model=self.model,
+                                            max_tokens=max_tokens, system=system, messages=conversation, **options)
+        reply = {"content": text}
         calls = [{"id": block.id, "type": "function",
                   "function": {"name": block.name, "arguments": json.dumps(block.input)}}
                  for block in response.content if block.type == "tool_use"]
         if calls:
             reply["tool_calls"] = calls
         finish = "length" if response.stop_reason == "max_tokens" else "stop"
-        usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
         return {"message": reply, "finish_reason": finish}, usage
 
     def rewrite(self, text, system, examples, image=None, intro="", max_tokens=2048):
         """One request without tools: (the answer's content, usage); max_tokens: the mode's budget."""
         options = self.options(shaped=True)
+        response, output, usage = self.create(
+            self.client, model=self.model, max_tokens=max_tokens, system=system,
+            messages=examples + [{"role": "user", "content": user_content(text, image, "claude", intro)}], **options)
+        if response.stop_reason == "max_tokens":
+            raise RuntimeError(LENGTH)
+        return output, usage
+
+    @staticmethod
+    def create(client, **request):
+        """One Messages request: (response, its text, usage). A refusal raises DECLINED."""
         try:
-            response = self.client.beta.messages.create(
-                model=self.model, max_tokens=max_tokens, system=system,
-                messages=examples + [{"role": "user", "content": user_content(text, image, "claude", intro)}],
-                **options)
+            response = client.beta.messages.create(**request)
         except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
             if "authentication" not in str(exc):
                 raise
             raise RuntimeError(NO_CREDENTIALS) from exc
         if response.stop_reason == "refusal":
             raise RuntimeError(DECLINED)
-        if response.stop_reason == "max_tokens":
-            raise RuntimeError(LENGTH)
-        output = "".join(block.text for block in response.content if block.type == "text").strip()
-        usage = {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
-        return output, usage
+        text = "".join(block.text for block in response.content if block.type == "text").strip()
+        return response, text, {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
 
 
 def claude_messages(messages):
@@ -252,7 +247,7 @@ class Rewriter:
         rewriter.session_command = settings.get("session_command")
         rewriter.summon = settings.get("summon", "Shift+Enter")
         rewriter.hints = settings.get("hints", True)
-        rewriter.max_context_chars = settings.get("max_context_chars", 6000)
+        rewriter.max_context_chars = settings.get("max_context_chars", DEFAULTS["max_context_chars"])
         if settings.get("tools"):
             if settings["backend"] not in LOOPS:
                 raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
@@ -271,6 +266,7 @@ class Rewriter:
         self.api_key = api_key
         self.timeout = timeout
         self.context = context
+        self.max_context_chars = DEFAULTS["max_context_chars"]  # (from_settings sets the profile's)
         self.bindings = list(bindings)
         from .sessions import Sessions
         self.sessions = Sessions()  # instructions as sessions: events, questions, a result (G18)
@@ -407,7 +403,7 @@ class Rewriter:
             return []
         from .context import Context
         # The profile's own limit, also over the service's bindings a routed profile gets.
-        return (self.context or Context(max_chars=getattr(self, "max_context_chars", 6000))).sections(extra)
+        return (self.context or Context(max_chars=self.max_context_chars)).sections(extra)
 
     def box(self, mode, app=None, purpose=None, before="", after="", look=False, screen=None, trusted=True):
         """The text box this request is for, with what its mode calls for observed. screen: a
@@ -653,7 +649,6 @@ class Rewriter:
         in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
         if in_place:  # a part of the text: the examples are parts too (none: the instruction alone)
             examples = spec.get("parts") or []
-        if in_place:
             # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
             # turn shows them in their place, and the rewrite is only that part.
             framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
