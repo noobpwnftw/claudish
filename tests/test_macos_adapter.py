@@ -208,6 +208,7 @@ def load_adapter():
     imk.kIMKLocateCandidatesBelowHint = 2
     panel = types.ModuleType("panel")
     panel.Panel, panel.Overlay = Panel, Overlay
+    panel.units = lambda text: len(text.encode("utf-16-le")) // 2
     layout = types.ModuleType("layout")
     layout.layout = lambda: Layout()
     spec = importlib.util.spec_from_file_location("claudish_macos_test", ROOT / "platforms/macos/controller.py")

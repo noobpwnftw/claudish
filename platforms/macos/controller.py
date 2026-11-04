@@ -13,7 +13,7 @@ from InputMethodKit import IMKInputController
 from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
-from panel import Overlay, Panel  # cd_AI's own panel and suggestion overlay (G45)
+from panel import Overlay, Panel, units  # cd_AI's own panel and suggestion overlay (G45)
 from layout import layout  # the keyboard layout's own dead keys
 
 # A file path: event kinds and errors, never typed text. An input method started by macOS (or with
@@ -72,6 +72,28 @@ objc.registerMetaDataForSelector(b"NSObject", b"attributesForCharacterIndex:line
                                  {"arguments": {3: {"type_modifier": objc._C_OUT}}})
 
 
+def span(found):
+    """An NSRange as (location, length): PyObjC gives a struct or a tuple."""
+    return (found.location, found.length) if hasattr(found, "location") else tuple(found)
+
+
+def substring(client, location, length):
+    """The client's text in a range. Not stringFromRange:actualRange:: PyObjC passes its
+    out-parameter as NULL, and IMK's client wrapper writes to it anyway (a crash on macOS 26)."""
+    found = client.attributedSubstringFromRange_((location, length))
+    return str(found.string()) if found is not None else ""
+
+
+RETURN_KEYS = (36, 76)  # Return, keypad Enter
+NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
+TYPED_TAIL = 32  # continue's typed tail: the app's text before the caret still ends with it, or a click moved it
+
+
+def plain(text):
+    """Text as compared with the app's: its line ends and no-break spaces as plain ones."""
+    return text.replace("\r", "").replace("\xa0", " ")
+
+
 def marked(text):
     """The composition as the design draws it: one plain underline in the text colour (apps
     otherwise draw marked text their own way, an accent-coloured thick line in a text view)."""
@@ -85,7 +107,7 @@ def unmark(client):
     the app's selection (NSTextInputClient), which would delete a selected word."""
     try:
         found = client.markedRange()
-        length = found.length if hasattr(found, "location") else tuple(found)[1]
+        length = span(found)[1]
     except Exception:
         length = 1  # cannot tell: clear it
     if length:
@@ -106,6 +128,10 @@ class ClaudishInputController(IMKInputController):
         if PANEL is None:
             PANEL, OVERLAY, TOAST = Panel(), Overlay(), Panel(toast=True)
         self.drawn = None  # the panel as last drawn (Composition.panel()), redrawn when it changes
+        self.kept_menu = None  # the input menu, built once
+        self.dead_state = 0  # UCKeyTranslate's dead-key state: an accent waiting for its letter
+        self.caret_known = True  # the app gave a caret position (no ghost without one)
+        self.ghost_at, self.ghost_checked = None, 0  # where the suggestion was drawn, and when last checked
         return self
 
     def activateServer_(self, sender):
@@ -136,7 +162,7 @@ class ClaudishInputController(IMKInputController):
         tap switches modes, and macOS shows the new input mode). macOS asks after nearly every key: one menu
         per controller, as Squirrel keeps one."""
         try:
-            menu = getattr(self, "kept_menu", None)
+            menu = self.kept_menu
             if menu is None:
                 menu = self.kept_menu = self.build_menu()
             return menu
@@ -264,11 +290,9 @@ class ClaudishInputController(IMKInputController):
         the panel and the toasts, as CJK candidate windows sit (docs/design/design.md, Placement).
         IMK's lineHeightRectangle is what input methods place windows by; firstRectForCharacterRange
         came back with y at the line's top in our tests, so it is the fallback, corrected for that."""
-        def location_of(found):
-            return (found.location, found.length) if hasattr(found, "location") else tuple(found)
         try:
-            location = location_of(client.selectedRange())[0]
-            marked = location_of(client.markedRange())
+            location = span(client.selectedRange())[0]
+            marked = span(client.markedRange())
             if start and marked[0] != NSNotFound and marked[1]:
                 location = marked[0]
         except Exception:
@@ -312,8 +336,7 @@ class ClaudishInputController(IMKInputController):
             OVERLAY.hide()
             return
         before = self.around_caret(client)[0] if client is not None else ""
-        plain = lambda text: text.replace("\r", "").replace("\xa0", " ")
-        typed = plain(self.state.text)[-32:]
+        typed = plain(self.state.text)[-TYPED_TAIL:]
         if before and before != getattr(self, "asked_before", before) and not plain(before).endswith(typed):
             # A click moved the caret while it was asked for (no key says so): the text before it is
             # neither what it was when asked (the app may still be catching up after the key, as
@@ -323,7 +346,7 @@ class ClaudishInputController(IMKInputController):
             OVERLAY.hide()
             return
         self.ghost_at = self.caret(client)
-        if not getattr(self, "caret_known", True):  # the app gives no caret: nothing to put it after
+        if not self.caret_known:  # the app gives no caret: nothing to put it after
             self.state.dismiss()
             OVERLAY.hide()
             return
@@ -337,11 +360,11 @@ class ClaudishInputController(IMKInputController):
         scroll, the window moving): while the suggestion shows, look at the caret a few times a
         second, and when it moved (or the text box is gone) drop the suggestion: Tab must never
         take one you no longer see. now: at once (Tab is about to take it)."""
-        if not OVERLAY.visible() or not now and time.monotonic() - getattr(self, "ghost_checked", 0) < 0.25:
+        if not OVERLAY.visible() or not now and time.monotonic() - self.ghost_checked < 0.25:
             return
         self.ghost_checked = time.monotonic()
         client = self.client()
-        if client is not None and self.caret(client) == getattr(self, "ghost_at", None):
+        if client is not None and self.caret(client) == self.ghost_at:
             return
         OVERLAY.hide()
         self.state.dismiss()
@@ -425,18 +448,16 @@ class ClaudishInputController(IMKInputController):
         typed it (marked in its place); then Tab rewrites it, Shift+Enter sends it. True when taken."""
         try:
             selected = client.selectedRange()
-            location, length = (selected.location, selected.length) if hasattr(selected, "location") else selected
+            location, length = span(selected)
             if location == NSNotFound or not 0 < length <= MAX_COMPOSITION:
                 return False
-            found = client.attributedSubstringFromRange_((location, length))
-            text = str(found.string()) if found is not None else ""
+            text = substring(client, location, length)
         except Exception:
             return False
         if not self.state.selectable(text):  # long or multi-line: Tab is the app's
             return False
         self.state.change(text)
-        units = len(text.encode("utf-16-le")) // 2
-        client.setMarkedText_selectionRange_replacementRange_(marked(text), (units, 0), (location, length))
+        client.setMarkedText_selectionRange_replacementRange_(marked(text), (units(text), 0), (location, length))
         return True
 
     @objc.python_method
@@ -445,17 +466,10 @@ class ClaudishInputController(IMKInputController):
         not share it. Chromium-based apps (VS Code, browsers) answer only about 100 characters
         around the selection; native text views answer the whole text."""
         def text(location, length):
-            if length <= 0:
-                return ""
-            # Not stringFromRange:actualRange:: PyObjC passes its out-parameter as NULL, and IMK's
-            # client wrapper writes to it anyway (a crash on macOS 26, found in a real session).
-            found = client.attributedSubstringFromRange_((location, length))
-            return str(found.string()) if found is not None else ""
-        def pair(found):
-            return (found.location, found.length) if hasattr(found, "location") else tuple(found)
+            return substring(client, location, length) if length > 0 else ""
         try:
-            location, length = pair(client.selectedRange())
-            marked = pair(client.markedRange())  # our own composition or suggestion is not the app's text
+            location, length = span(client.selectedRange())
+            marked = span(client.markedRange())  # our own composition or suggestion is not the app's text
             if marked[0] != NSNotFound and marked[1]:
                 location, length = marked
             total = client.length()
@@ -487,7 +501,7 @@ class ClaudishInputController(IMKInputController):
         shown = self.state.drawn  # your words (a rewrite waits in the panel for Tab), a waiting accent
         # Cocoa ranges count UTF-16 code units, rather than Python code points; the cursor is where
         # ← and → left it (the end by default).
-        cursor = len(shown[:self.state.drawn_cursor].encode("utf-16-le")) // 2
+        cursor = units(shown[:self.state.drawn_cursor])
         if shown:
             client.setMarkedText_selectionRange_replacementRange_(marked(shown), (cursor, 0), (NSNotFound, 0))
         else:  # empty marked text would leave a terminal composing: the next Return beeps
@@ -506,7 +520,7 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def with_accent(self, key, chars, flags, accent):
         """What a waiting accent and this key make, as the layout makes it (´ then t is ´t)."""
-        reader, state = layout(), getattr(self, "dead_state", 0)
+        reader, state = layout(), self.dead_state
         if reader is not None and state:
             made = reader.translate(key, flags, state)
             if made and made[0]:
@@ -544,7 +558,7 @@ class ClaudishInputController(IMKInputController):
             state.dismiss()
             self.changed(client)
             return True
-        navigation = key in (36, 76, 51, 115, 116, 117, 119, 121, 123, 124, 125, 126)
+        navigation = key in RETURN_KEYS + (51,) + NAVIGATION_KEYS
         if navigation or not chars or not chars.isprintable():
             if key == 51 and state.text:
                 state.backspace()
@@ -553,9 +567,8 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)  # clears the suggestion before the app handles the key
             return False
         before = self.around_caret(client)[0]
-        plain = lambda text: text.replace("\r", "").replace("\xa0", " ")
         # A fresh start (a paste, a new field), or a click since (no key says so): from the app's text.
-        if not state.text or (before and not plain(before).endswith(plain(state.text)[-32:])):
+        if not state.text or (before and not plain(before).endswith(plain(state.text)[-TYPED_TAIL:])):
             state.change(before[-MAX_COMPOSITION:])
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
@@ -667,7 +680,7 @@ class ClaudishInputController(IMKInputController):
             self.finish(client)
             return False
         shift = bool(flags & NSEventModifierFlagShift)
-        if key in (36, 76) and not self.state.talks(shift) and self.state.text:
+        if key in RETURN_KEYS and not self.state.talks(shift) and self.state.text:
             kept = self.state.keep()  # the keeper key: as it is, and keep composing
             if kept is not None:  # inserting ends the composition: no empty marked text before the key
                 client.insertText_replacementRange_(kept, (NSNotFound, 0))
@@ -675,7 +688,7 @@ class ClaudishInputController(IMKInputController):
             # Enter commits (or, once the model is asked, does nothing), as other input methods do:
             # press it again for the app.
             return True
-        if key in (36, 76):  # Return, keypad Enter
+        if key in RETURN_KEYS:  # Return, keypad Enter
             action = self.state.enter()  # the summon key talks to the model; it never inserts its text
             if action == "reply":  # your own words, in answer to the agent's question
                 session, question, words = self.state.answer_text()
@@ -695,7 +708,7 @@ class ClaudishInputController(IMKInputController):
                 self.show_panel(client)
             return action != "pass"
         if key == 48 and not shift:  # Tab; Shift+Tab commits and is the app's, as a navigation key
-            if not self.state.live and not self.state.text and self.take_selection(client):
+            if not self.state.text and self.take_selection(client):  # (continue returned above)
                 self.show_panel(client)  # a selection: your words now, as if typed
                 return True
             action = self.state.tab()
@@ -762,7 +775,7 @@ class ClaudishInputController(IMKInputController):
         if accent and text and all(typeable(char) for char in text):
             text = self.with_accent(key, text, flags, accent)  # é from ´ then e, as macOS makes it in a text field
         # Navigation keys use private-use characters, which must not enter the draft.
-        if key in (115, 116, 117, 119, 121, 123, 124, 125, 126) or not all(typeable(char) for char in text) or not text:
+        if key in NAVIGATION_KEYS or not all(typeable(char) for char in text) or not text:
             self.finish(client)
             return False
         if all(self.state.passes(char) for char in text):  # nothing composed: the space is the app's text
