@@ -179,7 +179,7 @@ def step_local(name, settings):
 
 def is_local(settings):
     """Whether the profile runs llama.cpp on this computer (the model setup downloads)."""
-    return settings["backend"] == "llama" and urlsplit(settings["model_url"]).hostname in ("127.0.0.1", "localhost")
+    return settings["backend"] == "llama" and config.loopback(settings["model_url"])
 
 
 def step_service(settings):

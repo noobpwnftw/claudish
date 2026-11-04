@@ -6,7 +6,6 @@ import subprocess
 import sys
 import threading
 import time
-from urllib.parse import urlsplit
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
@@ -62,14 +61,13 @@ def user_content(text, image, style, intro=""):
     return [picture, {"type": "text", "text": intro + "\n\n" + text}]
 
 
-from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL  # noqa: E402
+from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL, loopback  # noqa: E402
 
 
 def opener_for(url):
     """Loopback traffic never goes through HTTP_PROXY; a remote endpoint may need it. (Building one
     loads the system CA bundle, about 12 ms.)"""
-    local = urlsplit(url).hostname in ("127.0.0.1", "localhost", "::1")
-    return build_opener(ProxyHandler({})) if local else build_opener()
+    return build_opener(ProxyHandler({})) if loopback(url) else build_opener()
 
 
 CLAUDE_MODEL = DEFAULT_MODELS["claude"]  # the claude backend's model when a profile names none
@@ -301,7 +299,7 @@ class Rewriter:
             self.modes[name]["profile"] = route["profile"]
         self.finish = invocation.finish
         self.lock = threading.Lock()
-        self.local = urlsplit(self.endpoint).hostname in ("127.0.0.1", "localhost", "::1")
+        self.local = loopback(self.endpoint)
         self.opener = None
         self.warm = None  # Claude Code, Codex or a local model's server, run beside the service (claudish/warm.py)
         if backend in ("command", "claude-code", "codex"):

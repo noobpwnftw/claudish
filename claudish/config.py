@@ -18,12 +18,20 @@ model is set up (backend "none"): compose says so, and continue only types.
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .context import Binding, Context
 from . import modes as invocation
 
 BACKENDS = ("none", "llama", "openai", "claude", "claude-code", "codex", "command", "rules")
 MODEL_URL = "http://127.0.0.1:18766"  # the local model's server
+
+
+def loopback(url):
+    """Whether url is on this computer."""
+    return urlsplit(url).hostname in ("127.0.0.1", "localhost", "::1")
+
+
 # Each backend's model when a profile names none, and the starter config's: one place to change them.
 DEFAULT_MODELS = {"claude": "claude-opus-5-5", "claude-code": "haiku", "codex": "gpt-6-luna"}
 DEFAULTS = {"backend": "none", "model_url": MODEL_URL, "model": None, "api_key_env": None,

@@ -12,6 +12,12 @@ from claudish import config, setup
 
 
 class SetupTests(unittest.TestCase):
+    def test_a_local_model_is_one_on_this_computer_by_any_loopback_name(self):
+        for url in ("http://127.0.0.1:18766", "http://localhost:8080", "http://[::1]:18766"):
+            self.assertTrue(setup.is_local({"backend": "llama", "model_url": url}), url)
+        self.assertFalse(setup.is_local({"backend": "llama", "model_url": "http://10.0.0.2:8080"}))
+        self.assertFalse(setup.is_local({"backend": "openai", "model_url": "http://127.0.0.1:18766"}))
+
     """Every action is mocked: setup's real installs run only in the systemd container test."""
 
     def setUp(self):
