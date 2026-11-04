@@ -339,7 +339,14 @@ class Composition:
     def for_model(self):
         """What the composition shows is for the model, not the app: a sent instruction, or a
         follow-up typed on a rewrite. A focus change never puts it in the app (leave)."""
-        return self.sent or bool(self.converted and self.reply)
+        return self.sent or bool(self.converted and self.reply) or self.following
+
+    @property
+    def following(self):
+        """A follow-up on a rewrite back at the caret before its answer (F8 took it back to add or
+        drop the picture): an instruction, with your words before it in origin. Esc goes back to
+        them; nothing of it goes in the app, as with any follow-up."""
+        return bool(self.origin) and not self.answered
 
     @property
     def answered(self):
@@ -649,18 +656,18 @@ class Composition:
             return "back"
         # Drafts showing, or an answer pending: back to your words. (A rewrite shown and dismissed
         # leaves nothing visible to step back from, so the next Esc drops.)
-        if self.origin and self.text != self.origin:
+        if self.origin:  # (only a follow-up sets it, though it may read as your words did)
             # A follow-up on a rewrite: back to your words, as Esc on the rewrite is (with words set
             # aside while a question was up, as for an instruction).
             joined = " ".join(part for part in (self.origin.strip(), self.waiting.strip()) if part)
-            self.change(joined if self.waiting.strip() and len(joined) <= MAX_COMPOSITION else self.origin)
+            self.change(joined)  # (past the cap too: words are kept rather than cut, as done() and fail() keep them)
             self.editing = True
             return "back"
         if (self.candidates and self.asked == "instruct") or self.working or self.failed or self.question:
             # A new revision: a late answer for the old one is ignored. Words set aside while a
             # question was up go with the instruction you are back at, as an early follow-up does.
             joined = " ".join(part for part in (self.text.strip(), self.waiting.strip()) if part)
-            self.change(joined if self.waiting.strip() and len(joined) <= MAX_COMPOSITION else self.text)
+            self.change(joined)  # (past the cap too, as above)
             self.editing = True  # the instruction is back at the caret; Esc again drops it
             return "back"
         self.dropped, self.dropped_reply, self.dropped_at = self.text, False, time.monotonic()
@@ -734,7 +741,7 @@ class Composition:
         model is asked, a rewrite included (the key is taken, nothing goes in)."""
         if not self.text or self.live:
             return ""
-        if self.sent or self.question or self.working or self.converted:  # a failed rewrite leaves only your words
+        if self.sent or self.question or self.working or self.converted or self.following:  # a failed rewrite leaves only your words
             # Once the model is summoned the key is gated (owner): your instruction or a reply never
             # lands in the app by a reflexive press; the row Tab would take lights its Tab.
             if not self.light_tab() and self.working and self.asked == "instruct" and not self.question:
@@ -802,7 +809,7 @@ class Composition:
         # Words you typed meanwhile stay at the caret, a composition of their own (Shift+Enter
         # sends them as the next instruction in this conversation).
         typed = (self.reply.strip() + " " + self.waiting).strip() if self.waiting else self.reply.strip()
-        if self.origin and self.text != self.origin:  # a follow-up on a rewrite: back to your words, as Esc
+        if self.origin:  # a follow-up on a rewrite (even one that reads as your words did): back to them, as Esc
             # (past the cap too: words are kept over it rather than cut, as fail() keeps them)
             self.change(" ".join(part for part in (self.origin.strip(), typed) if part))
         else:
@@ -924,7 +931,7 @@ class Composition:
                 self.reply = self.reply[:at] + char + self.reply[at:]
             return True
         if len(self.text) >= MAX_COMPOSITION:
-            return False
+            return self.following  # a follow-up is full as a reply is; your words make room (make_room)
         # A rewrite showing in the panel: typing on goes on with your words (the rewrite goes).
         at = len(self.text) - self.back  # as typed: em dashes come from the model, never from a key
         self.edit(self.text[:at] + char + self.text[at:], self.back)
@@ -1048,8 +1055,9 @@ class Composition:
         """The text to insert: the candidate if asked for or shown in the panel, else your words."""
         text = (self.candidate if suggested else "") or self.text  # the model's words only when asked for
         # Your next words, back as the reply (an answer to read taken with Tab while they waited),
-        # stay at the caret as a composition of their own.
-        self.change(self.reply.strip() if suggested else "")
+        # stay at the caret as a composition of their own, with any set aside while a question was up.
+        typed = " ".join(part for part in (self.reply.strip(), self.waiting.strip()) if part)
+        self.change(typed if suggested else "")
         return text
 
     def leave(self, app=None):

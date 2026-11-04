@@ -4,7 +4,7 @@ import unittest
 from io import BytesIO
 from unittest.mock import patch
 
-from claudish.composition import Composition
+from claudish.composition import MAX_COMPOSITION, Composition
 from claudish.model import Rewriter
 
 
@@ -1050,7 +1050,7 @@ class ModeFeelTests(unittest.TestCase):
         for _ in "shorter":
             emptied.backspace()
         self.assertEqual((emptied.text, emptied.origin), ("teh cat", ""))
-        full = Composition()  # a full follow-up after F8: its words go into the app, the old words do not come back
+        full = Composition()  # a full follow-up after F8 is full as a reply is: nothing of it goes in the app
         full.mode = "compose"
         full.change("teh cat")
         full.tab()
@@ -1060,8 +1060,59 @@ class ModeFeelTests(unittest.TestCase):
         full.enter()
         full.submit()
         full.toggle_look()
-        self.assertFalse(full.insert("y"))
-        self.assertEqual((full.make_room("y"), full.text), ("a" * 512, "y"))
+        self.assertTrue(full.insert("y"))  # taken, as a full reply's key is
+        self.assertEqual((full.text, full.origin, full.for_model), ("a" * 512, "teh cat", True))
+        self.assertIsNone(full.keep())  # Enter on a follow-up: nothing goes in
+        self.assertEqual(full.escape(), "back")
+        self.assertEqual(full.text, "teh cat")  # Esc: your words again
+
+    def test_fuzzer_round_22(self):
+        """A follow-up F8 took back is the model's (a focus change holds it); a follow-up that reads
+        as your words is still one; set-aside words survive an answer to read and a long Esc."""
+        def rewritten(words="teh cat"):
+            state = Composition()
+            state.mode = "compose"
+            state.change(words)
+            state.tab()
+            state.offer(state.revision, "The cat.")
+            return state
+        state = rewritten()
+        for char in "shorter":
+            state.insert(char)
+        state.enter()
+        state.submit()
+        state.toggle_look()  # F8: back at the caret with the picture
+        self.assertTrue(state.for_model)
+        self.assertIsNone(state.keep())  # Enter: nothing of a follow-up goes in
+        self.assertEqual(state.leave("A"), "")  # a focus change holds it, your words with it
+        self.assertEqual(state.holds["A"][0].origin, "teh cat")
+        same = rewritten("e")
+        same.insert("e")  # the follow-up reads as your words did
+        same.enter()
+        same.submit()
+        same.done(same.revision)
+        self.assertEqual(same.text, "e")  # back to your words
+        read = Composition()
+        read.change("fix it")
+        read.enter()
+        read.submit()
+        for char in "and docs":
+            read.insert(char)
+        read.ask(read.revision, {"id": "r", "text": "Read", "body": "done", "read": True,
+                                 "choices": [{"label": "Insert it"}, {"label": "Dismiss"}]}, "s")
+        read.ask(read.revision, {"id": "q", "text": "Next?", "choices": [{"label": "A"}, {"label": "B"}]}, "s")
+        self.assertEqual(read.waiting, "and docs")
+        read.commit(True)  # Tab inserted the answer to read
+        self.assertEqual(read.text, "and docs")  # the words set aside come back
+        long = Composition()
+        long.change("x")
+        long.enter()
+        long.submit()
+        for _ in range(MAX_COMPOSITION):
+            long.insert("a")
+        long.ask(long.revision, {"id": "q", "text": "?", "choices": [{"label": "A"}, {"label": "B"}]}, "s")
+        self.assertEqual(long.escape(), "back")
+        self.assertEqual(long.text, "x " + "a" * MAX_COMPOSITION)  # kept past the cap, not cut
 
     def test_a_follow_up_on_a_rewrite_review_round(self):
         """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus
