@@ -176,12 +176,8 @@ class Warm:
 
     def binary(self):
         """The CLI's path; found again when an update moved it (as run_command does)."""
-        program = os.path.expanduser(self.command[0])
-        if not os.path.exists(program):
-            from . import settings
-            name = os.path.basename(program).lower()
-            program = (settings.codex() if name.startswith("codex") else settings.claude_code()) or program
-        return program
+        from . import settings
+        return settings.located(self.command[0])
 
     def retire(self):
         """The process that answered goes, ended in the background: the answer does not wait for it."""

@@ -504,6 +504,22 @@ class OpenTests(unittest.TestCase):
         shown.assert_called_once_with("http://x/settings#ticket=t&first=1")
 
 
+
+class LocatedTests(unittest.TestCase):
+    def test_a_moved_cli_is_found_again_and_anything_else_stays_as_given(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(settings, "claude_code", return_value="/new/claude"), \
+                patch.object(settings, "codex", return_value="/new/codex"):
+            here = Path(folder) / "claude"
+            here.write_text("")
+            self.assertEqual(settings.located(str(here)), str(here))  # where it was: kept
+            self.assertEqual(settings.located("/gone/claude"), "/new/claude")
+            self.assertEqual(settings.located("/gone/codex-x86_64"), "/new/codex")
+            self.assertEqual(settings.located("/gone/my-wrapper"), "/gone/my-wrapper")  # not ours to replace
+        with patch.object(settings, "claude_code", return_value=None):
+            self.assertEqual(settings.located("/gone/claude"), "/gone/claude")  # nowhere: as given, to fail plainly
+
+
 if __name__ == "__main__":
     unittest.main()
 

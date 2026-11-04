@@ -58,6 +58,17 @@ def codex():
     return command_path("codex", ".vscode*/extensions/openai.chatgpt-*/bin/*/codex*")
 
 
+def located(program):
+    """A Claude Code or Codex command where it is, or where an update moved it (the CLI, or its
+    VS Code extension's copy); any other program as given."""
+    program = os.path.expanduser(program)
+    if os.path.exists(program):
+        return program
+    name = os.path.basename(program).lower()
+    find = codex if name.startswith("codex") else claude_code if name.startswith("claude") else None
+    return (find and find()) or program
+
+
 def starter():
     return dict(config.STARTER, profiles={k: dict(v) for k, v in config.STARTER["profiles"].items()})
 
