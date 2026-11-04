@@ -103,6 +103,7 @@ class ModelServerTests(unittest.TestCase):
             fresh.adoptable = old.hand_over()  # what the service's swap does
             old.stop_model()
             self.assertIs(fresh.load("local").warm, process_warm)  # taken up, not started cold
+            self.assertIs(routed.warm, process_warm)  # a request still running on old has it too
             self.assertNotEqual(process_warm.state, "stopped")
         finally:
             fresh.stop_model()

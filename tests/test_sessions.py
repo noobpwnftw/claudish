@@ -408,6 +408,27 @@ class RoutingTests(unittest.TestCase):
             rewriter.make_driver(app="code", conversation="box", look=True)
         capture.assert_not_called()
 
+    def test_a_text_boxs_agent_follows_the_settings(self):
+        """An edited session_command (its model) is a new agent for the text box at its next
+        instruction; a profile without one ends the agent the box had."""
+        rewriter = Rewriter("rules")
+        rewriter.session_command = ["claude", "--model", "haiku"]
+        rewriter.make_driver(app="code", conversation="box")
+        first = rewriter.conversations.get("box").agent
+        rewriter.make_driver(app="code", conversation="box")
+        self.assertIs(rewriter.conversations.get("box").agent, first)  # unchanged: the same agent goes on
+        rewriter.session_command = ["claude", "--model", "sonnet"]
+        with patch.object(first, "close") as closed:
+            rewriter.make_driver(app="code", conversation="box")
+        closed.assert_called_once()
+        second = rewriter.conversations.get("box").agent
+        self.assertEqual(second.command, ["claude", "--model", "sonnet"])
+        rewriter.session_command = None
+        with patch.object(second, "close") as closed:
+            rewriter.make_driver(app="code", conversation="box")
+        closed.assert_called_once()
+        self.assertIsNone(rewriter.conversations.get("box").agent)
+
     def test_a_routed_profile_that_cannot_run_is_answered_not_dropped(self):
         main = Rewriter("rules")
         main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))

@@ -61,5 +61,44 @@ class SavedKeyTests(unittest.TestCase):
                 server.server_close()
 
 
+class SameProcessReloadTests(unittest.TestCase):
+    def test_a_request_running_when_a_reload_keeps_the_model_process_still_has_it(self):
+        """A tone changed while a rewrite runs: the same Claude Code process goes on, for the new
+        settings and for the request already running on the old ones (it was taken from it)."""
+        import os
+        import threading
+        from urllib.request import urlopen
+        from claudish.server import make_server
+
+        class Warm:
+            command, configured, state, stopped = ["claude"], "haiku", "warm", False
+
+            def stop(self):
+                self.stopped = True
+
+            def start(self):
+                pass
+        process = Warm()
+        old, fresh = Rewriter("rules"), Rewriter("rules")
+        old.warm, fresh.warm = process, Warm()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(old, 0, reload=lambda: fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+            try:
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                path.write_text('{"tone": "x"}')
+                os.utime(path, ns=(1, 1))
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertIs(server.rewriter, fresh)
+                self.assertIs(fresh.warm, process)  # the same process goes on
+                self.assertIs(old.warm, process)  # and the running request still has it
+                self.assertFalse(process.stopped)
+            finally:
+                server.shutdown()
+                server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

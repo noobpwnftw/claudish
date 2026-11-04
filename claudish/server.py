@@ -81,7 +81,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
         routed = fresh.adoptable.pop(warm_key(fresh.warm), None) if fresh.warm and not same else None
         if same:  # the same model process goes on (a tone or a binding changed)
-            fresh.warm, old.warm = old.warm, None
+            fresh.warm = old.warm  # and still old's for a request running there
+            old.handed.append(old.warm)
         elif routed is not None:  # a profile it routed to is now the one in use: its process goes on
             fresh.warm = routed
         else:

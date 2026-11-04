@@ -97,6 +97,9 @@ def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=
     return call(endpoint, "/suggest", body, timeout)
 
 
+SESSION_START_SECONDS = 120  # an instruction's start, its context read included (Suggestions._start)
+
+
 def call(endpoint, path, body=None, timeout=10):
     """A JSON request to the local service: POST with a body, else GET."""
     data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -305,7 +308,10 @@ class Suggestions:
             # (the next poll) still takes it out.
             if self.wanted is not None:
                 self.wanted = set(self.wanted) | {revision}
-        key = call(self.endpoint, "/sessions", body)["id"]
+        # The service reads the text box's context (its providers, each with its own timeout) before
+        # it answers with the session: waited for, as the session it starts is followed and stopped
+        # from here (Esc meanwhile stops it once the id is back); given up on, it would run unseen.
+        key = call(self.endpoint, "/sessions", body, timeout=SESSION_START_SECONDS)["id"]
         self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
         for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
             del self.revisions[old]
@@ -318,7 +324,7 @@ class Suggestions:
         try:
             self._follow(revision, key)
         except Exception as exc:
-            self.deliver(revision, {"error": str(exc), "session": key}, always=True)
+            self.deliver(revision, dict(said(exc), session=key), always=True)
 
     def _follow(self, revision, key):
         after, missed = 0, 0

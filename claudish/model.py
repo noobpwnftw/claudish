@@ -289,6 +289,7 @@ class Rewriter:
         self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
         self.routed = {}
         self.adoptable = {}  # model processes a reload handed over (hand_over), by warm_key
+        self.handed = []  # this one's processes a newer rewriter took over: never stopped from here
         self.takes = {}  # (mode, text) -> how many times it was asked: a repeat is another take
         self.schema = True  # an OpenAI-compatible server takes response_format (False once it refused it)
         # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
@@ -330,19 +331,21 @@ class Rewriter:
         """At service stop, or when the settings replace this profile: its model process ends, with
         the routed profiles' and those a reload left that nothing took up."""
         for rewriter in [self] + list(self.routed.values()):
-            if rewriter.warm:
+            if rewriter.warm and not any(rewriter.warm is each for each in self.handed):
                 rewriter.warm.stop()
         while self.adoptable:
             self.adoptable.popitem()[1].stop()
 
     def hand_over(self):
         """At a reload: the routed profiles' model processes, for the new rewriter to take up when
-        it routes to them again (an edit is not a cold start of every model)."""
+        it routes to them again (an edit is not a cold start of every model). They stay this one's
+        too: a request already running here finishes with its process."""
         kept = {}
         for rewriter in self.routed.values():
             warm = rewriter.warm
             if warm and not warm.state.startswith("failed") and warm_key(warm) not in kept:
-                kept[warm_key(warm)], rewriter.warm = warm, None
+                kept[warm_key(warm)] = warm
+                self.handed.append(warm)
         return kept
 
     @property
@@ -433,7 +436,10 @@ class Rewriter:
             kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
             config = self.agent_mcp_config(kept)
             textbox = self.url and "textbox" in ((config or {}).get("mcpServers") or {})
-            kept.agent = kept.agent or AgentProcess(self.session_command + self.agent_arguments(), config)
+            command = self.session_command + self.agent_arguments()
+            if kept.agent is not None and (kept.agent.command != command or kept.agent.mcp_config != config):
+                kept.close()  # the settings changed its agent (command, model, denied tools): a new one
+            kept.agent = kept.agent or AgentProcess(command, config)
             # The same description of the text box a model gets, and the same observations.
             box = self.box("instruct", app, purpose, before, after, look, screen=screen)
             words = self.modes["instruct"]["box"]
@@ -446,7 +452,9 @@ class Rewriter:
             return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy,
                                     words=self.modes["instruct"]["box"])
         from .conversation import ModelDriver
-        return ModelDriver(self, self.conversations.get(conversation), app, before, after, look, purpose, screen)
+        kept = self.conversations.get(conversation)
+        kept.close()  # an agent from settings that had one ends: this profile runs no agent
+        return ModelDriver(self, kept, app, before, after, look, purpose, screen)
 
     def agent_mcp_config(self, conversation):
         """--mcp-config for an agent: the profile's tool servers (as configured for Claudish, not the
