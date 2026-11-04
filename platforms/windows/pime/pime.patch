@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..8578590 100644
+index 0c7a8d5..aa34377 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -23,6 +23,7 @@
@@ -220,7 +220,7 @@ index 0c7a8d5..8578590 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +454,196 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +454,203 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -258,6 +258,9 @@ index 0c7a8d5..8578590 100644
 +		INPUT one = {};
 +		one.type = INPUT_KEYBOARD;
 +		one.ki.wVk = WORD(key.at(0).get<int>());
++		// The scan code too, in the app's layout: a Chromium app's KeyboardEvent.code (what VS Code's
++		// shortcuts match) comes from it, and Windows does not fill it in for SendInput.
++		one.ki.wScan = WORD(MapVirtualKeyExW(one.ki.wVk, MAPVK_VK_TO_VSC, GetKeyboardLayout(0)));
 +		one.ki.dwFlags = (key.at(1).get<bool>() ? KEYEVENTF_EXTENDEDKEY : 0) | (up ? KEYEVENTF_KEYUP : 0);
 +		return one;
 +	};
@@ -386,8 +389,12 @@ index 0c7a8d5..8578590 100644
 +		lastComposition_ = now;
 +	}
 +	else {
-+		onCompositionTerminated(true);  // the input method forgets its words: they are in the text
++		// The input method forgets its words (they are in the text) and its panel closes, as when the
++		// app ends a composition; ending it here is not a second termination to report.
++		textService_->onCompositionTerminated(true);
++		ending_ = true;
 +		textService_->endComposition(session->context());
++		ending_ = false;
 +		lastComposition_.clear();
 +	}
 +}
@@ -417,7 +424,7 @@ index 0c7a8d5..8578590 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +651,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +658,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -431,7 +438,7 @@ index 0c7a8d5..8578590 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +660,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +667,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -449,7 +456,7 @@ index 0c7a8d5..8578590 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -442,6 +748,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+@@ -442,6 +755,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
  
  	json req = createRpcRequest("filterKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -469,7 +476,7 @@ index 0c7a8d5..8578590 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -455,14 +774,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -455,14 +781,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  	if (!ensureConnected()) {
  		return false;
  	}
@@ -489,7 +496,7 @@ index 0c7a8d5..8578590 100644
  	}
  	return false;
  }
-@@ -490,6 +812,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +819,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -497,7 +504,7 @@ index 0c7a8d5..8578590 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +852,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +859,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -526,7 +533,16 @@ index 0c7a8d5..8578590 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -804,7 +1142,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -677,7 +1022,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
+ 
+ // called just before current composition is terminated for doing cleanup.
+ void Client::onCompositionTerminated(bool forced) {
+-	if (!ensureConnected()) {
++	if (ending_ || !ensureConnected()) {
+ 		return;
+ 	}
+ 
+@@ -804,7 +1149,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -536,7 +552,7 @@ index 0c7a8d5..8578590 100644
  	return pipeName;
  }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
-index feb9813..315d455 100644
+index feb9813..c534059 100644
 --- a/PIMETextService/PIMEClient.h
 +++ b/PIMETextService/PIMEClient.h
 @@ -92,6 +92,14 @@ public:
@@ -570,7 +586,7 @@ index feb9813..315d455 100644
  	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
  
  private:
-@@ -128,7 +145,13 @@ private:
+@@ -128,7 +145,14 @@ private:
  	std::shared_ptr<AsyncConnector> connector_;
  	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
  	unsigned int nextSeqNum_;
@@ -581,6 +597,7 @@ index feb9813..315d455 100644
  	bool isActivated_;
 +	// Claudish: the composition as last set, to tell text the app put into it (an Alt code) apart.
 +	std::wstring lastComposition_;
++	bool ending_ = false;  // addOutsideText ends the composition: the input method was told once
  	State state_;
  };
  

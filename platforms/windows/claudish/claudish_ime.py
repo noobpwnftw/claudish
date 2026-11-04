@@ -805,6 +805,10 @@ class ClaudishTextService(TextService):
         self.follow_document()
         self.field()  # this request carries the field's scopes: a key in a password field is not ours
         self.poll_results()  # what came while the app was in the background: the pill says it
+        if self.state.working or time.monotonic() < self.waiting_until:
+            # Still awaited: a timer that fired with no text box in focus stopped; the answer shows
+            # when it comes, not at your next key.
+            self.setTimer(TIMER_MS)
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
             self.setToast(pill, PILL_SECONDS)

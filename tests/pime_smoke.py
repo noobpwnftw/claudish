@@ -360,6 +360,9 @@ def main():
             assert (kwargs["before"], kwargs["after"], reply.get("timer")) == ("Dear Ana, ", " Best, Sam", 100), (kwargs, reply)
             reply = service.handleRequest({"method": "onTimer", "seqNum": 2})
             assert reply.get("timer") == 100  # still on its way: called back again
+            # Focus went where no text box was (the timer that fired then stopped): coming back calls back again.
+            reply = service.handleRequest({"method": "onSetFocus"})
+            assert reply.get("timer") == 100, reply
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
             reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
             worker_class.return_value.poll.return_value = None
