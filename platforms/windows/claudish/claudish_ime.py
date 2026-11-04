@@ -5,7 +5,7 @@ import os
 import time
 import weakref
 
-from .composition import MAX_COMPOSITION, MODES, Composition, ShiftTap, window
+from .composition import HELD_SECONDS, MAX_COMPOSITION, MODES, Composition, ShiftTap, window
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -84,7 +84,6 @@ def gone(box):
 
 
 def expire():
-    from .composition import HELD_SECONDS
     for window, (_, worker, when) in list(PARKED.items()):
         if time.monotonic() - when > HELD_SECONDS:
             del PARKED[window]
@@ -103,19 +102,26 @@ def foreground():
         return None
 
 
-# Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
 STEPS = {0x25: -1, 0x27: 1, 0x24: "home", 0x23: "end"}  # ← → Home End, inside what you type
+# Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
 EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
 
 
 MODIFIER_KEYS = (0x10, 0x11, 0x12, 0x5B)  # Shift, Ctrl, Alt, Windows
 # The left and right ones too: AltGr arrives as a key-down of left Ctrl (0xA2), then right Alt.
 SIDED_KEYS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5)
+CHORD_KEYS = (0x11, 0x12, 0x5B, 0x5C)  # Ctrl, Alt, left and right Windows: with a key, a shortcut
+SELECTING = (0x10, 0x11, 0x12)  # Shift, Ctrl, Alt: with an arrow or Delete, the app's (selection, words)
+
+
+def plain_tab(event):
+    """Tab without Shift (Shift+Tab is the app's)."""
+    return event.keyCode == 0x09 and not event.isKeyDown(0x10)
 
 
 def held_chord(event):
     """Ctrl, Alt or Win down with Shift: Windows' layout and language switch, not a Shift tap."""
-    return any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
+    return any(event.isKeyDown(key) for key in CHORD_KEYS)
 
 
 def held(event):
@@ -168,10 +174,11 @@ def focused_app():
     try:
         import ctypes
         from ctypes import wintypes
-        user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
-        pid = wintypes.DWORD()
-        user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), ctypes.byref(pid))
-        handle = kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+        kernel32 = ctypes.windll.kernel32
+        pid = foreground()
+        if not pid:
+            return None
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
             return None
         try:
@@ -223,6 +230,13 @@ class ClaudishTextService(TextService):
         self.last_document = None  # the text box of the last request (follow_document)
         self.taken_keys = set()  # continue's key-downs taken: their key-ups are taken too, only theirs
         self.drawn_ghost = ""  # the suggestion last drawn: Tab and Esc are cd_AI's only for one you see
+        self.owner = None  # this instance's app (its process, in front at its first request): parks go there
+        self.switching = False  # a Shift tap switched modes: its key-up is taken
+        self.committed = False  # the last reply committed: PIME's end of the composition is that commit's
+        self.panel_shown = None  # the panel as last published
+        self.waiting_until = 0  # an answer awaited: the timer looks for it until then (await_result)
+        self.previews = None  # the design lab's states (the gallery's preview)
+        self.known_scopes = None  # the text box's input scopes, kept from the request that carried them
 
     def onActivate(self):
         keylog("onActivate", id(self), "parked=%s" % list(PARKED))
@@ -272,9 +286,9 @@ class ClaudishTextService(TextService):
         parked with its worker for the next cd_AI instance in this app (pause, not stop)."""
         keylog("onDeactivate", id(self), "sent=%s held=%s" % (self.state.for_model, len(self.state.holds)))
         if self.state.for_model:
-            self.state.leave(getattr(self, "last_document", None))
+            self.state.leave(self.last_document)
         if self.worker and (self.state.holds or self.state.dropped):
-            park(getattr(self, "owner", None) or foreground(), self.state, self.worker)  # something to come back to
+            park(self.owner or foreground(), self.state, self.worker)  # something to come back to
             self.worker = None
             self.state = Composition()
         elif self.worker:
@@ -306,7 +320,7 @@ class ClaudishTextService(TextService):
         # switch), not in another window's (the instance that parked it at the click goes on with it);
         # looked at again at the next request. A request that names no box yet (a key) takes it.
         document, held = getattr(self, "document", None), parked[0]
-        boxes = set(held.holds) | ({held.dropped_box} if getattr(held, "dropped_box", None) else set())
+        boxes = set(held.holds) | ({held.dropped_box} if held.dropped_box else set())
         if document is not None and boxes and document not in boxes:
             return
         self.adopted_from = window
@@ -325,7 +339,7 @@ class ClaudishTextService(TextService):
         """One conversation per text box: Claudish's PIME names the TSF context of each request."""
         self.adopt_parked()
         document = getattr(self, "document", None)
-        if document and document != getattr(self, "last_document", None):
+        if document and document != self.last_document:
             if self.state.for_model:  # an instruction's exchange, left in the other text box: held for it
                 self.state.leave(self.last_document)
             elif self.state.live and self.state.text:  # continue's context and suggestion were the other box's
@@ -344,7 +358,7 @@ class ClaudishTextService(TextService):
         Without that file F12 is the app's."""
         if not os.path.exists(PREVIEW):
             return False
-        if getattr(self, "previews", None) is None:
+        if self.previews is None:
             with open(PREVIEW, encoding="utf-8") as source:
                 text = source.read()
             self.previews = list(json.loads(text[text.index("{"):text.rindex("}") + 1]).items())
@@ -398,7 +412,7 @@ class ClaudishTextService(TextService):
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
             # Backspace, Enter, and navigation are the app's (the context follows here).
-            if event.keyCode == 0x1B or event.keyCode == 0x09 and not event.isKeyDown(0x10):  # Shift+Tab: the app's
+            if event.keyCode == 0x1B or plain_tab(event):  # Shift+Tab: the app's
                 if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
                     self.drop_live()
                     return False
@@ -419,7 +433,7 @@ class ClaudishTextService(TextService):
             return False
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
-        taking = event.keyCode == 0x09 and not event.isKeyDown(0x10) and bool(self.selection())  # Tab on a selection: your words
+        taking = plain_tab(event) and bool(self.selection())  # Tab on a selection: your words
         return event.isPrintableChar() or bool(self.state.text) or restoring or taking
 
     def caret_stayed(self):
@@ -443,7 +457,7 @@ class ClaudishTextService(TextService):
         typing = event.isPrintableChar() or getattr(event, "isDead", False) or getattr(event, "charCount", 1) > 1
         altgr = (event.isKeyDown(0x11) and event.isKeyDown(0x12) and typing
                  and not (event.isKeyDown(0x5B) or event.isKeyDown(0x5C)))
-        return not altgr and any(event.isKeyDown(key) for key in (0x11, 0x12, 0x5B, 0x5C))
+        return not altgr and any(event.isKeyDown(key) for key in CHORD_KEYS)
 
     def publish(self):
         """The screen from the state, in Claudish's PIME (platforms/windows/pime): continue's
@@ -497,7 +511,7 @@ class ClaudishTextService(TextService):
         service names them; None for prose or when unknown."""
         if getattr(self, "inputScopes", None) is not None:  # only requests with an edit session carry them
             self.known_scopes = self.inputScopes
-        for scope in getattr(self, "known_scopes", None) or ():
+        for scope in self.known_scopes or ():
             if scope in INPUT_SCOPES:
                 return INPUT_SCOPES[scope]
         return None
@@ -514,14 +528,14 @@ class ClaudishTextService(TextService):
         self.setTimer(TIMER_MS)
 
     def onTimer(self):
-        away = getattr(self, "owner", None) and foreground() not in (None, self.owner)
+        away = self.owner and foreground() not in (None, self.owner)
         changed = self.poll_results(away)
         if away:
             pass  # another app is in front: nothing is drawn over it; onSetFocus shows it all on return
-        elif changed or (not self.state.live and self.state.panel() != getattr(self, "panel_shown", None)):
+        elif changed or (not self.state.live and self.state.panel() != self.panel_shown):
             self.publish()  # an answer, a question, progress, or the pause for compose's keys
         # Still waiting: an instruction or rewrite that is working, or a suggestion not yet back.
-        waiting = self.state.working or (not changed and time.monotonic() < getattr(self, "waiting_until", 0))
+        waiting = self.state.working or (not changed and time.monotonic() < self.waiting_until)
         if waiting:
             self.setTimer(TIMER_MS)
 
@@ -537,17 +551,17 @@ class ClaudishTextService(TextService):
             # must match the first.
             if self.shift.down:  # the first of the two
                 self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
-            keylog("filterKeyUp shift", "tap=%s" % getattr(self, "switching", False))
-            return getattr(self, "switching", False)
+            keylog("filterKeyUp shift", "tap=%s" % self.switching)
+            return self.switching
         # A shortcut's key-up goes where its key-down went (to the app): only typing's are continue's.
         return bool(self.keyboardOpen and (event.keyCode in self.taken_keys or
-                                           event.keyCode == 0x09 and not event.isKeyDown(0x10) and self.state.asked == "rewrite"
+                                           plain_tab(event) and self.state.asked == "rewrite"
                                            and self.state.working))
 
     def onKeyUp(self, event):
         self.taken_keys.discard(event.keyCode)
         self.poll_results()
-        if getattr(self, "switching", False):
+        if self.switching:
             self.switching = False
             self.switch_mode()
             return True
@@ -587,12 +601,12 @@ class ClaudishTextService(TextService):
             # instruction is not text for the app: it is cleared and its exchange held for Shift+Esc,
             # as a focus change does (and as on Linux and macOS).
             if self.state.for_model:
-                self.state.leave(getattr(self, "last_document", None))
+                self.state.leave(self.last_document)
                 self.publish()
             else:
                 self.setCommitString(self.state.commit())
                 self.changed()
-            if key not in (0x11, 0x12, 0x5B, 0x5C) + SIDED_KEYS:
+            if key not in CHORD_KEYS + SIDED_KEYS:
                 replay(key, held(event))
             return True
         shift = event.isKeyDown(0x10)
@@ -698,10 +712,10 @@ class ClaudishTextService(TextService):
             pass  # right after a dead key: Backspace takes back the accent (PIME uses it up), nothing else
         elif key == 0x08:
             self.state.backspace()
-        elif key in STEPS and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
+        elif key in STEPS and not any(event.isKeyDown(k) for k in SELECTING) \
                 and self.state.arrow(STEPS[key]):  # ← → Home End move in what you type (Shift+← selects)
             pass
-        elif key == 0x2E and not any(event.isKeyDown(k) for k in (0x10, 0x11, 0x12)) \
+        elif key == 0x2E and not any(event.isKeyDown(k) for k in SELECTING) \
                 and self.state.delete():  # forward delete, at the cursor (Shift+Delete cuts)
             pass
         elif event.isPrintableChar() and self.state.passes(chr(event.charCode)):
@@ -714,7 +728,7 @@ class ClaudishTextService(TextService):
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             # What is for the model never goes in: the exchange is held, as on a focus change.
             if self.state.for_model:
-                self.state.leave(getattr(self, "last_document", None))
+                self.state.leave(self.last_document)
             else:
                 self.setCommitString(self.state.commit())
             self.changed()
@@ -770,7 +784,7 @@ class ClaudishTextService(TextService):
     def onCompositionTerminated(self, forced):
         keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
-        if not forced and getattr(self, "committed", False):
+        if not forced and self.committed:
             # PIME ends the composition to put in what the last reply committed, and says so before
             # it shows that reply's composition: what stays composed (the words after a full
             # composition's commit, a reply on a draft Tab took) is not ended with it.
@@ -784,10 +798,10 @@ class ClaudishTextService(TextService):
             # and the exchange is held for this box, offered on return. Parked too: switching to
             # another input method closes this instance (with no onDeactivate), and the next one
             # here takes it up.
-            self.state.leave(getattr(self, "last_document", None))
+            self.state.leave(self.last_document)
             if self.worker:
                 # Its own app's: the one in front now may be where the click went.
-                park(getattr(self, "owner", None) or foreground(), self.state, self.worker)
+                park(self.owner or foreground(), self.state, self.worker)
             return
         self.state.change("")
         if self.worker:
@@ -812,7 +826,7 @@ class ClaudishTextService(TextService):
         self.keyboardOpen = opened
         if not opened:  # as a focus change: your words go in, an open exchange is held
             held = self.state.for_model
-            words = self.state.leave(getattr(self, "last_document", None))
+            words = self.state.leave(self.last_document)
             if words:
                 self.setCommitString(words)
             self.changed()

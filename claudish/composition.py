@@ -248,6 +248,7 @@ class Composition:
         self.question = None  # an agent session's open question: {"id", "text", "label", "body", "choices", "permission", "code", "read", "insert", "session"}
         self.reply = ""  # what you type while an instruction's exchange is open: a reply, or your next words
         self.back = 0  # characters after the cursor in what you type: ← → move it
+        self.origin = ""  # a follow-up on a rewrite: your words before it (Esc goes back to them)
         self.answers = []  # your answers in this exchange, for the panel's thread ("You answered")
         self.editing = False  # the instruction came back to the caret (Esc edit): the next Esc drops it
         self.dropped = ""  # the last words Esc dropped (an instruction, or a reply): Shift+Esc brings them back
@@ -416,7 +417,7 @@ class Composition:
     def edit(self, text, back):
         """Your words changed at the cursor: a new composition, the cursor kept where it was (and,
         for a follow-up on a rewrite, your words before it)."""
-        origin = getattr(self, "origin", "")  # (none before the first change)
+        origin = self.origin
         if not text and origin:  # the follow-up deleted: your words before it show again, as when a reply is
             self.change(origin)
             return
