@@ -24,6 +24,8 @@ from .modes import TEMPLATES
 # instruction only keeps it from adding an agent's habits around it (templates.json box.cli, the
 # profile's).
 CLI = TEMPLATES["box"]["cli"]
+# A model error that passes (capacity, a rate limit): the profile's model is kept for the next request.
+TRANSIENT = ("capacity", "rate limit", "overloaded", "try again", "temporar", "busy")
 
 
 class Lines:
@@ -84,6 +86,8 @@ class Warm:
 
     def warm_up(self):
         with self.lock:
+            if self.state == "warm" and self.alive():
+                return  # a request got here first and left the next process ready: nothing to redo
             started = time.monotonic()
             try:
                 self.check_running()
@@ -134,9 +138,13 @@ class Warm:
         """One rewrite, as its own conversation; RuntimeError with words for the panel. It waits
         for another request (an instruction, the warm-up) no longer than its own timeout."""
         deadline = time.monotonic() + timeout
-        if not self.lock.acquire(timeout=timeout):
+        waited = not self.lock.acquire(blocking=False)
+        if waited and not self.lock.acquire(timeout=timeout):
             raise RuntimeError("%s is busy; keep typing or retry" % self.name)
         try:
+            if waited and deadline - time.monotonic() < min(1.0, timeout / 2):
+                # Its time went waiting for the one before: it never ran, and the process is fine.
+                raise RuntimeError("%s is busy; keep typing or retry" % self.name)
             try:
                 self.check_running()
                 if not self.alive():
@@ -146,9 +154,9 @@ class Warm:
             except TimeoutError:
                 self.failed()  # a stuck one is not reused
                 raise RuntimeError("%s took longer than %g s" % (self.name, timeout))
-            except (RuntimeError, OSError) as exc:
+            except Exception as exc:  # garbled output too: the process may still hold this prompt
                 self.failed()
-                if isinstance(exc, OSError):
+                if not isinstance(exc, RuntimeError):
                     raise RuntimeError("%s: %s" % (self.name, exc)) from exc
                 raise
             try:
@@ -322,7 +330,8 @@ class Codex(Warm):
         except RuntimeError as exc:
             if not self.model:
                 raise
-            if "model" in str(exc).lower():
+            said = str(exc).lower()
+            if "model" in said and not any(word in said for word in TRANSIENT):
                 self.model = None  # not offered on this account: Codex's default model from now on
             params.pop("model")  # another failure (a rate limit): this request only
             thread = self.call("thread/start", params, deadline)

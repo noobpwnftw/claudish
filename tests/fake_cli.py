@@ -21,6 +21,8 @@ def claude():
             sys.exit(3)
         if "slow" in content:
             time.sleep(3)
+        if "garble" in content:  # a line that is JSON but not an event, then the answer
+            print("[1]", flush=True)
         if seen == 1:
             print(json.dumps({"type": "system", "subtype": "init"}), flush=True)
         print(json.dumps({"type": "result", "subtype": "success", "is_error": False,
@@ -44,6 +46,9 @@ def codex():
         elif method == "thread/start":
             if params.get("model") == "nope":
                 send({"id": ident, "error": {"code": -32600, "message": "model not available"}})
+                continue
+            if params.get("model") == "busy":  # the model, for now
+                send({"id": ident, "error": {"code": -32000, "message": "Selected model is at capacity. Please try a different model."}})
                 continue
             if params.get("model") == "limited":  # refused for another reason than the model
                 send({"id": ident, "error": {"code": -32000, "message": "rate limited, try again later"}})

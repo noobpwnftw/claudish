@@ -65,6 +65,32 @@ class ClaudeCodeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "ended"):
             self.backend.ask("die", 5)
 
+    def test_garbled_output_does_not_leave_its_answer_for_the_next_request(self):
+        self.backend.start()
+        ready(self.backend)
+        with self.assertRaises(RuntimeError):
+            self.backend.ask("garble", 5)
+        self.assertEqual(self.backend.ask("rewrite: ok", 5), "seen 1: rewrite: ok")  # not garble's answer
+
+    def test_a_warm_up_after_a_request_keeps_the_ready_process(self):
+        self.backend.start()
+        ready(self.backend)
+        process = self.backend.process
+        self.backend.warm_up()  # queued behind a request that already left the next one ready
+        self.assertIs(self.backend.process, process)
+        self.assertEqual(self.backend.state, "warm")
+
+    def test_a_request_whose_time_went_waiting_is_busy_and_kills_nothing(self):
+        self.backend.start()
+        ready(self.backend)
+        process = self.backend.process
+        self.backend.lock.acquire()
+        threading.Timer(1.6, self.backend.lock.release).start()
+        with self.assertRaisesRegex(RuntimeError, "busy"):
+            self.backend.ask("rewrite: ok", 2)
+        self.assertIs(self.backend.process, process)
+        self.assertEqual(self.backend.state, "warm")
+
     def test_stop_ends_the_process(self):
         self.backend.start()
         ready(self.backend)
@@ -104,6 +130,11 @@ class CodexTests(unittest.TestCase):
     def test_a_failed_turn_is_an_error_not_its_note_on_the_way(self):
         with self.assertRaisesRegex(RuntimeError, "stream disconnected"):
             self.backend.ask("please fail", 5)
+
+    def test_a_model_at_capacity_is_kept_for_the_next_request(self):
+        self.backend.model = "busy"
+        self.assertEqual(self.backend.ask("ok", 5)[:22], "t1 turn 1 model None: ")  # this request only
+        self.assertEqual(self.backend.model, "busy")
 
     def test_another_refusal_keeps_the_configured_model(self):
         self.backend.model = "limited"
