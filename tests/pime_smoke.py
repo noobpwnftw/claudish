@@ -476,6 +476,16 @@ def main():
                 reply = word.handleRequest({"method": "onTimer", "seqNum": 10})
             word.worker.poll.return_value = None
             assert "toast" not in reply and not reply.get("showMessage"), reply  # not over that window
+            # A helper takes the task just as Esc, Tab or Backspace is pressed (between two timers): the
+            # composition empties at that key, and the key is the app's, as on Linux and macOS.
+            for code in (0x1B, 0x09, 0x08):
+                word.state.change("hand it over")
+                word.state.submit()
+                word.worker.poll.return_value = (word.state.revision, {"done": "claude opened in a new window"})
+                reply = word.handleRequest({"method": "onKeyDown", "seqNum": 11, "charCode": 0, "keyCode": code,
+                                            "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": [0] * 256})
+                word.worker.poll.return_value = None
+                assert reply["return"] is False and not word.state.text, (hex(code), reply)
             # Back in a text box after a focus change: what waits there says so when the app has the
             # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
             back = ClaudishTextService(None)

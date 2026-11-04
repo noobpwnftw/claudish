@@ -528,6 +528,21 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.controller.state.mode, "compose")  # picked in the input menu
         self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])  # macOS chose it: not selected again
 
+    def test_a_question_sets_aside_words_typed_meanwhile_and_the_marked_text_follows(self):
+        """A reply typed while the model works is set aside by its question: the marked text is the
+        instruction again at once (as on Linux and Windows), not the words until the next key."""
+        self.type_text("summarize this")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        self.type_text("shorter")
+        self.assertEqual(self.client.marked, "shorter")
+        self.controller.worker.result = (state.revision, {"session": "s", "question": {
+            "id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}, {"label": "B"}]}})
+        self.controller.pollSuggestions_(None)
+        self.assertTrue(state.question)
+        self.assertEqual(self.client.marked, state.drawn)
+        self.assertNotEqual(self.client.marked, "shorter")
+
     def test_a_shift_tap_on_a_question_holds_it_and_the_way_back_says_so(self):
         """Owner: Shift on a pick panel left the instruction marked until a click, and back in
         compose nothing said the drafts were waiting."""

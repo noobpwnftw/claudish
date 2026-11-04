@@ -246,6 +246,7 @@ class ClaudishInputController(IMKInputController):
         result = self.worker.poll()
         if result:
             trace("result", sorted(result[1]), "current" if result[0] == self.state.revision else "stale")
+        drawn = (self.state.drawn, self.state.drawn_cursor)
         kind = self.state.receive(*result) if result else None
         if kind == "text":
             if self.state.converted:  # the rewrite you asked for with Tab: in the panel, your words stay marked
@@ -265,6 +266,10 @@ class ClaudishInputController(IMKInputController):
                     self.changed(client)
                 else:
                     unmark(client)
+        elif not self.state.live and drawn != (self.state.drawn, self.state.drawn_cursor):
+            client = self.client()  # a question, a draft or a failure: words set aside or brought back
+            if client is not None:
+                self.mark(client)
         self.check_ghost()
         if self.state.panel() != self.drawn:  # an answer, a question, progress, or the pause for the keys
             self.show_panel()
@@ -512,7 +517,13 @@ class ClaudishInputController(IMKInputController):
             self.show_ghost(client)
             return
         OVERLAY.hide()
-        shown = self.state.drawn  # your words (a rewrite waits in the panel for Tab), a waiting accent
+        self.mark(client)
+        self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
+
+    @objc.python_method
+    def mark(self, client):
+        """The marked text: your words (a rewrite waits in the panel for Tab), a waiting accent."""
+        shown = self.state.drawn
         # Cocoa ranges count UTF-16 code units, rather than Python code points; the cursor is where
         # ← and → left it (the end by default).
         cursor = units(shown[:self.state.drawn_cursor])
@@ -520,7 +531,6 @@ class ClaudishInputController(IMKInputController):
             client.setMarkedText_selectionRange_replacementRange_(marked(shown), (cursor, 0), (NSNotFound, 0))
         else:  # empty marked text would leave a terminal composing: the next Return beeps
             unmark(client)
-        self.show_panel(client)  # what is waiting (drafts, a question) or the one short hint
 
     @objc.python_method
     def dead_key(self, key, chars, flags):

@@ -416,6 +416,10 @@ class ClaudishTextService(TextService):
         # as typed. Backspace, Tab, Enter and Esc stay Claudish's keys (the accent goes).
         if getattr(event, "charCount", 1) > 1 and event.keyCode not in (0x08, 0x09, 0x0D, 0x1B):
             return False
+        return self.ours(event)
+
+    def ours(self, event):
+        """Whether cd_AI takes this key while composing (not continue)."""
         # Shift+Esc with nothing composed: the exchange you left, or the instruction Esc dropped, comes back.
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
         taking = plain_tab(event) and bool(self.selection())  # Tab on a selection: your words
@@ -573,9 +577,15 @@ class ClaudishTextService(TextService):
                "len=%d" % len(self.state.text),
                "around=%s/%s" % tuple(len(s) for s in self.around()),
                "selected=%d" % len(getattr(self, "textSelected", None) or ""), "scopes=%s" % getattr(self, "inputScopes", None))
+        composing = bool(self.state.text)
         self.poll_results()
         self.follow_document()
         key = event.keyCode
+        if composing and not self.state.text and not self.state.live and not self.ours(event):
+            # A result at this key emptied the composition (a helper took the task): the key is the
+            # app's after all, as on Linux and macOS, which poll at the key too.
+            self.publish()
+            return False
         if self.sensitive() and event.isPrintableChar() and not self.state.text:
             # The first key in a password field, taken before its kind was known: type it as is.
             self.setCommitString(chr(event.charCode))
