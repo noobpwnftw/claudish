@@ -226,9 +226,25 @@ def save(data, path=None):
     if not path.is_file() or any(isinstance(p, dict) and p.get("templates") == "templates.json" for p in profiles.values()):
         write_starter_templates(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    import tempfile
+    target = Path(os.path.realpath(path))  # a config.json linked from elsewhere (dotfiles) stays a link
+    mode = target.stat().st_mode & 0o777 if target.is_file() else 0o644
+    # A temporary file of its own (two writers at once, the settings and setup, each have theirs),
+    # on disk before it takes the config's place.
+    descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=target.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as out:
+            out.write(json.dumps(data, indent=2) + "\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
 
 
 def plainly(error):

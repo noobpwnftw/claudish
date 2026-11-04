@@ -9,6 +9,7 @@ import platform
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -144,7 +145,7 @@ def paths():
 
 def plan(action, extra=()):
     """[(description, kind, payload)]: "write" (path, text), "run" (argv), "stop" (argv; may find
-    nothing to stop), or "remove" (path)."""
+    nothing to stop), "gone" (argv that succeeds while the old one is still there), or "remove" (path)."""
     system, argv = platform.system(), command(extra)
     if system == "Linux":
         unit = paths()["Linux"]
@@ -175,6 +176,8 @@ def plan(action, extra=()):
         agent, domain = paths()["Darwin"], "gui/%d" % os.getuid()
         if action == "install":
             return [("stop a running one", "stop", ["launchctl", "bootout", "%s/%s" % (domain, LABEL)]),
+                    # launchd lets go of it a moment later: loaded before that, "Bootstrap failed: 5".
+                    ("wait for it to end", "gone", ["launchctl", "print", "%s/%s" % (domain, LABEL)]),
                     ("write the launch agent", "write", (agent, launchd_plist(argv))),
                     ("load it", "run", ["launchctl", "bootstrap", domain, str(agent)])]
         if action == "uninstall":
@@ -200,6 +203,10 @@ def run(action, extra=(), dry_run=False):
         elif kind == "remove":
             if payload.exists():
                 payload.unlink()
+        elif kind == "gone":
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and subprocess.run(payload, capture_output=True, timeout=10).returncode == 0:
+                time.sleep(0.1)
         else:
             try:
                 result = subprocess.run(payload, capture_output=True, text=True, timeout=60)

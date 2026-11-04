@@ -114,6 +114,23 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("stop and disable it: not done (Failed to connect to bus: No medium found)", lines)
         self.assertNotIn("stop and disable it: done", lines)
 
+    def test_macos_loads_the_agent_once_the_old_one_has_ended(self):
+        """Bootstrap right after bootout fails ("5: Input/output error", 4 of 5 on the Mac VM) and
+        nothing runs until the next login: it waits until launchd no longer has the old one."""
+        from subprocess import CompletedProcess
+        calls, printed = [], iter([0, 0, 113])
+        def run(argv, **kwargs):
+            calls.append(argv[:2])
+            return CompletedProcess(argv, next(printed) if argv[1] == "print" else 0, "", "")
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("claudish.service.platform.system", return_value="Darwin"), \
+                patch("claudish.service.os.getuid", create=True, return_value=501), \
+                patch.object(Path, "home", return_value=Path(directory)), \
+                patch("claudish.service.time.sleep"), \
+                patch("claudish.service.subprocess.run", side_effect=run), patch("builtins.print"):
+            service.run("install", extra=["--backend", "rules"])
+        self.assertEqual(calls, [["launchctl", "bootout"]] + [["launchctl", "print"]] * 3 + [["launchctl", "bootstrap"]])
+
     def test_windows_logon_task_is_this_accounts_own(self):
         """A machine-wide "claudish" task was taken by whoever installed first; another account's
         install could not replace it, so its service never started at login (Windows VM)."""

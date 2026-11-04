@@ -120,6 +120,39 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("mine", path.read_text(encoding="utf-8"))
 
 
+class SaveTests(unittest.TestCase):
+    def test_a_linked_config_stays_a_link_and_keeps_its_mode(self):
+        """A config.json linked from a dotfiles folder: the file it points to is written, the link stays."""
+        with tempfile.TemporaryDirectory() as folder:
+            real = Path(folder, "dotfiles/config.json")
+            real.parent.mkdir()
+            real.write_text(json.dumps(config.STARTER))
+            real.chmod(0o640)
+            link = Path(folder, "claudish/config.json")
+            link.parent.mkdir()
+            link.symlink_to(real)
+            config.save(dict(config.STARTER, profile="claude"), link)
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(json.loads(real.read_text())["profile"], "claude")
+            self.assertEqual(real.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(sorted(p.name for p in real.parent.iterdir()), ["config.json"])  # no temporary left
+
+    def test_two_saves_at_once_each_write_a_whole_file(self):
+        import threading
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            config.save(dict(config.STARTER), path)
+            big = dict(config.STARTER, note="x" * 200000)
+            threads = [threading.Thread(target=config.save, args=(big if i % 2 else dict(config.STARTER), path))
+                       for i in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            json.loads(path.read_text())  # whole, whichever came last
+            self.assertFalse(list(Path(folder).glob("*.tmp")))
+
+
 class ByteOrderMarkTests(unittest.TestCase):
     def test_a_config_saved_with_a_byte_order_mark_loads(self):
         """Windows PowerShell 5's Set-Content -Encoding UTF8 writes one."""
