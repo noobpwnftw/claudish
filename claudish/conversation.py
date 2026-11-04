@@ -6,6 +6,7 @@ their results; the text around the caret is sent fresh each turn. Conversations 
 and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
 (once per conversation if you allow it for the conversation), destructive tools ask every time.
 """
+import json
 import os
 import secrets
 import threading
@@ -17,6 +18,7 @@ from .tools import Finished
 
 IDLE_SECONDS = 1800
 KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs: compaction)
+KEPT_CHARACTERS = 24000  # and within what a small local model's context holds beside the text box
 # A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
 # it may take far longer than a suggestion while typing (the profile's timeout, if longer).
 TURN_TIMEOUT = 60
@@ -52,9 +54,17 @@ class Conversation:
             self.agent = None
 
     def remember(self, messages):
-        self.messages = (self.messages + messages)[-KEPT_MESSAGES:]
-        while self.messages and self.messages[0]["role"] != "user":  # never start mid-turn
-            self.messages.pop(0)
+        """Keep a turn: whole turns, the oldest going first past the limits; the newest always stays."""
+        kept = self.messages + messages
+        starts = [at for at, message in enumerate(kept) if message["role"] == "user"]  # never start mid-turn
+        size = lambda part: sum(len(json.dumps(message, ensure_ascii=False)) for message in part)
+        for start in starts:
+            if start == starts[-1] or (len(kept) - start <= KEPT_MESSAGES and size(kept[start:]) <= KEPT_CHARACTERS):
+                kept = kept[start:]
+                break
+        else:
+            kept = []
+        self.messages = kept
 
     def forget(self, messages):
         """A turn taken back after it was kept (Esc as its answer arrived): wherever it is, the latest
@@ -277,7 +287,14 @@ class ModelDriver:
     def ask_user(self, session, arguments):
         """The model's own question, shown as is and marked as the model's."""
         # A choice can be a whole draft (the panel wraps it); a longer one says it was cut.
-        labels = [shorten(str(c), CHOICE_CHARS) for c in (arguments.get("choices") or [])][:3] or ["Yes", "No"]
+        choices = arguments.get("choices") or []
+        if isinstance(choices, str):  # a list sent as text (a tool schema not held strictly)
+            try:
+                choices = json.loads(choices)
+            except ValueError:
+                choices = [choices]
+        choices = choices if isinstance(choices, list) else [choices]
+        labels = [shorten(str(c), CHOICE_CHARS) for c in choices][:3] or ["Yes", "No"]
         labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
         asked = shorten(str(arguments.get("question") or ""), 400)
         choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],

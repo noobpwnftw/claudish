@@ -759,13 +759,15 @@ class Rewriter:
                     try:
                         choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
                     except HTTPError as exc:
-                        if exc.code not in SCHEMA_REFUSED or not offered:
+                        if exc.code not in SCHEMA_REFUSED or not offered or steps[0]:
                             raise
                         # A tool's own argument schema the server cannot hold: any-object arguments.
                         shaped["response_format"] = shapes.step_format(offered, loose=True)
                         choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
                 except HTTPError as exc:
-                    if exc.code not in SCHEMA_REFUSED:
+                    # Refused after this turn's shaped steps were answered: not the schema (a request
+                    # past the model's context, say), and the turn's tools must not run again.
+                    if exc.code not in SCHEMA_REFUSED or steps[0]:
                         raise
                     self.schema = False  # a server without json_schema: the turn again, in plain text
                     raise Unshaped() from exc

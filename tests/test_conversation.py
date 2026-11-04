@@ -219,6 +219,29 @@ class PolicyTests(unittest.TestCase):
         conversation.forget(old)
         self.assertEqual([m["content"] for m in conversation.messages], ["second", "two"])
 
+    def test_a_long_turn_is_kept_whole_and_the_oldest_turns_go_first(self):
+        """A turn of many tool calls (over KEPT_MESSAGES on its own) once emptied the conversation."""
+        from claudish import conversation as kept
+        box = self.rewriter.conversations.get("box")
+        box.remember([{"role": "user", "content": "first"}, {"role": "assistant", "content": "one"}])
+        long = [{"role": "user", "content": "search a lot"}] + [
+            {"role": "tool", "tool_call_id": str(i), "content": "found"} for i in range(kept.KEPT_MESSAGES + 2)]
+        box.remember(long)
+        self.assertEqual(box.messages, long)
+
+    def test_the_history_stays_within_a_small_models_context(self):
+        """Reads of a long text box (4000 characters each) piled up past a local model's context,
+        and every later instruction in that box failed."""
+        from claudish import conversation as kept
+        box = self.rewriter.conversations.get("box")
+        for turn in range(12):
+            box.remember([{"role": "user", "content": "turn %d" % turn},
+                          {"role": "tool", "tool_call_id": "r", "content": "x" * 4000},
+                          {"role": "assistant", "content": "done %d" % turn}])
+        self.assertLessEqual(sum(len(json.dumps(m)) for m in box.messages), kept.KEPT_CHARACTERS)
+        self.assertEqual(box.messages[-1]["content"], "done 11")  # the newest turns stay
+        self.assertEqual(box.messages[0]["role"], "user")
+
     def test_an_instruction_cancelled_as_its_answer_arrived_is_taken_back(self):
         """Esc while the answer was on its way to the input method: the turn was kept, then taken back."""
         conversation = self.rewriter.conversations.get("box")
@@ -250,6 +273,49 @@ class AskAndHelperTests(unittest.TestCase):
                 session.answer(question["id"], choice)
             thread.join(5)
         return asked, session.events[-1]
+
+    def test_choices_sent_as_text_are_choices_not_letters(self):
+        for sent, labels in (('["Reply now", "Later"]', ["Reply now", "Later"]), ("Yes, No", ["Yes, No"])):
+            with self.subTest(sent=sent):
+                model = Scripted(answer(calls=[("user__ask", {"question": "When?", "choices": sent})]), answer("ok"))
+                asked, _ = self.drive(model, [0])
+                self.assertEqual([c["label"] for c in asked[0]["choices"]], labels)
+
+    def test_a_refusal_after_tools_ran_is_an_error_not_the_turn_again(self):
+        """A 400 once a step was answered (a request past the model's context) is not the server
+        refusing the schema: the turn is not run again, so its question is not asked twice."""
+        from urllib.error import HTTPError
+        model = Scripted(answer(calls=[("user__ask", {"question": "Which?", "choices": ["a", "b"]})]))
+
+        def chat(payload, headers, image=None, timeout=None):
+            if model.sent:
+                model.sent.append(payload)
+                raise HTTPError("u", 400, "the request exceeds the available context size", None, None)
+            return model(payload, headers, image, timeout)
+        failed = []
+        rewriter = Rewriter()
+        rewriter.modes["instruct"]["candidates"] = 1
+        with patch.object(rewriter, "chat", chat):
+            driver = ModelDriver(rewriter, rewriter.conversations.get("box"))
+            session = Session(driver)
+
+            def turn():
+                try:
+                    driver.run(session, "fix it")
+                except HTTPError as exc:
+                    failed.append(exc.code)
+            thread = threading.Thread(target=turn)
+            thread.start()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not [e for e in session.events if e["type"] == "question"]:
+                time.sleep(0.01)
+            question = [e for e in session.events if e["type"] == "question"][0]
+            session.answer(question["id"], 0)
+            thread.join(5)
+        self.assertEqual(len([e for e in session.events if e["type"] == "question"]), 1)
+        self.assertEqual(failed, [400])  # said as it is
+        self.assertEqual(len(model.sent), 2)  # the turn was not run again
+        self.assertIsNot(rewriter.schema, False)
 
     def test_esc_on_the_models_question_stops_the_turn(self):
         rewriter = Rewriter()
