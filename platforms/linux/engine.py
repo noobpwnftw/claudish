@@ -211,15 +211,15 @@ class ClaudishEngine(IBus.Engine):
             screen().publish(panel, state.ghost if state.live and not state.inside else "")
             return
         if state.live:
-            # Continue: your words are in the app already; the preedit is only the greyed suggestion,
-            # cleared (never committed) by a focus change.
-            ghost = state.ghost
-            preedit = IBus.Text.new_from_string(ghost)
+            # Continue: your words are in the app already; the preedit is a waiting accent and the
+            # greyed suggestion, cleared (never committed) by a focus change.
+            accent, ghost = state.accent, state.ghost
+            preedit = IBus.Text.new_from_string(accent + ghost)
             if ghost:
                 attributes = IBus.AttrList()
-                attributes.append(IBus.attr_foreground_new(0x8A8A8A, 0, len(ghost)))
+                attributes.append(IBus.attr_foreground_new(0x8A8A8A, len(accent), len(accent) + len(ghost)))
                 preedit.set_attributes(attributes)
-            self.update_preedit_text_with_mode(preedit, 0, bool(ghost), IBus.PreeditFocusMode.CLEAR)
+            self.update_preedit_text_with_mode(preedit, len(accent), bool(accent or ghost), IBus.PreeditFocusMode.CLEAR)
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)  # quiet: the suggestion speaks
             return
@@ -465,8 +465,8 @@ class ClaudishEngine(IBus.Engine):
                 and not typeable(IBus.keyval_to_unicode(keyval)):
             self.dead = None  # an accent waiting for its letter: any other key cancels it, as GTK's does
             self.render()
-            if keyval == IBus.KEY_BackSpace:
-                return True  # Backspace cancels the accent, and nothing else
+            if keyval in (IBus.KEY_BackSpace, IBus.KEY_Escape):
+                return True  # Backspace or Esc cancels the accent, and nothing else
         if state & SHORTCUT_MASK:
             self.finish()
             return False
@@ -714,6 +714,7 @@ class ClaudishEngine(IBus.Engine):
         the window you are in, named again (its class set late): only its app is taken up."""
         if not (self.shared and self.focused):
             return
+        self.shift.cancel()  # another window took focus (a Shift+click): its Shift is not a tap
         if not same:
             self.hold()
         self.do_focus_in_id(self.shared, "gnome-shell")
@@ -726,6 +727,7 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_out(self):
         trace("focus-out")
         self.focused = False
+        self.shift.cancel()  # focus moved (a Shift+click): its Shift is not a tap
         if screen().on_presence == self.render:
             screen().on_presence = None
         self.sequence = None  # a Compose key waiting goes with the focus
@@ -756,6 +758,7 @@ class ClaudishEngine(IBus.Engine):
 
     def do_reset(self):
         self.sequence = None
+        self.shift.cancel()  # a click (Shift+click): its Shift is not a tap
         trace("reset")
         if self.hold():  # a click in the field: the exchange is held, as on a focus change
             return

@@ -39,6 +39,7 @@ try:
     # A dead key in continue: its accent waits at the caret, then goes on the letter.
     assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
     assert engine.composition.accent == "´"
+    assert preedits[-1] == ("´", True), preedits[-1]  # drawn at the caret without the extension too
     assert engine.focus_mode() == IBus.PreeditFocusMode.CLEAR  # the accent alone: not typed when focus goes
     assert engine.do_process_key_event(ord("e"), 0, 0) and commits == ["é"], commits
     assert engine.composition.text == "ls -laé" and not engine.composition.accent
@@ -171,7 +172,17 @@ try:
     assert engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)
     engine.do_process_key_event(ord("e"), 0, 0)
     assert engine.composition.text == "e", engine.composition.text
+    # Esc too cancels only the accent: the words stay.
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_acute"), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    assert engine.composition.text == "e" and not engine.composition.accent, engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Shift held through a click (reset) is no tap: the mode stays.
+    mode = engine.composition.mode
+    assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, 0)
+    engine.do_reset()
+    assert not engine.do_process_key_event(IBus.KEY_Shift_L, 0, IBus.ModifierType.RELEASE_MASK)
+    assert engine.composition.mode == mode
     # The Compose key: Compose ' e is é, in the composition, as a dead key's is.
     for char in "caf":
         engine.do_process_key_event(ord(char), 0, 0)

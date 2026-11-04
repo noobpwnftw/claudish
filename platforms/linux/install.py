@@ -58,9 +58,9 @@ def component_path_setting():
     return "IBUS_COMPONENT_PATH=%s\n" % ":".join(parts)
 
 
-def enabled_extensions():
-    found = subprocess.run(["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
-                           capture_output=True, text=True)
+def extensions(key="enabled-extensions"):
+    """A GNOME Shell list of extensions (enabled, or disabled); None without gsettings."""
+    found = subprocess.run(["gsettings", "get", "org.gnome.shell", key], capture_output=True, text=True)
     if found.returncode != 0:
         return None
     value = found.stdout.strip()
@@ -80,12 +80,16 @@ def set_extension(enabled):
             link.symlink_to(target)
     elif link.is_symlink():
         link.unlink()
-    current = enabled_extensions()
+    current = extensions()
     if current is None:
         return False
     wanted = sorted(set(current) | {EXTENSION}) if enabled else [e for e in current if e != EXTENSION]
     if wanted != current:
         subprocess.run(["gsettings", "set", "org.gnome.shell", "enabled-extensions", str(wanted)], check=False)
+    off = extensions("disabled-extensions") or []
+    if enabled and EXTENSION in off:  # switched off in the Extensions app: that list wins over the other
+        subprocess.run(["gsettings", "set", "org.gnome.shell", "disabled-extensions",
+                        str([e for e in off if e != EXTENSION])], check=False)
     return True
 
 
