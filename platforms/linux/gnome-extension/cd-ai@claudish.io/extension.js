@@ -324,6 +324,7 @@ export default class CdAiExtension extends Extension {
             // Above the line when it does not fit below and there is more room above (as Windows does).
             if (top + tall > area.y + area.height && y - area.y > area.y + area.height - (y + height))
                 top = Math.round(y - tall - GAP * s);
+            top = Math.max(area.y + 4 * s, Math.min(top, area.y + area.height - tall - 4 * s));  // on its monitor
             box.set_position(left, top);
         }
         if (this._ghost.visible) {

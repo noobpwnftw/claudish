@@ -292,6 +292,22 @@ try:
     assert commits[-1] == "hunter" and not engine.composition.text, commits[-1:]  # typed words went in
     assert not engine.do_process_key_event(ord("x"), 0, 0)
     assert not engine.composition.text
+    # The GNOME extension appears or goes (enabled, disabled, the shell restarted): the focused box
+    # draws again where its panel now is; a box without focus does not.
+    engine.resume()
+    shown = module.screen()
+    for present in (True, False):
+        before = len(preedits)
+        shown.watch(present)
+        assert len(preedits) > before and shown.shell is present, (present, preedits[before:])
+        before = len(preedits)
+        shown.watch(present)  # no change: nothing to draw
+        assert len(preedits) == before
+    engine.do_focus_out()
+    before = len(preedits)
+    shown.watch(True)
+    assert len(preedits) == before and shown.on_presence is None
+    shown.watch(False)
     print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()

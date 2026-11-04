@@ -96,6 +96,7 @@ class Screen:
         # GNOME on Wayland gives IBus one input context for every app: the extension says which
         # window (and app) has focus, and the engine in that context follows it (on_focus).
         self.focus, self.on_focus = None, None
+        self.on_presence = None  # the focused engine: it draws again where the extension is, or is not
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
             info = Gio.DBusNodeInfo.new_for_xml(SCREEN_XML).interfaces[0]
@@ -109,7 +110,11 @@ class Screen:
 
     def watch(self, present):
         trace("shell extension", "present" if present else "absent")
-        self.shell = present
+        changed, self.shell = present != self.shell, present
+        if changed and self.on_presence is not None:
+            # Disabled, or the shell restarted: the panel and suggestion go to IBus's popup and
+            # preedit; back, the extension gets what is at the caret now, and IBus's are cleared.
+            self.on_presence()
 
     def call(self, connection, sender, path, interface, method, parameters, invocation):
         if method == "Focus":
@@ -676,6 +681,7 @@ class ClaudishEngine(IBus.Engine):
     def resume(self):
         """Focus in: the poll timer again (it stops while another box has focus), and what came meanwhile."""
         self.focused = True
+        screen().on_presence = self.render
         if self.timer is None:
             self.timer = GLib.timeout_add(40, self.poll)
             self.poll()
@@ -720,6 +726,8 @@ class ClaudishEngine(IBus.Engine):
     def do_focus_out(self):
         trace("focus-out")
         self.focused = False
+        if screen().on_presence == self.render:
+            screen().on_presence = None
         self.sequence = None  # a Compose key waiting goes with the focus
         if self.timer is not None:  # another box's engine polls now; results wait in the worker
             GLib.source_remove(self.timer)
