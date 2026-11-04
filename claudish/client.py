@@ -144,6 +144,10 @@ class Suggestions:
         self.summon = "Shift+Enter"  # the key that sends your words to the model (the config's "keys")
         self.hints = True  # the config's "hints"
         self.stopped = threading.Event()  # its own: a notify on the condition must wake the requests
+        # Whether to watch the service (watch()): an input method whose controller is not in use
+        # (macOS keeps one per text box) asks nothing.
+        self.watching = threading.Event()
+        self.watching.set()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
         threading.Thread(target=self._watch, daemon=True).start()
@@ -153,6 +157,9 @@ class Suggestions:
         says it is offline from the first key (a refused connection on this computer fails at once)."""
         missed = 0
         while True:
+            self.watching.wait()  # paused: nothing until it is in use again, then at once
+            if self.stopped.is_set():
+                return
             try:
                 with OPENER.open(self.endpoint + "/health", timeout=2) as answer:
                     self.offline, missed = False, 0
@@ -253,10 +260,15 @@ class Suggestions:
         except Exception:
             pass
 
+    def watch(self, on):
+        """Watch the service while the input method is in use (on), not while it waits unused."""
+        (self.watching.set if on else self.watching.clear)()
+
     def close(self):
         """The input method instance went away: stop, and end its text boxes' conversations (off the
         input thread)."""
         self.stopped.set()
+        self.watching.set()  # a paused watch ends too
         with self.condition:
             self.closed = True
             self.pending = None

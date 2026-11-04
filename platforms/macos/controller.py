@@ -55,6 +55,7 @@ MODE_TOAST = False  # macOS says the new input mode at the caret itself; cd_AI's
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
 PANEL = OVERLAY = TOAST = None  # one panel, overlay and toast for the server, shared by its controllers
+OWNER = [None]  # the controller last activated: only it hides them (another's late deactivate or close must not)
 TOAST_TIMER = [None]  # the shared toast's hide timer: another text box's toast (or pill) replaces it
 
 
@@ -137,8 +138,10 @@ class ClaudishInputController(IMKInputController):
     def activateServer_(self, sender):
         objc.super(ClaudishInputController, self).activateServer_(sender)
         self.active = True
+        OWNER[0] = self
         if self.worker is None:
             self.worker = Suggestions()
+        self.worker.watch(True)
         if self.timer is None:
             self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
                 0.04, self, "pollSuggestions:", None, True)
@@ -149,9 +152,10 @@ class ClaudishInputController(IMKInputController):
     def deactivateServer_(self, sender):
         try:
             self.finish(self.client())
-            self.pause()
-        except Exception:
+        except Exception:  # the client went (its window closed): still stop below
             trace("deactivate failed", traceback.format_exc())
+        finally:
+            self.pause()
         objc.super(ClaudishInputController, self).deactivateServer_(sender)
 
     def inputControllerWillClose(self):
@@ -203,7 +207,13 @@ class ClaudishInputController(IMKInputController):
         if self.timer is not None:
             self.timer.invalidate()
             self.timer = None
+        if self.worker is not None:
+            self.worker.watch(False)
         self.state.change("")
+        if OWNER[0] is not self:  # another text box's controller draws them now
+            self.drawn = None  # (drawn again when this one is in use again)
+            return
+        OWNER[0] = None
         self.hide_panel()
         TOAST.hide()  # a toast belongs to the text box it was shown at, which is gone
         OVERLAY.hide()
@@ -360,7 +370,11 @@ class ClaudishInputController(IMKInputController):
         scroll, the window moving): while the suggestion shows, look at the caret a few times a
         second, and when it moved (or the text box is gone) drop the suggestion: Tab must never
         take one you no longer see. now: at once (Tab is about to take it)."""
-        if not OVERLAY.visible() or not now and time.monotonic() - self.ghost_checked < 0.25:
+        if not OVERLAY.visible():
+            if now and self.state.ghost:  # not on screen (hidden from elsewhere): Tab takes nothing
+                self.state.dismiss()
+            return
+        if not now and time.monotonic() - self.ghost_checked < 0.25:
             return
         self.ghost_checked = time.monotonic()
         client = self.client()
@@ -674,6 +688,10 @@ class ClaudishInputController(IMKInputController):
             return True
         if accent and not self.state.text:
             unmark(client)  # the accent alone was marked: it goes before the key does (Esc, Return, an arrow)
+        elif accent:  # dropped: your words are marked again without it (Tab or an arrow may draw nothing)
+            shown = self.state.drawn
+            client.setMarkedText_selectionRange_replacementRange_(marked(shown), (units(shown[:self.state.drawn_cursor]), 0),
+                                                                  (NSNotFound, 0))
         if key in (36, 76, 51, 48) and flags & NSEventModifierFlagOption:
             # Option+Return (a newline in chat apps), Option+Backspace (delete a word) and Option+Tab (a
             # tab in a table cell) are the app's, as Alt with them is on Linux and Windows: your words go in first.

@@ -159,6 +159,9 @@ class Worker:
         self.hints = True
         self.modes = []
 
+    def watch(self, on):
+        self.watching = on
+
     def answer(self, session, question, choice=None, text=None):
         self.answered = (session, question, choice)
         self.answered_text = (session, question, text)
@@ -469,6 +472,40 @@ class MacOSAdapterTests(unittest.TestCase):
         self.type_text("u")
         self.assertEqual(self.client.marked, "café¨u")
         self.assertFalse(self.client.commits)
+
+    def test_an_accent_another_key_drops_is_not_drawn_on(self):
+        option = 1 << 19
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", option))
+        self.assertEqual(self.client.marked, "caf´")
+        self.key(48)  # Tab: the accent goes, and the marked text shows your words without it
+        self.assertEqual(self.client.marked, "caf")
+
+    def test_only_the_controller_in_use_hides_the_shared_windows(self):
+        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other.activateServer_(None)
+        self.controller.activateServer_(None)  # back here: this one draws now
+        self.module.OVERLAY.show(None, "world.")
+        other.deactivateServer_(None)  # a late deactivate, or a window closing in the background
+        other.inputControllerWillClose()
+        self.assertTrue(self.module.OVERLAY.visible())  # not hidden by the other text box's controller
+        self.assertTrue(self.controller.worker.watching)
+        self.module.OVERLAY.hide()  # hidden from elsewhere: Tab takes no suggestion you do not see
+        state = self.controller.state
+        state.mode, state.text, state.candidate = "continue", "Hello, ", "Hello, world."
+        self.assertEqual(state.ghost, "world.")
+        self.controller.check_ghost(now=True)
+        self.assertFalse(self.controller.state.ghost)
+
+    def test_a_failing_commit_at_deactivate_still_stops_the_timer(self):
+        self.type_text("hi")
+        def gone(*args):
+            raise RuntimeError("the client went")
+        self.client.insertText_replacementRange_ = gone
+        self.controller.deactivateServer_(None)
+        self.assertFalse(self.controller.active)
+        self.assertIsNone(self.controller.timer)
+        self.assertFalse(self.controller.worker.watching)  # a controller not in use asks the service nothing
 
     def test_ctrl_shift_is_a_chord_not_a_tap(self):
         self.controller.shift.typed_at = 0  # long after any key: only the chord decides
