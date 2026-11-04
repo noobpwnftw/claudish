@@ -58,6 +58,7 @@ export default class CdAiExtension extends Extension {
         this._cursor = {x: 0, y: 0, width: 0, height: 0};
         this._panel = new St.BoxLayout({vertical: true, style_class: 'cd-panel', visible: false});
         this._ghost = new St.Label({style_class: 'cd-ghost', visible: false});
+        this._ghost.clutter_text.ellipsize = Pango.EllipsizeMode.END;  // cut at its monitor's edge (_place)
         this._toast = new St.BoxLayout({vertical: true, style_class: 'cd-panel', visible: false});
         for (const actor of [this._panel, this._ghost, this._toast]) {
             try {
@@ -331,7 +332,11 @@ export default class CdAiExtension extends Extension {
             const [, tall] = this._ghost.get_preferred_height(-1);
             // Just past the caret's line (the reported x is a few pixels left of the drawn caret):
             // the suggestion never covers the space you typed.
-            this._ghost.set_position(Math.round(x + Math.max(width, 2) + CARET_GAP * scale()), Math.round(y + (height - tall) / 2));
+            const left = Math.round(x + Math.max(width, 2) + CARET_GAP * scale());
+            // On the caret's monitor: what does not fit ends in an ellipsis, not on the next screen.
+            const [, wide] = this._ghost.get_preferred_width(-1);
+            this._ghost.set_width(Math.max(0, Math.min(wide, area.x + area.width - left)));
+            this._ghost.set_position(left, Math.round(y + (height - tall) / 2));
         }
     }
 }

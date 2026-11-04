@@ -123,7 +123,13 @@ def main():
         print("If your session does not read environment.d, use `sudo /usr/bin/python3 %s --system` instead."
               % shlex.quote(str(Path(__file__).resolve())))
         if shutil.which("gnome-shell"):
-            if set_extension(True):
+            switched_off = subprocess.run(["gsettings", "get", "org.gnome.shell", "disable-user-extensions"],
+                                          capture_output=True, text=True).stdout.strip() == "true"
+            enabled = set_extension(True)
+            if enabled and switched_off:
+                print("Linked the GNOME Shell extension %s; GNOME has user extensions switched off: "
+                      "turn on Use Extensions in Extensions." % EXTENSION)
+            elif enabled:
                 print("Installed and enabled the GNOME Shell extension", EXTENSION, "(it draws cd_AI's panel)")
             else:
                 print("Linked the GNOME Shell extension %s; enable it in Extensions." % EXTENSION)

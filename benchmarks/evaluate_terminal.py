@@ -44,7 +44,8 @@ def main():
     args = parser.parse_args()
     data = json.loads((root / "benchmarks/eval/fix_cases.json").read_text(encoding="utf-8"))
     installed = set(data["installed"])
-    rewriter = Rewriter("llama", args.model_url, 128, timeout=20)
+    rewriter = Rewriter("llama", args.model_url, timeout=20)
+    rewriter.modes["instruct"]["max_tokens"] = 128  # a command line, not an essay (the mode's own is 2048)
     rows = []
     for case in data["cases"]:
         start = time.perf_counter()

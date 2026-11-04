@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..bc0c6a7 100644
+index 0c7a8d5..25eb407 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -23,6 +23,8 @@
@@ -91,7 +91,6 @@ index 0c7a8d5..bc0c6a7 100644
  	return success;
  }
  
-+// Claudish: Composition.panel() as sent by the input method; anything missing stays empty.
 +// Claudish: which text box a request comes from. The TSF context's own number, kept in a compartment
 +// of the context (it goes away with the context), not its address: a closed box's address is often
 +// the next box's, which would take up its conversation.
@@ -116,6 +115,7 @@ index 0c7a8d5..bc0c6a7 100644
 +	return std::to_string(GetCurrentProcessId()) + "." + std::to_string(id);
 +}
 +
++// Claudish: Composition.panel() as sent by the input method; anything missing stays empty.
 +static Ime::PanelSpec panelFromJson(const json& value) {
 +	Ime::PanelSpec spec;
 +	if (!value.is_object())
@@ -546,14 +546,14 @@ index 0c7a8d5..bc0c6a7 100644
 +		auto alive = alive_;
 +		auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive, ret](Ime::EditSession* session, TfEditCookie) mutable {
 +			if (*alive)
-+				updateStatus(ret, session);
++				handleRpcResponse(ret, session);  // as a key's reply: clearOnEnd too
 +		});
 +		HRESULT sessionResult;
 +		if (SUCCEEDED(context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &sessionResult))) {
 +			return result;
 +		}
 +	}
-+	updateStatus(ret, nullptr);
++	handleRpcResponse(ret, nullptr);
 +	return result;
  }
  
