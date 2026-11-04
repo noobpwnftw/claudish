@@ -134,7 +134,8 @@ def step_ime():
     if system == "Linux":
         results = doctor.check_ime_linux()
         first = results[0]
-        if first[1] == "ok":
+        problems = [r for r in results if r[1] == "fail"]
+        if first[1] == "ok" and not problems:
             return "done", first[2], None
         if "not installed" in first[2]:
             return "manual", first[2], first[3]
@@ -198,8 +199,10 @@ def step_service(settings):
         if not doctor.ours():
             return "manual", "another account's cd_AI service has %s" % doctor.SERVICE, \
                 "one account at a time can use it: log the other account out, then run setup again"
-        return "manual", "a Claudish service is already running outside the service manager", \
-            "stop it (Ctrl+C in its terminal), then run setup again"
+        registered = service.paths().get(platform.system())
+        if registered is None or not registered.is_file():  # with a unit or task (not enabled), installing again fixes it
+            return "manual", "a Claudish service is already running outside the service manager", \
+                "stop it (Ctrl+C in its terminal), then run setup again"
     except Exception:
         pass
     what = "`claudish serve`"
@@ -326,7 +329,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
         print("\n%s needs you: %s" % (label, as_typed(instruction)))
     if started and not wait_for_service():
         print("\nThe service has not answered within %d seconds; doctor may report it as down." % WAIT)
-    if any(label == "Local model" and state == "todo" for label, state, _, _ in steps):
+    if local and (started or any(label == "Local model" and state == "todo" for label, state, _, _ in steps)):
         wait_for_model()  # the service starts the local model at its next request: doctor checks it then
     print("\nChecking the whole chain (claudish doctor):\n")
     status = doctor.main()

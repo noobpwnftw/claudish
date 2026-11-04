@@ -196,7 +196,7 @@ def check_ime_linux():
     if component == user:
         path = os.environ.get("IBUS_COMPONENT_PATH", "")
         if str(user.parent) not in path.split(":"):
-            environment = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "environment.d/90-claudish-ibus.conf"
+            environment = Path.home() / ".config/environment.d/90-claudish-ibus.conf"  # systemd's own folder (install.py)
             if environment.is_file():  # set up; this session started before it, as any new install's does
                 results.append(("IBus search path", "warn",
                                 "set up in %s; it takes effect at your next login" % environment,

@@ -135,7 +135,9 @@ def launchd_plist(argv):
 def paths():
     home = Path.home()
     config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
-    return {"Linux": config / ("systemd/user/%s.service" % NAME),
+    # The systemd user manager reads units from its own config folder (~/.config), not from an
+    # XDG_CONFIG_HOME exported in a shell; the unit passes that one on (kept_environment).
+    return {"Linux": home / (".config/systemd/user/%s.service" % NAME),
             "Windows": config / NAME / "logon-task.xml",
             "Darwin": home / ("Library/LaunchAgents/%s.plist" % LABEL)}
 
@@ -152,7 +154,7 @@ def plan(action, extra=()):
                     ("enable it", "run", ["systemctl", "--user", "enable", NAME]),
                     ("start it, or restart it with these settings", "run", ["systemctl", "--user", "restart", NAME])]
         if action == "uninstall":
-            return [("stop and disable it", "run", ["systemctl", "--user", "disable", "--now", NAME]),
+            return [("stop and disable it", "stop", ["systemctl", "--user", "disable", "--now", NAME]),
                     ("remove the unit", "remove", unit),
                     ("reload systemd", "run", ["systemctl", "--user", "daemon-reload"])]
         return [("status", "run", ["systemctl", "--user", "is-active", NAME])]
@@ -165,8 +167,8 @@ def plan(action, extra=()):
                     ("stop a running one", "stop", ["schtasks", "/end", "/tn", task_name()]),
                     ("start it now", "run", ["schtasks", "/run", "/tn", task_name()])]
         if action == "uninstall":
-            return [("stop it", "run", ["schtasks", "/end", "/tn", task_name()]),
-                    ("delete the logon task", "run", ["schtasks", "/delete", "/tn", task_name(), "/f"]),
+            return [("stop it", "stop", ["schtasks", "/end", "/tn", task_name()]),
+                    ("delete the logon task", "stop", ["schtasks", "/delete", "/tn", task_name(), "/f"]),
                     ("remove the task file", "remove", paths()["Windows"])]
         return [("status", "run", ["schtasks", "/query", "/tn", task_name()])]
     if system == "Darwin":
@@ -176,7 +178,7 @@ def plan(action, extra=()):
                     ("write the launch agent", "write", (agent, launchd_plist(argv))),
                     ("load it", "run", ["launchctl", "bootstrap", domain, str(agent)])]
         if action == "uninstall":
-            return [("unload it", "run", ["launchctl", "bootout", "%s/%s" % (domain, LABEL)]),
+            return [("unload it", "stop", ["launchctl", "bootout", "%s/%s" % (domain, LABEL)]),
                     ("remove the launch agent", "remove", agent)]
         return [("status", "run", ["launchctl", "print", "%s/%s" % (domain, LABEL)])]
     raise SystemExit("no service manager support for %s" % system)
@@ -199,13 +201,19 @@ def run(action, extra=(), dry_run=False):
             if payload.exists():
                 payload.unlink()
         else:
-            result = subprocess.run(payload, capture_output=True, text=True)
+            try:
+                result = subprocess.run(payload, capture_output=True, text=True, timeout=60)
+            except subprocess.TimeoutExpired:
+                raise SystemExit("%s failed: no answer within 60 s" % description)
             if action == "status":
                 print((result.stdout or result.stderr).strip() or ("active" if result.returncode == 0 else "inactive"))
                 return result.returncode
-            # Stopping something that is not running is fine.
-            if result.returncode != 0 and action != "uninstall" and kind != "stop":
-                raise SystemExit("%s failed: %s" % (description, (result.stderr or result.stdout).strip()))
+            said = (result.stderr or result.stdout).strip()
+            if result.returncode != 0 and kind != "stop":
+                raise SystemExit("%s failed: %s" % (description, said))
+            if result.returncode != 0:  # nothing to stop, or it could not: said, not "done"
+                print("%s: not done (%s)" % (description, said.splitlines()[0] if said else "exit %d" % result.returncode))
+                continue
         print("%s: done" % description)
     if action == "install" and not dry_run:
         print("Claudish now starts at login. Check it with `claudish doctor`.")

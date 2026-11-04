@@ -92,6 +92,28 @@ class SafetyTests(unittest.TestCase):
             self.assertTrue(commands and all(c[0] == tool for c in commands), system)
 
 
+    def test_the_unit_goes_where_systemd_reads_it(self):
+        """An XDG_CONFIG_HOME exported in a shell is not the systemd user manager's: the unit goes
+        in ~/.config (and passes the variable on to the service)."""
+        with patch.dict("os.environ", {"XDG_CONFIG_HOME": "/elsewhere"}), \
+                patch.object(Path, "home", return_value=Path("/home/u")):
+            self.assertEqual(service.paths()["Linux"], Path("/home/u/.config/systemd/user/claudish.service"))
+
+    def test_uninstall_says_what_it_could_not_do(self):
+        from subprocess import CompletedProcess
+        results = iter([CompletedProcess([], 1, "", "Failed to connect to bus: No medium found"),
+                        CompletedProcess([], 1, "", "Failed to connect to bus: No medium found")])
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("claudish.service.platform.system", return_value="Linux"), \
+                patch.object(Path, "home", return_value=Path(directory)), \
+                patch("claudish.service.subprocess.run", side_effect=lambda *a, **k: next(results)), \
+                patch("builtins.print") as shown:
+            with self.assertRaisesRegex(SystemExit, "reload systemd failed: Failed to connect to bus"):
+                service.run("uninstall")
+        lines = [call.args[0] for call in shown.call_args_list]
+        self.assertIn("stop and disable it: not done (Failed to connect to bus: No medium found)", lines)
+        self.assertNotIn("stop and disable it: done", lines)
+
     def test_windows_logon_task_is_this_accounts_own(self):
         """A machine-wide "claudish" task was taken by whoever installed first; another account's
         install could not replace it, so its service never started at login (Windows VM)."""

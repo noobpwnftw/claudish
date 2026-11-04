@@ -21,7 +21,9 @@ from xml.sax.saxutils import escape
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_COMPONENTS = Path("/usr/share/ibus/component")
 USER_COMPONENTS = Path.home() / ".local/share/ibus/component"
-ENVIRONMENT = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "environment.d/90-claudish-ibus.conf"
+# The systemd user manager reads environment.d in its own config folder, not an XDG_CONFIG_HOME
+# exported in a shell.
+ENVIRONMENT = Path.home() / ".config/environment.d/90-claudish-ibus.conf"
 EXTENSION = "cd-ai@claudish.io"
 EXTENSIONS = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "gnome-shell/extensions"
 

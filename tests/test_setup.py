@@ -181,6 +181,24 @@ class SetupTests(unittest.TestCase):
         self.service_run.assert_not_called()
         self.assertIn("already running outside the service manager", out)
 
+    def test_a_running_service_whose_unit_is_not_enabled_is_installed_again(self):
+        """`systemctl --user disable` without --now: running, not starting at login, and no terminal
+        to Ctrl+C in. Installing again enables it."""
+        unit = self.home / ".config/systemd/user/claudish.service"
+        unit.parent.mkdir(parents=True)
+        unit.write_text("[Unit]\n")
+        self.managed = ("warn", "systemd user unit (disabled)")
+        with patch("claudish.setup.doctor.fetch_json", return_value={"backend": "llama"}):
+            _, out = self.quiet(yes=True)
+        self.service_run.assert_called_once_with("install")
+        self.assertNotIn("outside the service manager", out)
+
+    def test_an_input_method_ibus_cannot_see_is_set_up_again(self):
+        with patch("claudish.setup.doctor.check_ime_linux", return_value=[
+                ("Input method", "ok", "registered", None),
+                ("IBus search path", "fail", "IBus cannot see Claudish", "install.py")]):
+            self.assertEqual(self.states()["Input method"], "todo")
+
     def test_mcp_servers_are_offered_once(self):
         desktop = self.home / ".config/Claude/claude_desktop_config.json"
         desktop.parent.mkdir(parents=True)
