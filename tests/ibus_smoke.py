@@ -91,6 +91,18 @@ try:
     engine.composition.offer(engine.composition.revision, engine.composition.text + " Hello—truly.")
     assert engine.composition.ghost == " Hello—truly."
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and commits[-1] == " Hello—truly."
+    # A click elsewhere sends no key (a GTK 3 app resets nothing when keys went straight in): Tab
+    # never takes a suggestion asked for another place.
+    engine.composition.offer(engine.composition.revision, engine.composition.text + " Moved.")
+    real = engine.around_caret
+    engine.around_caret = lambda: ("Another paragraph", "")
+    count = len(commits)
+    assert not engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and len(commits) == count
+    assert not engine.composition.ghost
+    engine.around_caret = lambda: ("Earlier text " + engine.composition.text, "")  # still there: taken
+    engine.composition.offer(engine.composition.revision, engine.composition.text + " Here.")
+    assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and commits[-1] == " Here."
+    engine.around_caret = real
     engine.composition.offer(engine.composition.revision, engine.composition.text + " Bye.")
     assert engine.do_process_key_event(IBus.KEY_Escape, 0, 0) and not engine.composition.ghost
     assert not engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)  # the app deletes; the context follows
@@ -181,6 +193,16 @@ try:
     engine.do_process_key_event(ord("'"), 0, 0)
     assert engine.do_process_key_event(0x10001A1, 0, 0)
     assert engine.composition.text == "\u1edb", engine.composition.text
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # A dead key beyond the accents drawn here (Vietnamese's dot below, hook): the compose table's
+    # sequence, in the composition; the word goes on.
+    for char in "Vi":
+        engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_belowdot"), 0, 0)
+    assert engine.do_process_key_event(ord("e"), 0, 0)
+    assert engine.do_process_key_event(IBus.keyval_from_name("dead_hook"), 0, 0)
+    assert engine.do_process_key_event(ord("e"), 0, 0)
+    assert engine.composition.text == "Vi\u1eb9\u1ebb", engine.composition.text
     engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # The dead tilde (dead_perispomeni to IBus): ñ.
     engine.do_process_key_event(IBus.keyval_from_name("dead_tilde"), 0, 0)

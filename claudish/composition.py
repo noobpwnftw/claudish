@@ -83,6 +83,12 @@ def step_forward(text, at):
     return min(at, len(text))
 
 
+def plain(text):
+    """Text as compared for continue's caret check: what apps change as you type (a no-break space
+    after a word, Word's curly quotes) as typed."""
+    return text.replace("\r", "").replace("\xa0", " ").translate({0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"'})
+
+
 def window(before, after):
     """The text around the caret a rewrite sends (WINDOW)."""
     return before[-WINDOW[0]:], after[:WINDOW[1]]
@@ -1035,6 +1041,13 @@ class Composition:
         (hyphens in URLs and commands stay hyphens); em dashes come from the model."""
         self.change((self.text + char)[-MAX_COMPOSITION:])
         return char
+
+    def caret_stayed(self, before):
+        """Whether the app's text before the caret is still what continue typed: a click elsewhere
+        sends no key on every platform, and Tab never takes a suggestion for another place. True
+        when the app does not share its text."""
+        before = plain(before)
+        return not before or before.endswith(plain(self.text)[-32:])
 
     def take_ghost(self):
         """Tab in continue: the suggestion to commit, or "" (then Tab belongs to the app). Taking it

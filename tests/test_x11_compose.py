@@ -15,7 +15,7 @@ class ComposeTableTests(unittest.TestCase):
             system.write_text("\n".join([
                 '<Multi_key> <o> <c> : "\u00a9" copyright',
                 '<Multi_key> <minus> <minus> <minus> : "\u2014" emdash',
-                '<dead_acute> <e> : "\u00e9"',  # not a Compose-key sequence
+                '<dead_belowdot> <e> : "\u1eb9"',  # a dead key's sequence (Vietnamese's dot below)
                 r'<Multi_key> <quotedbl> <backslash> : "\"\\"']) + "\n", encoding="utf-8")
             own.write_text('include "%L"\n<Multi_key> <o> <c> : "(c)"\n', encoding="utf-8")
             with patch.object(x11_compose, "SYSTEM", (str(system),)), \
@@ -26,6 +26,8 @@ class ComposeTableTests(unittest.TestCase):
         self.assertEqual(compose.step(["minus", "minus", "minus"]), ("text", "\u2014"))
         self.assertEqual(compose.step(["quotedbl", "backslash"]), ("text", '"\\'))
         self.assertEqual(compose.step(["e"]), ("none", None))
+        self.assertEqual(compose.step(["dead_belowdot"]), ("wait", None))
+        self.assertEqual(compose.step(["dead_belowdot", "e"]), ("text", "\u1eb9"))
 
 
 if __name__ == "__main__":

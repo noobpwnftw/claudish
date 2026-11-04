@@ -205,7 +205,8 @@ class ClaudishEngine(IBus.Engine):
             # cd_AI's GNOME Shell extension draws the panel and the suggestion (the design lab's
             # GNOME mock); IBus keeps only the composition, as the platform's plain preedit.
             text = state.accent if state.live else state.drawn  # continue: only a waiting accent
-            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), state.drawn_cursor if text else 0, bool(text),
+            cursor = len(text) if state.live else state.drawn_cursor  # continue: after the accent
+            self.update_preedit_text_with_mode(IBus.Text.new_from_string(text), cursor if text else 0, bool(text),
                                               self.focus_mode())
             self.hide_lookup_table()
             self.update_auxiliary_text(IBus.Text.new_from_string(""), False)
@@ -322,6 +323,10 @@ class ClaudishEngine(IBus.Engine):
             self.live_commit(combined)  # é goes in, not the e the key would type
             return True
         if keyval == IBus.KEY_Tab:
+            if state.ghost and not state.caret_stayed(self.around_caret()[0]):  # a click moved it (no reset)
+                state.dismiss()
+                self.render()
+                return False
             ghost = state.take_ghost()
             if not ghost:
                 return False  # no suggestion: Tab is the app's (next field, indent)
@@ -393,10 +398,15 @@ class ClaudishEngine(IBus.Engine):
         return True
 
     def compose_key(self, keyval):
-        """The key's name; None for the Compose key (taken: its sequence waits for what follows)."""
+        """The key's name; None for the Compose key, or a dead key the accents here do not draw
+        (Vietnamese's dead_belowdot, dead_hook): taken, its sequence waits for what follows, as the
+        compose table makes it."""
         name = key_name(keyval)
         if name == "Multi_key":
             self.sequence = []
+            return None
+        if name.startswith("dead_") and name not in DEAD_KEYS and composer().step([compared(keyval)])[0] == "wait":
+            self.sequence = [compared(keyval)]
             return None
         return name
 

@@ -57,12 +57,6 @@ INSTANCES = weakref.WeakSet()  # the live instances: a parked worker one still u
 UNSEEN = object()  # an instance that has not looked for a parked exchange since it was activated
 
 
-def plain(text):
-    """Text as compared for continue's caret check: what apps change as you type (a no-break space
-    after a word, Word's curly quotes) as typed."""
-    return text.replace("\r", "").replace("\xa0", " ").translate({0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"'})
-
-
 def park(window, state, worker):
     expire()
     replaced = PARKED.get(window)
@@ -428,8 +422,7 @@ class ClaudishTextService(TextService):
     def caret_stayed(self):
         """Whether the text before the caret is still what continue typed (a click in the same field
         sends no key: macOS looks at the caret for the same reason). True without the text (a stock PIME)."""
-        before = plain(self.around()[0])
-        return not before or before.endswith(plain(self.state.text)[-32:])
+        return self.state.caret_stayed(self.around()[0])
 
     def selection(self):
         """The app's selected text when nothing is composed (Claudish's PIME sends it), if it fits."""

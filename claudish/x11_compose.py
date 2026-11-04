@@ -40,7 +40,7 @@ def system_file():
 
 
 def read(path, table, replace=False, depth=0):
-    """Add a file's Compose-key sequences to table (key names tuple -> text, or ("keysym", name)).
+    """Add a file's Compose-key and dead-key sequences to table (key names tuple -> text, or ("keysym", name)).
     replace: a later file's, which replace the ones they conflict with (one a prefix of the other),
     as libX11 does."""
     try:
@@ -59,9 +59,10 @@ def read(path, table, replace=False, depth=0):
         if not found:
             continue
         keys = tuple(re.findall(r"<([^>]+)>", found.group(1)))
-        if len(keys) < 2 or keys[0] != "Multi_key":
+        if len(keys) < 2 or not (keys[0] == "Multi_key" or keys[0].startswith("dead_")):
             continue
-        keys = keys[1:]
+        if keys[0] == "Multi_key":  # what follows the Compose key; a dead key's sequence keeps it
+            keys = keys[1:]
         if replace:
             for other in [k for k in table if k[:len(keys)] == keys or keys[:len(k)] == k]:
                 del table[other]
