@@ -76,6 +76,17 @@ def settings_url(url=SERVICE):
     return "%s/settings#ticket=%s" % (url.rstrip("/"), ticket)
 
 
+def show_settings(opener, failed=lambda error: None):
+    """cd_AI's settings, the same page on every OS: its link is asked for off the input thread
+    (typing never waits on it), then opener(link) shows it; failed(error) hears why it could not."""
+    def show():
+        try:
+            opener(settings_url())
+        except Exception as error:
+            failed(error)
+    threading.Thread(target=show, daemon=True).start()
+
+
 def headers(url=SERVICE):
     sent = {"Content-Type": "application/json"}
     token = read_token(port_of(url))

@@ -193,6 +193,14 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(session.events[-1]["text"], "cancelled")
 
+
+class HistoryTests(unittest.TestCase):
+    """What a text box's conversation keeps: no MCP server needed."""
+
+    def setUp(self):
+        self.rewriter = Rewriter()
+        self.rewriter.modes["instruct"]["candidates"] = 1
+
     def test_an_instruction_cancelled_while_the_model_works_is_not_remembered(self):
         """Esc, then another instruction: a late answer to the first must not join the conversation."""
         started, release = threading.Event(), threading.Event()
@@ -252,6 +260,7 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(len(conversation.messages), 4)
         session.cancel()  # the input method's cancel, after the session ended
         self.assertEqual([m["content"] for m in conversation.messages], ["earlier", "kept"])
+
 
 
 class AskAndHelperTests(unittest.TestCase):

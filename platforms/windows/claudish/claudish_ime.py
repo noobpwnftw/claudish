@@ -172,18 +172,11 @@ PREVIEW = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Claudish", "lab-prev
 
 
 def open_settings():
-    """cd_AI's settings in the browser, the same page on every OS. Asking the service for the page's
-    link happens off the input thread: typing never waits on it."""
-    import threading
+    """cd_AI's settings in the browser (claudish.client.show_settings); no service: nothing to open,
+    doctor says why."""
     import webbrowser
-    from .client import settings_url
-
-    def open_it():
-        try:
-            webbrowser.open(settings_url())
-        except Exception:
-            pass  # no service: nothing to open; doctor says why
-    threading.Thread(target=open_it, daemon=True).start()
+    from .client import show_settings
+    show_settings(webbrowser.open)
 
 
 class ClaudishTextService(TextService):

@@ -141,19 +141,12 @@ SCREEN = None
 
 
 def open_settings():
-    """cd_AI's settings in the browser, the same page on every OS. Asking the service for the page's
-    link happens off the main loop: typing never waits on it."""
+    """cd_AI's settings in the browser (claudish.client.show_settings)."""
     import subprocess
-    import threading
-    from claudish.client import settings_url
-
-    def open_it():
-        try:
-            subprocess.run(["xdg-open", settings_url()], check=False, timeout=10,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception as error:
-            trace("settings failed", type(error).__name__)
-    threading.Thread(target=open_it, daemon=True).start()
+    from claudish.client import show_settings
+    show_settings(lambda link: subprocess.run(["xdg-open", link], check=False, timeout=10,
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
+                  lambda error: trace("settings failed", type(error).__name__))
 
 
 def screen():

@@ -62,7 +62,7 @@ def regional(char):
     return 0x1F1E6 <= ord(char) <= 0x1F1FF
 
 
-def run(text, at):
+def regional_run(text, at):
     """How many regional indicators come right before at."""
     count = 0
     while at - count > 0 and regional(text[at - count - 1]):
@@ -76,7 +76,7 @@ def step_back(text, at):
     at -= 1
     while at > 0 and (joins(text[at]) or text[at - 1] == "\u200d"):
         at -= 1
-    if at > 0 and regional(text[at]) and regional(text[at - 1]) and run(text, at - 1) % 2 == 0:
+    if at > 0 and regional(text[at]) and regional(text[at - 1]) and regional_run(text, at - 1) % 2 == 0:
         at -= 1  # a flag is a pair, counted from the start of the run
     return max(at, 0)
 
@@ -84,7 +84,7 @@ def step_back(text, at):
 def step_forward(text, at):
     """Where the visible character at at ends (step_back's other direction)."""
     start, at = at, at + 1
-    if at < len(text) and regional(text[start]) and regional(text[at]) and run(text, start) % 2 == 0:
+    if at < len(text) and regional(text[start]) and regional(text[at]) and regional_run(text, start) % 2 == 0:
         at += 1
     while at < len(text) and (joins(text[at]) or text[at - 1] == "\u200d"):
         at += 1

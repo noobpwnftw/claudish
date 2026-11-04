@@ -178,19 +178,14 @@ class ClaudishInputController(IMKInputController):
         return menu
 
     def showSettings_(self, sender):
-        """cd_AI's settings, the same page on every OS, in the browser. Asking the service for the
-        page's link happens off the main thread: the input method never waits on it."""
+        """cd_AI's settings in the browser (claudish.client.show_settings)."""
         import subprocess
-        import threading
-        from claudish.client import settings_url
+        from claudish.client import show_settings
 
-        def open_it():
-            try:
-                subprocess.run(["/usr/bin/open", settings_url()], check=False, timeout=10)
-                trace("settings opened")
-            except Exception:
-                trace("settings failed", traceback.format_exc().splitlines()[-1])
-        threading.Thread(target=open_it, daemon=True).start()
+        def opened(link):
+            subprocess.run(["/usr/bin/open", link], check=False, timeout=10)
+            trace("settings opened")
+        show_settings(opened, lambda error: trace("settings failed", "%s: %s" % (type(error).__name__, error)))
 
     @objc.python_method
     def pause(self):

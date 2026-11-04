@@ -202,6 +202,19 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_settings_open_off_the_input_thread_and_say_why_they_could_not(self):
+        from claudish import client
+        opened, failed, done = [], [], threading.Event()
+        with patch.object(client, "settings_url", lambda: "http://127.0.0.1:1/settings#ticket=t"):
+            client.show_settings(lambda link: (opened.append(link), done.set()))
+            self.assertTrue(done.wait(2))
+        self.assertEqual(opened, ["http://127.0.0.1:1/settings#ticket=t"])
+        done.clear()
+        with patch.object(client, "settings_url", side_effect=OSError("no service")):
+            client.show_settings(opened.append, lambda error: (failed.append(str(error)), done.set()))
+            self.assertTrue(done.wait(2))
+        self.assertEqual(failed, ["no service"])
+
     def test_an_instruction_refused_after_a_shift_tap_still_says_why(self):
         refused = threading.Event()
 
