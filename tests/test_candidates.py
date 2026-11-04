@@ -1119,6 +1119,23 @@ class ModeFeelTests(unittest.TestCase):
         self.assertEqual(long.escape(), "back")
         self.assertEqual(long.text, "x " + "a" * MAX_COMPOSITION)  # kept past the cap, not cut
 
+    def test_only_spaces_ask_nothing(self):
+        """A composition of spaces (a word deleted around them): nothing would answer, so nothing is asked."""
+        state = Composition()
+        state.mode = "compose"
+        state.change("  ")
+        self.assertEqual((state.tab(), state.working), ("wait", False))
+        self.assertEqual((state.enter(), state.working), ("wait", False))
+
+    def test_a_click_with_shift_is_no_tap_and_a_tap_right_after_still_is(self):
+        from claudish.composition import ShiftTap
+        shift = ShiftTap()
+        shift.press(10.0)
+        shift.cancel()  # focus moved, or the app ended the composition: a click came with it
+        self.assertFalse(shift.release(10.3))
+        shift.press(10.4)  # a tap right after is still one (not rolled typing)
+        self.assertTrue(shift.release(10.5))
+
     def test_a_follow_up_on_a_rewrite_review_round(self):
         """Review findings: a cursor left in your words, the dropped toast, a Shift tap and a focus
         change with a follow-up typed, a retried follow-up's draft."""

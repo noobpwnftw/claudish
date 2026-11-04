@@ -120,8 +120,20 @@ def plain_tab(event):
 
 
 def held_chord(event):
-    """Ctrl, Alt or Win down with Shift: Windows' layout and language switch, not a Shift tap."""
-    return any(event.isKeyDown(key) for key in CHORD_KEYS)
+    """Ctrl, Alt or Win down with Shift: Windows' layout and language switch, not a Shift tap. Or a
+    mouse button pressed since the last look (Shift+click selects): a click sends no key."""
+    return any(event.isKeyDown(key) for key in CHORD_KEYS) or clicked()
+
+
+def clicked():
+    """A mouse button down, or pressed since the last call (GetAsyncKeyState's low bit; the first
+    call, at Shift's press, clears it). False when it cannot tell (not on Windows)."""
+    try:
+        import ctypes
+        state = ctypes.windll.user32.GetAsyncKeyState
+        return any([state(button) & 0x8001 for button in (0x01, 0x02, 0x04)])  # all three read: each clears
+    except (AttributeError, OSError):
+        return False
 
 
 def held(event):
@@ -291,6 +303,7 @@ class ClaudishTextService(TextService):
             park(self.owner or foreground(), self.state, self.worker)  # something to come back to
             self.worker = None
             self.state = Composition()
+            self.state.mode = LAST_MODE[0] or self.state.mode  # back to cd_AI: the mode you were in
         elif self.worker:
             for window, parked in list(PARKED.items()):  # parked at a click, and taken up again since
                 if parked[1] is self.worker:
@@ -318,8 +331,11 @@ class ClaudishTextService(TextService):
             return
         # Held for a text box: taken up there (the next instance in that box, after an input-method
         # switch), not in another window's (the instance that parked it at the click goes on with it);
-        # looked at again at the next request. A request that names no box yet (a key) takes it.
-        document, held = getattr(self, "document", None), parked[0]
+        # looked at again at the next request. A key names no box: the one focus last said is checked.
+        if any(other is not self and other.isActivated and getattr(other, "worker", None) is parked[1]
+               for other in list(INSTANCES)):
+            return  # still in use by the instance that parked it (another window of this app)
+        document, held = getattr(self, "document", None) or self.last_document, parked[0]
         boxes = set(held.holds) | ({held.dropped_box} if held.dropped_box else set())
         if document is not None and boxes and document not in boxes:
             return
@@ -784,6 +800,7 @@ class ClaudishTextService(TextService):
     def onCompositionTerminated(self, forced):
         keylog("onCompositionTerminated", "forced=%s" % forced, "len=%d" % len(self.state.text))
         super().onCompositionTerminated(forced)
+        self.shift.cancel()  # the app ended it (a click): a Shift released next is not a tap
         if not forced and self.committed:
             # PIME ends the composition to put in what the last reply committed, and says so before
             # it shows that reply's composition: what stays composed (the words after a full
@@ -812,6 +829,7 @@ class ClaudishTextService(TextService):
         held for this text box says so at once, rather than at the next key."""
         keylog("onSetFocus", getattr(self, "document", None))
         self.taken_keys.clear()  # a key held while focus went: its key-up went elsewhere
+        self.shift.cancel()  # focus moved (a Shift+click): its Shift is not a tap
         self.follow_document()
         self.field()  # this request carries the field's scopes: a key in a password field is not ours
         self.poll_results()  # what came while the app was in the background: the pill says it

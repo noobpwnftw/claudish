@@ -633,6 +633,8 @@ class Composition:
             # A failed instruction is retried with the summon key, as its footer says; a follow-up
             # is sent with it, never rewritten into the app.
             return "wait"
+        if not self.text.strip():
+            return "wait"  # only spaces: nothing to rewrite (and nothing would answer)
         self.asked, self.working, self.failed = "rewrite", True, False
         return "request"
 
@@ -735,6 +737,8 @@ class Composition:
             if self.asked == "instruct":
                 self.nudged = self._pending()  # a reflexive Enter: Tab lights when they come
             return "wait"
+        if not self.text.strip():
+            return "wait"  # only spaces: nothing to ask (the worker sends nothing, so nothing would answer)
         if not (self.failed and self.asked == "instruct"):  # a retry of a failed follow-up keeps its draft
             self.about = ""
         return "submit"
@@ -1188,6 +1192,11 @@ class ShiftTap:
     def other(self):
         self.down_at, self.down = None, False
         self.typed_at = time.monotonic()
+
+    def cancel(self):
+        """A Shift held now is no tap (a click came with it: focus moved, or the app ended the
+        composition); not a key typed, so a Shift right after is still one."""
+        self.down_at, self.down = None, False
 
     def release(self, now, chord=False):
         """True when this release ends a tap."""

@@ -432,6 +432,14 @@ def main():
             with patch.object(ime, "foreground", return_value=200):  # Word, clicked into
                 notepad.handleRequest({"method": "onCompositionTerminated", "forced": True})
             assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
+            # Another window of that app (one of its threads, another instance) while the first goes on
+            # with the exchange: a key there names no box, and it does not take the first one's.
+            with patch.object(ime, "foreground", return_value=100):
+                other = ClaudishTextService(None)
+                other.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                other.adopt_parked()
+            assert other.state is not notepad.state and other.worker is not notepad.worker
+            assert 100 in ime.PARKED  # still there for the box it was held for
             ime.PARKED.pop(100)
             # PIME drops an instance (its app's connection closed) with no onDeactivate: its worker ends.
             import types
