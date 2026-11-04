@@ -142,43 +142,12 @@ def held(event):
 
 
 def replay(vk, modifiers=()):
-    """Press the key again for the app just after cd_AI commits what was composed, so one press of a
-    shortcut or navigation key both commits and acts. A modifier that was down with it and is up by
-    now (a quick tap) is pressed with it again. Nothing is composed by then, so cd_AI lets it through."""
-    import threading
-
-    def send():
-        try:
-            import ctypes
-            from ctypes import wintypes
-
-            class KEYBDINPUT(ctypes.Structure):
-                _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
-                            ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
-
-            class MOUSEINPUT(ctypes.Structure):  # the union's largest member: INPUT's size follows it
-                _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD),
-                            ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
-
-            class UNION(ctypes.Union):  # sized for this Python (PIME's backend is a 32-bit Python)
-                _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT)]
-
-            class INPUT(ctypes.Structure):
-                _anonymous_ = ("u",)
-                _fields_ = [("type", wintypes.DWORD), ("u", UNION)]
-
-            user32 = ctypes.windll.user32
-            released = [key for key in modifiers if not user32.GetAsyncKeyState(key) & 0x8000]
-            steps = ([(key, 0) for key in released] + [(vk, 0), (vk, 0x2)]
-                     + [(key, 0x2) for key in reversed(released)])
-            inputs = (INPUT * len(steps))()
-            for index, (key, up) in enumerate(steps):
-                inputs[index].type = 1  # INPUT_KEYBOARD
-                inputs[index].ki = KEYBDINPUT(key, 0, (0x1 if key in EXTENDED_KEYS else 0) | up, 0, 0)
-            user32.SendInput(len(steps), inputs, ctypes.sizeof(INPUT))
-        except (AttributeError, OSError):  # not on Windows
-            pass
-    threading.Timer(0.03, send).start()  # after this reply: the commit lands first
+    """The reply's "replay": the key pressed again for the app just after cd_AI commits what was
+    composed, so one press of a shortcut or navigation key both commits and acts. cd_AI's PIME sends
+    it from the app's own process (where an app running as administrator accepts it), after the
+    commit; a modifier that was down with it and is up by then (a quick tap) is pressed with it again.
+    Nothing is composed by then, so cd_AI lets it through. Each key is [code, extended]."""
+    return {"key": [vk, vk in EXTENDED_KEYS], "modifiers": [[key, key in EXTENDED_KEYS] for key in modifiers]}
 
 
 def focused_app():
@@ -623,7 +592,7 @@ class ClaudishTextService(TextService):
                 self.setCommitString(self.state.commit())
                 self.changed()
             if key not in CHORD_KEYS + SIDED_KEYS:
-                replay(key, held(event))
+                self.currentReply["replay"] = replay(key, held(event))
             return True
         shift = event.isKeyDown(0x10)
         if key == 0x0D and not self.state.talks(shift) and self.state.text and not self.state.live:
@@ -748,7 +717,7 @@ class ClaudishTextService(TextService):
             else:
                 self.setCommitString(self.state.commit())
             self.changed()
-            replay(key, held(event))
+            self.currentReply["replay"] = replay(key, held(event))
             return True
         self.changed()
         return True

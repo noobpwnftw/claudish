@@ -48,8 +48,6 @@ def main():
             worker_class.return_value.hints = True
             service = ClaudishTextService(None)
             replayed = []  # keys pressed again for the app after a commit
-            replaying = patch("pime_claudish.claudish_ime.replay", lambda vk, modifiers=(): replayed.append((vk, modifiers)))
-            replaying.start()
             reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
             assert reply["setSelKeys"].strip() == "", reply["setSelKeys"]  # no digits beside drafts
             # The mode in the taskbar's input indicator; its menu and a click switch it.
@@ -72,9 +70,12 @@ def main():
                 states = [0] * 256
                 for modifier in modifiers:
                     states[modifier] = 128
-                return service.handleRequest(dict({"method": method, "seqNum": 1,
+                reply = service.handleRequest(dict({"method": method, "seqNum": 1,
                     "charCode": char, "keyCode": code, "repeatCount": 1,
                     "scanCode": 0, "isExtended": False, "keyStates": states}, **around))
+                if "replay" in reply:  # sent by cd_AI's PIME from the app's process
+                    replayed.append((reply["replay"]["key"][0], [k for k, _ in reply["replay"]["modifiers"]]))
+                return reply
 
             def shift_tap():
                 """Shift pressed and released alone: its key-up is taken, and onKeyUp switches mode."""
@@ -488,7 +489,6 @@ def main():
             back.worker.poll.return_value = None
             assert said(reply, "a draft is ready") and said(reply, "Shift+Esc"), reply
             worker_class.side_effect = None
-            replaying.stop()
         sys.path.remove(temporary)
     print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, agent questions, text around the caret, timers, input scopes and password fields included")
 
