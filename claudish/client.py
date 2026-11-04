@@ -130,6 +130,8 @@ def said(exc):
 
 
 class Suggestions:
+    generation = 0  # every request: a plain result asked before the latest one is stale
+
     def __init__(self, endpoint=SERVICE, debounce=0.18):
         self.endpoint = endpoint
         self.debounce = debounce
@@ -192,6 +194,7 @@ class Suggestions:
         """draft: a follow-up's draft, the one in view and not yet in the text (Composition.about)."""
         session = mode == "instruct" and immediate  # sent: a turn of this text box's conversation
         with self.condition:
+            self.generation += 1
             self.pending = None if session else (revision, text, mode, app, look, immediate, before, after, purpose,
                                                  draft, time.monotonic() + (0 if immediate else self.debounce))
             # A newer request makes earlier suggestions stale; an agent session's events stay.
@@ -283,12 +286,14 @@ class Suggestions:
         for conversation in set(self.boxes.values()) | {self.conversation}:
             threading.Thread(target=self._end, args=(conversation,), daemon=True).start()
 
-    def deliver(self, revision, data, always=False):
-        """A result for the composition. A newer request drops a plain one; an agent session's
-        events go through (always), tagged with their revision: the composition takes them for its
-        current exchange or a held one, and ignores the rest."""
+    def deliver(self, revision, data, always=False, generation=None):
+        """A result for the composition. A newer request drops a plain one (generation: the request
+        it answers; an instruction sent meanwhile is newer though nothing is pending); an agent
+        session's events go through (always), tagged with their revision: the composition takes
+        them for its current exchange or a held one, and ignores the rest."""
         with self.condition:
-            if not self.closed and (always or self.pending is None):
+            fresh = self.pending is None and generation in (None, self.generation)
+            if not self.closed and (always or fresh):
                 self.results.append((revision, data))
                 return True
             return False
@@ -315,11 +320,12 @@ class Suggestions:
         # it answers with the session: waited for, as the session it starts is followed and stopped
         # from here (Esc meanwhile stops it once the id is back); given up on, it would run unseen.
         key = call(self.endpoint, "/sessions", body, timeout=SESSION_START_SECONDS)["id"]
-        self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
-        for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
-            del self.revisions[old]
-            self.inserts.pop(old, None)
-            self.settling.discard(old)
+        with self.condition:  # two sessions starting at once trim the same oldest one
+            self.revisions[key] = revision  # an answer that cannot be sent fails this instruction
+            for old in list(self.revisions)[:-16]:  # the last few sessions' answers can still fail
+                self.revisions.pop(old, None)
+                self.inserts.pop(old, None)
+                self.settling.discard(old)
         # Followed beside the requests: a held exchange's agent goes on while continue suggests.
         threading.Thread(target=self._follow_session, args=(revision, key), daemon=True).start()
 
@@ -393,6 +399,7 @@ class Suggestions:
                     self.condition.wait(remaining)
                     continue
                 self.pending = None
+                generation = self.generation
             if not text.strip() or (mode == "continue" and len(text.strip()) < 3):
                 continue  # continue asks by itself at every pause, so not for a word or two; Tab asks for anything
             try:
@@ -400,4 +407,4 @@ class Suggestions:
                                  purpose=purpose)
             except Exception as exc:
                 result = said(exc)
-            self.deliver(revision, result)
+            self.deliver(revision, result, generation=generation)

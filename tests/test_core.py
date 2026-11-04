@@ -176,6 +176,32 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
+    def test_a_suggestion_on_its_way_is_not_the_answer_to_an_instruction_sent_since(self):
+        """Continue asked at a pause, then Shift+Enter on the same text (the same revision): the
+        suggestion arriving after was shown as the instruction's draft, and Tab took it."""
+        started, release, done = threading.Event(), threading.Event(), threading.Event()
+
+        def slow(text, *args, **kwargs):
+            started.set()
+            release.wait(5)
+            done.set()
+            return {"text": "a continuation"}
+        with patch("claudish.client.suggest", slow):
+            worker = Suggestions(debounce=0.01)
+            worker.session = lambda *request: None
+            try:
+                worker.schedule(1, "hello world ", "continue")
+                self.assertTrue(started.wait(1))
+                worker.schedule(1, "hello world ", "instruct", immediate=True)
+                release.set()
+                self.assertTrue(done.wait(1))
+                time.sleep(0.1)
+                self.assertIsNone(worker.poll())
+            finally:
+                release.set()
+                worker.close()
+                worker.thread.join(1)
+
     def test_an_instruction_refused_after_a_shift_tap_still_says_why(self):
         refused = threading.Event()
 
