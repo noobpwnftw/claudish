@@ -543,6 +543,31 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.marked, state.drawn)
         self.assertNotEqual(self.client.marked, "shorter")
 
+    def test_words_set_aside_for_a_question_come_back_marked_when_it_is_answered(self):
+        """A click on a choice brings back what you typed meanwhile: in the state and on screen."""
+        self.type_text("fix the intro")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        self.type_text("also the outro")
+        self.controller.worker.result = (state.revision, {"session": "s", "question": {
+            "id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}, {"label": "B"}]}})
+        self.controller.pollSuggestions_(None)
+        self.assertNotEqual(self.client.marked, "also the outro")  # set aside while it asks
+        self.controller.pick(1)
+        self.assertEqual(self.client.marked, state.drawn)
+        self.assertEqual(self.client.marked, "also the outro")
+
+    def test_a_shift_the_app_ended_the_composition_with_is_no_tap(self):
+        """Shift+click while composing: the app commits (commitComposition), and the Shift released
+        just after is not a mode switch (as on Windows)."""
+        self.type_text("hello")
+        self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: 1 << 17, characters=lambda: ""), self.client)
+        self.controller.commitComposition_(None)
+        self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: 0, characters=lambda: ""), self.client)
+        self.assertEqual(self.controller.state.mode, "compose")
+
     def test_a_shift_tap_on_a_question_holds_it_and_the_way_back_says_so(self):
         """Owner: Shift on a pick panel left the instruction marked until a click, and back in
         compose nothing said the drafts were waiting."""

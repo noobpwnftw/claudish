@@ -139,6 +139,7 @@ class ClaudishInputController(IMKInputController):
         objc.super(ClaudishInputController, self).activateServer_(sender)
         self.active = True
         OWNER[0] = self
+        self.shift.cancel()  # a Shift pressed elsewhere is not half a tap here (as Windows at a focus change)
         if self.worker is None:
             self.worker = Suggestions()
         self.worker.watch(True)
@@ -204,6 +205,7 @@ class ClaudishInputController(IMKInputController):
         """Focus went elsewhere: nothing shows, but the worker stays, so a held exchange's answer
         is there when you come back (as on IBus)."""
         self.active = False
+        self.shift.cancel()
         if self.timer is not None:
             self.timer.invalidate()
             self.timer = None
@@ -266,7 +268,7 @@ class ClaudishInputController(IMKInputController):
                     self.changed(client)
                 else:
                     unmark(client)
-        elif not self.state.live and drawn != (self.state.drawn, self.state.drawn_cursor):
+        if kind != "done" and not self.state.live and drawn != (self.state.drawn, self.state.drawn_cursor):
             client = self.client()  # a question, a draft or a failure: words set aside or brought back
             if client is not None:
                 self.mark(client)
@@ -286,6 +288,9 @@ class ClaudishInputController(IMKInputController):
             chosen = self.state.answer_choice()
             if chosen and self.worker is not None:
                 self.worker.answer(*chosen)
+            client = self.client()  # words set aside for the question come back
+            if client is not None:
+                self.mark(client)
             self.show_panel()
         elif action == "accept":  # a draft: inserted, as Tab would
             self.finish(self.client(), suggested=True)
@@ -634,6 +639,7 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
 
     def commitComposition_(self, sender):
+        self.shift.cancel()  # the app ended it (a Shift+click): that Shift is no tap
         self.finish(self.client())
 
     def handleEvent_client_(self, event, client):
@@ -774,6 +780,7 @@ class ClaudishInputController(IMKInputController):
                 chosen = self.state.dismissal()
                 if chosen and self.worker is not None:
                     self.worker.answer(*chosen)
+                self.mark(client)  # words set aside for the question come back
                 self.show_panel(client)
                 return True
             if action in ("clear", "drop"):  # words discarded: said, with the key that brings them back
