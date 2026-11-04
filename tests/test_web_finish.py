@@ -51,6 +51,21 @@ class WebFinishTests(unittest.TestCase):
                              timeout=10, check=True)
         self.assertEqual(json.loads(ran.stdout), [modes.finish("continue", text, output) for text, output in CASES])
 
+    def test_the_demo_drops_a_parroted_answer_as_the_service_does(self):
+        examples = [{"role": "user", "content": "tttt"}, {"role": "assistant", "content": "Thanks for the update."},
+                    {"role": "user", "content": "Hi"}, {"role": "assistant", "content": "the team"}]
+        cases = [["rewrite", "qqqq", "Thanks for the update.", examples], ["rewrite", "tttt", "thanks for the update.", examples],
+                 ["rewrite", "hello", "Hello there.", examples], ["continue", "Thanks for", "Thanks for", examples],
+                 ["continue", "Thanks for", "Thanks for the team", examples],
+                 ["continue", "we shipped the release today and then ", "we shipped the release today and then the release today", []],
+                 ["continue", "we shipped it ", "we shipped it on time", []], ["continue", "abc", "xyz", []]]
+        run = RUN.replace("const finish", "const parroted").replace('indexOf("function finish")', 'indexOf("function parroted")') \
+            .replace('"; return finish;"', '"; return parroted;"').replace("finish(\"continue\", text, output)", "parroted(...c)") \
+            .replace("([text, output]) => ", "(c) => ").replace('src.indexOf("const WIDE")', 'src.indexOf("function parroted")')
+        ran = subprocess.run(["node", "-e", run, str(BROWSER), json.dumps(cases)], capture_output=True, text=True,
+                             timeout=10, check=True)
+        self.assertEqual(json.loads(ran.stdout), [modes.parroted(*case) for case in cases])
+
 
 if __name__ == "__main__":
     unittest.main()

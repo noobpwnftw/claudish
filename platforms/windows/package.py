@@ -85,8 +85,8 @@ def main():
         parser.error("no PIME at %s: install PIME, then build Claudish's over it (platforms/windows/pime)" % args.pime_root)
     if not args.iscc.is_file():
         parser.error("no Inno Setup at %s (https://jrsoftware.org/isdl.php)" % args.iscc)
-    version = json.loads((HERE / "claudish/ime.json").read_text(encoding="utf-8"))["version"]
-    profile = json.loads((HERE / "claudish/ime.json").read_text(encoding="utf-8"))["guid"]
+    ime = json.loads((HERE / "claudish/ime.json").read_text(encoding="utf-8"))
+    version, profile = ime["version"], ime["guid"]
     payload = args.out / "payload"
     shutil.rmtree(payload, ignore_errors=True)
     payload.mkdir(parents=True)

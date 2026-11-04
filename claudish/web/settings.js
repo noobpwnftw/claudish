@@ -25,7 +25,6 @@ async function call(path, body) {
   return data;
 }
 
-// A sentence from an error; cd_AI keeps its name as it is written.
 // A sentence from an error; cd_AI's name and an address keep their case.
 const sentence = (text) => (/^(cd_AI|https?:)/.test(text) ? text : text.charAt(0).toUpperCase() + text.slice(1)).replace(/\.?$/, ".");
 const typed = () => (shown && shown.claudish) || "claudish";  // how claudish is run on this computer
