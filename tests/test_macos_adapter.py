@@ -325,11 +325,18 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.commitComposition_(None)  # a click elsewhere
         self.assertEqual((self.client.marked, self.client.commits), ("", []))
 
+    def test_esc_on_a_waiting_accent_keeps_your_words(self):
+        self.type_text("hello")
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e
+        self.assertTrue(self.key(53))  # Esc: the accent goes, the words stay
+        self.assertEqual((self.controller.state.text, self.controller.state.accent), ("hello", ""))
+        self.assertEqual(self.client.commits, [])
+
     def test_option_keys_and_a_lone_accent_are_the_apps(self):
         option = 1 << 19
         self.assertTrue(self.key(14, "´", option))  # Option+e with nothing composed: the accent, marked
         self.assertEqual(self.client.marked, "´")
-        self.assertFalse(self.key(53))  # Esc: the accent goes, and the key is the app's
+        self.assertTrue(self.key(53))  # Esc cancels the accent, and only it (as on Linux and Windows)
         self.assertEqual(self.client.marked, "")
         self.type_text("hello world")
         self.assertFalse(self.key(51, "", option))  # Option+Backspace: delete a word, the app's
@@ -567,6 +574,19 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.handleEvent_client_(types.SimpleNamespace(
             type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: 0, characters=lambda: ""), self.client)
         self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_a_shift_click_with_nothing_composed_is_no_tap(self):
+        """No key and no commit with nothing marked: the selection the click made says it."""
+        client = TextClient("First line.")
+        shift = lambda flags: self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: flags, characters=lambda: ""), client)
+        shift(1 << 17)
+        client.chosen = (0, 5)  # Shift+click: the selection extended
+        shift(0)
+        self.assertEqual(self.controller.state.mode, "compose")
+        shift(1 << 17)
+        shift(0)  # a tap where nothing moved: the mode switch
+        self.assertEqual(self.controller.state.mode, "continue")
 
     def test_a_shift_tap_on_a_question_holds_it_and_the_way_back_says_so(self):
         """Owner: Shift on a pick panel left the instruction marked until a click, and back in

@@ -87,6 +87,14 @@ def substring(client, location, length):
 
 RETURN_KEYS = (36, 76)  # Return, keypad Enter
 NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
+def selection(client):
+    """The text box's selection (location, length), or None when the app does not say."""
+    try:
+        return tuple(span(client.selectedRange()))
+    except Exception:
+        return None
+
+
 def marked(text):
     """The composition as the design draws it: one plain underline in the text colour (apps
     otherwise draw marked text their own way, an accent-coloured thick line in a text view)."""
@@ -130,6 +138,12 @@ class ClaudishInputController(IMKInputController):
     def activateServer_(self, sender):
         objc.super(ClaudishInputController, self).activateServer_(sender)
         self.active = True
+        if OWNER[0] is not None and OWNER[0] is not self:
+            # The text box before this one has not been told yet (its deactivation can come late):
+            # what it showed is not this box's.
+            OWNER[0].hide_panel()
+            TOAST.hide()
+            OVERLAY.hide()
         OWNER[0] = self
         self.shift.cancel()  # a Shift pressed elsewhere is not half a tap here (as Windows at a focus change)
         if self.worker is None:
@@ -421,6 +435,14 @@ class ClaudishInputController(IMKInputController):
         self.drawn = None
 
     @objc.python_method
+    def follow_caret(self, client):
+        """The suggestion moved with the caret by a key cd_AI marked (a waiting accent): drawn at
+        the caret again, so the caret check does not take it for a click elsewhere."""
+        if self.state.ghost and self.ghost_at is not None:
+            self.ghost_at = self.caret(client)
+            OVERLAY.show(self.ghost_at, self.state.ghost)
+
+    @objc.python_method
     def switch_mode(self, client, tell=True):
         """A Shift tap, or a mode picked in the input menu: continue <-> compose. Leaving compose
         keeps what you see, as typed. tell: select the mode, so the menu bar shows its icon."""
@@ -552,11 +574,13 @@ class ClaudishInputController(IMKInputController):
             state.accent, self.dead_state = found
             client.setMarkedText_selectionRange_replacementRange_(marked(state.accent), (len(state.accent), 0),
                                                                   (NSNotFound, 0))
+            self.follow_caret(client)  # the suggestion stays after the accent, not under it
             return True
         if accent:
             unmark(client)
-            if key == 51:
-                return True  # Backspace cancels the accent, and nothing else
+            if key in (51, 53):
+                self.follow_caret(client)
+                return True  # Backspace or Esc cancels the accent, and nothing else
             if chars and all(typeable(char) for char in chars):
                 chars = self.with_accent(key, chars, flags, accent)  # é, not the e the key would type
         if key == 48 and not flags & (NSEventModifierFlagShift | NSEventModifierFlagOption):  # Tab (Shift+Tab, Option+Tab: the app's)
@@ -654,8 +678,12 @@ class ClaudishInputController(IMKInputController):
                                                       NSEventModifierFlagCommand))
                 if event.modifierFlags() & NSEventModifierFlagShift:
                     self.shift.press(time.monotonic(), chord)
-                elif self.shift.release(time.monotonic(), chord):
-                    self.switch_mode(client)
+                    self.shift_range = selection(client)
+                else:
+                    # A Shift+click sends no key: the selection or caret it moved says so.
+                    clicked = selection(client) != getattr(self, "shift_range", None)
+                    if self.shift.release(time.monotonic(), chord or clicked):
+                        self.switch_mode(client)
             else:
                 self.shift.other()
             return False  # the app still sees its modifiers
@@ -685,7 +713,7 @@ class ClaudishInputController(IMKInputController):
             self.state.accent, self.dead_state = found
             self.changed(client)
             return True
-        if accent and key == 51:
+        if accent and key in (51, 53):  # Backspace or Esc cancels the accent, and nothing else
             self.changed(client)
             return True
         if accent and not self.state.text:

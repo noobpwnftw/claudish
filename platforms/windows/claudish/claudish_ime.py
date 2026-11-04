@@ -384,6 +384,8 @@ class ClaudishTextService(TextService):
             self.poll_results()  # a waiting suggestion decides whether Tab is ours
             # Continue types into the app. Tab and Esc are ours only while a suggestion shows;
             # Backspace, Enter, and navigation are the app's (the context follows here).
+            if event.keyCode == 0x1B and getattr(event, "charCount", 1) > 1:
+                return True  # right after a dead key: Esc takes back the accent, and only it
             if event.keyCode == 0x1B or plain_tab(event):  # Shift+Tab: the app's
                 if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
                     self.drop_live()
@@ -666,6 +668,8 @@ class ClaudishTextService(TextService):
                 self.await_result(60)
             self.publish()
             return True
+        elif key == 0x1B and getattr(event, "charCount", 1) > 1:
+            pass  # right after a dead key: Esc takes back the accent (PIME uses it up), nothing else
         elif key == 0x1B and event.isKeyDown(0x10) and self.state.text:
             return True  # composing, Shift+Esc brings nothing back, and never drops what you typed
         elif key == 0x1B:
@@ -725,6 +729,8 @@ class ClaudishTextService(TextService):
             ghost = self.state.take_ghost()
             if ghost:
                 self.setCommitString(ghost)
+        elif key == 0x1B and getattr(event, "charCount", 1) > 1:
+            pass  # the accent only (PIME uses it up); the suggestion stays
         elif key == 0x1B:
             self.state.dismiss()
         elif event.isPrintableChar():
@@ -805,8 +811,10 @@ class ClaudishTextService(TextService):
         pill = self.state.returned(getattr(self, "document", None))
         if pill:
             self.setToast(pill, PILL_SECONDS)
-        elif self.state.text:
-            self.publish()  # the panel as it is now (an answer that came meanwhile): Tab takes what you see
+        else:
+            # The panel as it is now (an answer that came meanwhile: Tab takes what you see), or an
+            # instruction a helper finished while another app was in front, no longer composed.
+            self.publish()
 
     def onKeyboardStatusChanged(self, opened):
         super().onKeyboardStatusChanged(opened)

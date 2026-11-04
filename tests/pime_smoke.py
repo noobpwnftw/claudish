@@ -174,6 +174,9 @@ def main():
             key(0x08)
             key(0x08, 0, charCount=2)  # Backspace right after a dead key: the accent goes, nothing else
             assert service.state.text == "hello-world", service.state.text
+            assert key(0x1B, 0, "filterKeyDown", charCount=2)["return"] is True
+            key(0x1B, 0, charCount=2)  # Esc right after a dead key: the accent goes, the words stay
+            assert service.state.text == "hello-world", service.state.text
             # Ctrl with a dead key is a shortcut: the words are committed, the key replayed.
             assert key(0xDD, method="filterKeyDown", modifiers=(0x11,), isDead=True)["return"] is True
             assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
