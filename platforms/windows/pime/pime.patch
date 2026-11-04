@@ -39,18 +39,19 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..aa34377 100644
+index 0c7a8d5..bc0c6a7 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
-@@ -23,6 +23,7 @@
+@@ -23,6 +23,8 @@
  #include "libIME2/src/Utils.h"
  #include <algorithm>
  #include <nlohmann/json.hpp>
 +#include <vector>
++#include <atomic>
  
  #include "PIMETextService.h"
  #include <VersionHelpers.h> // Provided by Windows SDK >= 8.1
-@@ -63,7 +64,17 @@ Client::Client(TextService* service, REFIID langProfileGuid):
+@@ -63,7 +65,17 @@ Client::Client(TextService* service, REFIID langProfileGuid):
  	guid_{ uuidToString(langProfileGuid) } {
  }
  
@@ -68,7 +69,7 @@ index 0c7a8d5..aa34377 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -81,6 +92,8 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
+@@ -81,6 +93,8 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
  	request["repeatCount"] = keyEvent.repeatCount();
  	request["scanCode"] = keyEvent.scanCode();
  	request["isExtended"] = keyEvent.isExtended();
@@ -77,7 +78,7 @@ index 0c7a8d5..aa34377 100644
  	json keyStates = json::array();
  	const BYTE* states = keyEvent.keyStates();
  	for (int i = 0; i < 256; ++i) {
-@@ -96,11 +109,78 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -96,11 +110,102 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	}
  	bool success = jsonValueOr<bool>(msg, "success", false);
  	if (success) {
@@ -91,6 +92,30 @@ index 0c7a8d5..aa34377 100644
  }
  
 +// Claudish: Composition.panel() as sent by the input method; anything missing stays empty.
++// Claudish: which text box a request comes from. The TSF context's own number, kept in a compartment
++// of the context (it goes away with the context), not its address: a closed box's address is often
++// the next box's, which would take up its conversation.
++static const GUID GUID_CLAUDISH_DOCUMENT =
++{ 0x6d1a3f0e, 0x52c4, 0x4b8e, { 0x9a, 0x61, 0x3e, 0x0b, 0x7c, 0x2d, 0x84, 0x15 } };
++
++static std::string documentId(Ime::TextService* service, ITfContext* context) {
++	static std::atomic<DWORD> next{ 0 };
++	auto address = std::to_string(reinterpret_cast<uintptr_t>(context));
++	auto compartment = service->contextCompartment(GUID_CLAUDISH_DOCUMENT, context);
++	if (!compartment) {
++		return address;
++	}
++	DWORD id = service->compartmentValue(compartment);
++	if (!id) {
++		id = ++next;
++		service->setCompartmentValue(compartment, id);
++		if (service->compartmentValue(compartment) != id) {
++			return address;  // a context that keeps no values: its address, as before
++		}
++	}
++	return std::to_string(GetCurrentProcessId()) + "." + std::to_string(id);
++}
++
 +static Ime::PanelSpec panelFromJson(const json& value) {
 +	Ime::PanelSpec spec;
 +	if (!value.is_object())
@@ -156,7 +181,7 @@ index 0c7a8d5..aa34377 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +212,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +237,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -172,7 +197,7 @@ index 0c7a8d5..aa34377 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -170,6 +259,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
+@@ -170,6 +284,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
  				textService_->updateMessageWindow(session);
  			}
  			textService_->endComposition(session->context());
@@ -180,7 +205,7 @@ index 0c7a8d5..aa34377 100644
  		}
  	}
  }
-@@ -188,6 +278,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -188,6 +303,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  			if (textService_->isComposing() && !textService_->showingCandidates()) {
  				// when the composition buffer is empty and we are not showing the candidate list, end composition.
  				textService_->setCompositionString(session, L"", 0);
@@ -195,7 +220,7 @@ index 0c7a8d5..aa34377 100644
  				endComposition = true;
  			}
  		}
-@@ -196,6 +294,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -196,6 +319,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->startComposition(session->context());
  			}
  			textService_->setCompositionString(session, compositionString.c_str(), compositionString.length());
@@ -203,7 +228,7 @@ index 0c7a8d5..aa34377 100644
  		}
  		// FIXME: update the position of candidate and message window when the composition string is changed.
  		if (textService_->candidateWindow_ != nullptr) {
-@@ -329,6 +428,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +453,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  
  		updateComposition(msg, session, endComposition);
  
@@ -220,7 +245,7 @@ index 0c7a8d5..aa34377 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +454,203 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +479,203 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -413,7 +438,7 @@ index 0c7a8d5..aa34377 100644
 +	// What kind of field this is (IS_URL, IS_EMAIL_SMTPEMAILADDRESS, ...), as the app declares it.
 +	request["inputScopes"] = textService_->inputScopes(session);
 +	// Which text box: the TSF context, so the input method can keep one conversation per field.
-+	request["document"] = std::to_string(reinterpret_cast<uintptr_t>(static_cast<ITfContext*>(session->context())));
++	request["document"] = documentId(textService_, static_cast<ITfContext*>(session->context()));
 +}
 +
 +// Claudish: continue's suggestion after the caret.
@@ -424,7 +449,7 @@ index 0c7a8d5..aa34377 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +658,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +683,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -438,7 +463,7 @@ index 0c7a8d5..aa34377 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +667,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +692,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -456,7 +481,7 @@ index 0c7a8d5..aa34377 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -442,6 +755,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+@@ -442,6 +780,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
  
  	json req = createRpcRequest("filterKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -476,7 +501,7 @@ index 0c7a8d5..aa34377 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -455,14 +781,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -455,14 +806,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  	if (!ensureConnected()) {
  		return false;
  	}
@@ -496,7 +521,7 @@ index 0c7a8d5..aa34377 100644
  	}
  	return false;
  }
-@@ -490,6 +819,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +844,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -504,7 +529,7 @@ index 0c7a8d5..aa34377 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +859,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +884,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -533,7 +558,7 @@ index 0c7a8d5..aa34377 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -677,7 +1022,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
+@@ -677,7 +1047,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
  
  // called just before current composition is terminated for doing cleanup.
  void Client::onCompositionTerminated(bool forced) {
@@ -542,7 +567,7 @@ index 0c7a8d5..aa34377 100644
  		return;
  	}
  
-@@ -804,7 +1149,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1174,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
