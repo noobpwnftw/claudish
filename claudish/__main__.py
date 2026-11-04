@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import statistics
 import sys
 import time
@@ -122,6 +123,10 @@ def main():
             store(accepted_key(value))  # checked with Anthropic first, as in the settings window
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             sys.exit(as_typed("Nothing saved: %s." % exc))
+        try:  # the service takes it up at its next request (a Keychain item has no file it watches)
+            os.utime(config.default_path())
+        except OSError:
+            pass
         print("Saved in %s. cd_AI's service uses it from your next rewrite." % where())
         return
     if args.command == "recent":

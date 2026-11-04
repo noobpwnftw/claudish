@@ -495,6 +495,8 @@ class Composition:
         elif self.offline:  # said from the first key, not found out on Tab
             shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
+        elif self.following:  # a follow-up back at the caret (F8): sent with the summon key; Esc, your words
+            shown["foot"] = ([("F8", "without this window")] if self.look else []) + [(self.summon, "ask"), ("Esc", "cancel")]
         else:  # composing: the keys show from the first key (what each Enter does must be known)
             shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
                              + [(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
@@ -627,8 +629,10 @@ class Composition:
         if self.asked == "rewrite" and self.candidate:
             self.converted = True
             return "convert"
-        if self.working or (self.failed and self.asked == "instruct"):
-            return "wait"  # a failed instruction is retried with the summon key, as its footer says
+        if self.working or (self.failed and self.asked == "instruct") or self.following:
+            # A failed instruction is retried with the summon key, as its footer says; a follow-up
+            # is sent with it, never rewritten into the app.
+            return "wait"
         self.asked, self.working, self.failed = "rewrite", True, False
         return "request"
 
@@ -1153,6 +1157,7 @@ class Composition:
                   "%d drafts ready" % len(held.candidates) if len(held.candidates) > 1 else
                   "a draft is ready" if held.candidate else
                   held.error if held.failed else
+                  "your follow-up" if held.following else
                   "working on what you asked" if held.for_model else "your words")  # ended; what you typed meanwhile
         return blank(status=status, busy=held.working, foot=[("Shift+Esc", "open" if held.for_model else "restore")])
 

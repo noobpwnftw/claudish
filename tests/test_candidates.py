@@ -1084,8 +1084,13 @@ class ModeFeelTests(unittest.TestCase):
         state.toggle_look()  # F8: back at the caret with the picture
         self.assertTrue(state.for_model)
         self.assertIsNone(state.keep())  # Enter: nothing of a follow-up goes in
+        self.assertEqual(state.tab(), "wait")  # Tab rewrites nothing of a follow-up into the app
+        self.assertEqual([key for key, _ in state.panel()["foot"]], ["F8", "Shift+Enter", "Esc"])
         self.assertEqual(state.leave("A"), "")  # a focus change holds it, your words with it
         self.assertEqual(state.holds["A"][0].origin, "teh cat")
+        state.returned("B")
+        state.returned("A")
+        self.assertEqual(state.held_pill()["status"], "your follow-up")
         same = rewritten("e")
         same.insert("e")  # the follow-up reads as your words did
         same.enter()

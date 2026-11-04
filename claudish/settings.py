@@ -67,13 +67,15 @@ def ask_shell(name, shell):
     import subprocess
     shell = shell or pwd.getpwuid(os.getuid()).pw_shell or "/bin/sh"
     try:
+        # Its own session: an interactive shell takes the terminal's foreground, and one killed at
+        # the timeout would leave a terminal caller (doctor) stopped.
         done = subprocess.run([shell, "-lic", "command -v %s" % name], stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True, timeout=5)
+                              capture_output=True, text=True, timeout=5, start_new_session=True)
     except (OSError, subprocess.SubprocessError):
         return None
     for line in reversed(done.stdout.splitlines()):  # after anything the shell's startup files print
         line = line.strip()
-        if line.startswith("/") and os.path.isfile(line) and os.access(line, os.X_OK):
+        if line.startswith("/") and os.path.basename(line) == name and os.path.isfile(line) and os.access(line, os.X_OK):
             return line
     return None
 
