@@ -156,7 +156,9 @@ class ModelDriver:
             # the conversation keeps what happened, so the next instruction in this box knows.
             result = {"consulted": []}
             if self.settled:
-                self.keep([{"role": "user", "content": prompt}, {"role": "assistant", "content": self.settled}])
+                # What happened, not a draft the model offered (shapes.as_answered, model.one_message).
+                self.keep([{"role": "user", "content": prompt},
+                           {"role": "assistant", "content": self.settled, "settled": True}])
         if self.cancelled:
             return  # Esc took it back: the conversation does not keep it either
         if result.get("turn"):

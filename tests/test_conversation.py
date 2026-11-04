@@ -632,6 +632,14 @@ class FollowUpTests(unittest.TestCase):
         self.assertIn("what does this error mean", later)
         self.assertIn("The linker cannot find tokenize.", later)  # what was shown, though dismissed
         self.assertIn("they dismissed it", later)
+        note = [m for m in model.sent[-1]["messages"] if "they dismissed it" in str(m.get("content"))][0]
+        self.assertFalse(note["content"].startswith('{"drafts"'))  # what happened, not a draft the model offered
+        self.assertTrue(all("settled" not in m for m in model.sent[-1]["messages"]))  # Claudish's mark stays here
+        from claudish.model import one_message
+        told = one_message("Help.", [], "now fix it", {"plain": "", "examples": "", "earlier": "Earlier:", "text": "Now:"},
+                           conversation.messages[:2])
+        self.assertIn("<note>", told)
+        self.assertNotIn("<output>", told)
         self.assertEqual(len(model.sent), 2)  # one call per turn
         self.assertEqual(session.events[-1]["text"], "cc -o app main.o parse.o tokenize.o")
 

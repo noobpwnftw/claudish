@@ -53,9 +53,11 @@ def answered(drafts):
 
 def as_answered(messages):
     """Examples and earlier turns with their answers in the shape the model answers, so it answers
-    in kind: a plain assistant text becomes {"drafts": [text]}; tool calls stay as they are."""
+    in kind: a plain assistant text becomes {"drafts": [text]}; tool calls stay as they are, and so
+    does a note of how a turn was settled (an answer dismissed, a handoff), which was no draft."""
     return [dict(m, content=example(m.get("content") or ""))
-            if m.get("role") == "assistant" and not m.get("tool_calls") and drafts(m.get("content")) is None else m
+            if m.get("role") == "assistant" and not m.get("tool_calls") and not m.get("settled")
+            and drafts(m.get("content")) is None else m
             for m in messages]
 
 

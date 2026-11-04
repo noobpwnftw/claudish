@@ -22,10 +22,11 @@ def one_message(prompt, examples, said, words, history=()):
     examples and the conversation's earlier turns as tagged text and output pairs (chat turns
     elsewhere), then the text, tagged too. words: templates.json box.one_message."""
     def tagged(messages, tag):
-        pairs = [(m["content"], n["content"]) for m, n in zip(messages, messages[1:])
+        pairs = [(m["content"], n["content"], "note" if n.get("settled") else "output")
+                 for m, n in zip(messages, messages[1:])
                  if m["role"] == "user" and n["role"] == "assistant" and not n.get("tool_calls")]
-        return "".join("\n<%s>\n<text>%s</text>\n<output>%s</output>\n</%s>" % (tag, text, output, tag)
-                       for text, output in pairs)
+        return "".join("\n<%s>\n<text>%s</text>\n<%s>%s</%s>\n</%s>" % (tag, text, kind, output, kind, tag)
+                       for text, output, kind in pairs)
     shots, earlier = tagged(examples, "example"), tagged(history, "turn")
     if not (shots or earlier):
         return prompt + "\n\n" + words["plain"] + "\n" + said
@@ -727,6 +728,7 @@ class Rewriter:
         usage, the turn's tool messages, what the tools consulted)."""
         from .conversation import TURN_TIMEOUT
         spec = self.modes[mode]
+        history = [{k: v for k, v in m.items() if k != "settled"} for m in history]  # Claudish's own mark
         messages = ([{"role": "system", "content": prompt}] + examples + history
                     + [{"role": "user", "content": user_content(said, box.image, "openai", spec["box"]["picture"])}])
         max_tokens = spec["max_tokens"] or self.max_tokens
