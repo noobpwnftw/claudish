@@ -42,12 +42,14 @@ def bind_to_this_process(process, what="the model"):
     return job  # the handle stays open for the life of this process (JOB)
 
 
-def spawn(argv, what, **options):
+def spawn(argv, what, job=True, **options):
     """A child process tied to this one: a Windows job object, and on every platform its stdin,
     which closes when the service goes (both CLIs end at the end of their input). Not Linux's
-    parent-death signal: it fires when the starting thread ends, and warm-ups start on a thread."""
+    parent-death signal: it fires when the starting thread ends, and warm-ups start on a thread.
+    job=False: its stdin only, so what it starts for you (an agent's programs) outlives the service,
+    as on Linux and macOS (the job kills every process in it)."""
     if os.name == "nt":
         options.setdefault("creationflags", 0x08000000)  # CREATE_NO_WINDOW
     process = subprocess.Popen(argv, **options)
-    process.claudish_job = bind_to_this_process(process, what)
+    process.claudish_job = bind_to_this_process(process, what) if job else None
     return process

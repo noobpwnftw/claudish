@@ -69,8 +69,9 @@ class AgentProcess:
             session += ["--permission-prompt-tool", "stdio"]
         if self.config_file:
             session += ["--mcp-config", self.config_file]  # last: it takes several values
-        # Tied to the service as the warm CLIs are (a Windows job object, no console window).
-        self.process = spawn(self.command + session, "the agent session", stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        # No console window on Windows; it ends with its input when the service goes. Not in the
+        # service's job: the programs it starts for you stay open, as on Linux and macOS.
+        self.process = spawn(self.command + session, "the agent session", job=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                              bufsize=1, env=with_own_folder(self.command[0]))
         self.started = True

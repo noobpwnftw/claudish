@@ -175,7 +175,7 @@ function panel() {
                  status: null, busy: false, failed: null, replying: false};
   // Once the composition no longer shows your instruction (you type a reply), the panel says it.
   if (sent() && state.reply) shown.thread = [{label: "You asked", body: state.text}];
-  const typing = sent() && state.reply ? {replying: true, on: -1, tail: null, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]} : {};
+  const typing = sent() && state.reply ? {replying: true, tail: null, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]} : {};
   if (state.working) return {...shown, status: state.asked === "rewrite" && !state.reply ? "rewriting" : "working", busy: true,
                              foot: [["Esc", "stop"]], ...typing};
   if (state.failed) return {...shown, tile: "warn", failed: state.error || "the request failed",  // Tab retries a rewrite
