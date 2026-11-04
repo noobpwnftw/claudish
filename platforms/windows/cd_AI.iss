@@ -66,12 +66,10 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\PIME\x64\PIMETextService
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\PIME\arm64\PIMETextService.dll"""; Check: IsArm64; Flags: runhidden waituntilterminated
 
 [UninstallRun]
-; In order: cd_AI's processes stop (only cd_AI's: a PIME beside it runs a launcher of the same
-; name), cd_AI leaves your input sources, its text service is unregistered; then the files go.
+; In order (cd_AI's processes stopped first, in CurUninstallStepChanged: StopCdAI): its logon
+; tasks go, cd_AI leaves your input sources, its text service is unregistered; then the files go.
 ; Every account's logon task (claudish-USER, or an older shared claudish), by those names only: the
 ; uninstaller is elevated.
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish','claudish-*' -ErrorAction SilentlyContinue | Stop-ScheduledTask"""; Flags: runhidden; RunOnceId: "EndService"
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopProcesses"
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-ScheduledTask -TaskName 'claudish','claudish-*' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false"""; Flags: runhidden; RunOnceId: "DeleteService"
 Filename: "{app}\python\python.exe"; Parameters: "-c ""import ctypes; ctypes.windll.input.InstallLayoutOrTip('0409:@TEXT_SERVICE_ESCAPED@@PROFILE_ESCAPED@', 1)"""; Flags: runhidden; RunOnceId: "LeaveInputSources"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\PIME\x86\PIMETextService.dll"""; Flags: runhidden; RunOnceId: "UnregisterX86"
@@ -115,17 +113,23 @@ begin
   RegWriteExpandStringValue(HKLM, Environment, 'Path', Path);
 end;
 
-function PrepareToInstall(var NeedsRestart: Boolean): String;
+{ cd_AI's service and launcher let go of their files (only cd_AI's: a PIME beside it runs a
+  launcher of the same name): every account's logon task, by its names only, then its processes. }
+procedure StopCdAI;
 var
   Code: Integer;
 begin
-  { An update: cd_AI's service and launcher let go of their files first (only cd_AI's). }
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
        '-NoProfile -Command "Get-ScheduledTask -TaskName ''claudish'',''claudish-*'' -ErrorAction SilentlyContinue | Stop-ScheduledTask"',
        '', SW_HIDE, ewWaitUntilTerminated, Code);
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
        '-NoProfile -Command "Get-Process pythonw,python,PIMELauncher -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''' +
        ExpandConstant('{app}') + '\*'' } | Stop-Process -Force"', '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  StopCdAI;  { an update: the files it replaces are free }
   Result := '';
 end;
 
@@ -151,6 +155,7 @@ var
 begin
   if Step = usUninstall then
   begin
+    StopCdAI;  { before [UninstallRun] deletes the tasks and unregisters the text service }
     LeavePath;
     { Each account that installed it leaves cd_AI in its input sources as itself: this uninstaller
       may run as the administrator who approved it ([UninstallRun] covers that account). }
