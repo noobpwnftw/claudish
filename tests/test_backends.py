@@ -15,7 +15,7 @@ from claudish import modes
 from claudish.keys import claude_credential
 from claudish.model import Rewriter
 from claudish.server import make_server
-from serving import serving
+from serving import asked, serving
 
 
 def response(text="A considered rewrite—truly.", stop_reason="end_turn"):
@@ -335,10 +335,7 @@ class ClaudeLoopTests(unittest.TestCase):
         session = Session(driver)
         thread = threading.Thread(target=lambda: driver.run(session, "fix"))
         thread.start()
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-            time.sleep(0.01)
-        question = next(e for e in session.events if e["type"] == "question")
+        question = asked(session)
         session.answer(question["id"], 0)
         thread.join(5)
         self.assertEqual(session.events[-1]["text"], "git status")

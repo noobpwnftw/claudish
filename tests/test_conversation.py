@@ -10,6 +10,7 @@ from claudish import modes
 from claudish.conversation import Conversations, ModelDriver
 from claudish.model import Rewriter
 from claudish.sessions import Session
+from serving import asked
 
 SERVER = {"notes": {"command": sys.executable, "args": [str(Path(__file__).with_name("mcp_server.py"))]}}
 
@@ -258,9 +259,7 @@ class AskAndHelperTests(unittest.TestCase):
         with patch.object(rewriter, "chat", model):
             driver = ModelDriver(rewriter, rewriter.conversations.get("box"))
             session, thread = run(driver, "delete the branch")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
+            asked(session)
             session.cancel()
             thread.join(15)
         self.assertFalse(thread.is_alive())
@@ -297,10 +296,7 @@ class AskAndHelperTests(unittest.TestCase):
         model = Scripted(answer(calls=[("user__show", {"answer": "The linker cannot find tokenize."})]))
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, conversation), "what does this error mean")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
-            question = next(e for e in session.events if e["type"] == "question")
+            question = asked(session)
             session.answer(question["id"], 0)  # Tab: Insert it (its follower does not cancel it: test_core)
             thread.join(5)
         self.assertEqual(len(conversation.messages), 2)
@@ -455,10 +451,7 @@ class AskAndHelperTests(unittest.TestCase):
         rewriter.modes["instruct"]["candidates"] = 1
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "do it")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
-            question = next(e for e in session.events if e["type"] == "question")
+            question = asked(session)
             self.assertEqual([c["label"] for c in question["choices"]], ["Yes", "No"])  # not Allow / Deny
             session.answer(question["id"], text="sure, my key is sk-abcdefghijklmnopqrstuvwxyz123456")
             thread.join(5)
@@ -508,10 +501,7 @@ class ShowTests(unittest.TestCase):
         rewriter.modes["instruct"]["candidates"] = 1
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("box")), "what does this error mean")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
-            question = next(e for e in session.events if e["type"] == "question")
+            question = asked(session)
             session.answer(question["id"], choice)
             thread.join(5)
         return question, session.events[-1]
@@ -529,10 +519,7 @@ class ShowTests(unittest.TestCase):
         with patch.object(rewriter, "chat", model):
             session, thread = run(ModelDriver(rewriter, rewriter.conversations.get("t"), purpose="terminal",
                                               screen="$ make\nerror\n$"), "what now")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
-            session.answer(next(e for e in session.events if e["type"] == "question")["id"], 0)
+            session.answer(asked(session)["id"], 0)
             thread.join(5)
         self.assertEqual(session.events[-1]["candidates"], ["make clean"])  # one line at a prompt
 
@@ -554,10 +541,7 @@ class FollowUpTests(unittest.TestCase):
             session, thread = run(ModelDriver(rewriter, conversation, purpose="terminal",
                                               screen="$ python3 -m unittest\nAssertionError: 49 != 48.85\n$"),
                                   "what does this error mean")
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                time.sleep(0.01)
-            session.answer(next(e for e in session.events if e["type"] == "question")["id"], text="well then fix it")
+            session.answer(asked(session)["id"], text="well then fix it")
             thread.join(5)
         self.assertIn("The user read it and asked: well then fix it", json.dumps(model.sent[-1]["messages"]))
         self.assertEqual(session.events[-1]["text"], "sed -i '' 's/tax_rate)/tax_rate, 2)/' invoice.py")
@@ -576,10 +560,7 @@ class FollowUpTests(unittest.TestCase):
                 session, thread = run(ModelDriver(rewriter, conversation, purpose="terminal",
                                                   screen="$ make\nundefined reference to `tokenize'\n$"), text)
                 if choice is not None:
-                    deadline = time.monotonic() + 5
-                    while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                        time.sleep(0.01)
-                    session.answer(next(e for e in session.events if e["type"] == "question")["id"], choice)
+                    session.answer(asked(session)["id"], choice)
                 thread.join(5)
         later = json.dumps(model.sent[-1]["messages"])
         self.assertIn("what does this error mean", later)
@@ -605,10 +586,7 @@ class HandleTests(unittest.TestCase):
             model = Scripted(answer(calls=[("helper__claude", {"task": "Fix the link error"})]))
             with patch.object(rewriter, "chat", model):
                 session, thread = run(ModelDriver(rewriter, conversation), "have claude fix the build")
-                deadline = time.monotonic() + 5
-                while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
-                    time.sleep(0.01)
-                session.answer(next(e for e in session.events if e["type"] == "question")["id"], 1)  # Yes
+                session.answer(asked(session)["id"], 1)  # Yes
                 thread.join(5)
             helper_session = launch.call_args.args[3]
             self.assertTrue(helper_session)  # Claude Code is started with an id Claudish chose

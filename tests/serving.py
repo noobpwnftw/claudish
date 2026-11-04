@@ -1,4 +1,5 @@
-"""Shared test helpers: a service on a free port, and waiting for a worker's result."""
+"""Shared test helpers: a service on a free port, waiting for a worker's result, and for a
+session's question."""
 import threading
 import time
 from contextlib import contextmanager
@@ -28,3 +29,11 @@ def poll_until(worker, timeout=1):
         result = worker.poll()
         time.sleep(0.001)
     return result
+
+
+def asked(session, timeout=5):
+    """The session's first question event, once it is there (None after timeout seconds)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not any(e["type"] == "question" for e in session.events):
+        time.sleep(0.01)
+    return next((e for e in session.events if e["type"] == "question"), None)

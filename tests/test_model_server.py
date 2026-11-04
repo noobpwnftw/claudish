@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from claudish import warm
+from serving import serving
 
 FAKE_LLAMA = r"""
 import sys
@@ -135,7 +136,6 @@ class ModelServerTests(unittest.TestCase):
 
     def test_the_routed_local_model_becoming_the_one_in_use_goes_on(self):
         from claudish.model import Rewriter
-        from claudish.server import make_server
         command = [sys.executable, "-c", "import time; time.sleep(30)"]
         local = lambda: Rewriter("llama", "http://127.0.0.1:9", command=command)
         main = Rewriter("rules")
@@ -150,21 +150,17 @@ class ModelServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder, "config.json")
             path.write_text("{}")
-            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
-            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-            try:
-                os.utime(path, ns=(1, 1))  # an edit made "local" the profile in use
-                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
-                self.assertIs(fresh.warm, routed)  # taken up, not a second server on its port
-            finally:
-                fresh.stop_model()
-                routed.thread.join(5)  # not left checking its address while the interpreter ends
-                server.shutdown()
-                server.server_close()
+            with serving(main, reload=lambda: fresh, config_path=path) as server:
+                try:
+                    os.utime(path, ns=(1, 1))  # an edit made "local" the profile in use
+                    urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                    self.assertIs(fresh.warm, routed)  # taken up, not a second server on its port
+                finally:
+                    fresh.stop_model()
+                    routed.thread.join(5)  # not left checking its address while the interpreter ends
 
     def test_a_routed_models_process_nothing_routes_to_after_an_edit_stops(self):
         from claudish.model import Rewriter
-        from claudish.server import make_server
         import os
         import tempfile
         from urllib.request import urlopen
@@ -177,21 +173,17 @@ class ModelServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder, "config.json")
             path.write_text("{}")
-            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
-            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-            try:
-                os.utime(path, ns=(1, 1))
-                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
-                self.assertEqual(routed.state, "stopped")  # not held until the next reload
-            finally:
-                fresh.stop_model()
-                server.shutdown()
-                server.server_close()
+            with serving(main, reload=lambda: fresh, config_path=path) as server:
+                try:
+                    os.utime(path, ns=(1, 1))
+                    urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                    self.assertEqual(routed.state, "stopped")  # not held until the next reload
+                finally:
+                    fresh.stop_model()
 
     def test_a_model_process_a_routed_profile_routes_on_to_goes_on_through_a_reload(self):
         from claudish.context import Binding
         from claudish.model import Rewriter
-        from claudish.server import make_server
         import os
         import tempfile
         from urllib.request import urlopen
@@ -215,16 +207,13 @@ class ModelServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder, "config.json")
             path.write_text("{}")
-            server = make_server(main, 0, reload=lambda: fresh, config_path=path)
-            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-            try:
-                os.utime(path, ns=(1, 1))
-                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
-                self.assertIs(fresh.route("terminal", "continue").warm, process)  # not stopped, not started cold
-            finally:
-                fresh.stop_model()
-                server.shutdown()
-                server.server_close()
+            with serving(main, reload=lambda: fresh, config_path=path) as server:
+                try:
+                    os.utime(path, ns=(1, 1))
+                    urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                    self.assertIs(fresh.route("terminal", "continue").warm, process)  # not stopped, not started cold
+                finally:
+                    fresh.stop_model()
 
     def test_a_new_local_model_command_starts_once_the_old_server_has_gone(self):
         import os
@@ -232,7 +221,6 @@ class ModelServerTests(unittest.TestCase):
         import tempfile
         from urllib.request import urlopen
         from claudish.model import Rewriter
-        from claudish.server import make_server
         slow = FAKE_LLAMA.replace("HTTPServer((", "import os, signal\nsignal.signal(signal.SIGTERM, lambda *a: "
                                   "threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start())\nHTTPServer((")
         slow = "import threading, time\n" + slow  # it answers a while after it is asked to end
@@ -246,23 +234,20 @@ class ModelServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder, "config.json")
             path.write_text("{}")
-            server = make_server(old, 0, reload=lambda: fresh, config_path=path)
-            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-            try:
-                deadline = time.monotonic() + 5
-                while old.model_state != "warm" and time.monotonic() < deadline:
-                    time.sleep(0.02)
-                os.utime(path, ns=(1, 1))  # the edit gives the model another command
-                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=10).close()
-                deadline = time.monotonic() + 5
-                while fresh.model_state != "warm" and time.monotonic() < deadline:
-                    time.sleep(0.02)
-                self.assertEqual(fresh.model_state, "warm")  # not "something already answers"
-            finally:
-                fresh.stop_model()
-                fresh.warm.thread.join(5)
-                server.shutdown()
-                server.server_close()
+            with serving(old, reload=lambda: fresh, config_path=path) as server:
+                try:
+                    deadline = time.monotonic() + 5
+                    while old.model_state != "warm" and time.monotonic() < deadline:
+                        time.sleep(0.02)
+                    os.utime(path, ns=(1, 1))  # the edit gives the model another command
+                    urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=10).close()
+                    deadline = time.monotonic() + 5
+                    while fresh.model_state != "warm" and time.monotonic() < deadline:
+                        time.sleep(0.02)
+                    self.assertEqual(fresh.model_state, "warm")  # not "something already answers"
+                finally:
+                    fresh.stop_model()
+                    fresh.warm.thread.join(5)
 
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)

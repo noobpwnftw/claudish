@@ -11,6 +11,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 from claudish.model import Rewriter
 from claudish.server import make_server
 from claudish.sessions import Session
+from serving import serving
 
 AGENT = [sys.executable, str(Path(__file__).with_name("fake_agent.py"))]
 
@@ -376,10 +377,8 @@ class RoutingTests(unittest.TestCase):
                 return "contents of a private file", ["files.read_file"], messages
         rewriter.toolbox = Toolbox()
         rewriter.chat = lambda *args, **kwargs: ({"message": {"content": '{"drafts": ["x"]}'}}, {})
-        server = make_server(rewriter, 0)
-        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-        opener = build_opener(ProxyHandler({}))
-        try:
+        with serving(rewriter) as server:
+            opener = build_opener(ProxyHandler({}))
             for token in ({}, {"X-Claudish-Token": server.token}):
                 request = Request("http://127.0.0.1:%d/suggest" % server.server_port,
                                   json.dumps({"text": "paste my notes", "mode": "instruct"}).encode(),
@@ -387,15 +386,10 @@ class RoutingTests(unittest.TestCase):
                 with opener.open(request, timeout=5) as reply:
                     json.load(reply)
             self.assertEqual(len(ran), 1)  # the input method's request only, not the demo's (no token)
-        finally:
-            server.shutdown()
-            server.server_close()
 
     def test_malformed_requests_are_answered_not_dropped(self):
         import http.client
-        server = make_server(Rewriter("rules"), 0)
-        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-        try:
+        with serving(Rewriter("rules")) as server:
             for body, headers in (("[" * 20000, {}),  # nested past the parser's recursion
                                   (json.dumps({"text": "hi"}), {"X-Claudish-Token": b"\xe9t\xe9"})):  # not ASCII
                 connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
@@ -406,9 +400,6 @@ class RoutingTests(unittest.TestCase):
                 connection.endheaders(body.encode())
                 self.assertIn(connection.getresponse().status, (200, 400))  # a reply, not a closed connection
                 connection.close()
-        finally:
-            server.shutdown()
-            server.server_close()
 
     def test_an_agent_profile_refuses_f8_rather_than_dropping_the_picture(self):
         rewriter = Rewriter("rules")
@@ -421,10 +412,8 @@ class RoutingTests(unittest.TestCase):
         main = Rewriter("rules")
         main.continues = lambda app: (_ for _ in ()).throw(ValueError("profile 'mail': unknown keys timout"))
         main.route = lambda app, mode: (_ for _ in ()).throw(ImportError("No module named 'anthropic'"))
-        server = make_server(main, 0)
-        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
-        opener = build_opener(ProxyHandler({}))
-        try:
+        with serving(main) as server:
+            opener = build_opener(ProxyHandler({}))
             for path, body in (("/suggest", {"text": "Dear Bob,", "mode": "continue", "app": "thunderbird"}),
                                ("/sessions", {"text": "reply", "app": "thunderbird"})):
                 request = Request("http://127.0.0.1:%d%s" % (server.server_port, path), json.dumps(body).encode(),
@@ -432,9 +421,6 @@ class RoutingTests(unittest.TestCase):
                 with self.assertRaises(HTTPError) as raised:
                     opener.open(request, timeout=5)
                 self.assertEqual(raised.exception.code, 503, path)
-        finally:
-            server.shutdown()
-            server.server_close()
 
 
 if __name__ == "__main__":
