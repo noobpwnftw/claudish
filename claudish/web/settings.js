@@ -272,6 +272,7 @@ document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEven
   if (radio.value === "claude") {
     change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.").then((done) => {
       if (done && shown && shown.key === "missing") say("model-message", "");  // nothing writes yet: the status says what to add
+      if (!done && shown) render(shown);  // not switched: the radio goes back to what is in use
     });
   } else if (radio.value === "claude-code" || radio.value === "codex") {
     $("claude").hidden = $("server").hidden = true;

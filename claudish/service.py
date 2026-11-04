@@ -67,12 +67,21 @@ After=default.target
 ExecStart=%s
 WorkingDirectory=%s
 Environment=PYTHONUNBUFFERED=1
-Restart=on-failure
+%sRestart=on-failure
 RestartSec=3
 
 [Install]
 WantedBy=default.target
-""" % (" ".join(shlex.quote(part) for part in argv), ROOT)
+""" % (" ".join(shlex.quote(part) for part in argv), ROOT,
+       "".join("Environment=%s\n" % shlex.quote("%s=%s" % pair) for pair in kept_environment()))
+
+
+def kept_environment():
+    """The config folder setup used, when not the default: the service reads the same config, keys
+    and token as the commands run where it was set up (a login service does not get a variable
+    exported only in a shell's startup file)."""
+    folder = os.environ.get("XDG_CONFIG_HOME")
+    return [("XDG_CONFIG_HOME", folder)] if folder else []
 
 
 def windows_task(argv):
@@ -111,13 +120,16 @@ def launchd_plist(argv):
   <array>
 %s
   </array>
-  <key>WorkingDirectory</key><string>%s</string>
+  <key>WorkingDirectory</key><string>%s</string>%s
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ProcessType</key><string>Interactive</string>
 </dict>
 </plist>
-""" % (LABEL, arguments, escape(str(ROOT)))
+""" % (LABEL, arguments, escape(str(ROOT)), "".join(
+        "\n  <key>EnvironmentVariables</key><dict>%s</dict>" % "".join(
+            "<key>%s</key><string>%s</string>" % (escape(name), escape(value)) for name, value in pairs)
+        for pairs in [kept_environment()] if pairs))
 
 
 def paths():

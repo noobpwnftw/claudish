@@ -159,6 +159,20 @@ async def check(args, home, port):
         await expect(page.locator("#controls")).to_be_visible()
         del lifecycle["unavailable"]
         lifecycle.update(backend="codex", model="warm")
+        # Claude picked but the service cannot switch to it: the radio goes back to what is in use.
+
+        async def refused(route):
+            if route.request.method == "POST" and (route.request.post_data_json or {}).get("choice") == "claude":
+                await route.fulfill(status=400, json={"error": "could not use that, so nothing changed"})
+            else:
+                await subscription_state(route)
+        await page.route("**/settings", refused)
+        await page.reload()
+        await expect(page.locator("#status")).to_have_text("Ready: Codex writes for you.")
+        await page.locator("input[name=choice][value=claude]").check()
+        await expect(page.locator("#model-message")).to_contain_text("nothing changed")
+        await expect(page.locator("input[name=choice][value=codex]")).to_be_checked()
+        await page.unroute("**/settings", refused)
 
         # A late response from the previous model must not overwrite a newer example.
         pending, release = asyncio.Event(), asyncio.Event()

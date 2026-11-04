@@ -1,3 +1,4 @@
+import os
 import plistlib
 import shlex
 import sys
@@ -11,6 +12,16 @@ from claudish import service
 
 
 class ServiceDefinitionTests(unittest.TestCase):
+    def test_the_service_reads_the_config_folder_setup_used(self):
+        with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/home/u/my config"}):
+            unit, plist = service.systemd_unit(["claudish", "serve"]), service.launchd_plist(["claudish", "serve"])
+        self.assertIn("Environment='XDG_CONFIG_HOME=/home/u/my config'\n", unit)
+        self.assertIn("<key>XDG_CONFIG_HOME</key><string>/home/u/my config</string>", plist)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("XDG_CONFIG_HOME", None)
+            self.assertNotIn("XDG_CONFIG_HOME", service.systemd_unit(["claudish", "serve"]))
+            self.assertNotIn("EnvironmentVariables", service.launchd_plist(["claudish", "serve"]))
+
     def test_systemd_unit_quotes_the_command(self):
         argv = ["/opt/py 3/python", "-m", "claudish", "serve", "--profile", "my profile"]
         unit = service.systemd_unit(argv)
