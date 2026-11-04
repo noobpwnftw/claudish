@@ -41,8 +41,9 @@ are missing), clones cd_AI into `~/.local/share/claudish`, makes its own Python 
 links `claudish` into `~/.local/bin`, and runs `claudish setup`. Setup asks for a tone, writes the
 config, registers the input method with IBus, starts the service at every login (a systemd user
 unit), and opens cd_AI's settings in your browser. Then **log out and back in**, and add
-**English → Claudish** in **Settings → Keyboard → Input Sources**. Running the same line
-again updates cd_AI and restarts its service; log out and back in to type with the new version.
+**English → Claudish** in **Settings → Keyboard → Input Sources**. Running a newer release's
+install line updates cd_AI and restarts its service (the line installs the release it names); log
+out and back in to type with the new version.
 
 **By hand**, from a checkout: `sudo apt install ibus python3-gi gir1.2-ibus-1.0`, then
 

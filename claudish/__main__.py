@@ -87,7 +87,10 @@ def main():
     args = parser.parse_args(argv)
     if args.command == "settings":
         from .client import port_of, read_token, settings_url
-        for attempt in range(20):  # just installed, the service may still be starting
+        # Just installed, the service may still be starting: its first start (a fresh Python, a
+        # virus scan) can take as long as setup waits for it.
+        deadline = time.monotonic() + (60 if args.first else 10)
+        while time.monotonic() < deadline:
             sent = read_token(port_of(args.url))
             try:
                 url = settings_url(args.url) + ("&first=1" if args.first else "")
@@ -119,7 +122,7 @@ def main():
             store(accepted_key(value))  # checked with Anthropic first, as in the settings window
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             sys.exit(as_typed("Nothing saved: %s." % exc))
-        print("Saved in %s. cd_AI's service uses it from its next start." % where())
+        print("Saved in %s. cd_AI's service uses it from your next rewrite." % where())
         return
     if args.command == "recent":
         if args.clear:

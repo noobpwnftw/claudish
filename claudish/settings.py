@@ -39,7 +39,43 @@ def command_path(name, extension_glob):
                      key=version_order, reverse=True)  # nvm's npm: the newest node first
     places += sorted((Path(p) for p in glob.glob(str(home / extension_glob))  # the command, not its helpers
                       if Path(p).name in (name, name + ".exe")), key=version_order, reverse=True)
-    return next((str(p) for p in places if p.is_file() and os.access(p, os.X_OK)), None)
+    return next((str(p) for p in places if p.is_file() and os.access(p, os.X_OK)), None) or from_shell(name)
+
+
+SHELL_ANSWERS = {}  # name -> (when, path): the shell asked again after SHELL_SECONDS
+SHELL_SECONDS = 30
+
+
+def from_shell(name):
+    """The command where your own shell finds it: a login service has a short PATH, and node
+    managers (volta, fnm, asdf, mise, ...) put their commands on the shell's. None on Windows, or
+    when the shell does not answer within a few seconds."""
+    if os.name == "nt":
+        return None
+    import time
+    shell_env = os.environ.get("SHELL")
+    asked = SHELL_ANSWERS.get((name, shell_env))
+    if asked and time.monotonic() - asked[0] < SHELL_SECONDS:  # the settings page asks at every look
+        return asked[1]
+    found = ask_shell(name, shell_env)
+    SHELL_ANSWERS[(name, shell_env)] = (time.monotonic(), found)
+    return found
+
+
+def ask_shell(name, shell):
+    import pwd
+    import subprocess
+    shell = shell or pwd.getpwuid(os.getuid()).pw_shell or "/bin/sh"
+    try:
+        done = subprocess.run([shell, "-lic", "command -v %s" % name], stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in reversed(done.stdout.splitlines()):  # after anything the shell's startup files print
+        line = line.strip()
+        if line.startswith("/") and os.path.isfile(line) and os.access(line, os.X_OK):
+            return line
+    return None
 
 
 def version_order(path):

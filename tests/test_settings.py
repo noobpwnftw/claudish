@@ -505,6 +505,24 @@ class OpenTests(unittest.TestCase):
 
 
 
+class FromShellTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "a POSIX shell")
+    def test_the_shell_says_where_a_node_managers_command_is(self):
+        with tempfile.TemporaryDirectory() as folder:
+            claude = Path(folder, "claude")
+            claude.write_text("#!/bin/sh\n")
+            claude.chmod(0o755)
+            shell = Path(folder, "shell")  # prints startup noise, then where the command is
+            shell.write_text("#!/bin/sh\necho 'Welcome back'\necho %s\n" % claude)
+            shell.chmod(0o755)
+            with patch.dict(os.environ, {"SHELL": str(shell)}), patch.dict(settings.SHELL_ANSWERS, clear=True):
+                self.assertEqual(settings.from_shell("claude"), str(claude))
+                shell.write_text("#!/bin/sh\necho 'claude not found'\n")
+                self.assertEqual(settings.from_shell("claude"), str(claude))  # asked again only after a while
+                settings.SHELL_ANSWERS.clear()
+                self.assertIsNone(settings.from_shell("claude"))
+
+
 class LocatedTests(unittest.TestCase):
     def test_a_moved_cli_is_found_again_and_anything_else_stays_as_given(self):
         with tempfile.TemporaryDirectory() as folder, \

@@ -37,5 +37,29 @@ class ServeTests(unittest.TestCase):
         self.assertIn("home folder", served[0].problem)
 
 
+class SavedKeyTests(unittest.TestCase):
+    def test_a_key_saved_with_claudish_key_is_taken_up_without_a_restart(self):
+        import os
+        import threading
+        from urllib.request import urlopen
+        from claudish.server import make_server
+        fresh, built = Rewriter("rules"), []
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text("{}")
+            server = make_server(Rewriter("rules"), 0, reload=lambda: built.append(1) or fresh, config_path=path)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+            try:
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertEqual(built, [])  # nothing changed
+                Path(folder, "anthropic.key").write_text("sk-ant-test")
+                os.utime(Path(folder, "anthropic.key"), ns=(1, 1))
+                urlopen("http://127.0.0.1:%d/health" % server.server_port, timeout=5).close()
+                self.assertEqual(built, [1])  # the next request builds the backend again, with the key
+            finally:
+                server.shutdown()
+                server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

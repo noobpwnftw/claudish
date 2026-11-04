@@ -118,11 +118,12 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         stamps[0] = read
 
     def stamp():
-        """When the config folder's JSON files (config.json, templates.json) and the templates files
-        its profiles name (in a folder of their own too) last changed."""
+        """When the config folder's JSON files (config.json, templates.json), its saved keys
+        (`claudish key`), and the templates files its profiles name (in a folder of their own too)
+        last changed."""
         path = config_path or _config_default()
         try:
-            watched = set(path.parent.glob("*.json"))
+            watched = set(path.parent.glob("*.json")) | set(path.parent.glob("*.key"))
         except OSError:
             return ()
         try:
