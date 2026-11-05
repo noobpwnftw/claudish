@@ -152,8 +152,12 @@ def claude_said(handle):
         if entry.get("type") != "assistant":
             continue
         last = entry.get("timestamp") or last
-        for block in (entry.get("message") or {}).get("content") or []:
-            if block.get("type") == "text" and block.get("text", "").strip():
+        message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+        content = message.get("content")
+        for block in content if isinstance(content, list) else []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text" and isinstance(block.get("text"), str) and block["text"].strip():
                 said.append(block["text"].strip()[:400])
             elif block.get("type") == "tool_use":
                 said.append("(used %s)" % block.get("name", "a tool"))
@@ -165,9 +169,14 @@ def codex_said(handle):
     messages mention the note (its id is Codex's own)."""
     import glob
     root = os.path.join(os.path.expanduser("~"), ".codex", "sessions")
-    for path in sorted(glob.glob(os.path.join(root, "*", "*", "*", "rollout-*.jsonl")), key=os.path.getmtime,
+    def modified(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:  # gone since it was listed
+            return 0
+    for path in sorted(glob.glob(os.path.join(root, "*", "*", "*", "rollout-*.jsonl")), key=modified,
                        reverse=True)[:20]:
-        if os.path.getmtime(path) < handle["started"] - 60:
+        if modified(path) < handle["started"] - 60:
             break
         try:
             with open(path, encoding="utf-8") as source:
@@ -179,12 +188,14 @@ def codex_said(handle):
             continue
         said, last = [], None
         for entry in jsonl(path):
-            payload = entry.get("payload") or {}
+            payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
             if entry.get("type") == "response_item" and payload.get("type") == "message" \
                     and payload.get("role") == "assistant":
                 last = entry.get("timestamp") or last
-                said += [part["text"].strip()[:400] for part in payload.get("content") or []
-                         if part.get("type") == "output_text" and part.get("text", "").strip()]
+                content = payload.get("content")
+                said += [part["text"].strip()[:400] for part in (content if isinstance(content, list) else [])
+                         if isinstance(part, dict) and part.get("type") == "output_text"
+                         and isinstance(part.get("text"), str) and part["text"].strip()]
         return said, last
     return [], None
 
@@ -198,19 +209,24 @@ def tmux_pane(name):
     return done.stdout if done.returncode == 0 else ""
 
 
-def jsonl(path, lines=400):
+def jsonl(path, lines=400, tail=1 << 20):
+    """The transcript's last entries (objects only), from its last tail bytes: a long session is not
+    read whole at every check, and a line half written as it is read is skipped."""
     import json
     try:
-        with open(path, encoding="utf-8") as source:
-            tail_lines = source.readlines()[-lines:]
+        with open(path, "rb") as source:
+            source.seek(max(0, source.seek(0, os.SEEK_END) - tail))
+            tail_lines = source.read().decode("utf-8", errors="replace").splitlines()[-lines:]
     except OSError:
         return []
     entries = []
     for line in tail_lines:
         try:
-            entries.append(json.loads(line))
+            entry = json.loads(line)
         except ValueError:
-            pass
+            continue
+        if isinstance(entry, dict):
+            entries.append(entry)
     return entries
 
 

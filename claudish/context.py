@@ -120,27 +120,83 @@ class Provider:
 
     def read(self):
         if self.kind == "file":
-            return self.path.read_text(encoding="utf-8", errors="replace")
+            return read_file(self.path, READ_LIMIT)
         if self.kind == "mcp":
             return read_mcp(self)
         # A list of arguments, no shell: the command is exactly what the config says.
-        result = subprocess.run(self.command, capture_output=True, text=True, errors="replace",
-                                timeout=self.timeout, cwd=self.cwd)
-        if result.returncode != 0:
-            raise RuntimeError("exit status %d: %s" % (result.returncode, result.stderr.strip()[-200:]))
-        return result.stdout
+        return run_bounded(self.command, self.timeout, self.cwd, READ_LIMIT)
 
     def get(self):
         """Cached text, or an error note: a failed provider must not block the rewrite."""
         with self.lock:
             if time.monotonic() >= self.expires:
                 try:
-                    self.cached = self.read().strip()
+                    self.cached, self.error = self.read().strip(), None
                 except (OSError, RuntimeError, TimeoutError, subprocess.TimeoutExpired) as exc:
                     self.cached = None
                     self.error = str(exc)
                 self.expires = time.monotonic() + self.ttl
             return self.cached
+
+
+READ_LIMIT = 256 * 1024  # bytes read from a file or a command: far more than any request sends
+
+
+def read_file(path, limit):
+    """A regular file's first limit bytes, as text: never a FIFO or a device, which would wait (or
+    never end) with the request waiting on it."""
+    import stat
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+    with os.fdopen(descriptor, "rb") as file:
+        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):
+            raise OSError("%s is not a regular file" % path)
+        return file.read(limit).decode("utf-8", errors="replace")
+
+
+def run_bounded(argv, timeout, cwd, limit):
+    """A command's output (its first limit bytes), within timeout: in a process group of its own,
+    ended with everything it started, so neither a child left in the background nor endless output
+    holds the request."""
+    windows = os.name == "nt"
+    process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               cwd=cwd, start_new_session=not windows,
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if windows else 0)
+    out, err = [], []
+    readers = [threading.Thread(target=lambda: out.append(process.stdout.read(limit)), daemon=True),
+               threading.Thread(target=lambda: err.append(process.stderr.read(4096)), daemon=True)]
+    for reader in readers:
+        reader.start()
+    deadline = time.monotonic() + timeout
+    try:
+        while process.poll() is None and readers[0].is_alive():  # running, and still writing what we read
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(argv, timeout)
+            time.sleep(0.02)
+    finally:
+        end_group(process, windows)
+        for reader in readers:
+            reader.join(1)
+    text = (out[0] if out else b"").decode("utf-8", errors="replace")
+    if process.returncode not in (0, None) and not (out and len(out[0]) >= limit):  # cut at the limit: ours, not its failure
+        said = (err[0] if err else b"").decode("utf-8", errors="replace")
+        raise RuntimeError("exit status %d: %s" % (process.returncode, said.strip()[-200:]))
+    return text
+
+
+def end_group(process, windows):
+    """The command and whatever it started; then it is waited for."""
+    try:
+        if windows:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, timeout=5)
+        else:
+            import signal
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass  # all ended already
+    try:
+        process.wait(5)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def connector(provider):
@@ -216,9 +272,10 @@ class Context:
         self.providers = [Provider(spec, base, servers) for spec in specs]
         self.max_chars = max_chars
 
-    def sections(self, extra=()):
+    def sections(self, extra=(), failed=None):
         """[(name, text)]: what the providers (and the app's bindings, extra) contribute, within
-        max_chars. The text around the caret is not one of them: the text box describes it."""
+        max_chars. The text around the caret is not one of them: the text box describes it.
+        failed: a list that gets (name, why) for each provider that could not be read."""
         found, budget = [], self.max_chars
         for provider in list(self.providers) + list(extra):
             if budget <= 0:
@@ -227,6 +284,8 @@ class Context:
             if text:
                 found.append((provider.name, text[:budget]))
                 budget -= len(text[:budget])
+            elif text is None and failed is not None:
+                failed.append((provider.name, getattr(provider, "error", None) or "unavailable"))
         return found
 
 

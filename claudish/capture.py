@@ -19,7 +19,7 @@ class CaptureError(RuntimeError):
 
 
 def png_size(data):
-    if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
         raise CaptureError("the capture is not a PNG")
     return struct.unpack(">II", data[16:24])
 

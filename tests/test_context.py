@@ -333,3 +333,63 @@ class ModeRoutingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BoundedProviderTests(unittest.TestCase):
+    """A provider never holds a request: not a FIFO, not a command's background child, not endless output."""
+
+    def test_a_fifo_is_refused_at_once(self):
+        import os
+        import time
+        from claudish.context import Provider
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("no FIFOs here")
+        with tempfile.TemporaryDirectory() as folder:
+            fifo = Path(folder, "pipe")
+            os.mkfifo(fifo)
+            provider = Provider({"type": "file", "path": str(fifo)}, Path(folder))
+            started = time.monotonic()
+            self.assertIsNone(provider.get())
+            self.assertLess(time.monotonic() - started, 1)
+            self.assertIn("not a regular file", provider.error)
+
+    @unittest.skipIf(sys.platform == "win32", "a POSIX shell")
+    def test_a_commands_background_child_ends_with_it_and_its_output_stays(self):
+        import os
+        import time
+        from claudish.context import Provider
+        with tempfile.TemporaryDirectory() as folder:
+            pidfile = Path(folder, "pid")
+            provider = Provider({"type": "command", "timeout": 3,
+                                 "command": ["sh", "-c", "echo hi; sleep 30 & echo $! > %s" % pidfile]}, Path(folder))
+            started = time.monotonic()
+            self.assertEqual(provider.get(), "hi")
+            self.assertLess(time.monotonic() - started, 2)
+            time.sleep(0.2)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)  # ended with its command
+
+    @unittest.skipIf(sys.platform == "win32", "a POSIX shell")
+    def test_endless_output_is_cut_not_buffered(self):
+        from claudish.context import READ_LIMIT, Provider
+        provider = Provider({"type": "command", "timeout": 5, "command": ["yes"]}, Path("."))
+        text = provider.get()
+        self.assertTrue(text and len(text) <= READ_LIMIT)
+
+    def test_a_provider_that_could_not_be_read_is_said(self):
+        from claudish.context import Context
+        failed = []
+        found = Context([{"type": "file", "path": "/no/such/notes.md", "name": "notes"}]).sections(failed=failed)
+        self.assertEqual(found, [])
+        self.assertEqual([name for name, _ in failed], ["notes"])
+
+
+class TranscriptTests(unittest.TestCase):
+    def test_a_helpers_transcript_with_odd_lines_still_reads(self):
+        from claudish.handoff import jsonl
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "s.jsonl")
+            path.write_bytes(b'"done"\n{"type": "assistant", "message": {"content": "plain"}}\n'
+                             b'{"type": "assistant", "message": {"content": [{"type": "text", "text": "ok"}]}}\n\xe9')
+            entries = jsonl(str(path))
+        self.assertEqual(len(entries), 2)  # the objects; the string and the half-written line skipped

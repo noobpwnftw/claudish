@@ -398,14 +398,15 @@ class Rewriter:
             self.routed[name] = other
         return self.routed[name]
 
-    def sections(self, app=None):
-        """The profile's context and the focused app's bindings (a supported text box): [(name, text)]."""
+    def sections(self, app=None, failed=None):
+        """The profile's context and the focused app's bindings (a supported text box): [(name, text)];
+        failed gets (name, why) for those that could not be read."""
         extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
         if not (self.context or extra):
             return []
         from .context import Context
         # The profile's own limit, also over the service's bindings a routed profile gets.
-        return (self.context or Context(max_chars=self.max_context_chars)).sections(extra)
+        return (self.context or Context(max_chars=self.max_context_chars)).sections(extra, failed)
 
     def box(self, mode, app=None, purpose=None, before="", after="", look=False, screen=None, trusted=True):
         """The text box this request is for, with what its mode calls for observed. screen: a

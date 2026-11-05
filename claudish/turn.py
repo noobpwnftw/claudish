@@ -98,8 +98,11 @@ def observe(rewriter, box, mode, look=False, screen=None):
     """Run the observers this request calls for: the profile's context and the app's bindings, a
     terminal's screen (for compose, never for continue's pauses; screen: given instead of read),
     and a picture of the window (F8, with an instruction)."""
-    for name, text in rewriter.sections(box.app):
+    failed = []
+    for name, text in rewriter.sections(box.app, failed):
         box.observe(name, text)
+    for name, why in failed:  # left out, and said: the answer came without it
+        box.consulted.append("%s (unavailable: %s)" % (name, why))
     if box.kind == "terminal" and mode != "continue" and (rewriter.read_terminal or screen):
         if screen is None:
             from .screen import read
