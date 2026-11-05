@@ -84,6 +84,41 @@ class ToolLoopTests(unittest.TestCase):
             Toolbox([{"server": "notes", "allow": []}], SERVER)  # an unknown key
 
 
+class StartupBudgetTests(unittest.TestCase):
+    """Servers that never answer: the one time budget covers starting them, and the rest are left out."""
+
+    def test_servers_that_never_start_share_one_budget(self):
+        import tempfile
+        import time
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        from claudish.tools import Toolbox
+        with tempfile.TemporaryDirectory() as folder:
+            silent = Path(folder, "silent.py")
+            silent.write_text("import sys\nfor line in sys.stdin:\n    pass\n")
+            servers = {name: {"command": sys.executable, "args": [str(silent)]} for name in ("a", "b", "c")}
+            started = time.monotonic()
+            text, consulted, _ = Toolbox(["a", "b", "c"], servers, timeout=1).run(
+                lambda messages, tools: {"content": "answered"}, [{"role": "user", "content": "hi"}])
+        self.assertEqual(text, "answered")
+        self.assertLess(time.monotonic() - started, 2.5)  # not a budget per server (3 s and more)
+        self.assertEqual(consulted[1:], ["b (unavailable: no time left)", "c (unavailable: no time left)"])
+
+
+class ResultTests(unittest.TestCase):
+    def test_what_is_not_text_says_what_it_was(self):
+        from types import SimpleNamespace as Block
+        from claudish.tools import said
+        self.assertEqual(said(Block(type="text", text="hi")), "hi")
+        self.assertEqual(said(Block(type="image", data="", mime_type="image/png")), "[image omitted (image/png)]")
+        self.assertEqual(said(Block(type="resource", resource=Block(uri="file:///a", text="the body"))), "the body")
+        self.assertEqual(said(Block(type="resource", resource=Block(uri="file:///b", blob="AA=="))),
+                         "[binary resource file:///b]")
+        self.assertEqual(said(Block(type="resource_link", uri="file:///c")), "[resource file:///c]")
+
+
 class RewriterTests(unittest.TestCase):
     def setUp(self):
         try:

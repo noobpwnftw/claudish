@@ -8,6 +8,8 @@ in "consulted", the loop is bounded in steps and time, and the result is still o
 Claudish's own read-only tools (the text box) join them, with or without MCP.
 """
 import json
+import re
+import threading
 import time
 
 from .context import Provider
@@ -78,6 +80,7 @@ class Toolbox:
             words = TEMPLATES["box"]
         from contextlib import ExitStack
         consulted, kinds, callers, offered, questions = [], {}, {}, [], {}
+        origins = {}  # an offered name -> (server, tool) as the server names them
         spent = 0.0  # model and tool time; waiting for your answer does not count
 
         def timed(call, *args):
@@ -93,6 +96,11 @@ class Toolbox:
                 "name": name, "description": (description or "").strip()[:500],
                 "parameters": parameters or {"type": "object", "properties": {}}}})
 
+        def offered_name(name):
+            """A name the model APIs take (letters, digits, _ and -, at most 64): an MCP tool's own
+            name may have dots or be longer; the call still reaches it (callers)."""
+            return re.sub(r"[^A-Za-z0-9_-]", "_", name)[:64]
+
         for name, spec in (local or {}).items():
             description, parameters, function = spec[:3]
             kind = spec[3] if len(spec) > 3 else "read"
@@ -101,14 +109,18 @@ class Toolbox:
             kinds[name], callers[name] = kind, function
             questions[name] = spec[4] if len(spec) > 4 else None
             offer(name, description, parameters)
-        with ExitStack() as stack:
+        stack = ExitStack()
+        try:
             if self.servers:
                 from anyio.from_thread import start_blocking_portal
                 portal = stack.enter_context(start_blocking_portal())
                 for name, trust, deny, provider in self.servers:
-                    limit = max(1.0, self.timeout - spent)
+                    if spent >= self.timeout:  # the budget went on starting the others: left out, and said
+                        consulted.append("%s (unavailable: no time left)" % name)
+                        continue
+                    limit = max(1.0, self.timeout - spent)  # starting counts: every server within the one budget
                     try:  # a server that does not start is left out, as a context provider is
-                        session = stack.enter_context(portal.wrap_async_context_manager(opened(provider, limit)))
+                        session = timed(stack.enter_context, portal.wrap_async_context_manager(opened(provider, limit)))
                         tools = timed(portal.call, listed, session, max(1.0, self.timeout - spent))
                     except Exception as exc:
                         consulted.append("%s (unavailable: %s)" % (name, type(exc).__name__))
@@ -117,10 +129,10 @@ class Toolbox:
                         kind = classify(tool, trust, deny)
                         if kind == "denied" or (kind != "read" and approve is None):
                             continue  # side effects are only offered when someone can approve them
-                        full = name + SEPARATOR + tool.name
+                        full = offered_name(name + SEPARATOR + tool.name)
                         if full in kinds:
-                            continue  # Claudish's own tools come first
-                        kinds[full] = kind
+                            continue  # Claudish's own tools come first (and a name taken once stays its first tool's)
+                        kinds[full], origins[full] = kind, (name, tool.name)
                         callers[full] = (lambda arguments, session=session, tool=tool.name: timed(
                             portal.call, called, session, tool, arguments, max(1.0, self.timeout - spent)))
                         offer(full, tool.description, field(tool, "input_schema"))
@@ -134,7 +146,9 @@ class Toolbox:
                 messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
                 for call in calls:
                     function = call.get("function") or {}
-                    server, _, tool = (function.get("name") or "").partition(SEPARATOR)
+                    server, _, tool = origins.get(function.get("name")) and (
+                        origins[function["name"]][0], None, origins[function["name"]][1]) or \
+                        (function.get("name") or "").partition(SEPARATOR)
                     kind = kinds.get(function.get("name"))
                     try:
                         arguments = json.loads(function.get("arguments") or "{}")
@@ -161,8 +175,11 @@ class Toolbox:
                             except (Finished, Cancelled):
                                 raise
                             except Exception as exc:  # a failed tool is information for the model
-                                result = "error: %s" % (exc,)
+                                result = "error: %s" % (str(exc) or type(exc).__name__)  # a timeout says nothing itself
                     messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
+        finally:
+            # The servers end after the answer is back, not before it (each may take seconds to go).
+            threading.Thread(target=stack.close).start()  # not a daemon: a program that exits next waits for it
         raise RuntimeError("the tool loop did not finish")
 
 
@@ -203,5 +220,23 @@ async def called(session, tool, arguments, limit):
     import anyio
     with anyio.fail_after(limit):
         outcome = await session.call_tool(tool, arguments)
-    text = "\n".join(block.text for block in outcome.content if getattr(block, "type", "") == "text")
+    text = "\n".join(filter(None, (said(block) for block in outcome.content or [])))
+    if not text and field(outcome, "structured_content") is not None:
+        text = json.dumps(field(outcome, "structured_content"), ensure_ascii=False)
     return "error: " + text if field(outcome, "is_error") else text
+
+
+def said(block):
+    """A tool result's block as text for the model: what is not text says what it was."""
+    kind = getattr(block, "type", "")
+    if kind == "text":
+        return block.text
+    if kind == "resource":
+        resource = getattr(block, "resource", None)
+        text = getattr(resource, "text", None)
+        return text if isinstance(text, str) else "[binary resource %s]" % getattr(resource, "uri", "")
+    if kind == "resource_link":
+        return "[resource %s]" % getattr(block, "uri", "")
+    if kind in ("image", "audio"):
+        return "[%s omitted (%s)]" % (kind, field(block, "mime_type") or "")
+    return ""
