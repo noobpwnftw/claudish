@@ -24,6 +24,12 @@ def field(item, name):
     return getattr(item, name, None) or getattr(item, head + "".join(part.title() for part in rest), None)
 
 
+def api_name(name):
+    """A name as tool APIs take it: letters, digits, _ and -, the rest as _ (an MCP tool's own name
+    may have dots; Claude Code names a server's tools this way too)."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", name)
+
+
 def parse(spec):
     """A "tools" entry -> (server name, trusted tool names, denied tool names)."""
     if isinstance(spec, str):
@@ -96,10 +102,6 @@ class Toolbox:
                 "name": name, "description": (description or "").strip()[:500],
                 "parameters": parameters or {"type": "object", "properties": {}}}})
 
-        def offered_name(name):
-            """A name the model APIs take (letters, digits, _ and -, at most 64): an MCP tool's own
-            name may have dots or be longer; the call still reaches it (callers)."""
-            return re.sub(r"[^A-Za-z0-9_-]", "_", name)[:64]
 
         for name, spec in (local or {}).items():
             description, parameters, function = spec[:3]
@@ -129,7 +131,7 @@ class Toolbox:
                         kind = classify(tool, trust, deny)
                         if kind == "denied" or (kind != "read" and approve is None):
                             continue  # side effects are only offered when someone can approve them
-                        full = offered_name(name + SEPARATOR + tool.name)
+                        full = api_name(name + SEPARATOR + tool.name)[:64]  # the call still reaches it (callers)
                         if full in kinds:
                             continue  # Claudish's own tools come first (and a name taken once stays its first tool's)
                         kinds[full], origins[full] = kind, (name, tool.name)

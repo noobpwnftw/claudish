@@ -11,7 +11,6 @@ session id. Message shapes follow the Agent SDK's control protocol
 """
 import json
 import os
-import re
 import subprocess
 import tempfile
 import threading
@@ -36,7 +35,8 @@ def summarize(tool, arguments):
 
 def wire_prefix(server):
     """How Claude Code names an MCP server's tools: mcp__<server>__, the name's other characters as _."""
-    return "mcp__%s__" % re.sub(r"[^A-Za-z0-9_-]", "_", server)
+    from .tools import api_name
+    return "mcp__%s__" % api_name(server)
 
 
 class AgentProcess:
