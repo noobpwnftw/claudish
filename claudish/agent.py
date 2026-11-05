@@ -11,6 +11,7 @@ session id. Message shapes follow the Agent SDK's control protocol
 """
 import json
 import os
+import re
 import subprocess
 import tempfile
 import threading
@@ -31,6 +32,11 @@ def summarize(tool, arguments):
         if isinstance(arguments.get(key), str):
             return "%s: %s" % (tool, arguments[key][:120])
     return tool
+
+
+def wire_prefix(server):
+    """How Claude Code names an MCP server's tools: mcp__<server>__, the name's other characters as _."""
+    return "mcp__%s__" % re.sub(r"[^A-Za-z0-9_-]", "_", server)
 
 
 class AgentProcess:
@@ -74,7 +80,8 @@ class AgentProcess:
         self.process = spawn(self.command + session, "the agent session", job=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                              bufsize=1, env=with_own_folder(self.command[0]))
-        self.started = True
+        # started (--resume from now on) once the agent has answered a turn (turn()): a process
+        # that dies before saved no session, and resuming one that does not exist fails every time.
         self.stderr = []
         threading.Thread(target=lambda process=self.process: self.stderr.extend(process.stderr), daemon=True).start()
         self.request({"subtype": "initialize", "hooks": None})
@@ -158,18 +165,20 @@ class ClaudeCodeDriver:
         self.agent.send(message)
 
     def run(self, session, prompt):
-        with self.agent.turn_lock:
-            if self.cancelled:  # Esc while an earlier turn of this conversation still ran
-                return
-            self.agent.ensure()
-            self.agent.turns += 1
-            self.agent.running = True
-            try:
-                self.turn(session, prompt)
-            finally:
-                self.agent.running = False
-        if self.own:
-            self.agent.close()
+        try:
+            with self.agent.turn_lock:
+                if self.cancelled:  # Esc while an earlier turn of this conversation still ran
+                    return
+                self.agent.ensure()
+                self.agent.turns += 1
+                self.agent.running = True
+                try:
+                    self.turn(session, prompt)
+                finally:
+                    self.agent.running = False
+        finally:
+            if self.own:  # a process for this turn only ends with it, also when the turn failed
+                self.agent.close()
 
     def watch(self, session, over):
         """The turn's time limit, which your waiting does not count: while a question waits for
@@ -204,7 +213,11 @@ class ClaudeCodeDriver:
                     message = json.loads(line)
                 except ValueError:
                     continue
+                if not isinstance(message, dict):  # JSON, but not a message
+                    continue
                 kind = message.get("type")
+                if kind in ("system", "result", "assistant"):
+                    self.agent.started = True  # its session is saved: the next process resumes it
                 if kind == "control_request":
                     self.question(session, message)
                 elif kind == "system" and message.get("subtype") == "permission_denied":
@@ -212,7 +225,9 @@ class ClaudeCodeDriver:
                     session.emit("progress", text="%s: not allowed by the agent's settings"
                                  % message.get("tool_name", "a tool"))
                 elif kind == "control_cancel_request":
+                    # Withdrawn: not waited for (the turn's time runs again); an answer to it is ignored.
                     self.pending.pop(message.get("request_id"), None)
+                    self.asks.pop(message.get("request_id"), None)
                 elif kind == "stream_event":
                     event = message.get("event") or {}
                     delta = event.get("delta") or {}
@@ -251,7 +266,10 @@ class ClaudeCodeDriver:
                 "subtype": "error", "request_id": request_id, "error": "not supported by this host"}})
             return
         name = body.get("tool_name") or ""
-        server, _, tool = name.partition("__")[2].partition("__")
+        # Claude Code names a server's tools mcp__<server>__<tool>, the server's name with anything
+        # but letters, digits, _ and - as _: matched that way, not split at "__" (a server "notes_").
+        server, tool = next(((each, name[len(wire_prefix(each)):]) for each in sorted(self.policy, key=len, reverse=True)
+                             if name.startswith(wire_prefix(each))), ("", name.partition("__")[2].partition("__")[2]))
         trust, deny = self.policy.get(server, ((), ()))
         if name.startswith("mcp__") and tool in deny:
             self.decide(request_id, {"behavior": "deny", "message": self.words["denied"]})

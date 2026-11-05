@@ -480,7 +480,8 @@ class Rewriter:
 
     def agent_arguments(self):
         """Extra agent CLI arguments from the policy: denied tools are never offered."""
-        denied = ["mcp__%s__%s" % (server, tool) for server, (_, deny) in (self.toolbox.policy().items()
+        from .agent import wire_prefix
+        denied = [wire_prefix(server) + tool for server, (_, deny) in (self.toolbox.policy().items()
                                                                           if self.toolbox else ()) for tool in sorted(deny)]
         return ["--disallowedTools", ",".join(denied)] if denied else []
 
