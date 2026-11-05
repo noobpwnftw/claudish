@@ -165,7 +165,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             pass
 
         def reply(self, code, data):
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            # errors="replace": text that is not Unicode (a lone surrogate) never drops the reply
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8", errors="replace")
             self.send_body(code, body, "application/json; charset=utf-8")
 
         def send_body(self, code, body, content_type):
@@ -219,6 +220,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                 data = None
             if not isinstance(data, dict):
                 return self.reply(400, {"error": "expected a JSON object"})
+            try:  # a lone surrogate ("\ud800") is valid JSON but not text: refused before it is kept
+                json.dumps(data, ensure_ascii=False).encode("utf-8")
+            except UnicodeEncodeError:
+                return self.reply(400, {"error": "the text is not valid Unicode (half an emoji?)"})
             return data
 
         def post_session(self):
@@ -354,8 +359,11 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     return self.reply(403, {"error": "the service token is required"})
                 from .model import RECENT_SECONDS
                 import time as clock
-                while rewriter.recent and clock.time() - rewriter.recent[0]["time"] > RECENT_SECONDS:
-                    rewriter.recent.popleft()
+                try:  # two readers at once may both drop the oldest
+                    while clock.time() - rewriter.recent[0]["time"] > RECENT_SECONDS:
+                        rewriter.recent.popleft()
+                except IndexError:
+                    pass
                 return self.reply(200, {"recent": list(rewriter.recent)})
             if self.path == "/health":
                 return self.reply(200, self.health())

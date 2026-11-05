@@ -342,7 +342,7 @@ def apply(changes, path=None):
             model = models[0]
         entry = profiles.setdefault("server", dict(config.STARTER["profiles"]["server"]))
         entry.update(model_url=url.strip().rstrip("/"), model=model.strip())
-    if "choice" in changes and changes["choice"] not in CHOICES:
+    if "choice" in changes and not (isinstance(changes["choice"], str) and changes["choice"] in CHOICES):
         raise ValueError("unknown choice")
     if changes.get("choice") == "server" or ("server" in changes and in_use(data) == "server"):
         server = profiles.get("server") or config.STARTER["profiles"]["server"]

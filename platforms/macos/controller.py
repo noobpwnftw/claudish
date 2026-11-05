@@ -87,6 +87,11 @@ def substring(client, location, length):
 
 RETURN_KEYS = (36, 76)  # Return, keypad Enter
 NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
+def whole(text):
+    """Text without a lone UTF-16 surrogate (half an emoji cut at a range's edge)."""
+    return "".join(char for char in text if not 0xD800 <= ord(char) <= 0xDFFF)
+
+
 def selection(client):
     """The text box's selection (location, length), or None when the app does not say."""
     try:
@@ -509,7 +514,8 @@ class ClaudishInputController(IMKInputController):
                 return "", ""
             start = max(0, location - AROUND)
             end = min(total, location + length)
-            return text(start, location - start), text(end, min(AROUND, total - end))
+            # Counted in UTF-16 units, a window's edge can split an emoji: its lone half is not text.
+            return (whole(text(start, location - start)), whole(text(end, min(AROUND, total - end))))
         except Exception:  # not every client implements these
             return "", ""
 

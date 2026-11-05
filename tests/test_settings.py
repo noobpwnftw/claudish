@@ -481,6 +481,10 @@ class ServiceTests(Home):
         self.assertIn("could not save that", answer["error"])
         self.assertEqual(keys.stored(), "sk-ant-earlier")
 
+    def test_a_choice_that_is_not_a_name_is_refused(self):
+        for choice in ([], {}, 5):
+            self.assertEqual(self.call("/settings", {"choice": choice})[0], 400)
+
     def test_a_slow_model_change_keeps_a_concurrent_tone_change(self):
         from concurrent.futures import ThreadPoolExecutor, TimeoutError
         config.write_starter()

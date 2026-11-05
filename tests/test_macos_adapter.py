@@ -979,3 +979,10 @@ class MacOSAdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HalfEmojiTests(unittest.TestCase):
+    def test_a_window_edge_through_an_emoji_drops_its_half(self):
+        whole = load_adapter().whole
+        self.assertEqual(whole("\udc4d fine \ud83d"), " fine ")
+        self.assertEqual(whole("thumbs 👍"), "thumbs 👍")

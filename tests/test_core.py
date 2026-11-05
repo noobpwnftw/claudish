@@ -405,6 +405,7 @@ class ServiceTests(unittest.TestCase):
             ({"text": "x" * 513}, {}, 400),
             ([], {}, 400),
             ({"text": "hello", "again": "no"}, {}, 400),
+            ({"text": "hi \ud800 there"}, {}, 400),  # half an emoji: not text, refused, never a dropped reply
             ({"text": "hello"}, {"Origin": "http://example.com"}, 403),
         ]:
             req = Request(self.url + "/suggest", data=json.dumps(body).encode(),
