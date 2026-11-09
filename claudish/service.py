@@ -192,7 +192,25 @@ def plan(action, extra=()):
     raise SystemExit("no service manager support for %s" % system)
 
 
+NO_SYSTEMD = ("no systemd user manager here (OpenRC, runit, WSL or a container without it): run "
+              "`claudish serve` from what starts your programs at login")
+
+
+def systemd_user():
+    """Whether this session has a systemd user manager to run the service (systemctl --user)."""
+    import shutil
+    if not shutil.which("systemctl"):
+        return False
+    try:
+        return subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True,
+                              timeout=5).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def run(action, extra=(), dry_run=False):
+    if platform.system() == "Linux" and action == "install" and not dry_run and not systemd_user():
+        raise SystemExit(NO_SYSTEMD)  # nothing written: a unit no manager reads would look installed
     steps = plan(action, extra)
     for description, kind, payload in steps:
         if dry_run:
@@ -239,6 +257,8 @@ def managed():
     system = platform.system()
     try:
         if system == "Linux":
+            if not systemd_user():
+                return "skip", NO_SYSTEMD
             if not paths()["Linux"].is_file():
                 return "warn", "not managed: it will not start at login"
             # Whether it starts at login: enabled (whether it runs now is the Service row's).

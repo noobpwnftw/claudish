@@ -201,9 +201,14 @@ def check_ime_linux():
     if engine and not Path(engine).is_file():
         results.append(("Input method", "fail", "the registered engine %s no longer exists (moved checkout?)" % engine,
                         "/usr/bin/python3 %s" % shlex.quote(str(INSTALL_PY))))
+    elif engine and Path(engine).resolve() != (INSTALL_PY.parent / "engine.py").resolve():
+        # Another checkout's (a clone, then the one-line install): the input method would type with
+        # that code while the service runs this one's.
+        results.append(("Input method", "fail", "registered from another checkout: %s" % engine,
+                        "/usr/bin/python3 %s   (then log out and back in)" % shlex.quote(str(INSTALL_PY))))
     else:
         results.append(("Input method", "ok", "registered (%s)" % component, None))
-    if component == user:
+    if component == user and not system.is_file():  # (--system: IBus sees it anyway)
         path = os.environ.get("IBUS_COMPONENT_PATH", "")
         if str(user.parent) not in path.split(":"):
             environment = Path.home() / ".config/environment.d/90-claudish-ibus.conf"  # systemd's own folder (install.py)

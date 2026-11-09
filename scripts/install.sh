@@ -5,6 +5,10 @@
 # and runs `claudish setup`, which ends in cd_AI's settings (the key, the tone). A missing system
 # package is named, with the line to install it.
 set -e
+if [ "$(id -u)" = 0 ]; then  # sudo: it would all go to root's home, not your session's
+  echo "Run this as yourself, without sudo: cd_AI installs into your own home and session."
+  exit 1
+fi
 home=${CLAUDISH_HOME:-$HOME/.local/share/claudish}
 ref=${CLAUDISH_REF:-v0.4.3}  # the release this script belongs to
 
@@ -12,6 +16,13 @@ missing=""
 command -v git > /dev/null || missing="$missing git"
 command -v python3 > /dev/null || missing="$missing python3"
 python3 -c "import venv, ensurepip" 2> /dev/null || missing="$missing python3-venv"
+for python in python3 /usr/bin/python3; do  # cd_AI's environment, and the input method's (the system's)
+  if command -v "$python" > /dev/null && ! "$python" -c "import sys; sys.exit(sys.version_info < (3, 10))"; then
+    echo "cd_AI needs Python 3.10 or newer; $python is $("$python" -c 'import platform; print(platform.python_version())')."
+    echo "Ubuntu 22.04, Debian 12, Fedora 36 and later have it."
+    exit 1
+  fi
+done
 /usr/bin/python3 -c "import gi; gi.require_version('IBus', '1.0')" 2> /dev/null || missing="$missing ibus python3-gi gir1.2-ibus-1.0"
 if [ -n "$missing" ]; then
   echo "cd_AI needs:$missing"

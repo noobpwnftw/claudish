@@ -27,6 +27,7 @@ class LinuxChecks(unittest.TestCase):
         engine.write_text("")
         self.xml = '<exec>/usr/bin/python3 &quot;%s&quot; --ibus</exec>' % engine
         patches = [patch.object(Path, "home", return_value=self.home),
+                   patch("claudish.doctor.INSTALL_PY", self.home / "install.py"),  # this checkout: its engine.py
                    patch("claudish.doctor.shutil.which", return_value="/usr/bin/ibus-daemon"),
                    patch("claudish.doctor.subprocess.run",
                          return_value=subprocess.CompletedProcess([], 0, "  claudish - cd_AI", ""))]
@@ -62,6 +63,16 @@ class LinuxChecks(unittest.TestCase):
         self.component.write_text('<exec>/usr/bin/python3 &quot;/gone/engine.py&quot; --ibus</exec>')
         self.assertEqual(self.run_checks()["Input method"][0], "fail")
 
+    def test_an_engine_from_another_checkout_is_registered_again(self):
+        other = self.home / "claudish-clone"
+        other.mkdir()
+        (other / "engine.py").write_text("")  # a clone set up before the one-line install
+        self.component.parent.mkdir(parents=True)
+        self.component.write_text('<exec>/usr/bin/python3 &quot;%s&quot; --ibus</exec>' % (other / "engine.py"))
+        status, fix = self.run_checks()["Input method"]
+        self.assertEqual(status, "fail")
+        self.assertIn(str(self.home / "install.py"), fix)  # this checkout's
+
     def test_a_path_with_an_ampersand_and_no_ibus_in_this_session(self):
         folder = self.home / "R&D"
         folder.mkdir()
@@ -71,7 +82,8 @@ class LinuxChecks(unittest.TestCase):
         self.component.write_text(escape('<exec>/usr/bin/python3 "%s" --ibus</exec>' % (folder / "engine.py"))
                                   .replace("&lt;", "<").replace("&gt;", ">").replace('"', "&quot;"))
         with patch("claudish.doctor.subprocess.run",
-                   return_value=subprocess.CompletedProcess([], 1, "", "Can't connect to IBus.\n")):
+                   return_value=subprocess.CompletedProcess([], 1, "", "Can't connect to IBus.\n")), \
+                patch("claudish.doctor.INSTALL_PY", folder / "install.py"):
             checks = self.run_checks()
         self.assertEqual(checks["Input method"][0], "ok")  # R&amp;D is R&D
         self.assertEqual(checks["IBus engine"][0], "skip")  # not "does not list Claudish yet"

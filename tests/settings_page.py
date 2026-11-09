@@ -119,9 +119,18 @@ async def check(args, home, port):
         await page.locator("#url").fill(gone)
         await page.locator("#model").fill("beta")
         posts.clear()
-        await page.locator("#server button").click()
+        both = asyncio.Event()
+
+        async def held(route):  # the check takes a moment: the second click comes while it runs
+            if route.request.method == "POST":
+                await both.wait()
+            await route.continue_()
+        await page.route("**/settings", held)
+        await page.locator("#server button").click(no_wait_after=True)
         await page.locator("#server button").click(force=True, no_wait_after=True)  # again, while it checks
+        both.set()
         await expect(page.locator("#model-message")).to_contain_text("Nothing answers at")
+        await page.unroute("**/settings", held)
         assert len(posts) == 1, len(posts)
         await expect(page.locator("#url")).to_have_value(gone)
         await expect(page.locator("#model")).to_have_value("beta")  # (nothing saved: the reload below shows the API in use)

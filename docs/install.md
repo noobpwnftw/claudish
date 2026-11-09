@@ -63,7 +63,8 @@ login. The engine keeps your keyboard layout. The checkout must stay where it is
 2. `claudish service uninstall`
 3. `/usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --uninstall`, and after a
    `--system` install also `sudo /usr/bin/python3 ~/.local/share/claudish/platforms/linux/install.py --system --uninstall`
-4. `rm -rf ~/.local/share/claudish ~/.local/bin/claudish`
+   (from a checkout of your own, its `platforms/linux/install.py`)
+4. `rm -rf ~/.local/share/claudish ~/.local/bin/claudish` (or your checkout)
 5. Log out and back in.
 
 The config stays in `~/.config/claudish/`.
@@ -103,7 +104,8 @@ writes `dist\windows\cd_AI-setup.exe`.
 **The installer**, `cd_AI.pkg` from the [latest release](https://github.com/noobpwnftw/claudish/releases/latest), for Apple silicon (Intel Macs are not supported yet). It installs
 for you alone (`~/Library/Input Methods`, no administrator password): the app, a starter config,
 the service at every login, and cd_AI added to your input sources and enabled. macOS asks once to
-allow it to enable cd_AI. On a first install, cd_AI's settings open at the end: choose your model
+allow it to enable cd_AI; after **Don't Allow**, add it in **System Settings → Keyboard → Text
+Input → Edit → +** (under English). On a first install, cd_AI's settings open at the end: choose your model
 and tone, then use Try a rewrite. Then **log out and back in**, as after installing or updating
 any macOS input method: until then macOS keeps its old list of input sources (and, after an update, the old cd_AI).
 In the input menu it is **Claudish — Compose** and **Claudish — Continue**: a Shift tap switches

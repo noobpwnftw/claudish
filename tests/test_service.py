@@ -150,5 +150,18 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual([kind for _, kind, _ in steps][-2:], ["stop", "run"])  # a running one ends first
 
 
+class NoSystemdTests(unittest.TestCase):
+    def test_without_a_systemd_user_manager_nothing_is_written_and_serve_is_named(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, "home", return_value=Path(home)), \
+                patch("claudish.service.platform.system", return_value="Linux"), \
+                patch("claudish.service.systemd_user", return_value=False):
+            with self.assertRaises(SystemExit) as stopped:
+                service.run("install")
+            self.assertIn("claudish serve", str(stopped.exception))
+            self.assertFalse(service.paths()["Linux"].exists())  # no unit that looks installed
+            self.assertEqual(service.managed()[0], "skip")
+
+
+
 if __name__ == "__main__":
     unittest.main()
