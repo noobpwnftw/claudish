@@ -678,7 +678,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 286246a..764c74f 100644
+index 286246a..e87d739 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -96,6 +96,21 @@ void TextService::onDeactivate() {
@@ -720,7 +720,7 @@ index 286246a..764c74f 100644
 -	if (selectionRect(session, &textRect)) {
 -		// FIXME: where should we put the candidate window?
 -		candidateWindow_->move(textRect.left, textRect.bottom);
-+	if (anchorRect(session, &textRect)) {
++	if (panelAnchor(session, &textRect)) {
 +		// Claudish: under the line, the content starting where the composition starts (or the
 +		// caret); it stays where it opened while it is open on that line, never sliding as you type.
 +		placeCandidates(textRect);
@@ -734,12 +734,12 @@ index 286246a..764c74f 100644
 -        if (selectionRect(session, &textRect)) {
 -            // FIXME: where should we put the candidate window?
 -            candidateWindow_->move(textRect.left, textRect.bottom);
-+        if (anchorRect(session, &textRect)) {
++        if (panelAnchor(session, &textRect)) {
 +            placeCandidates(textRect);
          }
      }
  }
-@@ -348,6 +366,56 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,70 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -775,10 +775,24 @@ index 286246a..764c74f 100644
 +	placePanel(*candidateWindow_, x, caret);
 +}
 +
-+// Claudish: continue's suggestion, right after the caret (never typed into the app).
++// Claudish: where a panel or toast is anchored (anchorRect), or where the last one was when the app
++// gives no place now (TF_E_NOLAYOUT just after a composition starts); false when it never gave one.
++bool TextService::panelAnchor(Ime::EditSession* session, RECT* rect) {
++	if (anchorRect(session, rect)) {
++		lastAnchor_ = *rect;
++		anchored_ = true;
++		return true;
++	}
++	if (anchored_)
++		*rect = lastAnchor_;
++	return anchored_;
++}
++
++// Claudish: continue's suggestion, right after the caret (never typed into the app). None in an app
++// that draws input method UI itself (UI-less: a game); it would cover the app.
 +void TextService::showGhost(Ime::EditSession* session, const std::wstring& text) {
 +	RECT caret;
-+	if (text.empty() || !session || !caretRect(session, &caret)) {
++	if (text.empty() || !session || isUiLess() || !caretRect(session, &caret)) {
 +		hideGhost();
 +		return;
 +	}
@@ -796,18 +810,20 @@ index 286246a..764c74f 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -371,14 +439,25 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +453,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
-+// Claudish: a panel shown briefly at the caret (a toast), in the message window.
++// Claudish: a panel shown briefly at the caret (a toast), in the message window. Not where there is
++// no place for it (it opened at the screen's corner) or in an app that draws input method UI itself.
 +void TextService::showToast(Ime::EditSession* session, const Ime::PanelSpec& panel, int duration) {
 +	hideMessage();
++	RECT anchor;
++	if (isUiLess() || !panelAnchor(session, &anchor))
++		return;
 +	messageWindow_ = make_unique<Ime::MessageWindow>(this, session);
 +	messageWindow_->setPanel(panel);
-+	RECT anchor;
-+	if (anchorRect(session, &anchor))
-+		placePanel(*messageWindow_, anchor.left - messageWindow_->textInset(), anchor);
++	placePanel(*messageWindow_, anchor.left - messageWindow_->textInset(), anchor);
 +	messageWindow_->show();
 +	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
 +}
@@ -821,12 +837,12 @@ index 286246a..764c74f 100644
 -            // FIXME: where should we put the message window?
 -            messageWindow_->move(textRect.left, textRect.bottom);
 -        }
-+        if (anchorRect(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
++        if (panelAnchor(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
 +            placePanel(*messageWindow_, textRect.left - messageWindow_->textInset(), textRect);
      }
  }
  
-@@ -431,6 +510,7 @@ void TextService::closeClient() {
+@@ -431,6 +526,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -835,7 +851,7 @@ index 286246a..764c74f 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 303cf17..a50bd9e 100644
+index 303cf17..5dcabc6 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -873,12 +889,16 @@ index 303cf17..a50bd9e 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +180,9 @@ private:
+@@ -166,6 +180,13 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;
 +	Ime::PanelSpec panel_;
 +	int pinnedX_ = 0, pinnedLine_ = -1;  // where the candidate window opened
++	// Claudish: the last place a panel was anchored, for an app that gives none now (no layout yet).
++	RECT lastAnchor_ = {};
++	bool anchored_ = false;
++	bool panelAnchor(Ime::EditSession* session, RECT* rect);
 +	std::unique_ptr<Ime::GhostWindow> ghostWindow_;
  	int candFontSize_;
  

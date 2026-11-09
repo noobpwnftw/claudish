@@ -84,11 +84,18 @@ def main():
                 assert key(0x10, method="filterKeyUp")["return"] is True  # PIME asks twice; the same answer
                 return key(0x10, method="onKeyUp")
 
-            # A Shift tap goes to continue, which types like en_US: keys straight in, hyphens kept.
+            # A Shift tap goes to continue, which types like en_US: the app types the keys itself (no
+            # composition per letter: a browser's keydown sees the key), and its text is read at the
+            # timer that follows.
             shift_tap()
             assert service.state.mode == "continue"
-            typed = "".join(key(ord(c.upper()), ord(c)).get("commitString", "") for c in "ls -la")
-            assert typed == "ls -la", typed
+            for c in "ls -la":
+                for _ in range(2):  # TSF's test, then the key itself: the same answer
+                    reply = key(ord(c.upper()), ord(c), "filterKeyDown")
+                    assert reply["return"] is False and reply.get("timer") == 30 and "commitString" not in reply, reply
+                assert key(ord(c.upper()), ord(c), "filterKeyUp")["return"] is False  # its key-up is the app's too
+            service.handleRequest({"method": "onTimer", "textBefore": "$ ls -la", "textAfter": ""})
+            assert service.state.text == "$ ls -la", service.state.text
             assert key(ord("C"), ord("c"), "filterKeyUp", modifiers=(0x11,))["return"] is False  # Ctrl+C's key-up: the app's
             service.state.mode = "compose"
             service.state.change("abc")
@@ -223,32 +230,44 @@ def main():
             assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
             last = worker_class.return_value.schedule.call_args.args
             assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
-            assert key(ord("!"), ord("!"), "filterKeyDown")["return"]  # every key reaches filterKeyDown first
-            assert key(ord("!"), ord("!"))["commitString"] == "!"
+            def typed_live(char, before):
+                """A key in continue: the app types it itself; the timer after it reads its text."""
+                assert key(ord(char), ord(char), "filterKeyDown")["return"] is False
+                return service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": before, "textAfter": ""})
+
+            def arrives(text, before):
+                worker_class.return_value.poll.return_value = (service.state.revision, {"text": text})
+                reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": before, "textAfter": ""})
+                worker_class.return_value.poll.return_value = None
+                return reply
+
+            typed_live("!", "say hi!")
             assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
-            assert key(9, method="filterKeyDown")["return"] is False  # no suggestion: Tab is the app's
-            # The suggestion shows when the key is released: continue takes printable key-ups too.
-            assert key(ord("!"), ord("!"), "filterKeyUp")["return"] is True
-            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "say hi! Hello—truly."})
-            reply = key(ord("!"), ord("!"), "onKeyUp")
-            # cd_AI's own grey text after the caret; no panel in continue.
+            assert key(9, method="filterKeyDown", textBefore="say hi!")["return"] is False  # no suggestion: Tab is the app's
+            # The suggestion shows when it comes (the timer): cd_AI's own grey text after the caret; no panel.
+            reply = arrives("say hi! Hello—truly.", "say hi!")
             assert reply.get("ghost", "").strip() == "Hello—truly." and reply.get("panel") is None, reply
             assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
-            assert key(9, method="filterKeyDown")["return"] is True  # a waiting suggestion makes Tab ours
-            worker_class.return_value.poll.return_value = None
-            assert key(9)["commitString"] == " Hello—truly."
+            assert key(9, method="filterKeyDown", textBefore="say hi!")["return"] is True  # a drawn suggestion makes Tab ours
+            assert key(9, textBefore="say hi!")["commitString"] == " Hello—truly."
             # A click moved the caret (no key): a suggestion made for the old spot is not Tab's to take.
-            key(ord("!"), ord("!"))
-            worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Again."})
-            key(ord("!"), ord("!"), "onKeyUp")
-            worker_class.return_value.poll.return_value = None
+            typed_live("!", "say hi! Hello—truly.!")
+            arrives(service.state.text + " Again.", "say hi! Hello—truly.!")
             assert service.state.ghost.strip() == "Again.", service.state.ghost
             assert key(9, method="filterKeyDown", textBefore="Total: ")["return"] is False and not service.state.ghost
+            # The next key hides a drawn suggestion at once (it was drawn where the caret was), and Tab
+            # is the app's until the app's text is read again.
+            typed_live("!", "Total: !")
+            arrives(service.state.text + " Shown.", "Total: !")
+            reply = key(ord("A"), ord("a"), "filterKeyDown")
+            assert reply["return"] is False and reply.get("ghost") == "" and reply.get("timer") == 30, reply
+            assert key(9, method="filterKeyDown", textBefore="Total: !a")["return"] is False
+            service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": "Total: !a", "textAfter": ""})
+            assert service.state.text == "Total: !a" and not service.state.ghost, service.state.text
             # One that came while nothing drew it (the timer had stopped): Tab is the app's, not for text unseen.
-            key(ord("!"), ord("!"), "filterKeyDown")
-            key(ord("!"), ord("!"))
+            typed_live("!", "Total: !a!")
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Unseen."})
-            assert key(9, method="filterKeyDown")["return"] is False
+            assert key(9, method="filterKeyDown", textBefore="Total: !a!")["return"] is False
             worker_class.return_value.poll.return_value = None
             # A key-up whose key-down went to the app (Ctrl let go first) stays the app's.
             assert key(ord("C"), ord("c"), "filterKeyUp")["return"] is False

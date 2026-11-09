@@ -1316,7 +1316,7 @@ index 0000000..dadfca2
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..06b589f 100644
+index ea37cdc..7e0f63c 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1341,7 +1341,36 @@ index ea37cdc..06b589f 100644
                  // end composition and clean up
                  composition_->EndComposition(cookie);
                  // do some cleanup in the derived class here
-@@ -257,6 +265,89 @@ std::wstring TextService::compositionString(EditSession* session) const {
+@@ -238,25 +246,105 @@ void TextService::endComposition(ITfContext* context) {
+ std::wstring TextService::compositionString(EditSession* session) const {
+     std::wstring result;
+     if (composition_) {
+-        ComPtr<ITfRange> compositionRange;
+-        if (composition_->GetRange(&compositionRange) == S_OK) {
+-            auto rangeAcp = compositionRange.query<ITfRangeACP>();
+-            if (rangeAcp) {
+-                LONG anchor, bufLen;
+-                rangeAcp->GetExtent(&anchor, &bufLen);  // get length of the text.
+-                auto buf = std::make_unique<wchar_t[]>(size_t(bufLen) + 1);
+-
+-                ULONG textLen = 0;
+-                if (compositionRange->GetText(session->editCookie(), 0, buf.get(), bufLen, &textLen) == S_OK) {
+-                    buf[textLen] = '\0';
+-                    result = buf.get();
+-                }
++        // Claudish: read through the range itself, as Microsoft's SampleIME does: an app whose text
++        // store is anchor-based has no ITfRangeACP, and the composition read as "" ended it at every key.
++        ComPtr<ITfRange> compositionRange, rest;
++        if (composition_->GetRange(&compositionRange) == S_OK && compositionRange->Clone(&rest) == S_OK) {
++            wchar_t buf[256];
++            ULONG textLen = 0;
++            while (rest->GetText(session->editCookie(), TF_TF_MOVESTART, buf, ARRAYSIZE(buf), &textLen) == S_OK && textLen > 0) {
++                result.append(buf, textLen);
++                if (textLen < ARRAYSIZE(buf))
++                    break;
+             }
+         }
+     }
      return result;
  }
  
@@ -1431,7 +1460,7 @@ index ea37cdc..06b589f 100644
  void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
      ITfContext* context = session->context();
      if(context) {
-@@ -650,6 +741,11 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+@@ -650,6 +738,11 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
  }
  
  STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
@@ -1443,7 +1472,32 @@ index ea37cdc..06b589f 100644
      return S_OK;
  }
  
-@@ -803,6 +899,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+@@ -750,7 +843,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
+             // We use TF_ES_SYNC here, so the request becomes synchronus and blocking.
+             // KeyEditSession::DoEditSession() and TextService::doKeyEditSession() will be
+             // called before RequestEditSession() returns.
+-            pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult);
++            // Claudish: an app that refuses the edit session (busy, read-only) gets its key back, not
++            // a key eaten with nothing typed.
++            if (FAILED(pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult))
++                || FAILED(sessionResult))
++                *pfEaten = FALSE;
+         }
+     }
+     return S_OK;
+@@ -784,7 +881,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
+                     *pfEaten = onKeyUp(keyEvent, session);
+                 }
+             );
+-            pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult);
++            if (FAILED(pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult))
++                || FAILED(sessionResult))
++                *pfEaten = FALSE;  // Claudish: refused, the key-up is the app's
++
+         }
+     }
+     return S_OK;
+@@ -803,6 +903,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
      // grabbed by others, we're ``forced'' to terminate current composition.
      // If we end the composition by calling ITfComposition::EndComposition() ourselves,
      // this event is not triggered.
@@ -1458,12 +1512,30 @@ index ea37cdc..06b589f 100644
      onCompositionTerminated(true);
      composition_ = nullptr;
      return S_OK;
-@@ -911,6 +1015,39 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -911,6 +1019,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
++// Claudish: a rectangle that says where something is (an app without layout yet answers all zeros).
++static bool placed(const RECT& rect) {
++    return rect.left || rect.top || rect.right || rect.bottom;
++}
++
++// Claudish: the system caret of this (the app's UI) thread, on the screen: what an app that gives TSF
++// no text rectangle (a custom-drawn editor through the IMM32 bridge) still shows.
++static bool systemCaret(RECT* rect) {
++    GUITHREADINFO info = { sizeof(info) };
++    if (!GetGUIThreadInfo(GetCurrentThreadId(), &info) || !info.hwndCaret || !placed(info.rcCaret))
++        return false;
++    POINT corners[2] = { { info.rcCaret.left, info.rcCaret.top }, { info.rcCaret.right, info.rcCaret.bottom } };
++    MapWindowPoints(info.hwndCaret, NULL, corners, 2);
++    *rect = { corners[0].x, corners[0].y, corners[1].x, corners[1].y };
++    return true;
++}
++
 +// Claudish: the caret's rectangle with or without a composition (continue's suggestion is drawn
-+// after the caret while nothing is composed; selectionRect answers only while composing).
++// after the caret while nothing is composed; selectionRect answers only while composing). An app
++// that has no layout yet (TF_E_NOLAYOUT), none at all, or all zeros: the system caret, else none.
 +bool TextService::caretRect(EditSession* session, RECT* rect) const {
 +    bool ret = false;
 +    ComPtr<ITfContextView> view;
@@ -1472,12 +1544,12 @@ index ea37cdc..06b589f 100644
 +        TF_SELECTION selection;
 +        ULONG selectionNum;
 +        if(session->context()->GetSelection(session->editCookie(), TF_DEFAULT_SELECTION, 1, &selection, &selectionNum) == S_OK) {
-+            if(view->GetTextExt(session->editCookie(), selection.range, rect, &clipped) == S_OK)
++            if(view->GetTextExt(session->editCookie(), selection.range, rect, &clipped) == S_OK && placed(*rect))
 +                ret = true;
 +            selection.range->Release();
 +        }
 +    }
-+    return ret;
++    return ret || systemCaret(rect);
 +}
 +
 +// Claudish: where a panel or a toast is anchored: the composition's start (as CJK candidate
@@ -1489,7 +1561,7 @@ index ea37cdc..06b589f 100644
 +        BOOL clipped;
 +        if(session->context()->GetActiveView(&view) == S_OK && composition_->GetRange(&range) == S_OK
 +           && range->Clone(&start) == S_OK && start->Collapse(session->editCookie(), TF_ANCHOR_START) == S_OK
-+           && view->GetTextExt(session->editCookie(), start, rect, &clipped) == S_OK)
++           && view->GetTextExt(session->editCookie(), start, rect, &clipped) == S_OK && placed(*rect))
 +            return true;
 +    }
 +    return caretRect(session, rect);

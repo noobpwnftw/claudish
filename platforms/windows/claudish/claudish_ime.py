@@ -29,6 +29,7 @@ INPUT_SCOPES = {1: "url", 4: "email", 5: "email", 7: "name", 28: "digits", 29: "
                 32: "phone", 33: "phone", 34: "phone", 35: "phone",
                 63: "password", 64: "password", 65: "password", 66: "password"}
 TIMER_MS = 100  # how often Claudish's PIME calls back while an answer is on its way
+LIVE_READ_MS = 30  # continue: the app's text read again this long after a key it typed itself
 
 
 def mode_icon(mode):
@@ -226,7 +227,7 @@ class ClaudishTextService(TextService):
         self.worker = None
         self.adopted_from = UNSEEN
         self.last_document = None  # the text box of the last request (follow_document)
-        self.taken_keys = set()  # continue's key-downs taken: their key-ups are taken too, only theirs
+        self.live_typed = False  # continue: a key the app typed itself, its text not read since
         self.drawn_ghost = ""  # the suggestion last drawn: Tab and Esc are cd_AI's only for one you see
         self.owner = None  # this instance's app (its process, in front at its first request): parks go there
         # The window this instance's text box is in, at its last key or focus: another window of
@@ -442,8 +443,15 @@ class ClaudishTextService(TextService):
                     return False
                 return bool(self.state.ghost) and self.state.ghost == self.drawn_ghost  # one you see
             if event.isPrintableChar():
-                self.taken_keys.add(event.keyCode)
-                return True
+                # The app types it itself, as with no input method: no composition per letter (a
+                # browser's keydown sees the key, not "Process"). Its text, the key in it, is read
+                # at the timer; this may run twice for the key, and changes nothing twice.
+                self.live_typed = True
+                if self.drawn_ghost:  # drawn where the caret was: gone until read again (Tab is the app's)
+                    self.drawn_ghost = ""
+                    self.setGhost("")
+                self.setTimer(LIVE_READ_MS)
+                return False
             # Backspace, Enter, navigation: the app's. The context starts over from the app's text at
             # the next key (this runs twice per key, in TSF's test and again for the key itself, so
             # it changes nothing that a second run would change again).
@@ -556,6 +564,11 @@ class ClaudishTextService(TextService):
         self.setTimer(TIMER_MS)
 
     def onTimer(self):
+        if self.live_typed:  # continue: what the app typed, read now that it is in
+            self.live_typed = False
+            if self.state.live:
+                self.state.change(self.around()[0][-MAX_COMPOSITION:])
+                self.changed()
         away = self.owner and foreground() not in (None, self.owner) or \
             self.front is not None and foreground_window() not in (None, self.front)
         changed = self.poll_results(away)
@@ -569,10 +582,9 @@ class ClaudishTextService(TextService):
             self.setTimer(TIMER_MS)
 
     def filterKeyUp(self, event):
-        # PIME can only change what is shown in reply to a request. In continue Claudish takes the
-        # key-downs of printable keys (it commits them itself), so it takes their key-ups too: the
-        # onKeyUp reply carries an edit session, and with it the suggestion.
-        # Likewise Tab's key-up while a rewrite it asked for is on its way: it often is by then.
+        # PIME can only change what is shown in reply to a request: Tab's key-up is taken while a
+        # rewrite it asked for is on its way (it often is by then), and the onKeyUp reply, with an
+        # edit session, shows it.
         # A Shift tap switches mode; its key-up is taken so onKeyUp, with an edit session, can commit
         # what you composed.
         if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
@@ -584,13 +596,9 @@ class ClaudishTextService(TextService):
                 self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
             keylog("filterKeyUp shift", "tap=%s" % self.switching)
             return self.switching
-        # A shortcut's key-up goes where its key-down went (to the app): only typing's are continue's.
-        return bool(self.keyboardOpen and (event.keyCode in self.taken_keys or
-                                           plain_tab(event) and self.state.asked == "rewrite"
-                                           and self.state.working))
+        return bool(self.keyboardOpen and plain_tab(event) and self.state.asked == "rewrite" and self.state.working)
 
     def onKeyUp(self, event):
-        self.taken_keys.discard(event.keyCode)
         self.poll_results()
         if self.switching:
             self.switching = False
@@ -781,7 +789,7 @@ class ClaudishTextService(TextService):
         return True
 
     def live_key(self, event):
-        """Continue mode: what filterKeyDown took (printable keys, Tab and Esc with a suggestion)."""
+        """Continue mode: what filterKeyDown took (Tab and Esc with a suggestion; the app types the rest)."""
         key = event.keyCode
         if key == 0x09 and not event.isKeyDown(0x10):
             ghost = self.state.take_ghost()
@@ -791,11 +799,6 @@ class ClaudishTextService(TextService):
             pass  # the accent only (PIME uses it up); the suggestion stays
         elif key == 0x1B:
             self.state.dismiss()
-        elif event.isPrintableChar():
-            # A fresh start (a paste, a new field), or a click since (Windows says nothing of it): from the app's text.
-            if not self.state.text or not self.caret_stayed():
-                self.state.change(self.around()[0][-MAX_COMPOSITION:])
-            self.setCommitString(self.state.type_live(chr(event.charCode)))
         self.changed()
         return True
 
@@ -857,7 +860,6 @@ class ClaudishTextService(TextService):
         """The app has the keyboard again (Claudish's PIME sends it in an edit session): an exchange
         held for this text box says so at once, rather than at the next key."""
         keylog("onSetFocus", getattr(self, "document", None))
-        self.taken_keys.clear()  # a key held while focus went: its key-up went elsewhere
         self.shift.cancel()  # focus moved (a Shift+click): its Shift is not a tap
         self.front = foreground_window()
         self.follow_document()
