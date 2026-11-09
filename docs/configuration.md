@@ -324,8 +324,10 @@ pick, and its final answer is a candidate like any other. For Claude Code:
 - **Follow-ups continue the same agent.** Each text box has its own agent
   process, started at the first instruction and kept between them, so "now
   shorten it" or "and the other branch?" builds on the files it read, its plan,
-  and its tool results. Esc interrupts the turn but keeps the agent. If the
-  process exits, the next instruction resumes its session (`--resume`). The agent
+  and its tool results. A turn Esc takes back (while it works, or as its answer
+  arrives) leaves the agent's session too: the next instruction resumes it where the
+  turn before ended (`--resume-session-at`), or starts a new one after a first turn.
+  If the process exits, the next instruction resumes its session (`--resume`). The agent
   exits when the text box goes away, after 30 idle minutes, or when the service
   stops. Claudish adds `--session-id` and `--permission-prompt-tool stdio` itself
   (without the latter, Claude Code denies by itself instead of asking you).

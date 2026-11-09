@@ -117,7 +117,20 @@ class ServiceTests(unittest.TestCase):
         process.wait(timeout=5)  # the conversation ended: its agent exits
         self.assertIsNone(self.rewriter.conversations.get("box").agent)
 
-    def test_esc_interrupts_the_turn_and_keeps_the_agent(self):
+    def test_a_turn_taken_back_after_its_answer_rewinds_the_agents_session(self):
+        """Esc as the answer arrived: the next turn resumes the agent's session at the end of the turn
+        kept before it (--resume-session-at), not after the one taken back."""
+        self.until(self.turn("count"), "result")  # kept: the agent's message msg-1
+        taken = self.turn("count")
+        self.until(taken, "result")
+        self.assertEqual(self.call("/sessions/%s/cancel" % taken, {})[0], 200)  # Esc after its answer
+        answer = self.until(self.turn("count"), "result")["text"]
+        self.assertIn("--resume-session-at msg-1", answer)
+        self.assertRegex(answer, r"^turn 1 of this process")  # a new process, at the kept turn's end
+
+    def test_esc_takes_the_turn_back_from_the_agent_too(self):
+        """Esc while the first turn works: the conversation does not keep it, and neither does the
+        agent's own session (a new one; after a kept turn it resumes at that turn's end)."""
         session = self.turn("slow task")
         agent = None
         for _ in range(50):
@@ -128,8 +141,9 @@ class ServiceTests(unittest.TestCase):
         process = agent.process
         self.assertEqual(self.call("/sessions/%s/cancel" % session, {})[0], 200)
         self.assertEqual(self.until(session, "error")["text"], "cancelled")
-        self.assertRegex(self.until(self.turn("count"), "result")["text"], r"^turn 2 ")
-        self.assertIs(agent.process, process)
+        answer = self.until(self.turn("count"), "result")["text"]
+        self.assertRegex(answer, r"^turn 1 of this process \(--session-id ")
+        self.assertIsNot(agent.process, process)
 
     def test_a_turn_past_its_time_says_so(self):
         from claudish import agent

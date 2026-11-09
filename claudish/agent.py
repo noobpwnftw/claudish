@@ -48,6 +48,8 @@ class AgentProcess:
         self.config_file = None
         self.session_id = str(uuid.uuid4())
         self.started = False  # once started, a restart resumes the same agent session
+        self.kept_at = None  # the last assistant message of the last turn kept (its uuid)
+        self.resume_at = None  # set by rewind(): the next process resumes the session at that message
         self.process = None
         self.write_lock = threading.Lock()
         self.turn_lock = threading.Lock()
@@ -66,6 +68,9 @@ class AgentProcess:
         session = []
         if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):
             session = ["--resume", self.session_id] if self.started else ["--session-id", self.session_id]
+            if self.started and self.resume_at:  # a turn taken back: the session as it was before it
+                session += ["--resume-session-at", self.resume_at]
+        self.resume_at = None
         if self.mcp_config and self.config_file is None:
             descriptor, self.config_file = tempfile.mkstemp(prefix="claudish-mcp-", suffix=".json")
             with os.fdopen(descriptor, "w", encoding="utf-8") as config:
@@ -99,6 +104,16 @@ class AgentProcess:
         self.counter += 1
         self.send({"type": "control_request", "request_id": "req_%d_%s" % (self.counter, os.urandom(4).hex()),
                    "request": body})
+
+    def rewind(self, to):
+        """Take the last turn back from the agent's own session: its next turn starts from `to`,
+        the last message of the turn before (None: before any turn, a session of its own)."""
+        self.close()
+        self.kept_at = to
+        if to is None:
+            self.session_id, self.started = str(uuid.uuid4()), False
+        else:
+            self.resume_at = to
 
     def interrupt(self):
         """Stop the current turn but keep the agent (and its session); kill it if it does not stop."""
@@ -156,6 +171,8 @@ class ClaudeCodeDriver:
         self.session = None
         self.cancelled = False
         self.ran = None  # the process this turn ran in
+        self.before = None  # the agent's kept_at when this turn started; the turn's own last message
+        self.reached = None
 
     @property
     def process(self):
@@ -172,10 +189,15 @@ class ClaudeCodeDriver:
                 self.agent.ensure()
                 self.agent.turns += 1
                 self.agent.running = True
+                self.before = self.agent.kept_at
                 try:
                     self.turn(session, prompt)
                 finally:
                     self.agent.running = False
+                if self.cancelled:  # Esc while it worked: the agent's session does not keep it either
+                    self.take_back(locked=True)
+                elif self.reached:
+                    self.agent.kept_at = self.reached
         finally:
             if self.own:  # a process for this turn only ends with it, also when the turn failed
                 self.agent.close()
@@ -239,6 +261,7 @@ class ClaudeCodeDriver:
                     elif event.get("type") == "message_start":
                         draft = ""  # a new assistant message: the draft starts over
                 elif kind == "assistant" and not message.get("parent_tool_use_id"):
+                    self.reached = message.get("uuid") or self.reached  # where this turn has got to
                     for block in (message.get("message") or {}).get("content") or []:
                         if block.get("type") == "tool_use":
                             session.emit("progress", text=summarize(block.get("name", "tool"), block.get("input")))
@@ -335,6 +358,20 @@ class ClaudeCodeDriver:
         """The answer to the agent's can_use_tool request: allow or deny."""
         self.send({"type": "control_response", "response": {
             "subtype": "success", "request_id": request_id, "response": decision}})
+
+    def take_back(self, locked=False):
+        """Esc as the answer arrived (or while it worked): the agent's own session goes back to
+        before this turn, as the conversation does. Only the latest turn, and never under a turn
+        running now: a newer one stays."""
+        if self.own or self.agent.kept_at not in (self.reached, self.before) or (self.agent.running and not locked):
+            return
+        if not locked and not self.agent.turn_lock.acquire(blocking=False):
+            return  # the next instruction has started: it builds on this one
+        try:
+            self.agent.rewind(self.before)
+        finally:
+            if not locked:
+                self.agent.turn_lock.release()
 
     def cancel(self):
         self.cancelled = True

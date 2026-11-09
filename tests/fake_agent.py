@@ -43,8 +43,8 @@ threading.Thread(target=reader, daemon=True).start()
 init = read()
 assert init["type"] == "control_request" and init["request"]["subtype"] == "initialize", init
 out({"type": "control_response", "response": {"subtype": "success", "request_id": init["request_id"], "response": {}}})
-session = " ".join(arg for i, arg in enumerate(sys.argv[1:]) if arg in ("--session-id", "--resume")
-                   or sys.argv[i] in ("--session-id", "--resume"))
+session = " ".join(arg for i, arg in enumerate(sys.argv[1:]) if arg in ("--session-id", "--resume", "--resume-session-at")
+                   or sys.argv[i] in ("--session-id", "--resume", "--resume-session-at"))
 turns = 0
 while True:
     prompt = read()
@@ -54,6 +54,7 @@ while True:
     out({"type": "system", "subtype": "init", "session_id": "fake"})
     try:
         if "count" in text:
+            out({"type": "assistant", "uuid": "msg-%d" % turns, "message": {"content": []}})  # as Claude Code marks its messages
             out({"type": "result", "subtype": "success", "is_error": False,
                  "result": "turn %d of this process (%s)" % (turns, session)})
             continue
