@@ -130,6 +130,10 @@ class Overlay:
 
     def __init__(self):
         self.text = ""
+        self.room = 1000  # characters to the screen's edge
+
+    def fits(self, rect):
+        return lambda text: len(text) <= self.room
 
     def show(self, rect, text):
         self.text = text
@@ -832,6 +836,41 @@ class MacOSAdapterTests(unittest.TestCase):
         finally:
             fresh.inputControllerWillClose()
 
+    def test_the_same_dead_key_twice_types_its_accent_without_characters(self):
+        """Apple documents a dead key's characters as empty: the second ´ committed the words and
+        reached the app instead of typing the accent."""
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e: the accent waits
+        self.assertTrue(self.key(14, "", 1 << 19))  # again, with no characters
+        self.assertEqual(self.controller.state.text, "caf´")
+
+    def test_a_held_tab_takes_no_rewrite(self):
+        """Tab held: the first press asked for a rewrite, and a repeat took it the moment it came."""
+        self.type_text("hi")
+        self.key(48, "\t")
+        self.controller.state.offer(self.controller.state.revision, "Greetings—truly.")
+        repeat = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0,
+                                       characters=lambda: "\t", isARepeat=lambda: True)
+        self.assertTrue(self.controller.handleEvent_client_(repeat, self.client))
+        self.assertEqual((self.controller.state.text, self.controller.state.converted), ("hi", True))  # still shown
+
+    def test_a_suggestion_past_the_screen_edge_is_cut_to_what_shows(self):
+        """A text box at the screen's right edge: the suggestion ran past it, and Tab took all of it."""
+        client = TextClient("Note:")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        self.module.OVERLAY.room = 12
+        try:
+            fresh.state.mode = "continue"
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49, modifierFlags=lambda: 0,
+                                                            characters=lambda: " "), client)
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "the results are in."})
+            fresh.poll()
+            self.assertEqual((self.module.OVERLAY.text, fresh.state.ghost), ("the results", "the results"))
+        finally:
+            self.module.OVERLAY.room = 1000
+            fresh.inputControllerWillClose()
+
     def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
         client = TextClient("keep this word")
         client.chosen = (5, 4)  # "this", selected in the app
@@ -885,6 +924,7 @@ class MacOSAdapterTests(unittest.TestCase):
         asked = list(self.controller.worker.modes)
         self.key(0, "a", 1 << 20)  # Cmd+A: a shortcut holds the exchange
         self.assertIsNotNone(self.controller.state.held)
+        self.assertEqual(self.module.TOAST.spec["status"], "working on what you asked")  # its pill, at once
         self.assertTrue(self.key(53, "\x1b", 1 << 17))  # Shift+Esc: back
         self.assertEqual((self.controller.state.text, self.controller.worker.modes), ("say hi", asked))
 

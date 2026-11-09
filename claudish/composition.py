@@ -889,10 +889,11 @@ class Composition:
         """↑ (-1) or ↓ (+1): move the highlight through the choices or the drafts (no wrap: two or
         three rows). An approval starts with nothing highlighted: the first ↓ lands on its safe
         choice (Deny). A single draft takes the key too, moving nothing: passed on, it ended the
-        exchange. False when there is nothing to choose from (you are typing), and the key is the
-        app's. Choices are not numbered: digits are text in English, as Space is."""
+        exchange. With nothing to choose while an exchange is open (it works, it failed, or you
+        type a reply), the key does nothing, as ← and → there: it never leaves it. False otherwise,
+        and the key is the app's. Choices are not numbered: digits are text in English, as Space is."""
         if self.reply or not (self.question or (self.asked == "instruct" and self.candidate)):
-            return False
+            return bool(self.answered)
         count = len(self.question.get("choices") or []) if self.question else len(self.candidates)
         if self.question and self.question.get("permission") and not self.selected:
             self.highlight, self.selected = 0, True
@@ -1102,6 +1103,20 @@ class Composition:
             self.change((self.text + ghost)[-MAX_COMPOSITION:])
             self.taken = True
         return ghost
+
+    def fit_ghost(self, fits):
+        """Continue's suggestion cut to the whole words that fit where it is drawn (fits(text): it
+        does), so Tab takes only what you see; dropped when not one word fits. The suggestion left."""
+        ghost = self.ghost
+        if not ghost or fits(ghost):
+            return ghost
+        cuts = [at for at, char in enumerate(ghost) if char.isspace() and ghost[:at].strip()]
+        shown = next((ghost[:at] for at in reversed(cuts) if fits(ghost[:at])), "")
+        if shown:
+            self.candidate = self.text + shown
+        else:
+            self.dismiss()
+        return shown
 
     def dismiss(self):
         """Esc in continue: drop the suggestion, keep going; nothing more is offered until you type

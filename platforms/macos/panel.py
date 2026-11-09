@@ -401,7 +401,20 @@ class Overlay:
     def __init__(self):
         self.window = None
 
-    def show(self, rect, text):
+    def fits(self, rect):
+        """fits(text): whether text, drawn after the caret, ends before its screen's right edge."""
+        (cx, cy), (cw, ch) = rect
+        frame = caret_screen(cx, cy)
+        room = frame.origin.x + frame.size.width - (cx + cw)
+        return lambda text: self.measure(text, ch).width <= room
+
+    def measure(self, text, height):
+        self.ready()
+        self.field.setStringValue_(text)
+        self.field.setFont_(NSFont.systemFontOfSize_(max(11.0, round(height / 1.25))))
+        return self.field.fittingSize()
+
+    def ready(self):
         if self.window is None:
             self.window = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 NSMakeRect(0, 0, 10, 10), BORDERLESS | NONACTIVATING, NSBackingStoreBuffered, False)
@@ -412,11 +425,11 @@ class Overlay:
             self.window.setHasShadow_(False)
             self.field = NSTextField.labelWithString_("")
             self.window.setContentView_(self.field)
+
+    def show(self, rect, text):
         (cx, cy), (cw, ch) = rect
-        self.field.setStringValue_(text)
-        self.field.setFont_(NSFont.systemFontOfSize_(max(11.0, round(ch / 1.25))))
+        size = self.measure(text, ch)
         self.field.setTextColor_(NSColor.systemGrayColor())  # the lab's --k-ghost (#8e8e93): 3:1 on white
-        size = self.field.fittingSize()
         self.window.setFrame_display_(NSMakeRect(cx + cw, cy + (ch - size.height) / 2, size.width, size.height), True)
         self.window.orderFrontRegardless()
 

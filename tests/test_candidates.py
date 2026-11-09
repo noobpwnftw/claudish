@@ -108,6 +108,29 @@ class SummonKeyTests(unittest.TestCase):
         self.assertTrue(state.move(1) and state.move(-1))
         self.assertEqual((state.highlight, state.tab()), (0, "accept"))
 
+    def test_a_suggestion_is_cut_to_the_words_drawn(self):
+        """macOS drew continue's suggestion past the screen's edge, and Tab inserted all of it."""
+        state = Composition()
+        state.mode = "continue"
+        state.change("We are")
+        state.candidate = "We are moving the launch to Friday."
+        self.assertEqual(state.fit_ghost(lambda text: len(text) <= 18), " moving the launch")
+        self.assertEqual((state.ghost, state.take_ghost()), (" moving the launch", " moving the launch"))
+        state.change("Fine")
+        state.candidate = "Fine, thanks."
+        self.assertEqual((state.fit_ghost(lambda text: False), state.ghost), ("", ""))  # not one word: none
+
+    def test_the_arrows_never_leave_an_open_exchange(self):
+        """↑/↓ with nothing to choose (it works, it failed, you type a reply) fell through to the
+        app as navigation and set the exchange aside, while ← and → did nothing."""
+        state = self.composing("Shift+Enter")
+        state.submit()
+        self.assertTrue(state.move(1) and state.move(-9))  # still working: nothing moves
+        state.fail(state.revision, "offline")
+        self.assertTrue(state.move(-1))  # failed: still the exchange's
+        self.assertEqual(state.shown, "running late")
+        self.assertFalse(self.composing("Shift+Enter").move(1))  # only your words: the app's, after they commit
+
     def test_a_rewrite_on_its_way_or_shown_gates_enter_too(self):
         state = self.composing("Shift+Enter")
         self.assertEqual(state.tab(), "request")  # the spinner: a reflexive Enter must not send
@@ -930,7 +953,8 @@ class ModeFeelTests(unittest.TestCase):
         state.insert("days")
         self.assertEqual((state.shown, state.panel()["replying"]), ("3 days", True))  # digits are text
         self.assertEqual(state.panel()["foot"], [("Shift+Enter", "send reply"), ("Esc", "cancel reply")])
-        self.assertFalse(state.move(1))  # typing: nothing is highlighted
+        self.assertTrue(state.move(1))  # typing: nothing is highlighted, and the key never leaves the exchange
+        self.assertEqual((state.highlight, state.shown), (1, "3 days"))
         self.assertEqual(state.answer_text()[2], "3 days")
         self.assertEqual(state.panel()["thread"][-1], {"label": "You answered", "body": "3 days"})
         self.assertEqual(state.escape(), "back")  # while it works: Esc edits (and stops it)

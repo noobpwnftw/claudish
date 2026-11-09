@@ -90,6 +90,7 @@ def substring(client, location, length):
 
 
 RETURN_KEYS = (36, 76)  # Return, keypad Enter
+PAGING = {126: -1, 125: 1, 116: -9, 121: 9}  # ↑ ↓ Page Up, Page Down: steps through the choices
 NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
 def whole(text):
     """Text without a lone UTF-16 surrogate (half an emoji cut at a range's edge)."""
@@ -382,6 +383,10 @@ class ClaudishInputController(IMKInputController):
             self.state.dismiss()
             OVERLAY.hide()
             return
+        ghost = self.state.fit_ghost(OVERLAY.fits(self.ghost_at))  # what runs past the screen's edge: Tab never takes it
+        if not ghost:
+            OVERLAY.hide()
+            return
         self.ghost_checked = time.monotonic()
         OVERLAY.show(self.ghost_at, ghost)
         trace("ghost overlay", len(ghost))
@@ -603,6 +608,8 @@ class ClaudishInputController(IMKInputController):
             if key in (51, 53):
                 self.follow_caret(client)
                 return True  # Backspace or Esc cancels the accent, and nothing else
+            if not chars and found and found[0] == accent:
+                chars = accent  # the same dead key twice (macOS may give it no characters): the accent itself
             if chars and all(typeable(char) for char in chars):
                 chars = self.with_accent(key, chars, flags, accent)  # é, not the e the key would type
         if key == 48 and not flags & (NSEventModifierFlagShift | NSEventModifierFlagOption):  # Tab (Shift+Tab, Option+Tab: the app's)
@@ -673,6 +680,15 @@ class ClaudishInputController(IMKInputController):
         if self.state.text and client is not None:  # words that stay are the next composition, marked
             self.changed(client)
 
+    @objc.python_method
+    def finish_key(self, client):
+        """A key that is the app's ends the composition. An exchange it sets aside says so with its
+        pill now: you stay in the text box, so no coming back would show it."""
+        held = self.state.for_model
+        self.finish(client)
+        if held:
+            self.show_toast(self.state.held_pill(), client, lasting=True)
+
     def commitComposition_(self, sender):
         self.shift.cancel()  # the app ended it (a Shift+click): that Shift is no tap
         self.finish(self.client())
@@ -719,7 +735,7 @@ class ClaudishInputController(IMKInputController):
         flags = event.modifierFlags()
         # Option types characters such as — and €; it is not a shortcut by itself.
         if flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl):
-            self.finish(client)
+            self.finish_key(client)
             return False
         self.pollSuggestions_(None)
         key = event.keyCode()
@@ -730,6 +746,10 @@ class ClaudishInputController(IMKInputController):
             return True
         if self.state.live:
             return self.live_key(client, key, chars, flags)
+        if key in (48, 36, 76, 53) and self.state.text and getattr(event, "isARepeat", lambda: False)():
+            # Tab, Return or Esc held: one press. Its repeats took a rewrite the moment it came, or
+            # sent the message after Enter kept your words.
+            return True
         # Option+e, Option+u, ...: a dead key gives its accent alone; it waits for its letter (the
         # next key takes it, Backspace cancels it, any other key drops it).
         accent, self.state.accent = self.state.accent, ""
@@ -750,7 +770,7 @@ class ClaudishInputController(IMKInputController):
         if key in (36, 76, 51, 48) and flags & NSEventModifierFlagOption:
             # Option+Return (a newline in chat apps), Option+Backspace (delete a word) and Option+Tab (a
             # tab in a table cell) are the app's, as Alt with them is on Linux and Windows: your words go in first.
-            self.finish(client)
+            self.finish_key(client)
             return False
         shift = bool(flags & NSEventModifierFlagShift)
         if key in RETURN_KEYS and not self.state.talks(shift) and self.state.text:
@@ -804,7 +824,7 @@ class ClaudishInputController(IMKInputController):
             elif action == "convert":
                 self.changed(client)
             return action != "pass"
-        if key in (126, 125) and self.state.move(-1 if key == 126 else 1):  # ↑ and ↓ move the highlight
+        if key in PAGING and self.state.move(PAGING[key]):  # ↑ and ↓ move the highlight; Page Up/Down to the ends
             self.show_panel(client)
             return True
         if key == 53 and flags & NSEventModifierFlagShift and self.state.restore():  # Shift+Esc: the dropped one, back
@@ -846,11 +866,13 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         text = event.characters() or ""
+        if accent and not text and found and found[0] == accent:
+            text = accent  # the same dead key twice (macOS may give it no characters): the accent itself
         if accent and text and all(typeable(char) for char in text):
             text = self.with_accent(key, text, flags, accent)  # é from ´ then e, as macOS makes it in a text field
         # Navigation keys use private-use characters, which must not enter the draft.
         if key in NAVIGATION_KEYS or not all(typeable(char) for char in text) or not text:
-            self.finish(client)
+            self.finish_key(client)
             return False
         if all(self.state.passes(char) for char in text):  # nothing composed: the space is the app's text
             client.insertText_replacementRange_(text, (NSNotFound, 0))

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import gi
 gi.require_version("IBus", "1.0")
-from gi.repository import Gio, IBus
+from gi.repository import Gio, GLib, IBus
 
 root = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("claudish_ibus", root / "platforms/linux/engine.py")
@@ -258,8 +258,14 @@ try:
     for char in "fix it":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK) and engine.composition.sent
+    shown, pills = module.screen(), []
+    publish, shell = shown.publish, shown.shell
+    shown.publish, shown.shell = (lambda *args, **kwargs: pills.append(args)), True
     assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
+    shown.publish, shown.shell = publish, shell
     assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
+    # You stay in the box: its pill says what waits at once (no coming back would show it).
+    assert pills and ((pills[-1] + (None,) * 3)[2] or {}).get("status") == "working on what you asked", pills[-1:]
     # Shift+Esc brings it back without asking again: its request is still running.
     # (Counted at schedule: the worker's thread takes pending requests at any moment.)
     scheduled, schedule = [], engine.suggestions.schedule
@@ -356,6 +362,47 @@ try:
     engine.resume()
     engine.do_disable()
     assert engine.timer is None and not engine.focused
-    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass")
+    def as_daemon(path, method, args):
+        """A call to an engine over D-Bus, as ibus-daemon makes it (its handlers, not the vfuncs)."""
+        address = Gio.dbus_address_get_for_bus_sync(Gio.BusType.SESSION, None)
+        daemon = Gio.DBusConnection.new_for_address_sync(
+            address, Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
+        done = []
+        daemon.call(connection.get_unique_name(), path, "org.freedesktop.IBus.Engine", method, args, None,
+                    Gio.DBusCallFlags.NONE, 2000, None, lambda source, result: done.append(source.call_finish(result)))
+        while not done:
+            GLib.MainContext.default().iteration(True)
+    # IBus 1.5.27+ with focus ids says focus-out as FocusOutId over D-Bus (GTK on X11 and XIM send
+    # no reset with it): the engine leaves the box, its words no longer composed.
+    ided = module.ClaudishEngine(connection=connection, object_path="/org/claudish/TestEngineId", has_focus_id=True)
+    try:
+        ided.do_focus_in_id("/ic/9", "gtk3-im:gedit")
+        ided.composition.mode = "compose"
+        for char in "hello":
+            ided.do_process_key_event(ord(char), 0, 0)
+        assert ided.composition.text == "hello" and ided.focused
+        as_daemon("/org/claudish/TestEngineId", "FocusOutId", GLib.Variant("(s)", ("/ic/9",)))
+        assert not ided.focused and ided.timer is None and not ided.composition.text, (ided.focused, ided.composition.text)
+    finally:
+        ided.destroy()
+    # The text around the caret IBus keeps is the last box's until the new one sends its own (Qt
+    # sends it only once asked, or when its caret moves): never another app's selection or words.
+    as_daemon("/org/claudish/TestEngine", "SetCapabilities", GLib.Variant("(u)", (int(IBus.Capabilite.SURROUNDING_TEXT),)))
+    engine.do_focus_in_id("/ic/10", "gtk3-im:gedit")
+    engine.do_set_surrounding_text(IBus.Text.new_from_string("secret in gedit"), 6, 0)
+    assert engine.surrounding() == ("secret in gedit", 6, 0)
+    engine.do_focus_in_id("/ic/11", "QIBusInputContext")
+    assert engine.surrounding() is None
+    engine.do_set_surrounding_text(IBus.Text.new_from_string("Dear Sam"), 8, 8)
+    assert engine.surrounding() == ("Dear Sam", 8, 8)
+    as_daemon("/org/claudish/TestEngine", "SetCapabilities", GLib.Variant("(u)", (0,)))
+    # IBus before 1.5.27 (no focus ids) moves one engine through every app: each focus-in is a box of its own.
+    engine.own_path = "/org/claudish/TestEngine"
+    engine.do_focus_in()
+    first = engine.context
+    engine.do_focus_in()
+    assert engine.context != first and engine.context.startswith(engine.own_path), (first, engine.context)
+    engine.own_path = None
+    print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass, focus-out by id, stale surrounding text, IBus 1.5.26 boxes")
 finally:
     engine.destroy()

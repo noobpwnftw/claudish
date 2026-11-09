@@ -51,6 +51,7 @@ SHORTCUT_MASK = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
 STEPS = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
          IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
 UP, DOWN = (IBus.KEY_Up, IBus.KEY_KP_Up), (IBus.KEY_Down, IBus.KEY_KP_Down)  # the numpad's too, as its ← and →
+PAGE_UP, PAGE_DOWN = (IBus.KEY_Page_Up, IBus.KEY_KP_Page_Up), (IBus.KEY_Page_Down, IBus.KEY_KP_Page_Down)
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -180,6 +181,7 @@ class ClaudishEngine(IBus.Engine):
         # The client's object path, GNOME's shared one, a Compose key's sequence, and the path IBus
         # 1.5.26 (no focus ids) gives this engine.
         self.context = self.shared = self.sequence = self.own_path = None
+        self.fresh_surrounding = True
 
     def poll(self):
         if self.composition.follow(self.suggestions):  # the service stopped or came back
@@ -275,7 +277,13 @@ class ClaudishEngine(IBus.Engine):
             text, cursor, anchor = self.get_surrounding_text()
         except Exception:  # not every client implements it
             return None
+        if not self.fresh_surrounding:  # the last box's (Qt sends its own only once asked, or the caret moves)
+            return None
         return (text.get_text() if text else ""), cursor, anchor
+
+    def do_set_surrounding_text(self, text, cursor, anchor):
+        IBus.Engine.do_set_surrounding_text(self, text, cursor, anchor)
+        self.fresh_surrounding = True  # this box's own
 
     def selection(self):
         """(cursor, anchor) in the app's text, when it shares it: a Shift+click changes it, and an
@@ -392,8 +400,12 @@ class ClaudishEngine(IBus.Engine):
             self.refresh_surrounding()
             return
         # A shortcut or another key ends the composition: the instruction is not text for the app;
-        # its exchange is held for this text box, its work going on, as on a focus change.
+        # its exchange is held for this text box, its work going on, as on a focus change. You
+        # stay in the box: its pill says so now, as it would when you came back.
         if not suggested and self.hold():
+            pill = self.composition.held_pill()
+            if pill and screen().shell:
+                screen().publish(None, "", pill, lasting=True)
             return
         text = self.composition.commit(suggested)
         if text:
@@ -554,8 +566,9 @@ class ClaudishEngine(IBus.Engine):
             elif action == "convert":
                 self.render()
             return action != "pass"
-        if keyval in UP + DOWN and self.composition.move(-1 if keyval in UP else 1):
-            self.render()  # ↑ and ↓ move the highlight
+        step = -1 if keyval in UP else 1 if keyval in DOWN else -9 if keyval in PAGE_UP else 9 if keyval in PAGE_DOWN else 0
+        if step and self.composition.move(step):
+            self.render()  # ↑ and ↓ move the highlight; Page Up and Page Down to the first and the last
             return True
         if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK:
             if self.composition.restore():
@@ -721,6 +734,8 @@ class ClaudishEngine(IBus.Engine):
         # context and approvals stay with the box they were made in, also when you come back to it.
         self.suggestions.use_conversation(object_path)
         self.context = object_path
+        if not self.shared:  # the text around the caret IBus keeps is the last box's until this one sends its own
+            self.fresh_surrounding = False
         self.resume()
         self.update_quiet()
         self.refresh_surrounding()
@@ -741,9 +756,17 @@ class ClaudishEngine(IBus.Engine):
         self.do_focus_in_id(self.shared, "gnome-shell")
 
     def do_focus_in(self):
-        """An IBus without focus ids (before 1.5.27): this engine's input context is the text box."""
+        """An IBus without focus ids (before 1.5.27). It moves one engine through every app's text
+        boxes and says nothing of which: each focus-in is a text box of its own, so no exchange,
+        earlier turns or dropped words follow you into another app."""
         if self.own_path:
-            self.do_focus_in_id(self.own_path, "")
+            self.focus_ins = getattr(self, "focus_ins", 0) + 1
+            self.do_focus_in_id("%s#%d" % (self.own_path, self.focus_ins), "")
+
+    def do_focus_out_id(self, object_path):
+        """IBus 1.5.27+ with focus ids says focus-out as FocusOutId, which never reaches
+        do_focus_out: leave the box all the same (GTK on X11, XIM and kitty send no reset with it)."""
+        self.do_focus_out()
 
     def do_focus_out(self):
         trace("focus-out")

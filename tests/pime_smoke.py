@@ -338,6 +338,7 @@ def main():
             before = list(replayed)
             reply = key(ord("C"), modifiers=(0x11,))
             assert reply.get("commitString", "") == "" and service.state.held is not None, reply
+            assert "working on what you asked" in json.dumps(reply.get("toast")), reply  # the pill, in the box you stay in
             assert not service.state.text and replayed == before + [(ord("C"), [0x11])], replayed
             service.state.held = None
             assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"] is False

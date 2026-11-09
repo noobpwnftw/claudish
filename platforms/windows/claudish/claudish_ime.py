@@ -123,6 +123,7 @@ def console_window():
 
 STEPS = {0x25: -1, 0x27: 1, 0x24: "home", 0x23: "end"}  # ← → Home End, inside what you type
 # Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
+PAGING = {0x26: -1, 0x28: 1, 0x21: -9, 0x22: 9}  # ↑ ↓ Page Up, Page Down: steps through the choices
 EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
 
 
@@ -639,6 +640,7 @@ class ClaudishTextService(TextService):
             if self.state.for_model:
                 self.state.leave(self.last_document)
                 self.publish()
+                self.show_pill(self.state.held_pill())  # you stay in the box: its pill says it now
             else:
                 self.setCommitString(self.state.commit())
                 self.changed()
@@ -712,7 +714,7 @@ class ClaudishTextService(TextService):
             if answering and self.worker:
                 self.worker.answer(*answering)
             self.setCommitString(self.state.commit(True))
-        elif key in (0x26, 0x28) and self.state.move(-1 if key == 0x26 else 1):  # ↑ and ↓ move the highlight
+        elif key in PAGING and self.state.move(PAGING[key]):  # ↑ and ↓ move the highlight; Page Up/Down to the ends
             self.publish()
             return True
         elif key == 0x1B and event.isKeyDown(0x10) and self.state.restore():  # Shift+Esc: the dropped one, back
@@ -765,11 +767,14 @@ class ClaudishTextService(TextService):
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             # What is for the model never goes in: the exchange is held, as on a focus change.
-            if self.state.for_model:
+            sent = self.state.for_model
+            if sent:
                 self.state.leave(self.last_document)
             else:
                 self.setCommitString(self.state.commit())
             self.changed()
+            if sent:
+                self.show_pill(self.state.held_pill())  # you stay in the box: its pill says it now
             self.currentReply["replay"] = replay(key, held(event))
             return True
         self.changed()
