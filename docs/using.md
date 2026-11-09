@@ -35,6 +35,11 @@ different input method for each app window"; macOS, System Settings → Keyboard
 Text Input → Edit… → "Automatically switch to a document's input source"; GNOME Tweaks →
 Keyboard → "Switch input sources individually for each window".
 
+In GNOME on Wayland, Electron apps (Slack, VS Code, Obsidian, Discord, …) take an input method only
+when started with `--enable-wayland-ime`; without it their keys go straight in and cd_AI does not
+compose there (Electron 45). Add the flag to the app's launcher: the `Exec=` line of its `.desktop`
+file (copied to `~/.local/share/applications/`), for example `Exec=code --enable-wayland-ime %F`.
+
 A composition is edited at its cursor: ← and → move it, and typing, Backspace and Delete work
 there. Other navigation keys (↑↓ with nothing to choose, Home, Page Up), Shift+← and Ctrl/Alt/Win
 shortcuts pressed while composing commit your words first, then act. While an answer is waiting,
