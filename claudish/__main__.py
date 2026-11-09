@@ -14,6 +14,11 @@ from .server import make_server
 
 
 def main():
+    # Output piped or redirected on Windows is in the console's code page (cp1252): a character it
+    # lacks (→, a model's emoji) is shown as ? instead of ending the command with a traceback.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     args, parser, passthrough = parse(sys.argv[1:])
     handler = COMMANDS.get(args.command)
     if handler:

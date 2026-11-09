@@ -602,3 +602,16 @@ class AdapterTests(unittest.TestCase):
         self.assertIn("before=before[-AROUND:], after=after[:AROUND]", (root / "platforms/linux/engine.py").read_text())
         self.assertIn("location - AROUND", (root / "platforms/macos/controller.py").read_text())
         self.assertGreaterEqual(AROUND, max(max(window) for window in WINDOWS.values()))
+
+
+class OutputEncodingTests(unittest.TestCase):
+    def test_an_output_encoding_without_a_character_prints_it_as_a_question_mark(self):
+        """Windows writes piped output in the console's code page (cp1252 has no →): `claudish recent |
+        more` ended in a traceback. The templates hold em dashes, which ASCII output lacks."""
+        import os
+        import subprocess
+        import sys as system
+        done = subprocess.run([system.executable, "-m", "claudish", "templates"], capture_output=True,
+                              env=dict(os.environ, PYTHONIOENCODING="ascii"), timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr[-300:])
+        self.assertIn(b"?", done.stdout)
