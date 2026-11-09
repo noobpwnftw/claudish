@@ -253,8 +253,11 @@ example, the diff of the branch whose PR description you are writing:
 ], "max_context_chars": 6000}}}
 ```
 
+A command runs as written, without a shell (`~` in an argument is your home): for a pipe or `&&`,
+run a shell yourself, `["sh", "-c", "git log --oneline | head -5"]`, or on Windows
+`["powershell", "-NoProfile", "-Command", "git log --oneline | Select-Object -First 5"]`.
 Results are cached for `ttl` seconds (default 30). A failing or slow provider (`timeout`,
-default 5 s) is skipped. Context goes in the user turn, ahead of your text. Adapters may also
+default 5 s) is skipped, and what was consulted names it with the reason. Context goes in the user turn, ahead of your text. Adapters may also
 send the text around the caret as `before`/`after` in `/suggest`.
 
 MCP servers can supply context too. Every installer includes the MCP SDK; a checkout needs
