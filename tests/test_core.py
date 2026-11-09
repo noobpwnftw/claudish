@@ -406,6 +406,8 @@ class ServiceTests(unittest.TestCase):
             ([], {}, 400),
             ({"text": "hello", "again": "no"}, {}, 400),
             ({"text": "hi \ud800 there"}, {}, 400),  # half an emoji: not text, refused, never a dropped reply
+            ({"text": "hi", "draft": "a draft"}, {}, 400),  # a draft in view is an instruction's only
+            ({"text": "hi", "mode": "instruct", "draft": ["a draft"]}, {}, 400),
             ({"text": "hello"}, {"Origin": "http://example.com"}, 403),
         ]:
             req = Request(self.url + "/suggest", data=json.dumps(body).encode(),

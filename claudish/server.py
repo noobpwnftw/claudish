@@ -492,6 +492,9 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     raise ValueError("look is a boolean, for instruct only")
                 purpose = checked_purpose(data.get("purpose"))
                 again = data.get("again", True)  # false: a measurement's repeat, not another take
+                draft = data.get("draft") or ""  # a follow-up's draft in view (the web demo's)
+                if not (isinstance(draft, str) and len(draft) <= AROUND) or (draft and mode != "instruct"):
+                    raise ValueError("draft is the draft in view, for instruct only")
                 if not isinstance(again, bool):
                     raise ValueError("again is a boolean")
             except (ValueError, UnicodeError) as exc:
@@ -506,7 +509,8 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     # Autocomplete runs at every pause: a hosted model only where a profile routes it.
                     return self.reply(503, {"error": "continue has no model of its own"})
                 answerer = rewriter.route(app, mode) if trusted else rewriter  # which AI answers here
-                result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted, again=again)
+                result = answerer.rewrite(text, before, after, mode, app, look, purpose, context=trusted, again=again,
+                                          draft=draft)
             except Exception as exc:
                 from .composition import failure
                 return self.reply(503, {"error": str(exc), "said": failure(exc)})  # said: in the panel's words

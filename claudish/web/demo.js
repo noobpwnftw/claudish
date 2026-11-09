@@ -68,6 +68,7 @@ function change(text) {
   state.error = state.reply = "";
   state.highlight = 0;
   state.editing = false;
+  state.about = "";  // a follow-up's draft in view (composition.py's about)
   state.revision++;
 }
 const live = () => state.mode === "continue";
@@ -75,7 +76,15 @@ const composing = () => !live() && Boolean(state.text);
 // Sent: the instruction stays the composition while its exchange is open, and a reply takes its
 // place (docs/design/design.md). A rewrite waits in the panel: only Tab puts the model's words in.
 const sent = () => state.asked === "instruct" && (state.working || state.failed || Boolean(state.candidate));
-const shown = () => sent() ? state.reply || state.text : state.text;
+// Answered: an instruction sent, or a rewrite showing; what you type next is a reply (a follow-up).
+const answered = () => sent() || state.converted;
+const shown = () => answered() ? state.reply || state.text : state.text;
+// Visible characters (an emoji, a flag, a letter with its accents), as composition.py steps over them.
+const SEGMENTER = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("en", {granularity: "grapheme"}) : null;
+const pieces = (text) => SEGMENTER ? [...SEGMENTER.segment(text)].map((piece) => piece.segment) : [...text];
+const lastPiece = (text) => (pieces(text).pop() || "").length;  // its length in code units
+const firstPiece = (text) => (pieces(text)[0] || "").length;
+const oneCharacter = (name) => pieces(name).length === 1 && !/^[\p{Cc}]$/u.test(name);
 const ghost = () => live() && !selected() && state.candidate.length > state.text.length
   && state.candidate.startsWith(state.text) ? state.candidate.slice(state.text.length) : "";
 function automatic() {
@@ -97,7 +106,9 @@ function commit(text) {
 // Before the caret moves, a selection is edited, or a shortcut runs, the input method commits your
 // words (navigation and shortcuts end a composition) and continue starts a fresh context.
 function settle() {
-  if (composing()) commit(shown());  // what the composition shows (your words, or a reply)
+  if (sent()) {  // a sent instruction never goes in: it is dropped (Shift+Esc brings it back)
+    state.dropped = state.text; state.droppedReply = false;
+  } else if (composing()) commit(shown());  // what the composition shows (your words, or a reply)
   change(live() ? context() : "");
 }
 
@@ -123,22 +134,26 @@ async function ask(revision) {
     return;
   }
   const text = state.text, mode = live() ? "continue" : state.asked, started = performance.now();
+  const about = mode === "instruct" ? state.about : "";  // a follow-up on a rewrite: the draft in view
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), Math.max(15000, serviceTimeout * 1000 + 2000));
   setStatus("");  // the panel says what is happening
   try {
     let data;
     if (IN_BROWSER) {
-      data = await browserBackend.suggest(text, mode);
+      data = await browserBackend.suggest(text, mode, about);
     } else {
       const response = await fetch("/suggest", {method: "POST", headers: {"Content-Type": "application/json"},
-                                                body: JSON.stringify({text, mode}), signal: controller.signal});
+                                                body: JSON.stringify(about ? {text, mode, draft: about} : {text, mode}),
+                                                signal: controller.signal});
       data = await response.json();
       if (!response.ok) throw new Error(data.error || "The model could not answer.");
     }
     if (revision !== state.revision) return;  // you typed since: a stale answer never lands
-    state.candidate = data.text;
-    state.candidates = (data.candidates || [data.text]).slice(0, 9);
+    // A rewrite keeps the spaces around your words (composition.py's offer).
+    const around = (draft) => mode === "rewrite" ? text.match(/^\s*/)[0] + draft.trim() + text.match(/\s*$/)[0] : draft;
+    state.candidate = around(data.text);
+    state.candidates = (data.candidates || [data.text]).slice(0, 9).map(around);
     if (mode === "rewrite" && state.working) state.converted = true;  // asked with Tab: shown as it arrives
     state.working = false;
     if (mode === "instruct" && state.nudged === pending())
@@ -187,6 +202,8 @@ function panel() {
             foot: [...(readings.length > 1 ? [["↑↓", "choose"]] : []), ["Tab", "insert"], ["Esc", "edit"]],
             tail: "or type to change it", nudge: nudge(), ...typing};
   }
+  if (state.converted && state.reply) return {...shown, label: "Rewrite", body: shortened(state.candidate, PANEL_ROWS),
+                                              replying: true, foot: [["Shift+Enter", "ask"], ["Esc", "cancel"]]};
   if (state.converted) return {...shown, label: "Rewrite", body: shortened(state.candidate, PANEL_ROWS),
                                foot: [["Tab", "insert"], ["Esc", "dismiss"]], tail: "or type to change it"};
   // Composing: the keys show from the first key (what each Enter does must be known).
@@ -235,7 +252,8 @@ function switchMode() {
   flash("Shift");
   if (live()) { state.mode = "compose"; change(""); }
   else {
-    const kept = shown();
+    const kept = sent() ? "" : shown();  // a sent instruction is not text for the app
+    if (sent()) { state.dropped = state.text; state.droppedReply = false; }
     if (kept) commit(kept);
     state.mode = "continue";
     change(context());
@@ -264,20 +282,23 @@ function key(name, shift = false) {
   flash(name === "Enter" && shift ? "Shift+Enter" : name);
   document.querySelectorAll("#editor > .k-toast").forEach((old) => old.remove());  // a key ends a toast
   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(name)) {
+    if (sent() && !state.reply) return true;  // the exchange stays: ← → do nothing on it
     settle();
     const lineStart = doc.text.lastIndexOf("\n", doc.caret - 1) + 1;
     const lineEnd = doc.text.indexOf("\n", doc.caret) < 0 ? doc.text.length : doc.text.indexOf("\n", doc.caret);
     const [start, end] = selection();
     const target = name === "Home" ? lineStart : name === "End" ? lineEnd
       : selected() && !shift ? (name === "ArrowLeft" ? start : end)
-      : doc.caret + (name === "ArrowLeft" ? -1 : 1);
+      : name === "ArrowLeft" ? doc.caret - lastPiece(doc.text.slice(0, doc.caret))
+      : doc.caret + firstPiece(doc.text.slice(doc.caret));
     moveTo(target, shift);
     changed();
     return true;
   }
   if (name === "Delete") {
     if (composing()) return true;
-    if (selected()) removeSelection(); else doc.text = doc.text.slice(0, doc.caret) + doc.text.slice(doc.caret + 1);
+    if (selected()) removeSelection();
+    else doc.text = doc.text.slice(0, doc.caret) + doc.text.slice(doc.caret + firstPiece(doc.text.slice(doc.caret)));
     change(live() ? context() : ""); changed();
     return true;
   }
@@ -301,8 +322,10 @@ function key(name, shift = false) {
       }
       commit(shown()); change(""); changed(); return true;
     }
-    if (sent() && state.reply.trim()) {  // your next words: a follow-up instruction
+    if (answered() && state.reply.trim()) {  // your next words: a follow-up instruction
+      const about = state.converted ? state.candidate : "";  // on a rewrite: about the draft in view
       change(state.reply.trim());
+      state.about = about;
       state.asked = "instruct"; state.working = true; render(); ask(state.revision);
       return true;
     }
@@ -329,13 +352,13 @@ function key(name, shift = false) {
     if (state.converted || (state.asked === "instruct" && state.candidate)) {  // the rewrite, or the highlighted draft
       commit(state.converted ? state.candidate : state.candidates[state.highlight]); change(""); changed();
     } else if (state.asked === "rewrite" && state.candidate) { state.converted = true; render(); }
-    else if (!state.working) {
+    else if (!state.working && !(state.failed && state.asked === "instruct")) {  // a failed instruction: Shift+Enter retries
       state.asked = "rewrite"; state.working = true; state.failed = false; render(); ask(state.revision);
     }
     return true;
   }
   if (name === "Escape") {  // one step back: what you typed, then edit, then drop
-    if (shift && state.dropped && state.droppedReply && sent() && !state.reply) {  // Shift+Esc: the cleared reply
+    if (shift && state.dropped && state.droppedReply && answered() && !state.reply) {  // Shift+Esc: the cleared reply
       state.reply = state.dropped; state.dropped = ""; render();
       return true;
     }
@@ -345,7 +368,7 @@ function key(name, shift = false) {
     }
     if (shift) return false;  // nothing to bring back: the key is the page's, as in composition.py
     if (!state.text) return false;
-    if (sent() && state.reply) {  // what you typed goes, and says so; Shift+Esc brings it back
+    if (answered() && state.reply) {  // what you typed goes, and says so; Shift+Esc brings it back
       state.dropped = state.reply; state.droppedReply = true; state.reply = ""; render(); dropped(); return true;
     }
     if (state.converted) {  // your words again, the rewrite forgotten: Tab asks for another take
@@ -360,22 +383,31 @@ function key(name, shift = false) {
     return true;
   }
   if (name === "Backspace") {
+    if (answered() && state.reply) {  // a reply; the instruction (or the rewrite) stays
+      state.reply = state.reply.slice(0, -lastPiece(state.reply)); render(); return true;
+    }
     if (state.converted) { state.converted = false; render(); return true; }  // your words again
-    if (sent()) { state.reply = state.reply.slice(0, -1); render(); return true; }  // a reply; the instruction stays
-    if (state.text) change(state.text.slice(0, -1));
+    if (sent()) return true;
+    if (state.text) change(state.text.slice(0, -lastPiece(state.text)));
     else if (selected()) removeSelection();
-    else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
+    else if (doc.caret) {
+      const back = lastPiece(doc.text.slice(0, doc.caret));
+      doc.text = doc.text.slice(0, doc.caret - back) + doc.text.slice(doc.caret); moveTo(doc.caret - back);
+    }
     changed();
     return true;
   }
-  if (name.length === 1) {
+  if (oneCharacter(name)) {
     if (selected() && !state.text) removeSelection();  // typing replaces the selection
     // Nothing composed: only a letter or a digit starts a composition; spaces and punctuation are the app's.
     if (!state.text && !/[\p{L}\p{N}]/u.test(name)) { commit(name); changed(); return true; }
-    // A rewrite showing in the panel: typing on goes on with your words (the rewrite goes).
-    if (state.text.length >= MAX) { commit(state.text); change(""); }
-    // Sent: what you type is your next words, at the caret; a Space with nothing typed does nothing.
-    if (sent()) { if (name !== " " || state.reply) state.reply += name; render(); return true; }
+    // Sent, or a rewrite showing: what you type is a reply (a follow-up), at the caret; a Space with
+    // nothing typed does nothing. The reply is capped; the instruction never goes in.
+    if (answered()) {
+      if ((name !== " " || state.reply) && state.reply.length + name.length <= MAX) state.reply += name;
+      render(); return true;
+    }
+    if (state.text.length >= MAX) { commit(state.text); change(""); }  // full: what you typed goes in
     change(state.text + name);  // as typed: em dashes come from the model, never from a key
     changed();
     return true;
@@ -399,12 +431,15 @@ function liveKey(name) {
   }
   if (name === "Backspace") {
     if (selected()) removeSelection();
-    else if (doc.caret) { doc.text = doc.text.slice(0, doc.caret - 1) + doc.text.slice(doc.caret); moveTo(doc.caret - 1); }
+    else if (doc.caret) {
+      const back = lastPiece(doc.text.slice(0, doc.caret));
+      doc.text = doc.text.slice(0, doc.caret - back) + doc.text.slice(doc.caret); moveTo(doc.caret - back);
+    }
     change(context()); changed();
     return true;
   }
   if (name === "Enter") { commit("\n"); change(context()); changed(); return true; }
-  if (name.length === 1) {  // exactly the key: continue types like en_US
+  if (oneCharacter(name)) {  // exactly the key: continue types like en_US
     commit(name); change(context()); changed();
     return true;
   }
@@ -540,7 +575,7 @@ sink.addEventListener("beforeinput", (event) => {
   if (event.inputType === "insertText" && event.data) {
     event.preventDefault();
     stopTyping();
-    for (const char of event.data) key(char);
+    for (const char of pieces(event.data)) key(char);  // each visible character (an emoji from the picker too)
   } else if (event.inputType === "insertLineBreak" || event.inputType === "insertParagraph") {
     event.preventDefault(); key("Enter");
   } else if (event.inputType === "deleteContentBackward") {

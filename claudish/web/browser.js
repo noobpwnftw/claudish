@@ -80,6 +80,13 @@ function parroted(mode, text, candidate, examples) {
   return answers.has(rest) || (rest.length >= 12 && text.toLowerCase().includes(rest));
 }
 
+// The turn as the service frames it: continue quotes the text as a task; a follow-up carries the
+// draft in view (templates.json's box.in_view, as the input methods send it).
+function framed(spec, text, draft) {
+  const said = spec.frame ? spec.frame.replace("{text}", text) : text;
+  return draft && spec.in_view ? spec.in_view.replace("{draft}", draft).replace("{text}", said) : said;
+}
+
 export async function createBrowserBackend(templates, modelUrl, onProgress, onNote = () => {}) {
   const { Wllama } = await import(WLLAMA);
   const wllama = new Wllama(WASM);
@@ -103,14 +110,14 @@ export async function createBrowserBackend(templates, modelUrl, onProgress, onNo
   return {
     // Stops the model: while it runs, its worker holds the stored files open and they cannot be removed.
     async exit() { await wllama.exit(); },
-    async suggest(text, mode) {
+    async suggest(text, mode, draft = "") {
       const spec = templates.modes[mode];
       if (!spec) throw new Error(`Unknown mode: ${mode}`);
       const started = performance.now();
       const response = await wllama.createChatCompletion({
         // Continue quotes the text as a task (spec.frame), so the model continues it instead of answering it.
         messages: [{ role: "system", content: spec.system }, ...spec.examples,
-                   { role: "user", content: spec.frame ? spec.frame.replace("{text}", text) : text }],
+                   { role: "user", content: framed(spec, text, draft) }],
         max_tokens: spec.max_tokens || templates.max_tokens,
         temperature: 0,  // greedy, as on the service
       });

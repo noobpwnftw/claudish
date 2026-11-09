@@ -548,7 +548,7 @@ class Rewriter:
         return data["choices"][0], data.get("usage", {})
 
     def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None,
-                context=True, again=True):
+                context=True, again=True, draft=""):
         """One answer for a /suggest request (continue, rewrite, or instruct without a session).
         look: a picture of the focused window (instruct only; F8); before/after: the text box
         around the caret; purpose: the field's kind; screen: a terminal's last lines, given instead
@@ -557,6 +557,7 @@ class Rewriter:
         if mode not in self.modes:
             raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
         box = self.box(mode, app, purpose, before, after, look, screen, trusted=context)
+        box.draft = draft or None  # a follow-up about the draft in view, framed as the input methods' are
         return self.answer(mode, text, box, again=again)
 
     def answer(self, mode, text, box, conversation=None, approve=None, progress=None, local=None, serial=True,

@@ -52,7 +52,8 @@ def build(out):
     (out / "design.html").write_text(design, encoding="utf-8")
     templates = {"model_url": MODEL_URL, "model_bytes": MODEL_BYTES, "max_tokens": 64,
                  "modes": {name: {"system": spec["system"], "examples": spec["examples"],
-                                  "max_tokens": spec["max_tokens"], "frame": spec.get("frame")}
+                                  "max_tokens": spec["max_tokens"], "frame": spec.get("frame"),
+                                  **({"in_view": spec["box"]["in_view"]} if name == "instruct" else {})}
                            for name, spec in modes.defaults().items()}}
     (out / "templates.json").write_text(json.dumps(templates, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return out

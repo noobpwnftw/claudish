@@ -18,7 +18,7 @@ h1,h2,.lede,.feedback,.samples>span{text-wrap:balance}
 .source-badge b{background:var(--ink);color:var(--paper);border-radius:3px;padding:1px 5px;font-weight:600}
 .source-badge:hover{border-color:var(--chip-hover-border)}
 .source-key{font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:3px;padding:0 4px}
-.editor{position:relative;min-height:230px;padding:26px 28px;background:var(--editor-bg);cursor:text}
+.editor{position:relative;min-height:230px;padding:16px 28px 26px;background:var(--editor-bg);cursor:text}
 .editor.focused{background:var(--focus-bg)}
 .page{font-family:var(--serif);font-size:24px;line-height:1.6;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 /* The composition wraps as text does: a space at a line's end takes no underline (pre-wrap kept it,
@@ -40,8 +40,8 @@ h1,h2,.lede,.feedback,.samples>span{text-wrap:balance}
 .timing{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .mode-hint{font-size:13px;color:var(--muted);margin:14px 0 0;text-wrap:pretty}
 .sample-mode{font-family:var(--mono);font-size:10px;letter-spacing:.6px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:1px 5px;margin-right:4px}
-@media(max-width:650px){.editor{padding:20px;min-height:200px}.page{font-size:21px}.desk-footer{flex-direction:column;gap:10px}.room-sub{display:none}}
-.workspace{overflow:visible}.workspace-bar{border-radius:6px 6px 0 0}.workspace .desk-footer{border-radius:0 0 6px 6px;background:var(--editor-bg)}.editor-placeholder{position:absolute;left:28px;top:26px;right:28px;pointer-events:none;text-wrap:balance}.samples button{text-wrap:balance}@media(max-width:650px){.editor-placeholder{left:20px;top:20px;right:20px}.desk-actions .text-button{display:inline}}.page .selected{background:color-mix(in srgb,var(--accent) 28%,var(--editor-bg))}.editor.focused .page .selected{background:color-mix(in srgb,var(--accent) 28%,var(--focus-bg))}.page{user-select:none}.model-action{gap:16px;align-items:center}#remove-model{border:1px solid var(--key-border);border-radius:3px;background:transparent;color:var(--label);padding:10px 12px;font-size:13px;white-space:nowrap}#remove-model:hover{background:var(--chip-hover)}@media(max-width:650px){.model-action #remove-model{width:100%}}.model-strip.loading #remove-model,#remove-model[hidden]{display:none}.wordmark{white-space:nowrap;flex-shrink:0}
+@media(max-width:650px){.editor{padding:12px 20px 20px;min-height:200px}.page{font-size:21px}.desk-footer{flex-direction:column;gap:10px}.room-sub{display:none}}
+.workspace{overflow:visible}.workspace-bar{border-radius:6px 6px 0 0}.workspace .desk-footer{border-radius:0 0 6px 6px;background:var(--editor-bg)}.editor-placeholder{position:absolute;left:28px;top:16px;right:28px;pointer-events:none;text-wrap:balance}.samples button{text-wrap:balance}@media(max-width:650px){.editor-placeholder{left:20px;top:12px;right:20px}.desk-actions .text-button{display:inline}}.page .selected{background:color-mix(in srgb,var(--accent) 28%,var(--editor-bg))}.editor.focused .page .selected{background:color-mix(in srgb,var(--accent) 28%,var(--focus-bg))}.page{user-select:none}.model-action{gap:16px;align-items:center}#remove-model{border:1px solid var(--key-border);border-radius:3px;background:transparent;color:var(--label);padding:10px 12px;font-size:13px;white-space:nowrap}#remove-model:hover{background:var(--chip-hover)}@media(max-width:650px){.model-action #remove-model{width:100%}}.model-strip.loading #remove-model,#remove-model[hidden]{display:none}.wordmark{white-space:nowrap;flex-shrink:0}
 @media(max-width:360px){.topbar{gap:10px}.wordmark{font-size:28px}.connection{min-width:0;overflow:hidden;text-overflow:ellipsis}}
 #load-model.attention{outline:3px solid var(--accent);outline-offset:3px}
 .keystrip>[data-key]:not([data-key="Shift"]){cursor:pointer}
