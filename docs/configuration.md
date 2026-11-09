@@ -153,7 +153,7 @@ back to Codex's default.
 
 ### An agent CLI as the backend
 
-With `"backend": "command"`, Claudish sends the mode's instructions, the profile's context, and your text on
+With `"backend": "command"`, Claudish sends the mode's instructions, the context, and your text on
 stdin; the command's output becomes the candidate, which you accept with Tab. The CLI starts for each
 request:
 
@@ -377,7 +377,7 @@ pick, and its final answer is a candidate like any other. For Claude Code:
 - **The agent gets the profile's tools.** The servers named in the profile's `tools` are
   passed to it (`--mcp-config`), under the same policy as the model:
   `deny` tools are never offered (`--disallowedTools`), `trust` tools run
-  without asking, the rest ask. The profile's `context` and the app's bindings go
+  without asking, the rest ask. The `context` and the app's bindings go
   with each instruction, as they do for the model.
 - **The agent sees your text box.** The text around the caret goes with each
   instruction, and with the MCP SDK (every installer has it), Claudish gives the agent a
@@ -464,7 +464,7 @@ Every request names a mode:
 | --- | --- | --- |
 | `rewrite` (default) | a phrase | the phrase, rewritten in house style |
 | `continue` | the start of a sentence | your text plus the next few words |
-| `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the profile's context |
+| `instruct` | an instruction, such as "decline politely, propose Thursday" | the text itself, written using the context |
 
 At the caret, compose's Tab asks for `rewrite`, its Shift+Enter (or Enter, [Keys](#keys)) sends `instruct`, and continue mode
 (a Shift tap) asks for `continue` ([all the keys](using.md#typing)). Adapters send `"mode"` in `/suggest`, and

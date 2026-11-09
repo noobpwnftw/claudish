@@ -400,7 +400,8 @@ class Rewriter:
         return self.routed[name]
 
     def sections(self, app=None, failed=None):
-        """The profile's context and the focused app's bindings (a supported text box): [(name, text)];
+        """The context and the focused app's bindings (a supported text box), within this profile's
+        max_context_chars: [(name, text)];
         failed gets (name, why) for those that could not be read."""
         extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
         if not (self.context or extra):

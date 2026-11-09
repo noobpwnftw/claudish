@@ -7,7 +7,7 @@ tools). The model answers with drafts (claudish/shapes.py) that complete (contin
 (rewrite) or insert (instruct), or asks (a question, through a tool that needs the user).
 
 The box is described once, in the system prompt. Observations (a terminal's screen, the
-profile's context, the app's bindings) go in the turn, next to the user's words, fenced as
+context, the app's bindings) go in the turn, next to the user's words, fenced as
 material, not instructions: a model reads "fix" as being about what it sees there, not about
 an earlier draft. A tone is for prose: a command line, a URL, or a number has none, so the
 Claudish tone and its prose examples apply only to prose boxes.
@@ -95,7 +95,7 @@ class Box:
 
 
 def observe(rewriter, box, mode, look=False, screen=None):
-    """Run the observers this request calls for: the profile's context and the app's bindings, a
+    """Run the observers this request calls for: the context and the app's bindings, a
     terminal's screen (for compose, never for continue's pauses; screen: given instead of read),
     and a picture of the window (F8, with an instruction)."""
     failed = []

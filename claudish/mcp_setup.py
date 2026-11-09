@@ -142,7 +142,8 @@ def import_servers(path=None, dry_run=False, replace=False):
     if needed:
         print("Set these in the environment Claudish runs in: %s" % ", ".join(sorted(needed)))
     if imported:
-        print(as_typed('Next: `claudish mcp list` shows their tools; use one in a profile\'s "context" or a binding, e.g.\n'
+        print(as_typed('Next: `claudish mcp list` shows their tools; use one in "context" (beside "profiles"), a '
+                       'binding\'s "context", or a profile\'s "tools", e.g.\n'
                        '  {"type": "mcp", "server": "%s", "tool": "TOOL", "arguments": {}}' % imported[0]))
     return 0
 
