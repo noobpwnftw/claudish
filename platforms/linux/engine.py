@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import AROUND, MAX_COMPOSITION, MODES, Composition, ShiftTap, accented, typeable, window
+from claudish.composition import AROUND, MODES, PAGE, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -50,8 +50,9 @@ SHORTCUT_MASK = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
                  IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)
 STEPS = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
          IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
-UP, DOWN = (IBus.KEY_Up, IBus.KEY_KP_Up), (IBus.KEY_Down, IBus.KEY_KP_Down)  # the numpad's too, as its ← and →
-PAGE_UP, PAGE_DOWN = (IBus.KEY_Page_Up, IBus.KEY_KP_Page_Up), (IBus.KEY_Page_Down, IBus.KEY_KP_Page_Down)
+# ↑ ↓ Page Up, Page Down, the numpad's too (as its ← and →): steps through the choices.
+PAGING = {IBus.KEY_Up: -1, IBus.KEY_KP_Up: -1, IBus.KEY_Down: 1, IBus.KEY_KP_Down: 1,
+          IBus.KEY_Page_Up: -PAGE, IBus.KEY_KP_Page_Up: -PAGE, IBus.KEY_Page_Down: PAGE, IBus.KEY_KP_Page_Down: PAGE}
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -182,6 +183,7 @@ class ClaudishEngine(IBus.Engine):
         # 1.5.26 (no focus ids) gives this engine.
         self.context = self.shared = self.sequence = self.own_path = None
         self.fresh_surrounding = True
+        self.focus_ins = 0  # IBus 1.5.26: each focus-in is a text box of its own (do_focus_in)
 
     def poll(self):
         if self.composition.follow(self.suggestions):  # the service stopped or came back
@@ -322,9 +324,6 @@ class ClaudishEngine(IBus.Engine):
         self.composition.change(value[start:end])
         return True
 
-    def before_caret(self):
-        return self.around_caret()[0][-MAX_COMPOSITION:]
-
     def live_key(self, keyval, shift=False):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it.
         shift: Shift is held."""
@@ -371,7 +370,7 @@ class ClaudishEngine(IBus.Engine):
         char = IBus.keyval_to_unicode(keyval)
         if char and char.isprintable():
             if not state.text:  # a fresh start (a click, a paste, a new field): begin from the app's text
-                state.change(self.before_caret())
+                state.follow_app(self.around_caret()[0])
             state.type_live(char)  # continue types exactly the key: the app inserts it itself
             self.changed()
             # Passed on rather than committed: the app then reports its caret after the key (a
@@ -385,7 +384,7 @@ class ClaudishEngine(IBus.Engine):
     def live_commit(self, text):
         """Continue: text the input method puts in itself (an accented letter), as typed."""
         if not self.composition.text:
-            self.composition.change(self.before_caret())
+            self.composition.follow_app(self.around_caret()[0])
         for char in text:
             self.composition.type_live(char)
         self.commit_text(IBus.Text.new_from_string(text))
@@ -402,8 +401,9 @@ class ClaudishEngine(IBus.Engine):
         # A shortcut or another key ends the composition: the instruction is not text for the app;
         # its exchange is held for this text box, its work going on, as on a focus change. You
         # stay in the box: its pill says so now, as it would when you came back.
-        if not suggested and self.hold():
-            pill = self.composition.held_pill()
+        if not suggested and self.composition.for_model:
+            pill = self.composition.set_aside(self.context)
+            self.render()
             if pill and screen().shell:
                 screen().publish(None, "", pill, lasting=True)
             return
@@ -566,8 +566,7 @@ class ClaudishEngine(IBus.Engine):
             elif action == "convert":
                 self.render()
             return action != "pass"
-        step = -1 if keyval in UP else 1 if keyval in DOWN else -9 if keyval in PAGE_UP else 9 if keyval in PAGE_DOWN else 0
-        if step and self.composition.move(step):
+        if keyval in PAGING and self.composition.move(PAGING[keyval]):
             self.render()  # ↑ and ↓ move the highlight; Page Up and Page Down to the first and the last
             return True
         if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK:
@@ -760,7 +759,7 @@ class ClaudishEngine(IBus.Engine):
         boxes and says nothing of which: each focus-in is a text box of its own, so no exchange,
         earlier turns or dropped words follow you into another app."""
         if self.own_path:
-            self.focus_ins = getattr(self, "focus_ins", 0) + 1
+            self.focus_ins += 1
             self.do_focus_in_id("%s#%d" % (self.own_path, self.focus_ins), "")
 
     def do_focus_out_id(self, object_path):

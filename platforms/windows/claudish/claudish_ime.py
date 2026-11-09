@@ -5,7 +5,7 @@ import os
 import time
 import weakref
 
-from .composition import HELD_SECONDS, MAX_COMPOSITION, MODES, Composition, ShiftTap, window
+from .composition import HELD_SECONDS, MODES, PAGE, Composition, ShiftTap, window
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -123,8 +123,8 @@ def console_window():
 
 
 STEPS = {0x25: -1, 0x27: 1, 0x24: "home", 0x23: "end"}  # ← → Home End, inside what you type
+PAGING = {0x26: -1, 0x28: 1, 0x21: -PAGE, 0x22: PAGE}  # ↑ ↓ Page Up, Page Down: steps through the choices
 # Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
-PAGING = {0x26: -1, 0x28: 1, 0x21: -9, 0x22: 9}  # ↑ ↓ Page Up, Page Down: steps through the choices
 EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
 
 
@@ -533,8 +533,8 @@ class ClaudishTextService(TextService):
         self.state.field(kind, kind == "terminal" or is_terminal(focused_app()))
         after = self.state.caret_after(self.around()[1] if self.state.live else "")
         if self.worker and self.state.automatic:
-            # Continue asks at once at a word boundary (itself the pause), so the answer is often
-            # ready by the time the key is released, and onKeyUp can show it.
+            # Continue asks at once at a word boundary (itself the pause); the timer shows the
+            # answer as soon as it comes (await_result).
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
                                  immediate=self.state.live, after=after, purpose=self.field())
             self.await_result()
@@ -567,7 +567,7 @@ class ClaudishTextService(TextService):
         if self.live_typed:  # continue: what the app typed, read now that it is in
             self.live_typed = False
             if self.state.live:
-                self.state.change(self.around()[0][-MAX_COMPOSITION:])
+                self.state.follow_app(self.around()[0])
                 self.changed()
         away = self.owner and foreground() not in (None, self.owner) or \
             self.front is not None and foreground_window() not in (None, self.front)
@@ -646,9 +646,9 @@ class ClaudishTextService(TextService):
             # instruction is not text for the app: it is cleared and its exchange held for Shift+Esc,
             # as a focus change does (and as on Linux and macOS).
             if self.state.for_model:
-                self.state.leave(self.last_document)
+                pill = self.state.set_aside(self.last_document)
                 self.publish()
-                self.show_pill(self.state.held_pill())  # you stay in the box: its pill says it now
+                self.show_pill(pill)  # you stay in the box: its pill says it now
             else:
                 self.setCommitString(self.state.commit())
                 self.changed()
@@ -775,14 +775,14 @@ class ClaudishTextService(TextService):
         else:
             # A navigation key commits the wording, then reaches the app (replayed): one press does both.
             # What is for the model never goes in: the exchange is held, as on a focus change.
-            sent = self.state.for_model
-            if sent:
-                self.state.leave(self.last_document)
+            pill = None
+            if self.state.for_model:
+                pill = self.state.set_aside(self.last_document)
             else:
                 self.setCommitString(self.state.commit())
             self.changed()
-            if sent:
-                self.show_pill(self.state.held_pill())  # you stay in the box: its pill says it now
+            if pill:
+                self.show_pill(pill)  # you stay in the box: its pill says it now
             self.currentReply["replay"] = replay(key, held(event))
             return True
         self.changed()

@@ -4,6 +4,7 @@ Exercises the real GObject/IBus bindings on an isolated session bus, without
 registering the input method or touching desktop settings. Not an app UI test.
 """
 import importlib.util
+from unittest.mock import patch
 from pathlib import Path
 
 import gi
@@ -109,10 +110,10 @@ try:
     assert not engine.do_process_key_event(IBus.KEY_BackSpace, 0, 0)  # the app deletes; the context follows
     # A fresh start in continue (after a click or a paste) begins from the app's text before the caret.
     engine.composition.change("")
-    engine.before_caret = lambda: "Pasted words. "
+    engine.around_caret = lambda: ("Pasted words. ", "")
     assert not engine.do_process_key_event(ord("W"), 0, 0)
     assert engine.composition.text == "Pasted words. W", engine.composition.text
-    del engine.before_caret
+    engine.around_caret = real
     shift_tap()
     assert engine.composition.mode == "compose" and engine.composition.text == ""  # the words are in the app
     # Compose holds the text; Shift+Enter sends it as an instruction; Enter then puts nothing in.
@@ -258,11 +259,10 @@ try:
     for char in "fix it":
         engine.do_process_key_event(ord(char), 0, 0)
     assert engine.do_process_key_event(IBus.KEY_Return, 0, IBus.ModifierType.SHIFT_MASK) and engine.composition.sent
-    shown, pills = module.screen(), []
-    publish, shell = shown.publish, shown.shell
-    shown.publish, shown.shell = (lambda *args, **kwargs: pills.append(args)), True
-    assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
-    shown.publish, shown.shell = publish, shell
+    pills = []
+    with patch.object(module.screen(), "publish", lambda *args, **kwargs: pills.append(args)), \
+            patch.object(module.screen(), "shell", True):
+        assert not engine.do_process_key_event(ord("a"), 0, IBus.ModifierType.CONTROL_MASK)
     assert commits[-1] != "fix it" and engine.composition.held is not None and not engine.composition.text  # held, not typed in
     # You stay in the box: its pill says what waits at once (no coming back would show it).
     assert pills and ((pills[-1] + (None,) * 3)[2] or {}).get("status") == "working on what you asked", pills[-1:]

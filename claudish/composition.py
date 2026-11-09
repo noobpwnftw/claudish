@@ -5,6 +5,7 @@ import time
 import unicodedata
 
 MAX_COMPOSITION = 512
+PAGE = 9  # Page Up/Down's step through the choices: past either end, so move() lands on the first or the last
 # The text box an adapter reads and sends on each side of the caret, the same on every platform
 # (Claudish's PIME reads this much too: pime.patch); the service keeps what each mode uses
 # (turn.WINDOWS: an instruction 6000 before, 2000 after).
@@ -887,7 +888,7 @@ class Composition:
 
     def move(self, step):
         """↑ (-1) or ↓ (+1): move the highlight through the choices or the drafts (no wrap: two or
-        three rows). An approval starts with nothing highlighted: the first ↓ lands on its safe
+        three rows); Page Up and Page Down (∓PAGE) to the first or the last. An approval starts with nothing highlighted: the first ↓ lands on its safe
         choice (Deny). A single draft takes the key too, moving nothing: passed on, it ended the
         exchange. With nothing to choose while an exchange is open (it works, it failed, or you
         type a reply), the key does nothing, as ← and → there: it never leaves it. False otherwise,
@@ -1079,6 +1080,11 @@ class Composition:
         suggestion or lose your words."""
         return self.mode == "continue"
 
+    def follow_app(self, before):
+        """Continue starts again from the app's text before the caret (a fresh start, a click since,
+        or a key the app typed itself)."""
+        self.change(before[-MAX_COMPOSITION:])
+
     def type_live(self, char):
         """Continue: what to commit for this key now. Exactly the key: continue types like en_US
         (hyphens in URLs and commands stay hyphens); em dashes come from the model."""
@@ -1222,6 +1228,12 @@ class Composition:
                 del self.holds[box]
                 gone = gone or box == self.here
         return gone
+
+    def set_aside(self, box):
+        """A key that is the app's (a shortcut) sets the open exchange aside for this box, as a focus
+        change does, while you stay in it: its pill, to show now (None with hints off)."""
+        self.leave(box)
+        return self.held_pill()
 
     def held_pill(self):
         """The held exchange's pill, or None (in continue Shift+Esc cannot open it; your words come first)."""

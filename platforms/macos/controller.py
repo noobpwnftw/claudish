@@ -10,7 +10,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, Composition, ShiftTap, accented, typeable, window
+from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, PAGE, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel, units  # cd_AI's own panel and suggestion overlay (G45)
@@ -90,7 +90,7 @@ def substring(client, location, length):
 
 
 RETURN_KEYS = (36, 76)  # Return, keypad Enter
-PAGING = {126: -1, 125: 1, 116: -9, 121: 9}  # ↑ ↓ Page Up, Page Down: steps through the choices
+PAGING = {126: -1, 125: 1, 116: -PAGE, 121: PAGE}  # ↑ ↓ Page Up, Page Down: steps through the choices
 NAVIGATION_KEYS = (115, 116, 117, 119, 121, 123, 124, 125, 126)  # Home, PgUp, forward Delete, End, PgDn, arrows
 def whole(text):
     """Text without a lone UTF-16 surrogate (half an emoji cut at a range's edge)."""
@@ -582,6 +582,17 @@ class ClaudishInputController(IMKInputController):
         return (chars, 0) if flags & NSEventModifierFlagOption and chars in ACCENTS else None
 
     @objc.python_method
+    def after_accent(self, key, chars, flags, accent, found):
+        """What this key types after a waiting accent: the accented character, or the accent itself
+        for the same dead key twice (macOS may give that key no characters); chars as they are when
+        not typeable (Esc, an arrow)."""
+        if not chars and found and found[0] == accent:
+            chars = accent
+        if chars and all(typeable(char) for char in chars):
+            return self.with_accent(key, chars, flags, accent)
+        return chars
+
+    @objc.python_method
     def with_accent(self, key, chars, flags, accent):
         """What a waiting accent and this key make, as the layout makes it (´ then t is ´t)."""
         reader, state = layout(), self.dead_state
@@ -608,10 +619,7 @@ class ClaudishInputController(IMKInputController):
             if key in (51, 53):
                 self.follow_caret(client)
                 return True  # Backspace or Esc cancels the accent, and nothing else
-            if not chars and found and found[0] == accent:
-                chars = accent  # the same dead key twice (macOS may give it no characters): the accent itself
-            if chars and all(typeable(char) for char in chars):
-                chars = self.with_accent(key, chars, flags, accent)  # é, not the e the key would type
+            chars = self.after_accent(key, chars, flags, accent, found)  # é, not the e the key would type
         if key == 48 and not flags & (NSEventModifierFlagShift | NSEventModifierFlagOption):  # Tab (Shift+Tab, Option+Tab: the app's)
             self.check_ghost(now=True)  # a click since the last look: the suggestion is not there any more
             ghost = state.take_ghost()
@@ -639,7 +647,7 @@ class ClaudishInputController(IMKInputController):
         # Keys typed fast may not be in the app's text yet (Chromium answers from a copy it updates
         # later): that is no click.
         if not state.text or not state.caret_stayed(before, lag=LAG):
-            state.change(before[-MAX_COMPOSITION:])
+            state.follow_app(before)
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
         self.changed(client)
@@ -866,10 +874,8 @@ class ClaudishInputController(IMKInputController):
             self.changed(client)
             return True
         text = event.characters() or ""
-        if accent and not text and found and found[0] == accent:
-            text = accent  # the same dead key twice (macOS may give it no characters): the accent itself
-        if accent and text and all(typeable(char) for char in text):
-            text = self.with_accent(key, text, flags, accent)  # é from ´ then e, as macOS makes it in a text field
+        if accent:
+            text = self.after_accent(key, text, flags, accent, found)  # é from ´ then e, as macOS makes it in a text field
         # Navigation keys use private-use characters, which must not enter the draft.
         if key in NAVIGATION_KEYS or not all(typeable(char) for char in text) or not text:
             self.finish_key(client)
