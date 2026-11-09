@@ -206,18 +206,24 @@ procedure CurStepChanged(Step: TSetupStep);
 var
   Code: Integer;
   First: Boolean;
+  Failed: String;
 begin
+  Failed := '';
   if Step = ssPostInstall then
   begin
     { A first install has no config yet (init writes one; an update keeps it). }
     First := AsYouCode('-c "import sys; from claudish import config; sys.exit(0 if config.default_path().is_file() else 3)"',
                        ewWaitUntilTerminated) = 3;
     { cd_AI in your input sources (English), next to the keyboard you have. }
-    AsYou('-c "import ctypes; ctypes.windll.input.InstallLayoutOrTip(''0409:@TEXT_SERVICE@@PROFILE@'', 0)"',
-          ewWaitUntilTerminated);
+    if AsYouCode('-c "import ctypes, sys; sys.exit(0 if ctypes.windll.input.InstallLayoutOrTip(''0409:@TEXT_SERVICE@@PROFILE@'', 0) else 1)"',
+                 ewWaitUntilTerminated) <> 0 then
+      Failed := Failed + #13#10 + 'cd_AI was not added to your input sources: add English, then Claudish, in Settings > Time & language > Language & region.';
     ExecAsOriginalUser(ExpandConstant('{app}\PIME\PIMELauncher.exe'), '', '', SW_HIDE, ewNoWait, Code);
     AsYou('-m claudish init', ewWaitUntilTerminated);
-    AsYou('-m claudish service install', ewWaitUntilTerminated);
+    if AsYouCode('-m claudish service install', ewWaitUntilTerminated) <> 0 then
+      Failed := Failed + #13#10 + 'cd_AI''s service does not start at sign-in yet: run "claudish service install", then "claudish doctor".';
+    if Failed <> '' then
+      SuppressibleMsgBox('Installed, with something left to do:' + Failed, mbInformation, MB_OK, IDOK);
     { The first install ends in cd_AI's settings (the key, the tone); an update opens nothing. }
     if First then
       AsYou('-m claudish settings --first', ewNoWait);

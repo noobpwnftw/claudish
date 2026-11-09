@@ -53,6 +53,11 @@ while True:
     turns += 1
     out({"type": "system", "subtype": "init", "session_id": "fake"})
     try:
+        if "environment" in text:  # what Claudish set for this agent
+            import os
+            out({"type": "result", "subtype": "success", "is_error": False,
+                 "result": "tasks wait: %s" % os.environ.get("CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND")})
+            continue
         if "count" in text:
             out({"type": "assistant", "uuid": "msg-%d" % turns, "message": {"content": []}})  # as Claude Code marks its messages
             out({"type": "result", "subtype": "success", "is_error": False,

@@ -131,6 +131,14 @@ class SafetyTests(unittest.TestCase):
             service.run("install", extra=["--backend", "rules"])
         self.assertEqual(calls, [["launchctl", "bootout"]] + [["launchctl", "print"]] * 3 + [["launchctl", "bootstrap"]])
 
+    def test_accounts_with_names_in_other_scripts_get_their_own_tasks(self):
+        names = []
+        for user in ("张三", "李四", "Mei Lin"):
+            with patch.dict("os.environ", {"USERNAME": user, "USERDOMAIN": "PC"}):
+                names.append(service.task_name())
+        self.assertEqual(len(set(names)), 3)
+        self.assertEqual(names[2], "claudish-Mei_Lin")  # an ASCII name keeps the name it had
+
     def test_windows_logon_task_is_this_accounts_own(self):
         """A machine-wide "claudish" task was taken by whoever installed first; another account's
         install could not replace it, so its service never started at login (Windows VM)."""

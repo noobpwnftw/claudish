@@ -33,6 +33,12 @@ def summarize(tool, arguments):
     return tool
 
 
+# An MCP tool call a server runs as a task: answered inside the turn, as any tool's (Claude Code
+# 2.1.319 otherwise moves it to the background and tells the model when it finishes, after the
+# turn's answer, which an instruction's draft cannot take).
+WAIT_FOR_TASKS = {"CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND": "1"}
+
+
 def wire_prefix(server):
     """How Claude Code names an MCP server's tools: mcp__<server>__, the name's other characters as _."""
     from .tools import api_name
@@ -84,7 +90,7 @@ class AgentProcess:
         # service's job: the programs it starts for you stay open, as on Linux and macOS.
         self.process = spawn(self.command + session, "the agent session", job=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                             bufsize=1, env=with_own_folder(self.command[0]))
+                             bufsize=1, env=dict(with_own_folder(self.command[0]) or os.environ, **WAIT_FOR_TASKS))
         # started (--resume from now on) once the agent has answered a turn (turn()): a process
         # that dies before saved no session, and resuming one that does not exist fails every time.
         self.stderr = []

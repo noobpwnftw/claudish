@@ -20,12 +20,18 @@ if [ -n "$missing" ]; then
 fi
 
 if [ -d "$home/.git" ]; then
-  git -C "$home" fetch --quiet --tags origin && git -C "$home" checkout --quiet "$ref"
+  git -C "$home" fetch --quiet --tags origin  # each its own command: set -e stops at either
+  git -C "$home" checkout --quiet "$ref"
+  # A branch (CLAUDISH_REF=main) moves to what was fetched; a tag is where it is.
+  if git -C "$home" show-ref --verify --quiet "refs/remotes/origin/$ref"; then
+    git -C "$home" merge --ff-only --quiet "origin/$ref"
+  fi
 else
   git clone --quiet --branch "$ref" "${CLAUDISH_REPO:-https://github.com/noobpwnftw/claudish}" "$home"
 fi
 cd "$home"
-[ -x .venv/bin/python ] || python3 -m venv .venv
+# Made again when the system Python it was made with has gone (an upgrade from 3.12 to 3.13).
+.venv/bin/python -c "import pip" 2> /dev/null || python3 -m venv --clear .venv
 .venv/bin/python -m pip install --quiet --upgrade pip
 .venv/bin/python -m pip install --quiet -e ".[claude,mcp]"
 # `claudish` on PATH, as ~/.local/bin is on Ubuntu, Fedora and most desktops.

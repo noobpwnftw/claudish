@@ -117,6 +117,11 @@ class ServiceTests(unittest.TestCase):
         process.wait(timeout=5)  # the conversation ended: its agent exits
         self.assertIsNone(self.rewriter.conversations.get("box").agent)
 
+    def test_an_mcp_task_is_answered_inside_the_turn(self):
+        """Claude Code 2.1.319 moves an MCP tool call a server runs as a task to the background and
+        reports it after the turn's answer: the agent is told to wait for it inside the call."""
+        self.assertEqual(self.until(self.turn("environment"), "result")["text"], "tasks wait: 1")
+
     def test_a_turn_taken_back_after_its_answer_rewinds_the_agents_session(self):
         """Esc as the answer arrived: the next turn resumes the agent's session at the end of the turn
         kept before it (--resume-session-at), not after the one taken back."""

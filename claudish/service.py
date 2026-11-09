@@ -20,8 +20,13 @@ NAME = "claudish"
 def task_name():
     """Windows' logon task, one per account: a machine-wide name was taken by whoever installed first,
     and another account's install could not replace it, so its service never started at login."""
+    import hashlib
     import re
-    return "%s-%s" % (NAME, re.sub(r"[^A-Za-z0-9_.-]", "_", os.environ.get("USERNAME", "") or "user"))
+    user = os.environ.get("USERNAME", "") or "user"
+    shown = re.sub(r"[^A-Za-z0-9_.-]", "_", user)
+    if not user.isascii():  # 张三 and 李四 are both "__": the account's own name, told apart
+        shown += "-" + hashlib.sha256(("%s\\%s" % (os.environ.get("USERDOMAIN", ""), user)).encode("utf-8")).hexdigest()[:8]
+    return "%s-%s" % (NAME, shown)
 LABEL = "com.claudish.service"
 
 
