@@ -166,6 +166,24 @@ class BindingTests(unittest.TestCase):
         main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
         self.assertEqual([len(text) for _, text in main.route("mailapp").sections("mailapp")], [50])
 
+    @unittest.skipIf(sys.platform == "win32", "a POSIX shell")
+    def test_a_routed_profile_reads_the_services_context_once(self):
+        """The context is the service's: a profile an app routes to reads the same providers and
+        cache, each within its own limit; a command is not run again for it."""
+        runs = self.root / "runs"
+        path = self.root / "config.json"
+        path.write_text(json.dumps({"profile": "main", "bindings": [{"app": "mail*", "profile": "mail"}],
+                                    "context": [{"type": "command", "name": "count", "ttl": 60,
+                                                 "command": ["sh", "-c", "echo x >> %s; echo %s" % (runs, "y" * 80)]}],
+                                    "profiles": {"main": {"backend": "rules"},
+                                                 "mail": {"backend": "rules", "max_context_chars": 10}}}), encoding="utf-8")
+        name, settings, templates, context = config.resolve(path)
+        main = Rewriter.from_settings(settings, templates, context, name)
+        main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
+        self.assertEqual([len(text) for _, text in main.sections("gedit")], [80])
+        self.assertEqual([len(text) for _, text in main.route("mailapp").sections("mailapp")], [10])  # its own limit
+        self.assertEqual(runs.read_text().count("x"), 1)
+
     def test_an_apps_context_keeps_to_the_profiles_limit(self):
         (self.root / "notes.md").write_text("x" * 3000, encoding="utf-8")
         path = self.root / "config.json"

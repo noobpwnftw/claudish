@@ -389,7 +389,9 @@ class Rewriter:
             other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
             other.url = self.url
             other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
-            other.bindings = self.bindings  # the service's: a binding's context reaches the profile it routes to
+            # The service's bindings and context: one set of providers, one cache, whichever profile
+            # answers (each reads them within its own max_context_chars).
+            other.bindings, other.context = self.bindings, self.context
             other.adoptable = self.adoptable
             kept = self.adoptable.pop(warm_key(other.warm), None) if other.warm else None
             if kept is not None:  # the same model process, from before the config was edited
@@ -407,8 +409,7 @@ class Rewriter:
         if not (self.context or extra):
             return []
         from .context import Context
-        # The profile's own limit, also over the service's bindings a routed profile gets.
-        return (self.context or Context(max_chars=self.max_context_chars)).sections(extra, failed)
+        return (self.context or Context()).sections(extra, failed, self.max_context_chars)
 
     def box(self, mode, app=None, purpose=None, before="", after="", look=False, screen=None, trusted=True):
         """The text box this request is for, with what its mode calls for observed. screen: a
