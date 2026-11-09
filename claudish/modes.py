@@ -4,6 +4,7 @@ The words for each mode are data, in claudish/templates.json; a profile's "templ
 same shape and replaces only what it names (docs/configuration.md#templates)."""
 import copy
 import json
+import re
 from pathlib import Path
 
 TEMPLATES = json.loads(Path(__file__).with_name("templates.json").read_text(encoding="utf-8"))
@@ -17,6 +18,12 @@ def load(path):
     where = "templates %s" % path
     if not isinstance(data, dict) or set(data) - SECTIONS:
         raise ValueError("%s: takes only %s" % (where, ", ".join(sorted(SECTIONS))))
+    for section, value in (("modes", data.get("modes")), ("tones", data.get("tones")), ("box", data.get("box")),
+                           ("tones.named", (data.get("tones") or {}).get("named") if isinstance(data.get("tones"), dict) else None)):
+        if value is not None and not isinstance(value, dict):
+            raise ValueError('%s: "%s" is an object of names' % (where, section))
+    for key, words in (data.get("box") or {}).items():
+        check_box(where, key, words)
     for name, mode in (data.get("modes") or {}).items():
         check_mode(where, name, mode, name in TEMPLATES["modes"])
     for name, tone in ((data.get("tones") or {}).get("named") or {}).items():
@@ -25,9 +32,34 @@ def load(path):
         if not isinstance(tone.get("persona", ""), str):
             raise ValueError('%s: tone %r: "persona" is text' % (where, name))
         shipped = ((TEMPLATES["tones"]["named"].get(name) or {}).get("modes") or {})
+        if not isinstance(tone.get("modes") or {}, dict):
+            raise ValueError('%s: tone %r: "modes" is an object of modes' % (where, name))
         for mode_name, mode in (tone.get("modes") or {}).items():  # a shipped tone's mode may name only part
             check_mode("%s, tone %r," % (where, name), mode_name, mode, mode_name in shipped)
     return data
+
+
+def check_box(where, key, words):
+    """A box wording: what the shipped one is (text, or a group of them), with only the fields the
+    shipped one fills in ({before}, {text}, ... as it has them)."""
+    shipped = TEMPLATES["box"].get(key)
+    if isinstance(shipped, dict):
+        if not isinstance(words, dict):
+            raise ValueError('%s: box %r is an object, as the shipped one' % (where, key))
+        for inner, value in words.items():
+            _box_text(where, "%s.%s" % (key, inner), value, shipped.get(inner))
+        return
+    _box_text(where, key, words, shipped)
+
+
+def _box_text(where, key, words, shipped):
+    if not isinstance(words, str):
+        raise ValueError('%s: box %r is text' % (where, key))
+    fields = set(re.findall(r"(?<!\{)\{(\w*)\}(?!\})", shipped)) if isinstance(shipped, str) else set()
+    unknown = set(re.findall(r"(?<!\{)\{(\w*)\}(?!\})", words)) - fields
+    if unknown:
+        raise ValueError('%s: box %r fills in only %s, not {%s}' % (
+            where, key, ", ".join("{%s}" % f for f in sorted(fields)) or "nothing", sorted(unknown)[0]))
 
 
 def check_mode(where, name, mode, known):
@@ -103,15 +135,13 @@ def defaults(override=None, tone=None):
         if custom:  # a wording of its own: only the examples and parts given with it, never the shipped ones
             examples, parts = own[name].get("examples", []), own[name].get("parts", [])
         voice, length, system = mode.get("voice"), mode.get("length"), mode.get("system")
-        persona = None
-        if tone and not custom and tone in named:
-            wording = (named[tone].get("modes") or {}).get(name)
-            if wording:
-                examples, parts = wording.get("examples", []), wording.get("parts", [])
-                system = wording.get("system")
-                voice, length = wording.get("voice"), wording.get("length") or words["tones"]["length"]
-                persona = named[tone].get("persona")  # a whole persona: the voice, before the job
-        elif tone and not custom and name in words["tones"]["tone"]:
+        persona = named[tone].get("persona") if tone and not custom and tone in named else None  # before every job
+        wording = (named[tone].get("modes") or {}).get(name) if tone and not custom and tone in named else None
+        if wording:
+            examples, parts = wording.get("examples", []), wording.get("parts", [])
+            system = wording.get("system")
+            voice, length = wording.get("voice"), wording.get("length") or words["tones"]["length"]
+        elif tone and not custom and tone not in named and name in words["tones"]["tone"]:  # a described tone (a few words)
             voice, length, examples, parts = words["tones"]["tone"][name].replace("{tone}", tone), words["tones"]["length"], [], []
             system = None
         if not system:
@@ -164,7 +194,9 @@ def finish(mode, text, output):
     # No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
     # goes on your last letter.
     opened = text.endswith(("—", "(", "[", "“", "‘")) or text.endswith('"') and text.count('"') % 2 == 1
-    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide or opened \
+    # Nor before a contraction or a possessive on your last word ('s, 're), or a percent sign.
+    attached = text[-1:].isalnum() and (output[0] == "%" or re.match(r"['’](s|re|ll|d|ve|t|m)\b", output))
+    joiner = "" if text.endswith((" ", "\n")) or output[0] in ",.;:!?—)" or wide or opened or attached \
         or unicodedata.category(output[0]).startswith("M") else " "
     return text + joiner + output
 

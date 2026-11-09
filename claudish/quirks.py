@@ -22,8 +22,12 @@ def tidy(text, output):
     fenced = FENCE.match(output)
     if fenced:
         output = fenced.group(1)
-    output = INTRO.sub("", output.strip(), count=1).strip()
-    if output.startswith("[[") and output.endswith("]]") and "[[" not in text:  # the part, as it was marked
+    output = output.strip()
+    intro = INTRO.match(output)
+    if intro and intro.group(0).strip().lower() not in text.lower():  # your own first line ("Here are the notes:") stays
+        output = output[intro.end():].strip()
+    if output.startswith("[[") and output.endswith("]]") and "[[" not in text \
+            and "[[" not in output[2:-2] and "]]" not in output[2:-2]:  # the part, as it was marked (one span)
         output = output[2:-2].strip()
     for pair in QUOTES:
         if (len(output) > 2 and output[0] == pair[0] and output[-1] == pair[1] and pair[0] not in output[1:-1]

@@ -114,7 +114,8 @@ def check_backend(state):
         listing = fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
         if backend == "openai" and settings.get("model"):  # as the settings window checks it
             from .settings import server_problem
-            names = [m.get("id") for m in (listing or {}).get("data", []) if isinstance(m, dict)]
+            data = (listing or {}).get("data") if isinstance(listing, dict) else None
+            names = [m.get("id") for m in data or [] if isinstance(m, dict)]  # {"data": null}: none listed
             problem = server_problem(url, names, settings["model"], key)
             if problem:
                 return "fail", problem, "name one of its models in the profile's \"model\", or pick it in cd_AI's settings"

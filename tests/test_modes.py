@@ -327,3 +327,41 @@ class ModeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Round41Tests(unittest.TestCase):
+    def test_a_tones_persona_goes_before_every_modes_job(self):
+        specs = modes.defaults({"tones": {"named": {"pirate": {"persona": "You are a salty pirate captain."}}}}, "pirate")
+        for mode in ("rewrite", "continue", "instruct"):
+            self.assertTrue(specs[mode]["system"].startswith("You are a salty pirate captain."), mode)
+
+    def test_a_templates_section_that_is_not_an_object_is_a_config_error(self):
+        for words in ({"modes": ["rewrite"]}, {"tones": {"named": {"x": {"modes": ["rewrite"]}}}}, {"box": []}):
+            with self.subTest(words=words), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder, "t.json")
+                path.write_text(json.dumps(words))
+                with self.assertRaises(ValueError):
+                    modes.load(path)
+
+    def test_box_wording_fills_in_only_the_shipped_fields(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "t.json")
+            path.write_text(json.dumps({"box": {"in_place": "Rewrite only the {part}:\n{before}[[{text}]]{after}"}}))
+            with self.assertRaisesRegex(ValueError, r"\{part\}"):
+                modes.load(path)
+            path.write_text(json.dumps({"box": {"in_place": "Only this:\n{before}[[{text}]]{after}"}}))
+            modes.load(path)
+
+    def test_continue_attaches_a_contraction_and_a_percent_sign(self):
+        self.assertEqual(modes.finish("continue", "the user", "'s profile"), "the user's profile")
+        self.assertEqual(modes.finish("continue", "the user", "’s profile"), "the user’s profile")
+        self.assertEqual(modes.finish("continue", "it is 100", "% sure"), "it is 100% sure")
+        self.assertEqual(modes.finish("continue", "said", "'hello' to me"), "said 'hello' to me")
+
+    def test_your_own_first_line_and_brackets_stay(self):
+        from claudish import quirks
+        self.assertEqual(quirks.plain("Here are the notes:\nmilk, eggs", "Here are the notes:\nMilk and eggs—synergized."),
+                         "Here are the notes:\nMilk and eggs—synergized.")
+        self.assertEqual(quirks.plain("milk, eggs", "Here's a rewrite:\nMilk and eggs—synergized."),
+                         "Milk and eggs—synergized.")
+        self.assertEqual(quirks.plain("add links", "[[Home]] and [[About]]"), "[[Home]] and [[About]]")
