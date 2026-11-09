@@ -26,6 +26,9 @@ TERMINALS = {
     "wezterm-gui.exe", "alacritty.exe", "mintty.exe",
     "com.apple.terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty", "org.alacritty", "io.alacritty",
     "com.github.wez.wezterm", "dev.warp.warp-stable", "com.mitchellh.ghostty",
+    # GNOME on Wayland: the window's app id (cd_AI's extension names it).
+    "org.gnome.terminal", "org.gnome.console", "org.gnome.ptyxis", "app.devsuite.ptyxis", "org.kde.konsole",
+    "org.wezfurlong.wezterm",
 }
 
 

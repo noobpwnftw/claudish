@@ -43,6 +43,36 @@ class MCPSetupTests(unittest.TestCase):
         self.assertNotIn("project", mcp_setup.discover())
         self.assertEqual(set(mcp_setup.discover()), {"github", "docs", "notes", "remote"})
 
+    def test_what_claude_mcp_add_keeps_per_project_is_found_and_what_is_off_is_not(self):
+        """`claude mcp add` (local scope, its default) keeps a server under projects[path]; Cline-style
+        configs mark one "disabled"; Claude Code turns one off per project."""
+        (self.home / ".claude.json").write_text(json.dumps({
+            "mcpServers": {"remote": {"type": "sse", "url": "https://sse.example.com/sse"}},
+            "projects": {"/home/me/app": {
+                "mcpServers": {"linear-server": {"type": "http", "url": "https://mcp.linear.app/mcp"},
+                               "sqlite": {"command": "uvx", "args": ["mcp-server-sqlite"]},
+                               "github": {"command": "docker", "args": ["run", "-i", "ghcr.io/github/github-mcp-server"]}},
+                "disabledMcpServers": ["sqlite"]}}}))
+        desktop = self.home / ".config/Claude/claude_desktop_config.json"
+        data = json.loads(desktop.read_text())
+        data["mcpServers"]["old"] = {"command": "old-server", "disabled": True}
+        data["mcpServers"]["socket"] = {"type": "ws", "url": "ws://localhost:9000"}
+        desktop.write_text(json.dumps(data))
+        skipped = []
+        found = mcp_setup.discover(skipped)
+        self.assertIn("linear-server", found)
+        self.assertIn("project /home/me/app", found["linear-server"][0])
+        self.assertNotIn("sqlite", found)
+        self.assertNotIn("old", found)
+        self.assertEqual(found["github"][0], "Claude Desktop")  # found first; the project's is said
+        self.assertEqual({name for name, _, _ in skipped}, {"sqlite", "old", "github"})
+        _, out = self.run_quiet(mcp_setup.import_servers)
+        servers = json.loads(config.default_path().read_text())["mcp_servers"]
+        self.assertNotIn("socket", servers)
+        self.assertIn("WebSocket", out)
+        self.assertIn("linear-server: no token header", out)
+        config.resolve()
+
     def run_quiet(self, function, *args, **kwargs):
         out = io.StringIO()
         with redirect_stdout(out):
@@ -58,9 +88,10 @@ class MCPSetupTests(unittest.TestCase):
         self.assertEqual(servers["github"], {"command": "github-mcp-server", "args": ["stdio"],
                                              "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"}})
         self.assertEqual(servers["docs"]["headers"], {"Authorization": "$CLAUDISH_MCP_DOCS_AUTHORIZATION"})
-        self.assertEqual(servers["notes"]["env"], {"TEST_TOKEN": "$MY_TOKEN"})
+        self.assertEqual(servers["notes"]["env"], {"TEST_TOKEN": "${MY_TOKEN}"})  # a reference, as written
         self.assertEqual(servers["remote"], {"url": "https://sse.example.com/sse", "type": "sse",
-                                             "headers": {"X-Key": "$REMOTE_KEY"}})
+                                             "headers": {"X-Key": "${REMOTE_KEY}"}})
+        self.assertEqual(servers["docs"]["type"], "http")  # Claude Code skips a url without its type
         self.assertIn("GITHUB_PERSONAL_ACCESS_TOKEN", out)
         self.assertNotIn(SECRET, out)
         config.resolve()  # the result is a valid config
@@ -102,3 +133,23 @@ class MCPSetupTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgentConfigTests(unittest.TestCase):
+    def test_an_agent_gets_remote_servers_it_can_use_and_no_secrets(self):
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        from claudish.model import Rewriter
+        from claudish.tools import Toolbox
+        servers = {"docs": {"url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer $DOCS_TOKEN"}},
+                   "notes": {"command": "notes-mcp", "env": {"TOKEN": "$NOTES_TOKEN"}}}
+        rewriter = Rewriter()
+        rewriter.toolbox = Toolbox(["docs", "notes"], servers)
+        with patch.dict(os.environ, {"DOCS_TOKEN": "s3cret", "NOTES_TOKEN": "s3cret"}):
+            given = rewriter.agent_mcp_config(type("Box", (), {"key": "box", "token": "t"})())["mcpServers"]
+        self.assertEqual(given["docs"]["type"], "http")
+        self.assertEqual(given["docs"]["headers"], {"Authorization": "Bearer ${DOCS_TOKEN}"})  # Claude Code fills it in
+        self.assertEqual(given["notes"]["env"], {"TOKEN": "${NOTES_TOKEN}"})
+        self.assertNotIn("s3cret", json.dumps(given))

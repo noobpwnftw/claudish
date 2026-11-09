@@ -27,16 +27,33 @@ def claude_sources():
             ("Claude Code (user)", home / ".claude.json")]
 
 
-def discover():
-    found = {}
+def discover(skipped=None):
+    """{name: (where, server)}: the servers you set up for Claude: Claude Desktop's, Claude Code's for
+    you (user scope) and the ones `claude mcp add` keeps per project (local scope, its default).
+    skipped gets (name, where, why) for one turned off there or already found elsewhere."""
+    found, skipped = {}, skipped if skipped is not None else []
     for label, path in claude_sources():
         try:
-            servers = json.loads(path.read_text(encoding="utf-8-sig")).get("mcpServers") or {}
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             continue
-        for name, server in servers.items():
-            if isinstance(server, dict) and name not in found:
-                found[name] = (label, server)
+        if not isinstance(data, dict):
+            continue
+        groups = [(label, data.get("mcpServers"), ())]
+        for project, settings in sorted((data.get("projects") or {}).items()):
+            if isinstance(settings, dict):
+                groups.append(("%s, project %s" % (label, project), settings.get("mcpServers"),
+                               settings.get("disabledMcpServers") or ()))
+        for where, servers, disabled in groups:
+            for name, server in (servers or {}).items() if isinstance(servers, dict) else ():
+                if not isinstance(server, dict):
+                    continue
+                if server.get("disabled") is True or name in disabled:
+                    skipped.append((name, where, "turned off there"))
+                elif name in found:
+                    skipped.append((name, where, "the one from %s is used" % found[name][0]))
+                else:
+                    found[name] = (where, server)
     return found
 
 
@@ -44,19 +61,24 @@ def variable(*parts):
     return re.sub(r"[^A-Z0-9]+", "_", "_".join(parts).upper()).strip("_")
 
 
+def variables(value):
+    """The environment variables a value names without a default ($NAME, ${NAME}; not ${NAME:-x})."""
+    return [m.group(1) or m.group(3) for m in re.finditer(r"\$(?:\{(\w+)(:-[^}]*)?\}|(\w+))", value)
+            if not m.group(2)]
+
+
 def sanitize(name, server):
     """(server for our config, [environment variables to set])."""
     needed, clean = [], {}
     if server.get("url"):
         clean["url"] = server["url"]
-        if server.get("type") == "sse":
-            clean["type"] = "sse"
+        clean["type"] = "sse" if server.get("type") == "sse" else "http"  # Claude Code needs it said
+        needed += variables(server["url"])
         headers = {}
         for key, value in (server.get("headers") or {}).items():
-            reference = re.fullmatch(r"(.*?)\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?", str(value))
-            if reference:  # "Bearer ${TOKEN}" -> "Bearer $TOKEN"
-                headers[key] = "%s$%s" % (reference.group(1), reference.group(2))
-                needed.append(reference.group(2))
+            if variables(str(value)):  # "Bearer ${TOKEN}", "${TOKEN:-dev}": kept as written
+                headers[key] = str(value)
+                needed += variables(str(value))
             else:
                 var = variable("CLAUDISH_MCP", name, key)
                 headers[key] = "$" + var
@@ -68,9 +90,12 @@ def sanitize(name, server):
         clean["args"] = list(server.get("args") or [])
         env = {}
         for key, value in (server.get("env") or {}).items():
-            reference = re.fullmatch(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?", str(value))
-            env[key] = "$" + (reference.group(1) if reference else key)
-            needed.append(reference.group(1) if reference else key)
+            if variables(str(value)):  # "$TOKEN", "${PATH_TO:-~/notes}": kept as written
+                env[key] = str(value)
+                needed += variables(str(value))
+            else:  # a value written there: from your environment here, not copied into the config
+                env[key] = "$" + key
+                needed.append(key)
         if env:
             clean["env"] = env
     return clean, needed
@@ -80,19 +105,28 @@ def import_servers(path=None, dry_run=False, replace=False):
     path = Path(path or config.default_path())
     data = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else json.loads(json.dumps(config.STARTER))
     servers = data.setdefault("mcp_servers", {})
-    found, imported, needed = discover(), [], set()
+    skipped = []
+    found, imported, needed = discover(skipped), [], set()
     if not found:
         print("No MCP servers found in: " + ", ".join(str(p) for _, p in claude_sources()))
         return 0
+    for name, where, why in skipped:
+        print("skip %-20s in %s: %s" % (name, where, why))
     for name, (label, server) in sorted(found.items()):
         if name in servers and not replace:
             print("skip %-20s already in your config (use --replace)" % name)
+            continue
+        if server.get("type") == "ws":
+            print("skip %-20s from %s: a WebSocket server, which cd_AI does not connect to" % (name, label))
             continue
         clean, variables = sanitize(name, server)
         servers[name] = clean
         needed.update(variables)
         imported.append(name)
         print("%s %-20s from %s" % ("would import" if dry_run else "import", name, label))
+        if clean.get("url") and not clean.get("headers"):  # a remote that signs you in (OAuth) in Claude
+            print("    %s: no token header: cd_AI's own calls get one from \"headers\" (Claude Code, as an "
+                  "agent, signs in itself)" % name)
     if not dry_run and imported:
         config.save(data, path)
         print("Wrote %s." % path)

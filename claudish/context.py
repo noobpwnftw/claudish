@@ -8,6 +8,7 @@ Providers come only from the user's config file, never from a request:
 The request may add the text around the caret ("before"/"after").
 """
 import os
+import re
 import shlex
 import subprocess
 import threading
@@ -18,6 +19,31 @@ PROVIDER_KEYS = {"file": {"type", "name", "path", "ttl"},
                  "command": {"type", "name", "command", "ttl", "timeout", "cwd"},
                  "mcp": {"type", "name", "server", "command", "env", "cwd", "url", "transport", "headers",
                          "tool", "arguments", "resource", "ttl", "timeout"}}
+
+
+VARIABLE = re.compile(r"\$(?:\{(\w+)(?::-([^}]*))?\}|(\w+))")
+
+
+def expanded(value, missing=None):
+    """$NAME, ${NAME} and ${NAME:-default} from this environment, as Claude Code expands them. A
+    variable that is not set and has no default is added to missing (or raises when missing is None)."""
+    def one(match):
+        name = match.group(1) or match.group(3)
+        if name in os.environ:
+            return os.environ[name]
+        if match.group(2) is not None:
+            return match.group(2)
+        if missing is None:
+            raise ValueError("%s is not set in the environment cd_AI runs in" % name)
+        missing.append(name)
+        return match.group(0)
+    return VARIABLE.sub(one, value)
+
+
+def for_agent(value):
+    """A value as Claude Code expands it itself: $NAME written ${NAME} (its own config does not take
+    the bare form); the secret stays out of the config file Claudish writes."""
+    return VARIABLE.sub(lambda m: m.group(0) if m.group(1) else "${%s}" % m.group(3), value)
 
 
 def from_server(spec, servers):
@@ -31,6 +57,8 @@ def from_server(spec, servers):
     name = spec.pop("server")
     if server.get("url"):
         spec.setdefault("url", server["url"])
+        if server.get("type") == "ws":
+            raise ValueError('mcp server %r: a WebSocket server ("type": "ws") is not supported' % name)
         spec.setdefault("transport", "sse" if server.get("type") == "sse" else "http")
         spec.setdefault("headers", server.get("headers") or {})
     elif isinstance(server.get("command"), str) and server["command"]:
@@ -62,7 +90,7 @@ class Provider:
             # An app that exposes MCP on a local socket: connect instead of starting a server.
             if spec.get("command"):
                 raise ValueError('mcp context takes "command" (stdio) or "url", not both')
-            if not str(spec["url"]).startswith(("http://", "https://")):
+            if not str(spec["url"]).startswith(("http://", "https://", "$")):
                 raise ValueError("mcp url must be http:// or https://")
             self.url, self.command = spec["url"], None
             self.transport = spec.get("transport", "http")
@@ -71,7 +99,7 @@ class Provider:
             headers = spec.get("headers") or {}
             if not (isinstance(headers, dict) and all(isinstance(v, str) for v in headers.values())):
                 raise ValueError("mcp headers must map names to strings")
-            self.headers = {key: os.path.expandvars(value) for key, value in headers.items()}
+            self.headers = dict(headers)  # $NAME and ${NAME:-default} filled in when it connects
             self.timeout = float(spec.get("timeout", 5))
             self.cwd, self.name = None, spec.get("name") or spec["url"]
         elif kind == "file":
@@ -108,7 +136,7 @@ class Provider:
             env = spec.get("env") or {}
             if not (isinstance(env, dict) and all(isinstance(v, str) for v in env.values())):
                 raise ValueError("mcp env must map names to strings")
-            self.env = {key: os.path.expandvars(value) for key, value in env.items()}
+            self.env = dict(env)  # filled in when it starts (an unset variable says so then)
             if self.listing:
                 self.name = spec.get("name") or "listing"
                 return
@@ -203,16 +231,23 @@ def connector(provider):
     """The MCP client transport for a provider: stdio for a started server, else SSE or streamable HTTP."""
     from mcp import StdioServerParameters
     from mcp.client.stdio import stdio_client
+    # Variables now (Claude Code's forms): one that is not set fails this server, by name, rather
+    # than reaching it as the text "$GITHUB_TOKEN".
+    if provider.command is None:
+        url = expanded(provider.url)
+        headers = {key: expanded(value) for key, value in provider.headers.items()}
     if provider.command is None and provider.transport == "sse":
         from mcp.client.sse import sse_client
-        return sse_client(provider.url, headers=provider.headers, timeout=provider.timeout)
+        return sse_client(url, headers=headers, timeout=provider.timeout)
     if provider.command is None:
         import httpx2
         from mcp.client.streamable_http import streamable_http_client
-        client = httpx2.AsyncClient(headers=provider.headers, timeout=provider.timeout)
-        return streamable_http_client(provider.url, http_client=client)
-    return stdio_client(StdioServerParameters(command=provider.command[0], args=provider.command[1:],
-                                              env={**os.environ, **provider.env}, cwd=provider.cwd))
+        client = httpx2.AsyncClient(headers=headers, timeout=provider.timeout)
+        return streamable_http_client(url, http_client=client)
+    command = [expanded(part) for part in provider.command]
+    return stdio_client(StdioServerParameters(command=command[0], args=command[1:],
+                                              env={**os.environ, **{key: expanded(value) for key, value in provider.env.items()}},
+                                              cwd=provider.cwd))
 
 
 def read_mcp(provider):

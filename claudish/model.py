@@ -463,11 +463,14 @@ class Rewriter:
         agent's own), and Claudish's textbox server when the MCP SDK is here to run it."""
         import importlib.util
         servers = {}
+        from .context import for_agent
         for name, server in (self.toolbox.configs.items() if self.toolbox else ()):
             server = dict(server)
-            for field in ("env", "headers"):  # "$NAME" from this environment: the agent reads values
+            for field in ("env", "headers"):  # $NAME as Claude Code expands it itself: no secret in the file
                 if isinstance(server.get(field), dict):
-                    server[field] = {key: os.path.expandvars(value) for key, value in server[field].items()}
+                    server[field] = {key: for_agent(value) for key, value in server[field].items()}
+            if server.get("url"):  # Claude Code skips a url without its type
+                server["type"] = "sse" if server.get("type") == "sse" else "http"
             servers[name] = server
         url = self.url
         if url and importlib.util.find_spec("mcp") is not None:

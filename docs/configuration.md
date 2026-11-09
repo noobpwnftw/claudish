@@ -175,12 +175,23 @@ slow, so the profile's `timeout` applies (`/health` reports it).
 
 ## Apps: bindings
 
-The input method knows which app has focus. On Linux, IBus reports the program
-(`gtk3-im:thunderbird` arrives as `thunderbird`); in GNOME on Wayland it is the window's app id
-(`org.gnome.Terminal`, `org.mozilla.Thunderbird`). On macOS it is the bundle identifier
-(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`). A binding
-matches apps by a case-insensitive glob and sets, for them, which profile answers
-(its backend, tone, tools and helper) and context the model gets there every time:
+The input method knows which app has focus. On macOS it is the bundle identifier
+(`com.apple.Terminal`); on Windows, the program file (`notepad.exe`; a console window reports its
+shell, `powershell.exe`). On Linux, IBus reports the program of a GTK app (`gtk3-im:thunderbird`
+arrives as `thunderbird`); in GNOME on Wayland, a native Wayland window is named by its app id
+(`org.gnome.Terminal`, `net.thunderbird.Thunderbird`) and an X11 window by its program. Qt apps
+(Konsole, Telegram) report `QIBusInputContext`, X11 apps without GTK or Qt (xterm, JetBrains IDEs on
+X11) `xim`, kitty on X11 `GLFW_Application`, and every app on Wayland desktops other than GNOME
+`wayland`: those cannot be told apart by a binding. A browser is one app: a binding matches the
+browser, not the site in it.
+
+To see the name an app reports, write a few words there and run `claudish recent`, which lists
+each request's app; `claudish context test --app NAME` shows which bindings match a name.
+
+A binding matches apps by a case-insensitive glob (one pattern; several bindings
+can match one app: all their context is read, and the first that names a profile
+chooses it) and sets, for them, which profile answers (its backend, tone, tools
+and helper) and context the model gets there every time:
 
 ```json
 {"profile": "claude", "profiles": {
@@ -191,6 +202,22 @@ matches apps by a case-insensitive glob and sets, for them, which profile answer
   "proofread": {"backend": "claude", "tone": "proofread"},
   "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
 ```
+
+`*terminal*` matches GNOME Terminal, Terminal.app and Windows Terminal; other terminals are
+named for themselves (`com.googlecode.iterm2`, `org.gnome.Ptyxis`, `kitty`, `powershell.exe`) and
+each needs its own binding. Names for some common apps:
+
+| App | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Slack | `slack.exe` | `com.tinyspeck.slackmacgap` | |
+| Microsoft Teams | `ms-teams.exe` | `com.microsoft.teams2` | the browser |
+| Outlook | `olk.exe` (new), `outlook.exe` (classic) | `com.microsoft.Outlook` | the browser |
+| Thunderbird | `thunderbird.exe` | `org.mozilla.thunderbird` | `thunderbird`, `net.thunderbird.Thunderbird` |
+| VS Code | `code.exe` | `com.microsoft.VSCode` | `code` |
+| Cursor | `cursor.exe` | `com.todesktop.230313mzl4w4u92` | |
+| Messages | | `com.apple.MobileSMS` | |
+| Word | `winword.exe` | `com.microsoft.Word` | |
+| Chrome | `chrome.exe` | `com.google.Chrome` | `google-chrome` |
 
 A binding holds what is true of an app every time: who answers there, a style
 guide, a glossary. What changes from one request to the next comes with the
@@ -242,19 +269,26 @@ caches the text:
  "ttl": 3600, "timeout": 15}
 ```
 
-`"$NAME"` values in `env` are read from your environment. Use `"resource": "uri"` instead of `"tool"` to read a resource.
+`$NAME`, `${NAME}` and `${NAME:-default}` in `command`, `env`, `url` and headers are read from the
+environment cd_AI runs in, as Claude Code reads them; a server whose variable is not set is left out,
+and what was consulted names it. Use `"resource": "uri"` instead of `"tool"` to read a resource.
 
 Already using MCP servers with Claude? Bring them along:
 
 ```sh
-claudish mcp import            # from Claude Desktop and Claude Code (~/.claude.json)
+claudish mcp import            # from Claude Desktop and Claude Code (~/.claude.json, its projects too)
 claudish mcp list              # connect to each server; show its tools and resources
 claudish context test --app thunderbird --show   # what a binding would read in that app
 ```
 
 Imported servers land under `"mcp_servers"` in your config and are used by name:
-`{"type": "mcp", "server": "github", "tool": "...", "arguments": {...}}`. Every `env` and
-header value becomes a `$NAME` reference, and `import` lists the variables to set.
+`{"type": "mcp", "server": "github", "tool": "...", "arguments": {...}}`. Import reads Claude
+Desktop's servers, Claude Code's for you and the ones `claude mcp add` keeps per project; one
+turned off there (`"disabled": true`, a project's `disabledMcpServers`) is left out, and a name
+found twice is taken once. A `$NAME` reference is kept as written; any other `env` or header value
+becomes one (`$KEY` for an `env` value), and `import` lists the variables to set. A remote server
+you sign in to in Claude (OAuth) has no header to bring: give it one in `"headers"` for cd_AI's own
+calls; an agent (Claude Code) signs in itself.
 
 Apps that publish MCP on a local socket are read with `url` instead of
 `command`: streamable HTTP by default, or `"transport": "sse"`. Headers may use

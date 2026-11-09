@@ -194,11 +194,32 @@ class MCPContextTests(unittest.TestCase):
                  "arguments": {"number": 7}, "env": {"TEST_TOKEN": "$SECRET_FOR_TEST"}, "timeout": 20},
                 {"type": "mcp", "command": self.server, "resource": "notes://style", "timeout": 20},
                 {"type": "mcp", "name": "broken", "command": self.server, "tool": "broken", "timeout": 20}])
-        found = dict(context.sections())
+            found = dict(context.sections())  # the variable read when the server starts
         self.assertEqual(found["pr"], "PR #7: + retry the flaky upload (token t-42)")
         self.assertIn("Prefer em dashes.", "".join(found.values()))
         self.assertNotIn("broken", found)  # a failing provider contributes nothing
         self.assertIn("broken", context.providers[2].error)
+
+    def test_a_variable_that_is_not_set_fails_its_server_by_name(self):
+        import os
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("CLAUDISH_TEST_UNSET", None)
+            context = Context([{"type": "mcp", "name": "gh", "command": self.server, "tool": "pull_request_diff",
+                                "arguments": {"number": 7}, "env": {"TEST_TOKEN": "$CLAUDISH_TEST_UNSET"},
+                                "timeout": 20}])
+            failed = []
+            self.assertEqual(context.sections(failed=failed), [])
+        self.assertIn("CLAUDISH_TEST_UNSET is not set", failed[0][1])
+
+    def test_claude_codes_variable_forms(self):
+        import os
+        from claudish.context import expanded, for_agent
+        with patch.dict("os.environ", {"HOST_FOR_TEST": "api.example"}):
+            os.environ.pop("PORT_FOR_TEST", None)
+            self.assertEqual(expanded("https://${HOST_FOR_TEST}:${PORT_FOR_TEST:-8443}/mcp"), "https://api.example:8443/mcp")
+            self.assertEqual(expanded("Bearer $HOST_FOR_TEST"), "Bearer api.example")
+        self.assertEqual(for_agent("Bearer $GITHUB_TOKEN"), "Bearer ${GITHUB_TOKEN}")
+        self.assertEqual(for_agent("${A:-b}"), "${A:-b}")
 
     def test_url_transport_to_an_app_exposing_mcp(self):
         import socket
@@ -222,8 +243,7 @@ class MCPContextTests(unittest.TestCase):
                 {"type": "mcp", "name": "app", "url": url, "headers": {"Authorization": "Bearer $APP_TOKEN"},
                  "tool": "pull_request_diff", "arguments": {"number": 9}, "timeout": 20},
                 {"type": "mcp", "url": url, "resource": "notes://style", "timeout": 20}])
-        self.assertEqual(context.providers[0].headers, {"Authorization": "Bearer t-7"})
-        block = joined(context)
+            block = joined(context)  # the header's variable filled in as it connects
         self.assertIn("PR #9: + retry the flaky upload", block)
         self.assertIn("Prefer em dashes.", block)
 
