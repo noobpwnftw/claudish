@@ -217,6 +217,8 @@ def run(action, extra=(), dry_run=False):
                 result = subprocess.run(payload, capture_output=True, text=True, timeout=60)
             except subprocess.TimeoutExpired:
                 raise SystemExit("%s failed: no answer within 60 s" % description)
+            except OSError as exc:  # no systemctl (WSL1, OpenRC, a container): said, not a traceback
+                raise SystemExit("%s failed: %s" % (description, exc))
             if action == "status":
                 print((result.stdout or result.stderr).strip() or ("active" if result.returncode == 0 else "inactive"))
                 return result.returncode
@@ -228,7 +230,7 @@ def run(action, extra=(), dry_run=False):
                 continue
         print("%s: done" % description)
     if action == "install" and not dry_run:
-        print("Claudish now starts at login. Check it with `claudish doctor`.")
+        print(as_typed("Claudish now starts at login. Check it with `claudish doctor`."))
     return 0
 
 

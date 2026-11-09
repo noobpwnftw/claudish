@@ -21,8 +21,23 @@ def main():
             stream.reconfigure(errors="replace")
     args, parser, passthrough = parse(sys.argv[1:])
     handler = COMMANDS.get(args.command)
-    if handler:
+    if not handler:
+        return None
+    try:
         return handler(args, parser, passthrough)
+    except KeyboardInterrupt:  # Ctrl+C at a prompt or a wait: nothing more to say
+        print(file=sys.stderr)
+        sys.exit(130)
+    except HTTPError as exc:  # the service answered, and refused
+        sys.exit("cd_AI's service answered %d: %s" % (exc.code, answered(exc)))
+
+
+def answered(exc):
+    """What the service said in an HTTP error: its "error", else the status's reason."""
+    try:
+        return json.load(exc).get("error") or exc.reason
+    except (ValueError, OSError, AttributeError):
+        return exc.reason
 
 
 def parse(argv):
@@ -135,7 +150,10 @@ def save_key(args, parser, passthrough):
     import subprocess
     from .keys import store, where
     from .settings import accepted_key
-    value = getpass.getpass("Claude API key (not shown): ").strip()
+    try:
+        value = getpass.getpass("Claude API key (not shown): ").strip()
+    except EOFError:  # piped empty, or Ctrl+D
+        value = ""
     if not value:
         sys.exit("No key given; nothing saved.")
     try:
@@ -155,7 +173,7 @@ def recent(args, parser, passthrough):
         from .client import call
         with reachable(args.url):
             call(args.url, "/recent/clear", {})
-        return print("Cleared.")
+        return print("Cleared.")  # an HTTP error: said by main()
     return show_recent(args.url, args.full)
 
 
@@ -186,8 +204,11 @@ def service(args, parser, passthrough):
 def mcp(args, parser, passthrough):
     """`claudish mcp import|list`."""
     from . import mcp_setup
-    sys.exit(mcp_setup.import_servers(dry_run=args.dry_run, replace=args.replace) if args.action == "import"
-             else mcp_setup.list_servers())
+    try:
+        sys.exit(mcp_setup.import_servers(dry_run=args.dry_run, replace=args.replace) if args.action == "import"
+                 else mcp_setup.list_servers())
+    except ValueError as exc:  # a config that does not read
+        parser.error(str(exc))
 
 
 def context(args, parser, passthrough):
@@ -256,7 +277,7 @@ def serve(args, parser, passthrough):
         profile, settings, rewriter = build()
     except (OSError, ValueError) as exc:
         try:
-            config.resolve(args.config, args.profile)
+            config.resolve(args.config)  # without this command's flags (a --profile it does not have)
         except (OSError, ValueError):
             pass  # the config's own problem
         else:
@@ -284,7 +305,7 @@ def serve(args, parser, passthrough):
 def rewrite(args, parser, passthrough):
     """`claudish rewrite TEXT` through the running service."""
     with reachable(args.url):
-        print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))
+        print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))  # an HTTP error: said by main()
 
 
 def bench(args, parser, passthrough):
@@ -303,9 +324,10 @@ def bench(args, parser, passthrough):
         source = samples[index % len(samples)]
         start = time.perf_counter()
         try:
-            response = suggest(source, args.url, again=False)
+            with reachable(args.url):  # the service stopping mid-run: said, not a traceback
+                response = suggest(source, args.url, again=False)
         except HTTPError as exc:
-            response = {"error": json.load(exc).get("error", str(exc))}
+            response = {"error": answered(exc)}
         results.append({"input": source,
                         "wall_ms": round((time.perf_counter() - start) * 1000, 2),
                         **response})
@@ -314,6 +336,8 @@ def bench(args, parser, passthrough):
                       "median_ms": statistics.median(latencies),
                       "p95_ms": latencies[min(len(latencies)-1, int(len(latencies)*0.95))],
                       "results": results}, ensure_ascii=False, indent=2))
+    if not any("text" in r for r in results):
+        sys.exit(1)  # nothing answered: a failed measurement, for a script that checks
 
 
 COMMANDS = {"settings": open_settings, "key": save_key, "recent": recent, "textbox-mcp": textbox_mcp,
@@ -354,8 +378,9 @@ def run_service(rewriter, port, reload, config_path, ready):
             raise
         # Another service has the port (most likely cd_AI's own): nothing to do, and its
         # token stays as it is. Exit 0, so the login service does not start it again.
-        print("Port %s is in use: cd_AI is already running, or another program has it. "
-              "Check with `claudish doctor`." % port, file=sys.stderr, flush=True)
+        from .service import as_typed
+        print(as_typed("Port %s is in use: cd_AI is already running, or another program has it. "
+                       "Check with `claudish doctor`." % port), file=sys.stderr, flush=True)
         return
     write_token(token, server.server_address[1])  # once the port is ours; another port's service has its own
     ready(server)

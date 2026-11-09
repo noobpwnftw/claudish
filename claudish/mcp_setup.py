@@ -96,9 +96,23 @@ def sanitize(name, server):
     return clean, needed
 
 
+def read_config(path):
+    """The config file's data; {} when there is none. ValueError when it does not read."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("cannot read %s: %s" % (path, exc))
+    if not isinstance(data, dict) or not isinstance(data.get("mcp_servers", {}), dict):
+        raise ValueError("cannot read %s: not a cd_AI config (an object with \"mcp_servers\")" % path)
+    return data
+
+
 def import_servers(path=None, dry_run=False, replace=False):
+    from .service import as_typed
     path = Path(path or config.default_path())
-    data = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else json.loads(json.dumps(config.STARTER))
+    data = read_config(path) if path.exists() else json.loads(json.dumps(config.STARTER))
     servers = data.setdefault("mcp_servers", {})
     skipped = []
     found, imported, needed = discover(skipped), [], set()
@@ -128,8 +142,8 @@ def import_servers(path=None, dry_run=False, replace=False):
     if needed:
         print("Set these in the environment Claudish runs in: %s" % ", ".join(sorted(needed)))
     if imported:
-        print('Next: `claudish mcp list` shows their tools; use one in a profile\'s "context" or a binding, e.g.\n'
-              '  {"type": "mcp", "server": "%s", "tool": "TOOL", "arguments": {}}' % imported[0])
+        print(as_typed('Next: `claudish mcp list` shows their tools; use one in a profile\'s "context" or a binding, e.g.\n'
+                       '  {"type": "mcp", "server": "%s", "tool": "TOOL", "arguments": {}}' % imported[0]))
     return 0
 
 
@@ -137,13 +151,11 @@ def list_servers():
     from .doctor import marks
     shown = marks()
     from .context import list_server
-    try:
-        data = json.loads(Path(config.default_path()).read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        data = {}
+    from .service import as_typed
+    data = read_config(Path(config.default_path()))
     servers = data.get("mcp_servers") or {}
     if not servers:
-        print("No MCP servers configured; `claudish mcp import` copies the ones you use with Claude.")
+        print(as_typed("No MCP servers configured; `claudish mcp import` copies the ones you use with Claude."))
         return 0
     status = 0
     for name, server in servers.items():
@@ -161,6 +173,12 @@ def list_servers():
     return status
 
 
+def autocompletes(settings):
+    """Whether continue asks this profile's model at every pause (model.Rewriter.autocompletes)."""
+    return settings["backend"] == "rules" or (settings["backend"] in ("llama", "openai")
+                                              and config.loopback(settings.get("model_url") or ""))
+
+
 def context_test(app, profile=None, show=False):
     from .doctor import marks
     shown = marks()
@@ -168,16 +186,26 @@ def context_test(app, profile=None, show=False):
     # Which AI answers there: the app's binding, then that profile's choice per mode; the context is
     # what that profile consults (its own, and the service profile's bindings for the app), as the service does.
     answering = next((b.profile for b in settings.get("bindings") or [] if b.matches(app) and b.profile), None) or name
-    _, routed, _, context = config.resolve(profile=answering) if answering != name else (None, settings, None, context)
+    _, routed, _, _ = config.resolve(profile=answering) if answering != name else (None, settings, None, None)
     bindings = [b for b in settings.get("bindings") or [] if b.matches(app)]  # the service's: a routed profile gets them
-    providers = [("profile %s" % answering, p) for p in (context.providers if context else [])] + \
-                [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
-    print("App %r, profile %r: %d binding(s) match, %d provider(s) would be consulted"
-          % (app, answering, len(bindings), len(providers)))
+    print("App %r, profile %r: %d binding(s) match" % (app, answering, len(bindings)))
+    # Each mode as the service answers it (Rewriter.route, continues): its profile's own context, and
+    # the service's bindings for the app.
+    providers, read = [], set()
     for mode in ("continue", "rewrite", "instruct"):
         chosen = (routed["modes"].get(mode) or {}).get("profile") or answering
-        _, chosen_settings, _, _ = config.resolve(profile=chosen) if chosen != name else (None, settings, None, None)
+        _, chosen_settings, _, chosen_context = config.resolve(profile=chosen) if chosen != name \
+            else (None, settings, None, context)
+        if mode == "continue" and chosen == answering and not autocompletes(chosen_settings):
+            print("  %-9s not asked: %r is a hosted model and no profile routes continue (it types as is)"
+                  % (mode, chosen))
+            continue
         print("  %-9s answered by profile %r (%s)" % (mode, chosen, chosen_settings["backend"]))
+        if chosen not in read:
+            read.add(chosen)
+            providers += [("profile %s" % chosen, p) for p in (chosen_context.providers if chosen_context else [])]
+    providers += [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
+    print("%d provider(s) would be consulted" % len(providers))
     status = 0
     for origin, provider in providers:
         text = provider.get()
