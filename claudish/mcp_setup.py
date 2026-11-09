@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 
 from . import config
+from .context import variables
 
 
 def claude_sources():
@@ -59,12 +60,6 @@ def discover(skipped=None):
 
 def variable(*parts):
     return re.sub(r"[^A-Z0-9]+", "_", "_".join(parts).upper()).strip("_")
-
-
-def variables(value):
-    """The environment variables a value names without a default ($NAME, ${NAME}; not ${NAME:-x})."""
-    return [m.group(1) or m.group(3) for m in re.finditer(r"\$(?:\{(\w+)(:-[^}]*)?\}|(\w+))", value)
-            if not m.group(2)]
 
 
 def sanitize(name, server):

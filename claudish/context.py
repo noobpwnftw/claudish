@@ -40,6 +40,12 @@ def expanded(value, missing=None):
     return VARIABLE.sub(one, value)
 
 
+def variables(value):
+    """The environment variables a value needs: those it names without a default ($NAME, ${NAME};
+    not ${NAME:-x}), as expanded() reads them."""
+    return [m.group(1) or m.group(3) for m in VARIABLE.finditer(value) if m.group(2) is None]
+
+
 def for_agent(value):
     """A value as Claude Code expands it itself: $NAME written ${NAME} (its own config does not take
     the bare form); the secret stays out of the config file Claudish writes."""
