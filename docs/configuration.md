@@ -36,10 +36,11 @@ What a profile can hold, by purpose (each is optional but `backend`; the section
 | --- | --- |
 | The model | `backend`, `model`, `model_url` (a server), `api_key_env`, `command` (an agent CLI, Claude Code, Codex, or a local model's `llama-server`, which the service runs), `timeout` (seconds) |
 | The words | `tone` (this profile's own), `templates` (a templates file), `modes` (another profile for a mode, [Modes](#modes)) |
-| Apps and context | `bindings` ([Apps](#apps-bindings)), `context` and `max_context_chars` ([Context](#context)), `read_terminal` ([terminals](using.md#in-a-terminal)), `look_command` ([Window pictures](#window-pictures)) |
+| Context | `max_context_chars` ([Context](#context)), `read_terminal` ([terminals](using.md#in-a-terminal)), `look_command` ([Window pictures](#window-pictures)) |
 | Agents | `tools` ([Tools](#tools-instructions-that-look-things-up)), `session_command` ([Agent sessions](#agent-sessions-an-agent-at-the-caret)), `helper` and `launcher` ([Helpers](#helpers-handing-a-task-over)) |
 
-Beside `"profile"` and `"profiles"`: `"tone"`, `"keys"`, `"hints"` (below) and `"mcp_servers"` ([Context](#context)).
+Beside `"profile"` and `"profiles"`, for whatever profile is in use: `"tone"`, `"keys"`, `"hints"`
+(below), `"bindings"` ([Apps](#apps-bindings)), `"context"` and `"mcp_servers"` ([Context](#context)).
 
 ### Tone
 
@@ -188,19 +189,23 @@ browser, not the site in it.
 To see the name an app reports, write a few words there and run `claudish recent`, which lists
 each request's app; `claudish context test --app NAME` shows which bindings match a name.
 
-A binding matches apps by a case-insensitive glob (one pattern; several bindings
-can match one app: all their context is read, and the first that names a profile
-chooses it) and sets, for them, which profile answers (its backend, tone, tools
-and helper) and context the model gets there every time:
+Bindings go beside `"profiles"`: they hold whatever profile is in use, so picking
+another model in cd_AI's settings keeps them. A binding matches apps by a
+case-insensitive glob (one pattern; several bindings can match one app: all their
+context is read, and the first that names a profile chooses it) and sets, for
+them, which profile answers (its backend, tone, tools and helper) and context the
+model gets there every time:
 
 ```json
-{"profile": "claude", "profiles": {
-  "claude": {"backend": "claude", "bindings": [
-    {"app": "*thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
-    {"app": "*slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
-    {"app": "*terminal*", "profile": "agent"}]},
-  "proofread": {"backend": "claude", "tone": "proofread"},
-  "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
+{"profile": "claude",
+ "bindings": [
+   {"app": "*thunderbird*", "context": [{"type": "file", "path": "~/notes/email-style.md"}]},
+   {"app": "*slack*", "profile": "proofread", "context": [{"type": "file", "path": "~/notes/team-glossary.md"}]},
+   {"app": "*terminal*", "profile": "agent"}],
+ "profiles": {
+   "claude": {"backend": "claude"},
+   "proofread": {"backend": "claude", "tone": "proofread"},
+   "agent": {"backend": "claude", "helper": ["claude", "{prompt}"]}}}
 ```
 
 `*terminal*` matches GNOME Terminal, Terminal.app and Windows Terminal; other terminals are
@@ -223,8 +228,8 @@ A binding holds what is true of an app every time: who answers there, a style
 guide, a glossary. What changes from one request to the next comes with the
 request: the text around the caret, a terminal's last lines, the window's
 picture (F8), and the [tools](#tools-instructions-that-look-things-up) the model calls for
-what you asked ("summarize PR 1234 for the standup" reads that PR). Elsewhere, the service's own profile
-answers with its own context. Every response lists what was `consulted`.
+what you asked ("summarize PR 1234 for the standup" reads that PR). Elsewhere, the profile in use
+answers. Every response lists what was `consulted`.
 
 A mode can name the profile that answers it, too: continue runs at every pause
 and wants a small, fast model; an instruction is sent on purpose and can wait
@@ -236,21 +241,22 @@ routes it like this; otherwise continue types as is.
               "tiny": {"backend": "llama", "model_url": "http://127.0.0.1:18766"}}}
 ```
 
-The app's binding chooses first, then that profile's choice for the mode. The
-service's own profile (`claudish serve --profile`, or the file's `"profile"`)
-holds the bindings; other profiles are loaded when they are first needed.
+The app's binding chooses first, then that profile's choice for the mode. Other
+profiles than the one in use are loaded when they are first needed.
 
 ## Context
 
-A profile can attach reference context that the model sees with your text: a
-file such as a style guide or glossary, or any local command's output. For
-example, the diff of the branch whose PR description you are writing:
+Reference context, beside `"profiles"`, is what the model sees with your text in every app,
+whichever profile answers: a file such as a style guide or glossary, or any local command's
+output (a binding's own `"context"` adds to it in its app). A profile's `"max_context_chars"`
+keeps it to what that model takes. For example, the diff of the branch whose PR description you
+are writing:
 
 ```json
-{"profiles": {"pr": {"backend": "claude", "context": [
-  {"type": "command", "name": "branch diff", "command": ["git", "-C", "~/src/app", "diff", "main...HEAD"], "ttl": 60},
-  {"type": "file", "path": "~/notes/style.md"}
-], "max_context_chars": 6000}}}
+{"context": [
+   {"type": "command", "name": "branch diff", "command": ["git", "-C", "~/src/app", "diff", "main...HEAD"], "ttl": 60},
+   {"type": "file", "path": "~/notes/style.md"}],
+ "profiles": {"pr": {"backend": "claude", "max_context_chars": 6000}}}
 ```
 
 A command runs as written, without a shell (`~` in an argument is your home): for a pipe or `&&`,

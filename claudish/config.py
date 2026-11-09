@@ -36,14 +36,16 @@ def loopback(url):
 DEFAULT_MODELS = {"claude": "claude-opus-5-5", "claude-code": "haiku", "codex": "gpt-6-luna"}
 DEFAULTS = {"backend": "none", "model_url": MODEL_URL, "model": None, "api_key_env": None,
             "timeout": 3, "templates": None,
-            "context": None, "max_context_chars": 6000, "modes": None, "command": None,
-            "bindings": None, "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
+            "max_context_chars": 6000, "modes": None, "command": None,
+            "look_command": None, "read_terminal": True, "tone": None, "helper": None, "launcher": None, "tools": None,
             "session_command": None}
-FILE_KEYS = ("about", "profile", "profiles", "tone", "keys", "hints", "mcp_servers")  # beside the profiles
+# Beside the profiles: what holds whatever profile is in use (the apps' bindings and the context too:
+# picking another model in the settings keeps them).
+FILE_KEYS = ("about", "profile", "profiles", "tone", "keys", "hints", "mcp_servers", "bindings", "context")
 # The key that sends your words to the model, the default first; the other one puts them in as typed.
 SUMMON_KEYS = ("Shift+Enter", "Enter")
 TYPES = {"backend": str, "model_url": str, "model": str, "api_key_env": str, "timeout": (int, float),
-         "templates": str, "context": list, "max_context_chars": int, "modes": dict, "command": list, "bindings": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
+         "templates": str, "max_context_chars": int, "modes": dict, "command": list, "look_command": list, "read_terminal": bool, "tone": str, "helper": (list, dict), "launcher": list, "tools": list, "session_command": list}
 
 
 def default_path():
@@ -57,6 +59,7 @@ def resolve(path=None, profile=None, overrides=None):
     templates: the profile's templates file, read (modes.load), or None for the shipped ones;
     settings["modes"] becomes name -> {"profile"}: which profile answers a mode."""
     settings, name, base, servers, known, entry = dict(DEFAULTS), None, Path.cwd(), {}, set(), None
+    bindings, context_specs = [], []
     summon, hints = SUMMON_KEYS[0], True
     if path is not None or default_path().is_file():
         path = Path(path or default_path())
@@ -87,9 +90,17 @@ def resolve(path=None, profile=None, overrides=None):
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
+        bindings, context_specs = data.get("bindings") or [], data.get("context") or []
+        for key, value in (("bindings", bindings), ("context", context_specs)):
+            if not (isinstance(value, list) and all(isinstance(spec, dict) for spec in value)):
+                raise ValueError('"%s" must be a list of objects' % key)
         entry = profiles[name]
         if not isinstance(entry, dict):
             raise ValueError("profile %r must be an object" % name)
+        moved = sorted({"bindings", "context"} & set(entry))
+        if moved:
+            raise ValueError('profile %r: move %s beside "profiles" in %s, where it applies whatever profile '
+                             'is in use' % (name, " and ".join('"%s"' % key for key in moved), path))
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)
@@ -140,16 +151,14 @@ def resolve(path=None, profile=None, overrides=None):
                              % (name, mode, spec["profile"]))
         modes[mode] = {"profile": spec["profile"]}
     settings["modes"] = modes
-    context = None
-    if settings["context"]:
-        if not all(isinstance(spec, dict) for spec in settings["context"]):
-            raise ValueError("profile %r: context must be a list of objects" % name)
-        context = Context(settings["context"], base, settings["max_context_chars"], servers)
-    settings["bindings"] = [Binding(spec, base, servers) for spec in settings["bindings"] or []]
+    # The service's context and bindings: the same whatever profile is in use; a profile's own
+    # max_context_chars sizes it for that model.
+    context = Context(context_specs, base, settings["max_context_chars"], servers) if context_specs else None
+    settings["bindings"] = [Binding(spec, base, servers) for spec in bindings]
     for binding in settings["bindings"]:
         if binding.profile and binding.profile not in known:
-            raise ValueError("profile %r: binding for %r names profile %r, which is not in the config"
-                             % (name, binding.pattern, binding.profile))
+            raise ValueError("binding for %r names profile %r, which is not in the config"
+                             % (binding.pattern, binding.profile))
     settings["mcp_servers"] = servers
     settings["summon"], settings["hints"] = summon, hints
     return name, settings, templates, context

@@ -207,6 +207,29 @@ class SettingsTests(Home):
                 self.assertEqual((profile["model"], profile["timeout"], profile["tone"], profile["read_terminal"]),
                                  ("chosen-model", 42, "critic", False))
 
+    def test_picking_another_model_keeps_the_apps_bindings_and_context(self):
+        """Owner (2026-11-09): bindings and context are the service's, not a profile's; picking Claude
+        Code in the settings kept them in the file but they no longer applied."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "claude",
+                                         "context": [{"type": "file", "path": "~/notes/style.md"}],
+                                         "bindings": [{"app": "*slack*", "profile": "proofread"}],
+                                         "profiles": {"claude": {"backend": "claude"},
+                                                      "proofread": {"backend": "claude", "tone": "proofread"}}}))
+        with patch.object(settings, "claude_code", return_value="/opt/claude/bin/claude"):
+            settings.apply({"choice": "claude-code"})
+        name, resolved, _, context = config.resolve()
+        self.assertEqual(name, "claude-code")
+        self.assertEqual([b.pattern for b in resolved["bindings"]], ["*slack*"])
+        self.assertEqual(len(context.providers), 1)
+
+    def test_a_profiles_own_bindings_say_where_they_go(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps({"profile": "p", "profiles": {"p": {"backend": "rules",
+                                                                          "bindings": [{"app": "x"}]}}}))
+        with self.assertRaisesRegex(ValueError, 'move "bindings" beside "profiles"'):
+            config.resolve()
+
     def test_a_profiles_own_command_that_runs_is_kept(self):
         """A path from the docs (not on PATH, not where cd_AI looks), or a wrapper with arguments:
         switching to it is not refused, and it is not replaced by whatever `which` finds."""

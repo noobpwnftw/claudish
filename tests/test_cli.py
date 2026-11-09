@@ -65,13 +65,15 @@ class CommandTests(unittest.TestCase):
     def test_context_test_says_what_each_mode_reads(self):
         (self.home / "a.md").write_text("A")
         (self.home / "b.md").write_text("B")
-        self.config({"profile": "a", "profiles": {
-            "a": {"backend": "rules", "context": [{"type": "file", "name": "a-notes", "path": str(self.home / "a.md")}],
-                  "modes": {"rewrite": {"profile": "b"}}},
-            "b": {"backend": "rules", "context": [{"type": "file", "name": "b-notes", "path": str(self.home / "b.md")}]}}})
+        self.config({"profile": "a", "context": [{"type": "file", "name": "a-notes", "path": str(self.home / "a.md")}],
+                     "bindings": [{"app": "thunder*", "context": [{"type": "file", "name": "b-notes",
+                                                                  "path": str(self.home / "b.md")}]}],
+                     "profiles": {"a": {"backend": "rules", "modes": {"rewrite": {"profile": "b"}}},
+                                  "b": {"backend": "rules"}}})
         done = self.claudish("context", "test", "--app", "thunderbird")
-        self.assertSaid(done, 0, "b-notes")  # rewrite reads its own profile's context
-        self.assertIn("a-notes", done.stdout)
+        self.assertSaid(done, 0, "rewrite   answered by profile 'b'")
+        self.assertIn("a-notes", done.stdout)  # the service's context, whatever profile answers
+        self.assertIn("b-notes", done.stdout)  # and the app's
         self.config({"profile": "claude", "profiles": {"claude": {"backend": "claude"}}})
         self.assertSaid(self.claudish("context", "test", "--app", "x"), 0, "continue  not asked")
 

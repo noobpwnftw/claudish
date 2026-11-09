@@ -71,11 +71,11 @@ class ContextTests(unittest.TestCase):
         path = self.root / "config.json"
         for spec, message in [({"type": "web"}, "type must be"), ({"type": "file", "path": "a", "x": 1}, "unknown keys x"),
                               ({"type": "command"}, "needs a"), ("not an object", "list of objects")]:
-            path.write_text(json.dumps({"profiles": {"p": {"context": [spec]}}}), encoding="utf-8")
+            path.write_text(json.dumps({"context": [spec], "profiles": {"p": {}}}), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
-        path.write_text(json.dumps({"profiles": {"p": {"context": [{"type": "file", "path": "glossary.md"}],
-                                                       "max_context_chars": 500}}}), encoding="utf-8")
+        path.write_text(json.dumps({"context": [{"type": "file", "path": "glossary.md"}],
+                                    "profiles": {"p": {"max_context_chars": 500}}}), encoding="utf-8")
         _, _, _, context = config.resolve(path)
         self.assertEqual(context.max_chars, 500)
         self.assertIn("Fjordline", joined(context))
@@ -136,11 +136,11 @@ class BindingTests(unittest.TestCase):
     def test_binding_config_and_service(self):
         path = self.root / "config.json"
         for spec, message in [({"context": []}, "binding is"), ({"app": "x", "mode": "instruct"}, "binding is")]:
-            path.write_text(json.dumps({"profiles": {"p": {"bindings": [spec]}}}), encoding="utf-8")
+            path.write_text(json.dumps({"bindings": [spec], "profiles": {"p": {}}}), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, message):
                 config.resolve(path)
-        path.write_text(json.dumps({"profiles": {"p": {"bindings": [
-            {"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}]}}}), encoding="utf-8")
+        path.write_text(json.dumps({"bindings": [{"app": "gtk3-*", "context": [{"type": "file", "path": "pr.md"}]}],
+                                    "profiles": {"p": {}}}), encoding="utf-8")
         _, settings, _, _ = config.resolve(path)
         with serving(Rewriter("rules", bindings=settings["bindings"])) as server:
             url = "http://127.0.0.1:%s/suggest" % server.server_port
@@ -158,10 +158,9 @@ class BindingTests(unittest.TestCase):
     def test_a_routed_profile_keeps_its_own_context_limit(self):
         (self.root / "notes.md").write_text("x" * 200, encoding="utf-8")
         path = self.root / "config.json"
-        path.write_text(json.dumps({"profile": "main", "profiles": {
-            "main": {"backend": "rules", "bindings": [{"app": "mail*", "profile": "mail",
-                                                      "context": [{"type": "file", "path": "notes.md"}]}]},
-            "mail": {"backend": "rules", "max_context_chars": 50}}}), encoding="utf-8")
+        path.write_text(json.dumps({"profile": "main", "bindings": [
+            {"app": "mail*", "profile": "mail", "context": [{"type": "file", "path": "notes.md"}]}], "profiles": {
+            "main": {"backend": "rules"}, "mail": {"backend": "rules", "max_context_chars": 50}}}), encoding="utf-8")
         name, settings, templates, context = config.resolve(path)
         main = Rewriter.from_settings(settings, templates, context, name)
         main.loader = lambda profile: Rewriter.from_settings(*config.resolve(path, profile)[1:], profile)
@@ -170,8 +169,8 @@ class BindingTests(unittest.TestCase):
     def test_an_apps_context_keeps_to_the_profiles_limit(self):
         (self.root / "notes.md").write_text("x" * 3000, encoding="utf-8")
         path = self.root / "config.json"
-        path.write_text(json.dumps({"profiles": {"p": {"backend": "rules", "max_context_chars": 100, "bindings": [
-            {"app": "slack*", "context": [{"type": "file", "path": "notes.md"}]}]}}}), encoding="utf-8")
+        path.write_text(json.dumps({"bindings": [{"app": "slack*", "context": [{"type": "file", "path": "notes.md"}]}],
+                                    "profiles": {"p": {"backend": "rules", "max_context_chars": 100}}}), encoding="utf-8")
         name, settings, templates, context = config.resolve(path)
         rewriter = Rewriter.from_settings(settings, templates, context, name)
         self.assertEqual([len(text) for _, text in rewriter.sections("slack")], [100])  # not the default 6000
@@ -265,8 +264,8 @@ class RoutingTests(unittest.TestCase):
 
     def config(self, folder, bindings):
         path = Path(folder) / "config.json"
-        path.write_text(json.dumps({"profile": "main", "profiles": {
-            "main": {"backend": "rules", "bindings": bindings},
+        path.write_text(json.dumps({"profile": "main", "bindings": bindings, "profiles": {
+            "main": {"backend": "rules"},
             "plain": {"backend": "rules", "tone": "plain"}}}))
         return path
 
@@ -332,9 +331,8 @@ class ModeRoutingTests(unittest.TestCase):
         from claudish import config
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
-            path.write_text(json.dumps({"profile": "main", "profiles": {
-                "main": {"backend": "rules", "modes": {"continue": {"profile": "tiny"}},
-                         "bindings": [{"app": "slack*", "profile": "chat"}]},
+            path.write_text(json.dumps({"profile": "main", "bindings": [{"app": "slack*", "profile": "chat"}], "profiles": {
+                "main": {"backend": "rules", "modes": {"continue": {"profile": "tiny"}}},
                 "tiny": {"backend": "rules", "tone": "plain"},
                 "chat": {"backend": "rules", "modes": {"instruct": {"profile": "strong"}}},
                 "strong": {"backend": "rules"}}}))

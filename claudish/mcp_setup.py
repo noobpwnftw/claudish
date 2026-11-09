@@ -189,22 +189,18 @@ def context_test(app, profile=None, show=False):
     _, routed, _, _ = config.resolve(profile=answering) if answering != name else (None, settings, None, None)
     bindings = [b for b in settings.get("bindings") or [] if b.matches(app)]  # the service's: a routed profile gets them
     print("App %r, profile %r: %d binding(s) match" % (app, answering, len(bindings)))
-    # Each mode as the service answers it (Rewriter.route, continues): its profile's own context, and
-    # the service's bindings for the app.
-    providers, read = [], set()
+    # Each mode as the service answers it (Rewriter.route, continues); the context is the service's
+    # own and the app's bindings', whichever profile answers.
     for mode in ("continue", "rewrite", "instruct"):
         chosen = (routed["modes"].get(mode) or {}).get("profile") or answering
-        _, chosen_settings, _, chosen_context = config.resolve(profile=chosen) if chosen != name \
-            else (None, settings, None, context)
+        _, chosen_settings, _, _ = config.resolve(profile=chosen) if chosen != name else (None, settings, None, None)
         if mode == "continue" and chosen == answering and not autocompletes(chosen_settings):
             print("  %-9s not asked: %r is a hosted model and no profile routes continue (it types as is)"
                   % (mode, chosen))
             continue
         print("  %-9s answered by profile %r (%s)" % (mode, chosen, chosen_settings["backend"]))
-        if chosen not in read:
-            read.add(chosen)
-            providers += [("profile %s" % chosen, p) for p in (chosen_context.providers if chosen_context else [])]
-    providers += [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
+    providers = [("context", p) for p in (context.providers if context else [])] + \
+                [("binding %s" % b.pattern, p) for b in bindings for p in b.providers]
     print("%d provider(s) would be consulted" % len(providers))
     status = 0
     for origin, provider in providers:

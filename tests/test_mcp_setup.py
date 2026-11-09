@@ -115,7 +115,7 @@ class MCPSetupTests(unittest.TestCase):
         self.run_quiet(mcp_setup.import_servers)
         data = json.loads(config.default_path().read_text())
         data["mcp_servers"] = {"notes": data["mcp_servers"]["notes"]}  # only the server that exists here
-        data["profiles"][data["profile"]]["bindings"] = [{"app": "code", "context": [  # the default profile
+        data["bindings"] = [{"app": "code", "context": [  # beside the profiles
             {"type": "mcp", "server": "notes", "tool": "pull_request_diff", "arguments": {"number": 3}, "timeout": 20}]}]
         config.default_path().write_text(json.dumps(data))
         with patch.dict(os.environ, {"MY_TOKEN": "t-1"}):
