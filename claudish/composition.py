@@ -1076,12 +1076,14 @@ class Composition:
         self.change((self.text + char)[-MAX_COMPOSITION:])
         return char
 
-    def caret_stayed(self, before):
+    def caret_stayed(self, before, lag=0):
         """Whether the app's text before the caret is still what continue typed: a click elsewhere
         sends no key on every platform, and Tab never takes a suggestion for another place. True
-        when the app does not share its text."""
-        before = plain(before)
-        return not before or before.endswith(plain(self.text)[-TYPED_TAIL:])
+        when the app does not share its text. lag: the app may not show the last few characters
+        typed yet (a browser answers from a copy it updates later)."""
+        before, typed = plain(before), plain(self.text)
+        return not before or any(before.endswith(typed[:len(typed) - behind][-TYPED_TAIL:])
+                                 for behind in range(min(lag, len(typed) - 1) + 1))
 
     def take_ghost(self):
         """Tab in continue: the suggestion to commit, or "" (then Tab belongs to the app). Taking it

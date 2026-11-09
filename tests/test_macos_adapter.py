@@ -256,6 +256,7 @@ class MacOSAdapterTests(unittest.TestCase):
         cls.guard.stop()
 
     def setUp(self):
+        self.module.LAST_MODE[0] = None  # each test starts as a new session would
         self.client = Client()
         self.controller = self.module.ClaudishInputController().initWithServer_delegate_client_(
             object(), None, self.client)
@@ -503,6 +504,44 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(state.ghost, "world.")
         self.controller.check_ghost(now=True)
         self.assertFalse(self.controller.state.ghost)
+
+    def test_a_controller_not_in_use_neither_draws_nor_hides_the_panel(self):
+        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other.activateServer_(None)
+        other.state.change("hello")
+        other.state.fail(other.state.revision, "the model is offline")  # a panel of its own
+        self.controller.activateServer_(None)  # here now; the other's deactivation comes late
+        self.controller.state.change("hi")
+        self.controller.state.fail(self.controller.state.revision, "no model is set up")
+        self.controller.show_panel()
+        drawn = self.module.PANEL.spec
+        other.poll()  # its timer still runs: it must not cover this box's panel with its own
+        self.assertIs(self.module.PANEL.spec, drawn)
+        other.deactivateServer_(None)  # nor hide it
+        self.assertTrue(self.module.PANEL.visible)
+        self.assertIs(self.module.PANEL.spec, drawn)
+        other.inputControllerWillClose()
+
+    def test_a_text_box_you_come_to_is_in_the_mode_you_were_in(self):
+        self.shift_tap()  # continue, as the menu bar now shows for every text box
+        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other.activateServer_(None)
+        self.assertEqual(other.state.mode, "continue")
+        other.inputControllerWillClose()
+
+    def test_continue_keys_the_app_shows_a_moment_later_are_no_click(self):
+        class Behind(TextClient):  # a browser: its text, as asked, lacks the last key typed
+            def whole(self):
+                return super().whole()[:-1] if self.commits else super().whole()
+
+            def selectedRange(self):
+                return (len(self.whole()), 0)
+        self.client = self.controller.client_ = Behind("Thanks for the ")
+        self.controller.client = lambda: self.client
+        self.controller.state.mode = "continue"
+        self.type_text("word")
+        self.assertEqual(self.client.text, "Thanks for the word")
+        self.assertEqual(self.controller.state.text, "Thanks for the word")  # not "Thanks for the wor" + "d"
 
     def test_a_failing_commit_at_deactivate_still_stops_the_timer(self):
         self.type_text("hi")

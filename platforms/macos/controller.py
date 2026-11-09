@@ -55,7 +55,11 @@ MODE_TOAST = False  # macOS says the new input mode at the caret itself; cd_AI's
 # the server and is freed with its controller, and IMK later messaged the freed panel while
 # deactivating (a crash on macOS 26).
 PANEL = OVERLAY = TOAST = None  # one panel, overlay and toast for the server, shared by its controllers
-OWNER = [None]  # the controller last activated: only it hides them (another's late deactivate or close must not)
+OWNER = [None]  # the controller last activated: only it draws or hides them (another's late deactivate or close must not)
+# The mode, as the menu bar shows it for every text box (one input source): a text box you come to
+# is in the mode you were in, as on Windows and IBus.
+LAST_MODE = [None]
+LAG = 3  # characters typed in continue an app may not show yet at the next key
 TOAST_TIMER = [None]  # the shared toast's hide timer: another text box's toast (or pill) replaces it
 
 
@@ -150,6 +154,8 @@ class ClaudishInputController(IMKInputController):
             TOAST.hide()
             OVERLAY.hide()
         OWNER[0] = self
+        if LAST_MODE[0] and self.state.mode != LAST_MODE[0] and not self.state.text:
+            self.state.toggle()
         self.shift.cancel()  # a Shift pressed elsewhere is not half a tap here (as Windows at a focus change)
         if self.worker is None:
             self.worker = Suggestions()
@@ -245,7 +251,9 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def poll(self):
-        if not self.active or self.worker is None or secure_input():  # results wait: nothing is drawn
+        # Results wait, nothing drawn: a password field, or another text box's controller in use
+        # (this one's deactivation can come late) whose panel this one must not cover.
+        if not self.active or self.worker is None or secure_input() or OWNER[0] is not self:
             return
         if self.state.follow(self.worker):  # the service stopped or came back
             trace({True: "offline", False: "online"}.get(self.state.offline, self.state.offline))
@@ -436,7 +444,9 @@ class ClaudishInputController(IMKInputController):
 
     @objc.python_method
     def hide_panel(self):
-        PANEL.hide()
+        """This text box's panel goes; the shared panel only while it is this box's (or no one's)."""
+        if OWNER[0] in (self, None):
+            PANEL.hide()
         self.drawn = None
 
     @objc.python_method
@@ -452,6 +462,7 @@ class ClaudishInputController(IMKInputController):
         """A Shift tap, or a mode picked in the input menu: continue <-> compose. Leaving compose
         keeps what you see, as typed. tell: select the mode, so the menu bar shows its icon."""
         kept = self.state.toggle()
+        LAST_MODE[0] = self.state.mode
         if self.worker is not None:
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         if kept:
@@ -613,7 +624,9 @@ class ClaudishInputController(IMKInputController):
             return False
         before = self.around_caret(client)[0]
         # A fresh start (a paste, a new field), or a click since (no key says so): from the app's text.
-        if not state.text or not state.caret_stayed(before):
+        # Keys typed fast may not be in the app's text yet (Chromium answers from a copy it updates
+        # later): that is no click.
+        if not state.text or not state.caret_stayed(before, lag=LAG):
             state.change(before[-MAX_COMPOSITION:])
         for char in chars:
             client.insertText_replacementRange_(state.type_live(char), (NSNotFound, 0))
@@ -627,7 +640,8 @@ class ClaudishInputController(IMKInputController):
             if self.worker is not None:
                 self.worker.schedule(self.state.revision, "")
             self.hide_panel()
-            OVERLAY.hide()
+            if OWNER[0] in (self, None):  # another box's suggestion is not this one's to drop
+                OVERLAY.hide()
             if client is not None:
                 unmark(client)
             return

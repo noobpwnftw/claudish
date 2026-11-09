@@ -434,6 +434,17 @@ class ReceiveTests(unittest.TestCase):
                       "the answer ran past its length budget; use a shorter phrase"):
             self.assertEqual(failure(words), words)
 
+    def test_an_app_a_few_keys_behind_is_no_click(self):
+        state = Composition()
+        state.mode = "continue"
+        state.change("Thanks for the wor")
+        self.assertFalse(state.caret_stayed("Thanks for the w"))  # what Tab and the suggestion go by
+        self.assertTrue(state.caret_stayed("Thanks for the w", lag=3))  # a browser's copy, not yet updated
+        self.assertFalse(state.caret_stayed("Thanks for th", lag=3))
+        self.assertFalse(state.caret_stayed("Elsewhere entirely", lag=3))
+        state.change("a")
+        self.assertFalse(state.caret_stayed("b", lag=3))  # never nothing typed at all
+
     def test_a_subscription_cli_signed_out_is_said_as_its_sign_in(self):
         from claudish.composition import failure
         for error, said in (
