@@ -297,6 +297,8 @@ def server_problem(url, models, model=None, key=None):
         return "%s answered, but not with a list of models at %s/v1/models" % (url, url.rstrip("/"))
     if model and models and model not in models:
         return "the server has no model %r; it has: %s" % (model, ", ".join(models))
+    if not model and isinstance(models, list) and len(models) > 1:  # which one would be a guess: every request fails
+        return "the server has several models (%s): pick one" % ", ".join(models[:8])
     return None
 
 

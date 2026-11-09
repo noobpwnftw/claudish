@@ -134,11 +134,23 @@ OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no a
              "the agent ", "the instruction had ended", "text must be")  # an agent session's, the service's checks
 
 
+# A subscription CLI's own failure (claudish/warm.py: "Claude Code: <its words>"), and how to sign it in.
+SIGN_IN = {"Claude Code": "run claude, then /login", "Codex": "run codex login"}
+SIGNED_OUT = ("login", "logged in", "401", "unauthorized", "authentication", "oauth", "api key")
+
+
 def failure(error):
     """Why a request failed, in a few plain words for the panel."""
     if str(error or "").startswith(OWN_WORDS):
         return str(error)  # cd_AI's own, already said for the panel
-    error = str(error or "").lower()
+    for name, fix in SIGN_IN.items():
+        if str(error or "").startswith(name + ": "):
+            said = str(error)[len(name) + 2:].lower()
+            if any(words in said for words in SIGNED_OUT):  # not a key: the CLI's sign-in
+                return "%s is signed out: %s" % (name, fix)
+            if "errno 2" in said or "no such file" in said or "cannot find the file" in said:
+                return "%s did not start: see cd_AI's settings" % name
+    said, error = str(error or ""), str(error or "").lower()
     if "no model is set up" in error:
         return "no model is set up"
     if "the config is not used" in error:
@@ -152,6 +164,11 @@ def failure(error):
         return "Anthropic did not accept the key"
     if "http error 401" in error or "http error 403" in error:  # an OpenAI-compatible server's answer
         return "the model API did not accept the key"
+    if "has several models" in error:
+        return "the model server has several models: pick one in cd_AI's settings"
+    if "http error 400" in error or "http error 422" in error:  # the server's reason, as claudish/model.py keeps it
+        reason = str(said).split(": ", 2)[2:]
+        return "the model API refused the request" + (": " + reason[0][:80] if reason else "")
     if "http error 404" in error:
         return "the model API has no such model or address"
     if any(words in error for words in ("name or service not known", "no address associated", "nodename nor servname",

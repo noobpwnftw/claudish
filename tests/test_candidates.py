@@ -434,6 +434,20 @@ class ReceiveTests(unittest.TestCase):
                       "the answer ran past its length budget; use a shorter phrase"):
             self.assertEqual(failure(words), words)
 
+    def test_a_subscription_cli_signed_out_is_said_as_its_sign_in(self):
+        from claudish.composition import failure
+        for error, said in (
+                ("Claude Code: Not logged in · Please run /login", "Claude Code is signed out: run claude, then /login"),
+                ("Claude Code: API Error: 401 {\"type\":\"authentication_error\",\"message\":\"OAuth token has expired\"}",
+                 "Claude Code is signed out: run claude, then /login"),
+                ("Codex: unexpected status 401 Unauthorized", "Codex is signed out: run codex login"),
+                ("Claude Code: [Errno 2] No such file or directory: 'claude'", "Claude Code did not start: see cd_AI's settings"),
+                ("Claude Code: rate limit reached", "too many requests"),
+                ("Claude Code is busy; keep typing or retry", "Claude Code is busy; keep typing or retry"),
+                ('http://h:1 has several models (a, b): name one with "model" in the profile',
+                 "the model server has several models: pick one in cd_AI's settings")):
+            self.assertEqual(failure(error), said)
+
     def test_follow_copies_the_workers_view(self):
         state, worker = Composition(), type("W", (), {"summon": "Enter", "hints": False, "offline": True})()
         self.assertTrue(state.follow(worker))

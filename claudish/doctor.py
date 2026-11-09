@@ -37,7 +37,13 @@ def check_config(state):
     from . import config
     path = config.default_path()
     try:
-        name, settings, _, context = config.resolve()
+        name, settings, templates, context = config.resolve()
+        import contextlib, io
+        from .model import Rewriter
+        with contextlib.redirect_stderr(io.StringIO()):  # a missing key is the Model row's
+            Rewriter.from_settings(settings, templates, context, name)  # as the service builds it ("tools" it cannot call)
+    except ImportError:
+        pass  # the Anthropic SDK: the Model row says so
     except (OSError, ValueError) as exc:
         return "fail", str(exc), "fix %s, or move it aside and run `claudish init`" % path
     state.update(profile=name, settings=settings, context=context)
@@ -112,11 +118,11 @@ def check_backend(state):
             "paste the key again in cd_AI's settings (`claudish settings`)"
     try:
         listing = fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
-        if backend == "openai" and settings.get("model"):  # as the settings window checks it
+        if backend == "openai":  # as the settings window checks it (no model: the server's only one)
             from .settings import server_problem
             data = (listing or {}).get("data") if isinstance(listing, dict) else None
             names = [m.get("id") for m in data or [] if isinstance(m, dict)]  # {"data": null}: none listed
-            problem = server_problem(url, names, settings["model"], key)
+            problem = server_problem(url, names, settings.get("model"), key)
             if problem:
                 return "fail", problem, "name one of its models in the profile's \"model\", or pick it in cd_AI's settings"
         return "ok", "model server reachable at %s" % url, None

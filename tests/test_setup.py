@@ -148,6 +148,31 @@ class SetupTests(unittest.TestCase):
         self.service_run.assert_not_called()
         self.assertIn("skipped", out)
 
+    def test_a_profile_asked_for_becomes_the_default_of_a_config_there_already(self):
+        config.write_starter()  # an earlier install's, or the installer's: the default is "claude"
+        self.assertEqual(self.states()["Config"], "done")
+        self.assertEqual(self.states("claude")["Config"], "done")
+        self.assertEqual(self.states("codex")["Config"], "todo")
+        status, out = self.quiet(profile="codex", yes=True, skip=("service", "input", "model"))
+        self.assertIn("make 'codex' the default profile", out)
+        self.assertEqual(config.resolve()[0], "codex")  # what the service and doctor run
+        self.assertEqual(self.states("codex")["Config"], "done")
+
+    def test_a_tone_without_the_config_step_writes_the_profile_asked_for(self):
+        status, out = self.quiet(profile="codex", yes=True, tone="proofread", skip=("config", "service", "input", "model"))
+        self.assertEqual(status, 0, out)
+        name, settings, _, _ = config.resolve()
+        self.assertEqual((name, settings["tone"]), ("codex", "proofread"))
+
+    def test_a_config_whose_templates_are_gone_is_said_not_a_traceback(self):
+        config.write_starter(profile="claude")
+        data = json.loads(config.default_path().read_text())
+        data["profiles"]["claude"]["templates"] = "gone.json"
+        config.default_path().write_text(json.dumps(data))
+        status, out = self.quiet(dry_run=True)
+        self.assertEqual(status, 2)
+        self.assertIn("setup: ", out)
+
     def test_done_steps_are_left_alone(self):
         config.write_starter()
         self.model.parent.mkdir(parents=True)

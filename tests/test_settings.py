@@ -318,6 +318,10 @@ class SettingsTests(Home):
         self.assertNotIn("critic", self.path.read_text())
         self.assertIn("plain letter", settings.server_problem("http://x", settings.KEY_CHARACTERS))
         self.assertIn("not with a list of models", settings.server_problem("http://x", settings.NOT_MODELS))
+        # No "model" in the profile: the server's only one; with several, every request would fail.
+        self.assertIsNone(settings.server_problem("http://x", ["gemma"]))
+        self.assertEqual(settings.server_problem("http://x", ["gemma", "qwen"]), "the server has several models (gemma, qwen): pick one")
+        self.assertIsNone(settings.server_problem("http://x", ["gemma", "qwen"], "qwen"))
 
     @unittest.skipIf(sys.platform == "darwin", "the Keychain on macOS")
     def test_another_model_api_with_its_key_saved_for_its_address_only(self):

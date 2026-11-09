@@ -65,6 +65,25 @@ def user_content(text, image, style, intro=""):
 from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL, loopback  # noqa: E402
 
 
+def said_by(error):
+    """The reason an OpenAI-compatible server gives with an HTTP error ({"error": {"message": ...}}
+    and its variants, or its text), short; read once, so the error says it wherever it is shown."""
+    if getattr(error, "said", None) is None:
+        try:
+            body = error.read(4096).decode("utf-8", "replace") if error.fp is not None else ""
+        except Exception:
+            body = ""
+        try:
+            data = json.loads(body)
+            found = data.get("error", data) if isinstance(data, dict) else data
+            found = found.get("message", found) if isinstance(found, dict) else found
+            body = found if isinstance(found, str) else body
+        except ValueError:
+            pass
+        error.said = " ".join(body.split())[:200]
+    return error.said
+
+
 def opener_for(url):
     """Loopback traffic never goes through HTTP_PROXY; a remote endpoint may need it. (Building one
     loads the system CA bundle, about 12 ms.)"""
@@ -552,6 +571,9 @@ class Rewriter:
             if image is not None and exc.code in (400, 500, 501) and not refusal:
                 raise RuntimeError("this model server did not accept the window picture; it needs a vision "
                                    "model (llama.cpp: --mmproj)") from exc
+            said = None if refusal else said_by(exc)
+            if said:
+                exc.msg = "%s: %s" % (exc.msg, said)
             raise
         return data["choices"][0], data.get("usage", {})
 

@@ -163,6 +163,13 @@ class ModelServerChecks(unittest.TestCase):
     def test_the_saved_key_is_sent(self):
         self.assertEqual(self.check()[0::2], ("ok", "sk-saved"))
 
+    def test_no_model_named_and_several_on_the_server_fails_as_every_request_would(self):
+        settings = {"backend": "openai", "model_url": "http://h:1", "api_key_env": None, "model": None}
+        with patch.object(doctor, "fetch_json", return_value={"data": [{"id": "gemma"}, {"id": "qwen"}]}), \
+                patch("claudish.keys.server_key", return_value=None):
+            status, detail, _ = doctor.check_backend({"settings": settings})
+        self.assertEqual((status, detail), ("fail", "the server has several models (gemma, qwen): pick one"))
+
     def test_a_server_without_the_profiles_model_fails_as_in_the_settings(self):
         settings = {"backend": "openai", "model_url": "http://h:1", "api_key_env": None, "model": "gone"}
         with patch.object(doctor, "fetch_json", return_value={"data": [{"id": "gemma"}]}), \
@@ -245,3 +252,16 @@ class WarmBackendChecks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConfigCheck(unittest.TestCase):
+    def test_a_profile_that_reads_but_cannot_run_fails_as_the_service_would(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home, "claudish/config.json")
+            path.parent.mkdir()
+            path.write_text(json.dumps({"profile": "rules", "profiles": {"rules": {"backend": "rules", "tools": [{"server": "github"}]}}}))
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": home}), patch("claudish.config.default_path", return_value=path):
+                status, detail, _ = doctor.check_config({})
+        self.assertEqual(status, "fail")
+        self.assertIn("the rules backend cannot use them", detail)

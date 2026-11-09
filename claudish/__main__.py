@@ -276,12 +276,19 @@ def serve(args, parser, passthrough):
     try:
         profile, settings, rewriter = build()
     except (OSError, ValueError) as exc:
+        flagged = False  # the config reads without this command's flags (a --profile it does not have), not with them
         try:
-            config.resolve(args.config)  # without this command's flags (a --profile it does not have)
+            config.resolve(args.config)
+            try:
+                config.resolve(args.config, args.profile, overrides)
+            except (OSError, ValueError):
+                flagged = True
         except (OSError, ValueError):
-            pass  # the config's own problem
-        else:
-            parser.error(str(exc))  # the config reads: a flag of this command, said here as always
+            pass
+        if flagged:
+            parser.error(str(exc))  # a flag of this command, said here as always
+        # Otherwise the config's own problem, if only in what a profile asks for ("tools" a backend
+        # cannot call): a service that exited would be started again and again.
         # Still an input method, and the settings window still opens to fix it: no model until
         # the config reads (an edit is taken up at once).
         print("cd_AI could not use its config, so no model is set up: %s" % exc, file=sys.stderr, flush=True)

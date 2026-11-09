@@ -259,6 +259,19 @@ class ModeTests(unittest.TestCase):
             result = rewriter.rewrite(text, mode=mode, **field)
             return result, json.loads(opener.open.call_args.args[0].data)
 
+    def test_a_servers_refusal_keeps_its_reason(self):
+        from urllib.error import HTTPError
+        from claudish.composition import failure
+        rewriter = Rewriter(max_tokens=64)
+        body = json.dumps({"error": {"message": "Unsupported parameter: 'max_tokens'"}}).encode()
+        with patch.object(rewriter, "opener") as opener:
+            opener.open.side_effect = lambda *args, **kwargs: (_ for _ in ()).throw(
+                HTTPError("u", 400, "Bad Request", {}, BytesIO(body)))
+            with self.assertRaises(HTTPError) as caught:
+                rewriter.rewrite("hi", mode="rewrite")
+        self.assertEqual(str(caught.exception), "HTTP Error 400: Bad Request: Unsupported parameter: 'max_tokens'")
+        self.assertEqual(failure(caught.exception), "the model API refused the request: Unsupported parameter: 'max_tokens'")
+
     def test_each_mode_sends_its_template_and_budget(self):
         rewriter = Rewriter(max_tokens=64)
         result, payload = self.call(rewriter, "Thanks for the review on", "continue")

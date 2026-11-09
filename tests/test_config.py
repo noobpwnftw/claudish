@@ -170,11 +170,22 @@ if __name__ == "__main__":
 
 class ServeTests(unittest.TestCase):
     def test_a_config_it_cannot_use_leaves_the_service_running_with_no_model(self):
+        health = self.health({"profiles": {"claude": {"backend": "claude", "claude_model": "x"}}})
+        self.assertEqual(health["backend"], "none")
+        self.assertIn("unknown keys claude_model", health["problem"])
+
+    def test_a_profile_that_reads_but_cannot_run_leaves_it_running_too(self):
+        # Not a flag of the command (exit 2, and a login service started again and again).
+        health = self.health({"profiles": {"rules": {"backend": "rules", "tools": [{"server": "github"}]}}})
+        self.assertEqual(health["backend"], "none")
+        self.assertIn("the rules backend cannot use them", health["problem"])
+
+    def health(self, data):
         import socket, subprocess, sys, time
         from urllib.request import urlopen
         with tempfile.TemporaryDirectory() as home:
             path = Path(home, "config.json")
-            path.write_text(json.dumps({"profiles": {"claude": {"backend": "claude", "claude_model": "x"}}}))
+            path.write_text(json.dumps(data))
             with socket.socket() as probe:
                 probe.bind(("127.0.0.1", 0))
                 port = probe.getsockname()[1]
@@ -195,8 +206,7 @@ class ServeTests(unittest.TestCase):
                 service.terminate()
                 service.wait(5)
                 service.stderr.close()
-            self.assertEqual(health["backend"], "none")
-            self.assertIn("unknown keys claude_model", health["problem"])
+        return health
 
 
 class FlagTests(unittest.TestCase):

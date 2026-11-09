@@ -55,10 +55,17 @@ def progress(label):
     return lambda received, total: sys.stderr.write("\r  %s: %d/%d MB" % (label, received >> 20, total >> 20))
 
 
-def step_config(name):
-    """The starter config, with the profile being set up as its default (so serve and doctor agree)."""
+def step_config(name, chosen=None):
+    """The starter config, with the profile being set up as its default (so serve and doctor agree);
+    chosen: --profile, made the default of a config there already, which the service runs."""
     path = config.default_path()
     if path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        if chosen and data.get("profile") != chosen:
+            def use():
+                data["profile"] = chosen
+                config.save(data, path)
+            return "todo", "make %r the default profile in %s (it was %r)" % (chosen, path, data.get("profile")), use
         return "done", str(path), None
     return "todo", "write %s with profiles: %s (default %s)" % (path, ", ".join(config.STARTER["profiles"]), name), \
         lambda: config.write_starter(profile=name)
@@ -78,6 +85,9 @@ def step_tone(name, settings, tone):
         from .settings import read
         path = config.default_path()
         data = read(path)  # the starter's, when the config step was skipped
+        if not path.is_file():  # as the config step writes it: this profile the default, templates beside
+            data["profile"] = name
+            config.write_starter_templates(path)
         config.set_tone(data, tone, name)
         config.save(data, path)
     return "todo", "set the tone to %r" % tone, write
@@ -217,7 +227,7 @@ def plan(profile=None, variant="cpu", skip=(), tone=None):
     """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
     name, settings = chosen_profile(profile)
     local = is_local(settings)
-    steps = [("Config", lambda: step_config(name)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
+    steps = [("Config", lambda: step_config(name, profile)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", step_mcp)]
     if local and not has_scripts():  # the Windows and macOS installs have no scripts/
         steps += [("Local model", lambda: ("manual", "the local model is set up from a source checkout",
                                            "set it up there (docs/install.md), or put llama-server's command line "
@@ -287,7 +297,7 @@ def run(profile=None, yes=False, dry_run=False, variant="cpu", skip=(), tone=Non
         if tone is None and fresh and not (yes or dry_run) and sys.stdin.isatty():
             tone = choose_tone()  # asked once, on the first run: an update does not ask again
         name, steps = plan(profile, variant, skip, tone)
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:  # a config that does not read, or its templates gone
         print("setup: %s" % exc)
         return 2
     symbols = doctor.marks()

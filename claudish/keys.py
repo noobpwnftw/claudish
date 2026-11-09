@@ -43,9 +43,30 @@ def claude_credential():
             return "environment", variable
     if stored():
         return "saved", None
-    if Path.home().joinpath(".config", "anthropic").is_dir():
+    if anthropic_profile():
         return "profile", None
     return None, None
+
+
+def anthropic_profile():
+    """Whether the Anthropic SDK finds an `ant auth login` profile, where it looks: its config folder
+    (ANTHROPIC_CONFIG_DIR, else %APPDATA%\\Anthropic on Windows, ~/.config/anthropic elsewhere), the
+    active profile (ANTHROPIC_PROFILE, else the folder's active_config, else "default"), and that
+    profile's configs/<profile>.json."""
+    import os
+    import sys
+    from pathlib import Path
+    if os.environ.get("ANTHROPIC_CONFIG_DIR"):
+        folder = Path(os.environ["ANTHROPIC_CONFIG_DIR"])
+    elif sys.platform == "win32":
+        folder = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Anthropic"
+    else:
+        folder = Path.home() / ".config" / "anthropic"
+    try:
+        name = os.environ.get("ANTHROPIC_PROFILE") or (folder / "active_config").read_text(encoding="utf-8").strip()
+    except OSError:
+        name = ""
+    return (folder / "configs" / ("%s.json" % (name or "default"))).is_file()
 
 
 def for_profile(settings):
