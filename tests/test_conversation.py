@@ -714,3 +714,30 @@ class TmuxHandleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IdleTests(unittest.TestCase):
+    def test_idle_conversations_end_with_no_instruction_coming(self):
+        import claudish.conversation as conversation
+        closed = []
+        with patch.object(conversation, "IDLE_SECONDS", 0.1), patch.object(conversation, "SWEEP_SECONDS", 0.05):
+            kept = Conversations()
+            box = kept.get("box")
+            box.agent = type("Agent", (), {"close": lambda self, ended=False: closed.append(ended)})()
+            deadline = time.monotonic() + 3
+            while not closed and time.monotonic() < deadline:
+                time.sleep(0.02)
+        self.assertEqual(closed, [True])  # its agent exited
+        self.assertIsNone(kept.find("box"))
+
+    def test_an_answer_after_the_end_says_the_instruction_ended(self):
+        from claudish.sessions import Sessions
+        driver = type("Driver", (), {"run": lambda self, s, p: (s.emit("question", id="q", text="?", choices=[{"label": "A"}]),
+                                                                s.emit("error", text="no answer, so the instruction stopped")),
+                                     "answer": lambda self, *a: None, "cancel": lambda self: None})()
+        session = Sessions().start(driver, "ask")
+        deadline = time.monotonic() + 2
+        while not session.done and time.monotonic() < deadline:
+            time.sleep(0.01)
+        with self.assertRaisesRegex(ValueError, "no such open question"):
+            session.answer("q", 0)

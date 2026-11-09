@@ -176,6 +176,36 @@ class RewriterTests(unittest.TestCase):
             finally:
                 rewriter.stop_model()
 
+    def test_esc_stops_an_instructions_exchange_and_the_next_rewrite_does_not_wait(self):
+        from claudish.model import Rewriter
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"XDG_CONFIG_HOME": folder}):
+            rewriter = Rewriter("claude-code", command=[sys.executable, FAKE, "claude"], timeout=10)
+            try:
+                rewriter.start_model()
+                self.assertEqual(ready(rewriter.warm), "warm")
+                session = rewriter.start_session("make it slow please", conversation="box")  # 3 s
+                time.sleep(0.4)
+                session.cancel()
+                started = time.monotonic()
+                rewriter.rewrite("hello there")
+                self.assertLess(time.monotonic() - started, 2.0)  # not behind the 3 s exchange
+                deadline = time.monotonic() + 2
+                while session.running and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                self.assertFalse(session.running)  # its place among the service's sessions is free
+            finally:
+                rewriter.stop_model()
+
+    def test_an_exchange_taken_back_before_it_ran_never_runs(self):
+        backend = warm.ClaudeCode([sys.executable, FAKE, "claude"])
+        self.addCleanup(backend.stop)
+        backend.start()
+        ready(backend)
+        backend.abandon(threading.get_ident())
+        with self.assertRaisesRegex(RuntimeError, "had ended"):
+            backend.ask("rewrite: ok", 5)
+        self.assertEqual(backend.ask("rewrite: ok", 5), "seen 1: rewrite: ok")  # the process is fine
+
 
 class LifecycleTests(unittest.TestCase):
     def backends(self):

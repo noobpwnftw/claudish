@@ -61,6 +61,7 @@ class AgentProcess:
         self.turn_lock = threading.Lock()
         self.turns = 0  # turns started; with running, tells an interrupted turn from the next one
         self.running = False
+        self.ended = False
         self.counter = 0
         self.stderr = []
 
@@ -70,13 +71,16 @@ class AgentProcess:
     def ensure(self):
         if self.alive():
             return
+        if self.ended:  # its conversation ended (idle, or the text box gone): a turn queued behind starts none
+            raise RuntimeError("the instruction had ended")
         self.close()  # an agent that exited: its pipes go before it is resumed
         session = []
         if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):
             session = ["--resume", self.session_id] if self.started else ["--session-id", self.session_id]
             if self.started and self.resume_at:  # a turn taken back: the session as it was before it
                 session += ["--resume-session-at", self.resume_at]
-        self.resume_at = None
+        # resume_at stays until the new process reports (turn()): one that dies first saved nothing,
+        # and a plain --resume would bring the turn taken back with it.
         if self.mcp_config and self.config_file is None:
             descriptor, self.config_file = tempfile.mkstemp(prefix="claudish-mcp-", suffix=".json")
             with os.fdopen(descriptor, "w", encoding="utf-8") as config:
@@ -137,6 +141,7 @@ class AgentProcess:
 
     def close(self, ended=False):
         """Stop the process; ended: the conversation is over (its MCP config goes too)."""
+        self.ended = self.ended or ended
         if ended and self.config_file:
             try:
                 os.unlink(self.config_file)
@@ -179,6 +184,7 @@ class ClaudeCodeDriver:
         self.ran = None  # the process this turn ran in
         self.before = None  # the agent's kept_at when this turn started; the turn's own last message
         self.reached = None
+        self.failed = False  # the turn ended in an error
 
     @property
     def process(self):
@@ -194,13 +200,18 @@ class ClaudeCodeDriver:
                     return
                 self.agent.ensure()
                 self.agent.turns += 1
-                self.agent.running = True
+                self.agent.running = True  # from here an Esc's interrupt counts this turn (its kill timer)
+                if self.cancelled:  # Esc while the agent started: the prompt is never sent
+                    self.agent.running = False
+                    return
                 self.before = self.agent.kept_at
                 try:
                     self.turn(session, prompt)
                 finally:
                     self.agent.running = False
-                if self.cancelled:  # Esc while it worked: the agent's session does not keep it either
+                if self.cancelled or self.failed:
+                    # Esc while it worked, or a turn that failed: the agent's session does not keep it
+                    # either (as the model's conversation keeps no failed turn).
                     self.take_back(locked=True)
                 elif self.reached:
                     self.agent.kept_at = self.reached
@@ -246,6 +257,7 @@ class ClaudeCodeDriver:
                 kind = message.get("type")
                 if kind in ("system", "result", "assistant"):
                     self.agent.started = True  # its session is saved: the next process resumes it
+                    self.agent.resume_at = None  # from where it was taken back to
                 if kind == "control_request":
                     self.question(session, message)
                 elif kind == "system" and message.get("subtype") == "permission_denied":
@@ -278,11 +290,13 @@ class ClaudeCodeDriver:
                     elif message.get("subtype") == "success" and text and not message.get("is_error"):
                         session.emit("result", text=text)
                     else:
+                        self.failed = True
                         session.emit("error", text=text or "the agent stopped: %s" % message.get("subtype"))
                     return
         finally:
             over.set()
         if not session.done and not self.cancelled:  # the process ended mid-turn; the next turn resumes it
+            self.failed = True
             tail = "".join(self.agent.stderr).strip()[-300:]
             session.emit("error", text="the agent exited without a result" + (": " + tail if tail else ""))
 

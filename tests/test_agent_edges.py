@@ -51,6 +51,58 @@ class AgentEdgeTests(unittest.TestCase):
             finally:
                 agent.close(True)
 
+    def test_a_failed_turn_is_taken_back_from_the_agents_session(self):
+        with patch.dict(os.environ, {"FAKE_MODE": ""}):
+            agent = AgentProcess(COMMAND)
+            try:
+                self.assertEqual(turn(agent, "first one"), [("result", "answer to: first one")])
+                kept = agent.kept_at
+                self.assertEqual(turn(agent, "fail this")[-1][0], "error")
+                self.assertEqual((agent.kept_at, agent.resume_at), (kept, kept))  # resumed before the failure
+            finally:
+                agent.close(True)
+
+    def test_a_turn_taken_back_stays_back_when_the_next_start_dies(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.dict(os.environ, {"FAKE_MODE": "atcrash", "FAKE_LOG": folder + "/log"}):
+            agent = AgentProcess(COMMAND)
+            try:
+                turn(agent, "first one")
+                turn(agent, "second one")
+                agent.rewind(agent.kept_at)  # Esc took the second back
+                kept = agent.resume_at
+                self.assertEqual(turn(agent, "third")[-1][0], "error")  # that start died
+                self.assertEqual(agent.resume_at, kept)  # the next start still resumes at the first
+            finally:
+                agent.close(True)
+
+    def test_esc_while_the_agent_starts_sends_no_prompt(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"FAKE_MODE": "", "FAKE_LOG": folder + "/log"}):
+            agent = AgentProcess(COMMAND)
+            driver = ClaudeCodeDriver(COMMAND, agent=agent, timeout=60)
+            starting = agent.ensure
+
+            def ensure():
+                starting()
+                driver.cancel()  # Esc, while the process started
+            agent.ensure = ensure
+            try:
+                session = Sessions().start(driver, "never sent")
+                deadline = time.monotonic() + 5
+                while session.running and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                time.sleep(0.3)
+                self.assertNotIn("never sent", Path(folder, "log").read_text())
+            finally:
+                agent.close(True)
+
+    def test_an_ended_conversations_agent_starts_no_process(self):
+        agent = AgentProcess(COMMAND)
+        agent.close(ended=True)
+        with self.assertRaisesRegex(RuntimeError, "had ended"):
+            agent.ensure()
+        self.assertIsNone(agent.process)
+
 
 class PolicyNameTests(unittest.TestCase):
     def test_a_server_name_claude_code_rewrites_keeps_its_policy(self):

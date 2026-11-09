@@ -45,6 +45,7 @@ class Session:
                 self.questions[event["id"]] = len(event.get("choices") or [])
             if kind in ("result", "error"):
                 self.done, self.finished_at = True, time.monotonic()
+                self.questions.clear()  # ended: an answer to one of them says so, not "taken"
             self.condition.notify_all()
 
     def wait(self, after=0, timeout=1.0):

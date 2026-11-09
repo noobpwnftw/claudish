@@ -75,6 +75,8 @@ class Warm:
         self.state = "stopped"
         self.lock = threading.Lock()
         self.lifecycle = threading.RLock()
+        self.asking = None  # the thread whose exchange runs now (abandon)
+        self.abandoned = set()  # threads whose exchange was taken back before it ran
         self.stopped = threading.Event()
         self.process = self.lines = None
 
@@ -141,10 +143,16 @@ class Warm:
         waited = not self.lock.acquire(blocking=False)
         if waited and not self.lock.acquire(timeout=timeout):
             raise RuntimeError("%s is busy; keep typing or retry" % self.name)
+        owner = threading.get_ident()
         try:
             if waited and deadline - time.monotonic() < min(1.0, timeout / 2):
                 # Its time went waiting for the one before: it never ran, and the process is fine.
                 raise RuntimeError("%s is busy; keep typing or retry" % self.name)
+            with self.lifecycle:
+                if owner in self.abandoned:  # taken back (Esc) while it waited: it never runs
+                    self.abandoned.discard(owner)
+                    raise RuntimeError("the instruction had ended")
+                self.asking = owner
             try:
                 self.check_running()
                 if not self.alive():
@@ -165,7 +173,23 @@ class Warm:
                 self.failed()  # it starts again at the next request; this answer stands
             return text
         finally:
+            self.asking = None
             self.lock.release()
+
+    def abandon(self, owner):
+        """An instruction taken back (Esc): its exchange (asked from thread owner) stops now, not
+        after the CLI's whole answer, which would hold every rewrite behind it. The process, holding
+        its prompt, is not reused (ask's failure starts a fresh one); not yet asked, it never is."""
+        with self.lifecycle:
+            if self.asking == owner:
+                self.kill(force=True)
+            else:
+                self.abandoned.add(owner)
+
+    def forget(self, owner):
+        """The instruction's thread is done: nothing of it is waiting any more."""
+        with self.lifecycle:
+            self.abandoned.discard(owner)
 
     def failed(self):
         """A request failed: this process is not reused. A fresh one warms up in the background

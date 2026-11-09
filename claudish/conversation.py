@@ -17,6 +17,7 @@ from .textbox import Textbox
 from .tools import Finished
 
 IDLE_SECONDS = 1800
+SWEEP_SECONDS = 60  # how often idle conversations are looked for
 KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs: compaction)
 KEPT_CHARACTERS = 24000  # and within what a small local model's context holds beside the text box
 # A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
@@ -81,19 +82,39 @@ class Conversations:
     def __init__(self):
         self.lock = threading.Lock()
         self.items = {}
+        self.sweeper = None
 
     def get(self, key):
         """The conversation for this text box (a new one for an unknown or missing key)."""
+        self.sweep()
         with self.lock:
-            now = time.monotonic()
-            for old in [k for k, c in self.items.items() if now - c.used > IDLE_SECONDS]:
-                self.items.pop(old).close()
             if not key:
                 return Conversation(None)
             conversation = self.items.get(key) or Conversation(key)
-            conversation.used = now
+            conversation.used = time.monotonic()
             self.items[key] = conversation
+            if self.sweeper is None:  # idle ones end also when no instruction comes
+                self.sweeper = threading.Thread(target=self.sweeping, daemon=True)
+                self.sweeper.start()
             return conversation
+
+    def sweep(self):
+        """End the conversations idle past IDLE_SECONDS: their agents exit (outside the lock: each
+        may take seconds to stop, and other text boxes go on)."""
+        with self.lock:
+            now = time.monotonic()
+            old = [self.items.pop(k) for k, c in list(self.items.items()) if now - c.used > IDLE_SECONDS]
+        for conversation in old:
+            conversation.close()
+
+    def sweeping(self):
+        while True:
+            time.sleep(SWEEP_SECONDS)
+            self.sweep()
+            with self.lock:
+                if not self.items:
+                    self.sweeper = None
+                    return
 
     def find(self, key):
         """The live conversation for this key, or None (never creates one)."""
@@ -129,12 +150,23 @@ class ModelDriver:
         self.settled = None  # what a settling tool did, for this conversation's next turn
         self.draft = None  # a follow-up's draft: the one in view, not yet in the text (start_session sets it)
         self.kept = None  # the turn this instruction added to the conversation
+        self.thread = None  # the thread its turn runs in (a warm CLI's exchange is stopped by it)
 
     def run(self, session, prompt):
         """The instruction as a turn in this text box's conversation: the same one answer as every
         request, with the tools an instruction may use (the profile's, the text box's, a question
         to the user, a helper) and their questions asked through the session."""
         rewriter = self.rewriter
+        self.thread = threading.get_ident()  # (before the check: an Esc after it finds the exchange to stop)
+        try:
+            if self.cancelled:
+                return
+            self.answer_turn(session, prompt, rewriter)
+        finally:
+            if hasattr(rewriter.warm, "forget"):  # a CLI's (a local model's server has no exchange to stop)
+                rewriter.warm.forget(self.thread)
+
+    def answer_turn(self, session, prompt, rewriter):
         box = rewriter.box("instruct", self.app, self.purpose, self.before, self.after, self.look, self.screen)
         box.draft = self.draft
         self.conversation.textbox = Textbox(self.before, self.after)
@@ -360,6 +392,8 @@ class ModelDriver:
 
     def cancel(self):
         self.cancelled = True
+        if self.thread is not None and hasattr(self.rewriter.warm, "abandon"):
+            self.rewriter.warm.abandon(self.thread)  # Claude Code, Codex: the CLI stops this exchange now
         self.take_back()  # Esc as the answer arrived: the conversation does not keep it either
         for waiter in self.pending.values():
             waiter[1] = (1, "cancelled")
