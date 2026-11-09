@@ -153,3 +153,27 @@ class AgentConfigTests(unittest.TestCase):
         self.assertEqual(given["docs"]["headers"], {"Authorization": "Bearer ${DOCS_TOKEN}"})  # Claude Code fills it in
         self.assertEqual(given["notes"]["env"], {"TOKEN": "${NOTES_TOKEN}"})
         self.assertNotIn("s3cret", json.dumps(given))
+
+
+class AgentToolsTests(unittest.TestCase):
+    def test_an_agents_profile_takes_tools_whatever_its_backend(self):
+        """The agent (session_command) calls the profile's tools itself; a rules profile that runs one
+        was refused them ("tools need a backend with tool calls")."""
+        try:
+            import mcp  # noqa: F401
+        except ImportError:
+            self.skipTest('needs the MCP SDK: pip install "claudish-ime[mcp]"')
+        from claudish.model import Rewriter
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_text(json.dumps({"profile": "code", "mcp_servers": {"notes": {"command": "notes-mcp"}},
+                                        "profiles": {"code": {"backend": "rules", "tools": ["notes"],
+                                                              "session_command": ["claude", "--print"]},
+                                                     "plain": {"backend": "rules", "tools": ["notes"]}}}))
+            for name in ("code", "plain"):
+                _, settings, templates, context = config.resolve(path, name)
+                if name == "code":
+                    Rewriter.from_settings(settings, templates, context, name)
+                else:
+                    with self.assertRaisesRegex(ValueError, "tools need a backend"):
+                        Rewriter.from_settings(settings, templates, context, name)

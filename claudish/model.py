@@ -248,7 +248,8 @@ class Rewriter:
         rewriter.hints = settings.get("hints", True)
         rewriter.max_context_chars = settings.get("max_context_chars", DEFAULTS["max_context_chars"])
         if settings.get("tools"):
-            if settings["backend"] not in LOOPS:
+            # The profile's agent (session_command) calls the tools itself (--mcp-config): any backend then.
+            if settings["backend"] not in LOOPS and not settings.get("session_command"):
                 raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
                                  "Claude); the %s backend cannot use them" % settings["backend"])
             from .tools import Toolbox
