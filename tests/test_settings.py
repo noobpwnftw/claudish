@@ -229,6 +229,16 @@ class SettingsTests(Home):
                                                                           "bindings": [{"app": "x"}]}}}))
         with self.assertRaisesRegex(ValueError, 'move "bindings" beside "profiles"'):
             config.resolve()
+        # A profile only an app routes to: refused now, not at every request in that app.
+        self.path.write_text(json.dumps({"profile": "main", "bindings": [{"app": "foo*", "profile": "other"}],
+                                         "profiles": {"main": {"backend": "rules"},
+                                                      "other": {"backend": "rules", "context": []}}}))
+        with self.assertRaisesRegex(ValueError, "profile 'other': move \"context\""):
+            config.resolve()
+        for wrong in ({}, False, ""):  # not a list: said, not taken as none
+            self.path.write_text(json.dumps({"profile": "main", "context": wrong, "profiles": {"main": {"backend": "rules"}}}))
+            with self.assertRaisesRegex(ValueError, '"context" must be a list'):
+                config.resolve()
 
     def test_a_profiles_own_command_that_runs_is_kept(self):
         """A path from the docs (not on PATH, not where cd_AI looks), or a wrapper with arguments:

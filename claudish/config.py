@@ -90,17 +90,21 @@ def resolve(path=None, profile=None, overrides=None):
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
-        bindings, context_specs = data.get("bindings") or [], data.get("context") or []
+        bindings, context_specs = data.get("bindings"), data.get("context")
+        bindings, context_specs = [] if bindings is None else bindings, [] if context_specs is None else context_specs
         for key, value in (("bindings", bindings), ("context", context_specs)):
             if not (isinstance(value, list) and all(isinstance(spec, dict) for spec in value)):
                 raise ValueError('"%s" must be a list of objects' % key)
+        # Every profile, not only the one in use: one an app or a mode routes to is loaded later, and
+        # would fail every request there instead of the config being refused now.
+        for each, settings_of in profiles.items():
+            moved = sorted({"bindings", "context"} & set(settings_of)) if isinstance(settings_of, dict) else []
+            if moved:
+                raise ValueError('profile %r: move %s beside "profiles" in %s, where it applies whatever profile '
+                                 'is in use' % (each, " and ".join('"%s"' % key for key in moved), path))
         entry = profiles[name]
         if not isinstance(entry, dict):
             raise ValueError("profile %r must be an object" % name)
-        moved = sorted({"bindings", "context"} & set(entry))
-        if moved:
-            raise ValueError('profile %r: move %s beside "profiles" in %s, where it applies whatever profile '
-                             'is in use' % (name, " and ".join('"%s"' % key for key in moved), path))
         if "api_key" in entry:
             raise ValueError('profile %r: store keys in the environment and set "api_key_env" to the '
                              "variable's name" % name)

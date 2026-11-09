@@ -143,7 +143,7 @@ Every request carries what the input method knows about where you are typing,
 described the same way for every mode:
 
 - **the app** (the program, or the bundle on macOS), which also picks the
-  profile's bindings;
+  bindings;
 - **the field's kind** when the app reports it (IBus: terminal, email, URL,
   number, and so on). URL, email, number, and phone fields get no unasked
   suggestions; Tab and Shift+Enter still work there;

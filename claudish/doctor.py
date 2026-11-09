@@ -288,7 +288,7 @@ def check_context(state):
     if not providers and not bindings:
         return [("Context", "skip", "no context providers or bindings configured", None)]
     results = []
-    for label, provider in [("profile", p) for p in providers] + \
+    for label, provider in [("context", p) for p in providers] + \
                            [("app %s" % b.pattern, p) for b in bindings for p in b.providers]:
         text = provider.get()
         name = "Context: %s" % provider.name
