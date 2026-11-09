@@ -31,8 +31,14 @@ const typed = () => (shown && shown.claudish) || "claudish";  // how claudish is
 const reopen = () => `this window has expired: open Settings again from cd_AI's menu (Settings…) or with \`${typed()} settings\``;
 
 function say(id, text, bad) {
-  $(id).textContent = text || "";
+  coded($(id), text || "");
   $(id).classList.toggle("bad", Boolean(bad));
+}
+
+function coded(element, text) {
+  // Text whose `commands` show as code, not as backticks.
+  element.replaceChildren(...String(text).split("`").map((part, index) =>
+    index % 2 ? Object.assign(document.createElement("code"), {textContent: part}) : document.createTextNode(part)));
 }
 
 function subscription(state) {
@@ -74,6 +80,8 @@ function status(state) {
 }
 
 let picking = false;  // "Your own API" picked, not yet used: its form stays open through other saves
+let edited = false;  // the API's fields as you typed them, not yet used: kept through a refusal
+const offer = (names) => $("models").replaceChildren(...names.map((name) => Object.assign(document.createElement("option"), {value: name})));
 let shown = null, viewVersion = 0, sampleVersion = 0, healthTimer, lockTimer, toneTimer, started = false;
 // Every change would be refused while the config in use does not read: the file comes first.
 const locked = (state) => Boolean((state.service || {}).problem || state.config_locked);
@@ -92,8 +100,8 @@ function lost(error) {
   if (!error.down && !error.expired) return false;
   clearTimeout(healthTimer);
   clearTimeout(lockTimer);
-  $("status").textContent = error.expired ? sentence(error.message)
-    : `cd_AI's service is not running. Start it with \`${typed()} service install\`, then open Settings again.`;
+  coded($("status"), error.expired ? sentence(error.message)
+    : `cd_AI's service is not running. Start it with \`${typed()} service install\`, then open Settings again.`);
   $("status").className = "bad";
   $("controls").hidden = true;
   $("config-fix").hidden = true;
@@ -103,7 +111,7 @@ function lost(error) {
 
 function showStatus(state) {
   const [line, kind] = status(state);
-  $("status").textContent = line;
+  coded($("status"), line);
   $("status").className = kind;
   if (kind === "bad" && subscription(state)) say("model-message", "");  // not "now writes with" beside it
   $("try").querySelector("button").disabled = !ready(state) &&
@@ -151,17 +159,18 @@ function render(state) {
   $("try").hidden = picking && state.choice !== "server";  // the model in use; hidden while another is picked but not yet in use
   $("server").hidden = choice !== "server";
   $("other").hidden = !["local", "other"].includes(choice);
-  $("other").textContent = state.choice === "local"
+  coded($("other"), state.choice === "local"
     ? "cd_AI uses the local model that `claudish setup --profile local` set up. Pick one above to change that."
-    : `cd_AI uses the profile “${state.profile}” from its config. Pick one above to change that.`;
-  $("key-state").textContent = {saved: `Saved in ${state.key_where}`, missing: "Not set",
+    : `cd_AI uses the profile “${state.profile}” from its config. Pick one above to change that.`);
+  coded($("key-state"), {saved: `Saved in ${state.key_where}`, missing: "Not set",
                                 profile: "Your `ant auth login` profile (a saved key goes first)",
-                                environment: `${state.key_env} in your environment (used before a saved key)`}[state.key];
+                                environment: `${state.key_env} in your environment (used before a saved key)`}[state.key]);
   $("key-state").classList.toggle("good", state.key !== "missing");
-  if (!picking && document.activeElement !== $("url")) $("url").value = state.server.url;
-  if (!picking && document.activeElement !== $("model")) $("model").value = state.server.model;
+  if (!picking && !edited && document.activeElement !== $("url")) $("url").value = state.server.url;
+  if (!picking && !edited && document.activeElement !== $("model")) $("model").value = state.server.model;
   $("server-key-state").textContent = state.server.key === "saved" ? `Key saved for this address in ${state.server.key_where}` : "";
-  $("models").replaceChildren(...state.server_models.map((name) => Object.assign(document.createElement("option"), {value: name})));
+  $("server-key-row").hidden = state.server.key !== "saved";
+  if (!edited) offer(state.server_models);
   tones(state);
   for (const radio of document.getElementsByName("summon")) radio.checked = radio.value === state.summon;
   for (const radio of document.getElementsByName("hints")) radio.checked = radio.value === (state.hints === false ? "off" : "on");
@@ -180,16 +189,21 @@ function tones(state) {
     words.id = "own-words";
     words.maxLength = 200;
     words.setAttribute("aria-label", TONE_WORDS);
-    words.addEventListener("change", () => words.value.trim() && change({tone: words.value}, "tone-message", "Tone saved."));
+    words.addEventListener("change", () => {
+      if (!words.value.trim()) return;
+      words.dataset.saving = "1";  // its save on the way: leaving the field keeps the words
+      change({tone: words.value}, "tone-message", "Tone saved.").finally(() => { delete words.dataset.saving; });
+    });
     words.addEventListener("focus", () => { own.querySelector("input[type=radio]").checked = true; });
-    words.addEventListener("blur", () => { if (!words.value.trim() && shown) tones(shown); });  // nothing saved: the tone in use
+    // Left without a change saved: the tone in use is checked again (the words stay only if they are it).
+    words.addEventListener("blur", () => setTimeout(() => { if (shown && !words.dataset.saving && document.activeElement !== words) tones(shown); }));
     own.querySelector("span").append(words);
     group.replaceChildren(...rows, own);
   }
   for (const radio of group.querySelectorAll("input[type=radio]")) {
     radio.checked = state.own_words ? radio.value === "" : radio.value === state.tone;
   }
-  if (state.own_words && document.activeElement !== $("own-words")) $("own-words").value = state.tone;
+  if (document.activeElement !== $("own-words")) $("own-words").value = state.own_words ? state.tone : "";
 }
 
 function toneRow(value, title, about) {
@@ -255,7 +269,8 @@ async function change(body, message, done) {
     sampleVersion++;
     $("sample").hidden = true;
   }
-  say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the API…" : "");
+  say(message, body.key ? "Checking the key with Anthropic…" : body.server ? "Checking the API…"
+    : body.choice ? "Switching…" : "");
   try {
     render(await call("/settings", body));
     say(message, done);
@@ -272,7 +287,21 @@ async function change(body, message, done) {
   }
 }
 
-document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => {
+// Radios step with the arrow keys, each step a change: only where they stop is saved (a model
+// choice starts its CLI), as in the tone list.
+const settleTimers = {};
+let steppedAt = 0;
+document.addEventListener("keydown", (event) => {
+  if (event.key.startsWith("Arrow")) steppedAt = Date.now();
+}, true);
+const settle = (group, save) => {  // a click (or Space) is where you stopped: at once
+  clearTimeout(settleTimers[group]);
+  if (Date.now() - steppedAt < 1000) settleTimers[group] = setTimeout(save, 400);
+  else save();
+};
+
+document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEventListener("change", () => settle("choice", () => {
+  if (!radio.checked) return;
   picking = radio.value === "server";
   if (radio.value === "claude") {
     change({choice: "claude"}, "model-message", "cd_AI now writes with Claude.").then((done) => {
@@ -288,7 +317,7 @@ document.querySelectorAll("input[name=choice]").forEach((radio) => radio.addEven
     $("try").hidden = $("sample").hidden = shown && shown.choice !== "server";
     say("model-message", "Fill in the API, then Use this API.");
   }
-}));
+})));
 $("claude").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = $("claude").querySelector("button");
@@ -300,15 +329,24 @@ $("claude").addEventListener("submit", async (event) => {
   }
   button.disabled = false;
 });
+for (const id of ["url", "model"]) $(id).addEventListener("input", () => { edited = true; });
 $("server").addEventListener("submit", (event) => {
   event.preventDefault();
+  const button = $("server").querySelector("button");
+  if (button.disabled) return;  // (Enter in a field while it checks)
+  button.disabled = true;
   change({server: {url: $("url").value, model: $("model").value, key: $("server-key").value}, choice: "server"},
          "model-message", "cd_AI now writes with this API.").then((done) => {
+    button.disabled = false;
     if (done) {
-      picking = false;
+      picking = edited = false;
       $("server-key").value = "";
       $("url").value = shown.server.url;  // as saved
       $("model").value = shown.server.model;
+      offer(shown.server_models);
+    } else {  // its models, when it answered with a list to pick from
+      const listed = /pick the model to use: (.+?)\.?$/i.exec($("model-message").textContent);
+      if (listed) offer(listed[1].split(", "));
     }
   });
 });
@@ -333,16 +371,22 @@ async function start() {
   $("controls").disabled = false;
   $("controls").hidden = locked(shown);
 }
+// Back to this window: the state as it is now (the config may have been edited by hand meanwhile).
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && started && !picking && !edited) recheck();
+});
+window.addEventListener("focus", () => { if (started && !picking && !edited) recheck(); });
+
 start().catch((error) => {
   if (lost(error)) return;
-  $("status").textContent = sentence(error.message);
+  coded($("status"), sentence(error.message));
   $("status").className = "bad";
 });
 
 for (const radio of document.getElementsByName("hints")) {
-  radio.addEventListener("change", () => change({hints: radio.value === "on"}, "hints-message",
-                                                radio.value === "on" ? "Hints show." : "The panel shows only what is pending."));
+  radio.addEventListener("change", () => settle("hints", () => radio.checked && change({hints: radio.value === "on"}, "hints-message",
+                                                radio.value === "on" ? "Hints show." : "The panel shows only what is pending.")));
 }
 for (const radio of document.getElementsByName("summon")) {
-  radio.addEventListener("change", () => change({summon: radio.value}, "keys-message", `${radio.value} asks the model.`));
+  radio.addEventListener("change", () => settle("summon", () => radio.checked && change({summon: radio.value}, "keys-message", `${radio.value} asks the model.`)));
 }

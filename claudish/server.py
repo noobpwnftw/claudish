@@ -430,6 +430,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                         swap()
                     except Exception as exc:  # it would not start at the next login either: put it back
                         put_back()
+                        if isinstance(exc, ImportError):  # Claude without the Anthropic SDK: how to add it
+                            from .doctor import SDK_INSTALL
+                            return self.reply(400, {"error": "Claude needs the Anthropic SDK, so nothing changed: "
+                                                             "run `%s` in cd_AI's checkout" % SDK_INSTALL})
                         return self.reply(400, {"error": "cd_AI could not use that, so nothing changed (%s)" % exc})
                     if "choice" in data and server.rewriter.profile != shown["profile"]:
                         # Started with a profile of its own (--profile, the local model's service): it

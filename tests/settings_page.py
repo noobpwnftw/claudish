@@ -75,6 +75,22 @@ async def check(args, home, port):
         await page.locator("#own-words").blur()
         await expect(page.locator("#tone-message")).to_have_text("Tone saved.")
         assert json.loads(config.read_text())["tone"] == "plain and friendly"
+        await page.get_by_text("Critic", exact=True).click()  # a named tone: the words go
+        await expect(page.locator("#tone-message")).to_have_text("Critic it is.")
+        await page.locator("#own-words").focus()  # passing through the field, typing nothing
+        await page.keyboard.press("Tab")
+        await expect(page.locator("input[name=tone][value=critic]")).to_be_checked()
+        await expect(page.locator("#own-words")).to_have_value("")
+
+        # ↑↓ through a radio group: only where it stops is saved.
+        posts = []
+        page.on("request", lambda request: request.method == "POST" and request.url.endswith("/settings")
+                and posts.append(request))
+        await page.locator("input[name=summon]:checked").focus()
+        await page.keyboard.press("ArrowDown")
+        await page.keyboard.press("ArrowUp")
+        await expect(page.locator("#keys-message")).not_to_be_empty()  # the one save, where it stopped
+        assert len(posts) == 1, len(posts)
 
         await expect(page.locator("input[name=hints][value=on]")).to_be_checked()
         await page.get_by_text("Only what is pending", exact=True).click()
@@ -98,6 +114,17 @@ async def check(args, home, port):
         profile = json.loads(config.read_text())["profiles"]["server"]
         assert (profile["model_url"], profile["model"]) == (args.server, "gemma-4"), profile
         await expect(page.locator("#status")).not_to_have_class("bad")  # it answers (this service's flag keeps rules)
+        # In use, changed and refused: what you typed stays to correct, and one click is one save.
+        gone = "http://127.0.0.1:%d" % free_port()
+        await page.locator("#url").fill(gone)
+        await page.locator("#model").fill("beta")
+        posts.clear()
+        await page.locator("#server button").click()
+        await page.locator("#server button").click(force=True, no_wait_after=True)  # again, while it checks
+        await expect(page.locator("#model-message")).to_contain_text("Nothing answers at")
+        assert len(posts) == 1, len(posts)
+        await expect(page.locator("#url")).to_have_value(gone)
+        await expect(page.locator("#model")).to_have_value("beta")  # (nothing saved: the reload below shows the API in use)
 
         await page.set_viewport_size({"width": 360, "height": 700})
         await page.wait_for_function("() => document.documentElement.scrollWidth <= window.innerWidth", timeout=2000)

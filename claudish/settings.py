@@ -218,7 +218,8 @@ def check_key(key):
     try:
         import anthropic
     except ImportError:
-        return "the Anthropic SDK is missing from this install"
+        from .doctor import SDK_INSTALL
+        return "the Anthropic SDK is missing from this install: run `%s` in cd_AI's checkout" % SDK_INSTALL
     try:
         # Anthropic's own address, whatever ANTHROPIC_BASE_URL says: the key goes nowhere else.
         anthropic.Anthropic(api_key=key, base_url="https://api.anthropic.com", timeout=10.0,
@@ -319,7 +320,10 @@ def apply(changes, path=None):
         raise ValueError("unknown setting")
     path = path or config.default_path()
     before = path.stat().st_mtime_ns if path.is_file() else None
-    data = read(path)
+    try:
+        data = read(path)
+    except ValueError as exc:  # edited by hand, and it does not read: where, and how to fix it
+        raise ValueError("%s does not read (%s): fix it (it applies when you save), or move it aside" % (path, exc))
     profiles = data.setdefault("profiles", {})
     if "key" in changes:
         changes = dict(changes, key=accepted_key(changes["key"]))

@@ -264,7 +264,8 @@ def check_ime_windows():
 
 
 # Every installer has it; a checkout installs it into its venv.
-SDK_FIX = '%s -m pip install -e ".[claude]" in the checkout' % sys.executable
+SDK_INSTALL = '%s -m pip install -e ".[claude]"' % sys.executable  # in cd_AI's checkout
+SDK_FIX = SDK_INSTALL + " in the checkout"
 
 
 def macos_enabled():
