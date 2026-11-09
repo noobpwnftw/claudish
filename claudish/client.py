@@ -95,6 +95,15 @@ def headers(url=SERVICE):
     return sent
 
 
+APP_CHARACTERS = 200  # what the service takes as an app's name (claudish/server.py checked_app)
+
+
+def app_name(app):
+    """The focused app's name as the service takes it: a window's class can be a whole URL (a
+    Chromium --app window, chrome-<url>-Default); its start names the app, and bindings match it."""
+    return app[:APP_CHARACTERS] if isinstance(app, str) else app
+
+
 # Runs on the background worker, never on an input event. The service enforces each backend's
 # own timeout, so this only needs to outlast the slowest configured backend (agents take minutes).
 def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=False,
@@ -105,7 +114,7 @@ def suggest(text, endpoint=SERVICE, timeout=330, mode="rewrite", app=None, look=
     body = {"text": text, "mode": mode}
     if not again:
         body["again"] = False
-    for key, value in (("app", app), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
+    for key, value in (("app", app_name(app)), ("look", look), ("before", before), ("after", after), ("purpose", purpose)):
         if value:
             body[key] = value
     return call(endpoint, "/suggest", body, timeout)
@@ -320,7 +329,7 @@ class Suggestions:
         if purpose:
             body["purpose"] = purpose
         if app:
-            body["app"] = app
+            body["app"] = app_name(app)
         if draft:
             body["draft"] = draft
         with self.condition:

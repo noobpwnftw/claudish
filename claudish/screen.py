@@ -10,6 +10,7 @@ Linux: AT-SPI (the accessibility bus GNOME and KDE run). Windows: UI Automation 
 macOS: the AX API through pyobjc; the service's Python needs the Accessibility permission.
 Keep importable on PIME's Python 3.6: adapters use `is_terminal` for quiet continue.
 """
+import os
 import re
 import sys
 import time
@@ -116,8 +117,30 @@ def read(app=None):
     return tail(text)
 
 
+A11Y_BUS = []  # the accessibility bus answered once: AT-SPI keeps its connection
+
+
+def accessibility_bus():
+    """Whether the desktop's accessibility bus is there. Without it AT-SPI does not fail, it ends
+    the process (dbind-ERROR: "Couldn't connect to accessibility bus"): asked first, over the
+    session bus (which starts it where the desktop can), as AT-SPI itself would."""
+    if A11Y_BUS or os.environ.get("AT_SPI_BUS_ADDRESS"):
+        return True
+    from gi.repository import Gio, GLib
+    try:
+        Gio.bus_get_sync(Gio.BusType.SESSION, None).call_sync(
+            "org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", "GetAddress", None, None,
+            Gio.DBusCallFlags.NONE, int(BUDGET_SECONDS * 1000), None)
+    except GLib.Error:
+        return False
+    A11Y_BUS.append(True)
+    return True
+
+
 def read_atspi(app):
     import gi
+    if not accessibility_bus():
+        return None
     gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi
     deadline = time.monotonic() + BUDGET_SECONDS

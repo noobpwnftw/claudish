@@ -50,6 +50,7 @@ SHORTCUT_MASK = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
                  IBus.ModifierType.SUPER_MASK | IBus.ModifierType.META_MASK)
 STEPS = {IBus.KEY_Left: -1, IBus.KEY_Right: 1, IBus.KEY_Home: "home", IBus.KEY_End: "end",
          IBus.KEY_KP_Left: -1, IBus.KEY_KP_Right: 1, IBus.KEY_KP_Home: "home", IBus.KEY_KP_End: "end"}
+UP, DOWN = (IBus.KEY_Up, IBus.KEY_KP_Up), (IBus.KEY_Down, IBus.KEY_KP_Down)  # the numpad's too, as its ← and →
 
 # Pressed alone, these keys must not end the phrase. AltGr (Level3) types characters.
 MODIFIER_KEYS = {getattr(IBus, "KEY_" + name) for name in (
@@ -111,6 +112,8 @@ class Screen:
     def watch(self, present):
         trace("shell extension", "present" if present else "absent")
         changed, self.shell = present != self.shell, present
+        if not present:
+            self.focus = None  # its last window is no window: each box is its input context again
         if changed and self.on_presence is not None:
             # Disabled, or the shell restarted: the panel and suggestion go to IBus's popup and
             # preedit; back, the extension gets what is at the caret now, and IBus's are cleared.
@@ -166,6 +169,7 @@ class ClaudishEngine(IBus.Engine):
         super().__init__(*args, **kwargs)
         self.composition = Composition()
         self.shift = ShiftTap()  # Shift alone, tapped: the mode switch
+        self.shift_selection = None  # the app's selection when Shift went down (selected_since)
         self.suggestions = Suggestions()
         self.sensitive = False
         self.app = None  # The focused program, for bindings ("supported text boxes").
@@ -184,12 +188,12 @@ class ClaudishEngine(IBus.Engine):
         result = self.suggestions.poll()
         if result:
             revision, data = result
-            trace("result", sorted(data), "current" if revision == self.composition.revision else "stale")
+            trace("result", sorted(data), "current" if revision == self.composition.revision else "stale", data.get("error"))
             kind = self.composition.receive(revision, data)
             if kind:  # a draft, a question, progress; done: nothing to insert
                 self.render()
             toast = self.composition.done_toast(data["done"]) if kind == "done" else None
-            if toast and screen().shell:
+            if toast and screen().shell and not self.drawn:  # words typed meanwhile: their panel, no toast over it
                 screen().publish(self.drawn, "", toast)
         if not self.composition.live and self.composition.panel() != self.drawn:
             self.render()  # the pause before compose's keys, or anything else the description shows
@@ -273,6 +277,19 @@ class ClaudishEngine(IBus.Engine):
             return None
         return (text.get_text() if text else ""), cursor, anchor
 
+    def selection(self):
+        """(cursor, anchor) in the app's text, when it shares it: a Shift+click changes it, and an
+        app need not reset the input method for a click."""
+        found = self.surrounding()
+        return found[1:] if found else None
+
+    def selected_since(self):
+        """Whether a Shift+click selected text since Shift went down (no tap then, as on macOS): an
+        app need not reset the input method for a click. Only a selection counts: a caret the
+        cache shows a key late is no click."""
+        now = self.selection()
+        return bool(now) and now[0] != now[1] and now != self.shift_selection
+
     def around_caret(self):
         """(before, after): the app's text around the caret; empty when the client does not share it."""
         found = self.surrounding()
@@ -300,8 +317,9 @@ class ClaudishEngine(IBus.Engine):
     def before_caret(self):
         return self.around_caret()[0][-MAX_COMPOSITION:]
 
-    def live_key(self, keyval):
-        """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it."""
+    def live_key(self, keyval, shift=0):
+        """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it.
+        shift: the key's modifier state."""
         state = self.composition
         name = self.compose_key(keyval)
         if name is None:
@@ -320,7 +338,7 @@ class ClaudishEngine(IBus.Engine):
             combined, self.dead = accented(self.composition.accent, char), None
             self.live_commit(combined)  # é goes in, not the e the key would type
             return True
-        if keyval == IBus.KEY_Tab:
+        if keyval == IBus.KEY_Tab and not shift & IBus.ModifierType.SHIFT_MASK:  # Shift+Tab: the app's
             if state.ghost and not state.caret_stayed(self.around_caret()[0]):  # a click moved it (no reset)
                 state.dismiss()
                 self.render()
@@ -448,7 +466,8 @@ class ClaudishEngine(IBus.Engine):
             chord = bool(state & SHORTCUT_MASK)
             if not state & IBus.ModifierType.RELEASE_MASK:
                 self.shift.press(time.monotonic(), chord)
-            elif self.shift.release(time.monotonic(), chord):
+                self.shift_selection = self.selection()
+            elif self.shift.release(time.monotonic(), chord) and not self.selected_since():
                 self.switch_mode()
             return False
         if not state & IBus.ModifierType.RELEASE_MASK:
@@ -479,7 +498,7 @@ class ClaudishEngine(IBus.Engine):
             self.render()
             return True
         if self.composition.live:
-            return self.live_key(keyval)
+            return self.live_key(keyval, state)  # (a Shift+Tab some clients send as Tab with Shift)
         # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
         shift = bool(state & IBus.ModifierType.SHIFT_MASK)
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
@@ -510,7 +529,7 @@ class ClaudishEngine(IBus.Engine):
             elif action == "wait":  # on the model's text, the panel lights Tab, the key that takes it
                 self.render()
             return action != "pass"
-        if keyval == IBus.KEY_Tab:
+        if keyval == IBus.KEY_Tab and not shift:  # Shift+Tab (Tab with Shift, from some clients): the app's
             if not self.composition.text and self.take_selection():  # (continue returned above)
                 self.render()  # a selection: your words now, as if typed
                 return True
@@ -535,7 +554,7 @@ class ClaudishEngine(IBus.Engine):
             elif action == "convert":
                 self.render()
             return action != "pass"
-        if keyval in (IBus.KEY_Up, IBus.KEY_Down) and self.composition.move(-1 if keyval == IBus.KEY_Up else 1):
+        if keyval in UP + DOWN and self.composition.move(-1 if keyval in UP else 1):
             self.render()  # ↑ and ↓ move the highlight
             return True
         if keyval == IBus.KEY_Escape and state & IBus.ModifierType.SHIFT_MASK:
@@ -605,6 +624,8 @@ class ClaudishEngine(IBus.Engine):
         self.update_quiet()
         if self.sensitive:
             self.finish()  # words typed before it became a password field go in, as on a focus change
+            if screen().shell:
+                screen().end_toast()  # a held exchange's pill: Shift+Esc is the app's key here
 
     def update_quiet(self):
         """Not prose (a URL, an address, a number, a terminal's command line): nothing unasked;
@@ -750,7 +771,10 @@ class ClaudishEngine(IBus.Engine):
         return True
 
     def do_disable(self):
+        """Another input source: your words go in, and cd_AI leaves this box as at a focus change
+        (nothing it shows stays, its timer stops), with no focus-out from IBus to say so."""
         self.finish()
+        self.do_focus_out()
 
     def refresh_surrounding(self):
         """Ask the client for fresh surrounding text now: asking only when a key arrives returns stale text."""

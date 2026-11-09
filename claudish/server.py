@@ -27,7 +27,8 @@ def checked_text(text):
 
 def checked_app(app):
     """The focused app as the adapter names it, or None."""
-    if app is not None and not (isinstance(app, str) and len(app) <= 200):
+    from .client import APP_CHARACTERS  # what the input methods send (client.app_name)
+    if app is not None and not (isinstance(app, str) and len(app) <= APP_CHARACTERS):
         raise ValueError("app must be a short string")
     return app
 

@@ -352,6 +352,16 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result["text"], "Leverage this—it is particularly crucial.")
         self.assertEqual(result["backend"], "rules")
 
+    def test_a_window_class_that_is_a_whole_url_still_names_the_app(self):
+        # GNOME names a Chromium --app window by its class, chrome-<url>-Default: hundreds of characters.
+        from serving import serving
+        from claudish.model import Rewriter
+        app = "chrome-_text_html," + "%3Ctextarea%3E" * 60 + "-Default"
+        with serving(Rewriter("rules")) as server:
+            with patch("claudish.client.read_token", return_value=server.token):
+                result = suggest("very important", "http://127.0.0.1:%d" % server.server_port, app=app)
+        self.assertEqual(result["text"], "particularly crucial")
+
     def test_the_native_worker_keeps_the_model_error_from_the_http_response(self):
         from claudish.composition import failure
         message = "no Claude credentials: save a key in cd_AI's settings"

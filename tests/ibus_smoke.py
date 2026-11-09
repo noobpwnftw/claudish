@@ -319,6 +319,43 @@ try:
     shown.watch(True)
     assert len(preedits) == before and shown.on_presence is None
     shown.watch(False)
+    # The extension gone: the last window it named is no window (every box one text box otherwise).
+    shown.focus = ("org.gnome.TextEditor", "7")
+    shown.watch(True)
+    shown.watch(False)
+    assert shown.focus is None
+    engine.do_set_content_type(IBus.InputPurpose.FREE_FORM, 0)
+    engine.do_focus_in_id("/", "gtk3-im:gedit")
+    if engine.composition.mode != "compose":
+        shift_tap()
+    # Drafts showing: numpad ↓ moves the highlight as ↓ does; Tab with Shift (Shift+Tab from some
+    # clients) is the app's and takes nothing.
+    for char in "two":
+        engine.do_process_key_event(ord(char), 0, 0)
+    engine.composition.asked, engine.composition.working = "instruct", True
+    engine.composition.offer(engine.composition.revision, "One.", ["Two."])
+    assert engine.composition.highlight == 0
+    assert engine.do_process_key_event(IBus.KEY_KP_Down, 0, 0) and engine.composition.highlight == 1
+    assert engine.do_process_key_event(IBus.KEY_KP_Up, 0, 0) and engine.composition.highlight == 0
+    taken = len(commits)
+    engine.do_process_key_event(IBus.KEY_Tab, 0, IBus.ModifierType.SHIFT_MASK)
+    assert commits[taken:] != ["One."], commits[taken:]
+    # A Shift+click that selects (the app says so in its surrounding text, with no reset) is no tap.
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    engine.composition.change("")
+    selections = iter([("hello world", 3, 3), ("hello world", 3, 8)])
+    engine.surrounding = lambda: next(selections)
+    mode = engine.composition.mode
+    shift_tap()
+    assert engine.composition.mode == mode, "a Shift+click switched modes"
+    engine.surrounding = lambda: ("hello world", 5, 5)  # a caret the cache shows late: still a tap
+    shift_tap()
+    assert engine.composition.mode != mode
+    del engine.surrounding
+    # Another input source: cd_AI leaves the box as at a focus change (its timer stops).
+    engine.resume()
+    engine.do_disable()
+    assert engine.timer is None and not engine.focused
     print("IBus binding smoke passed: compose by default, composition, modifiers, commit, Shift tap, compose (rewrite on Tab, instruct on Shift+Enter, keep on Enter), live continue, F8, candidate list, row clicks, Delete, dead keys, Shift+Esc, mode menu, quiet in terminals, password bypass")
 finally:
     engine.destroy()

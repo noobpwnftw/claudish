@@ -104,3 +104,23 @@ class TerminalLineTests(unittest.TestCase):
         with patch.object(handoff, "find_helper", return_value="claude", create=True):
             line = handoff.line(["claude", "{note}"], "/tmp/x(1)/h.md")
         self.assertTrue(line.endswith('"/tmp/x(1)/h.md"'), line)
+
+
+class AccessibilityBusTests(unittest.TestCase):
+    """Without the accessibility bus AT-SPI ends the process: it is asked for first."""
+
+    def test_no_accessibility_bus_reads_nothing(self):
+        try:
+            from gi.repository import GLib
+        except ImportError:
+            self.skipTest("no PyGObject")
+        from claudish import screen
+
+        def refused(*args):
+            raise GLib.Error("The name org.a11y.Bus was not provided by any .service files")
+        session = type("Bus", (), {"call_sync": lambda self, *args: refused()})()
+        with patch.object(screen, "A11Y_BUS", []), patch.dict("os.environ", {"AT_SPI_BUS_ADDRESS": ""}), \
+                patch("gi.repository.Gio.bus_get_sync", return_value=session), \
+                patch("gi.require_version", side_effect=AssertionError("AT-SPI loaded")):
+            self.assertFalse(screen.accessibility_bus())
+            self.assertIsNone(screen.read_atspi("konsole"))

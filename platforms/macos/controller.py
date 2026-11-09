@@ -289,7 +289,7 @@ class ClaudishInputController(IMKInputController):
         self.check_ghost()
         if self.state.panel() != self.drawn:  # an answer, a question, progress, or the pause for the keys
             self.show_panel()
-        if kind == "done":
+        if kind == "done" and self.drawn is None:  # words typed meanwhile: their panel, no toast over it
             self.show_toast(self.state.done_toast(result[1]["done"]))
 
     @objc.python_method
