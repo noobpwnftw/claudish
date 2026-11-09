@@ -60,9 +60,8 @@ class ContextTests(unittest.TestCase):
 
     def test_budget_truncates(self):
         (self.root / "big.md").write_text("x" * 5000, encoding="utf-8")
-        context = Context([{"type": "file", "path": "big.md"}, {"type": "file", "path": "glossary.md"}],
-                          base=self.root, max_chars=1000)
-        block = joined(context)
+        context = Context([{"type": "file", "path": "big.md"}, {"type": "file", "path": "glossary.md"}], base=self.root)
+        block = "\n".join(text for _, text in context.sections(max_chars=1000))
         self.assertIn("x" * 1000, block)
         self.assertNotIn("x" * 1001, block)
         self.assertNotIn("Fjordline", block)
@@ -76,8 +75,8 @@ class ContextTests(unittest.TestCase):
                 config.resolve(path)
         path.write_text(json.dumps({"context": [{"type": "file", "path": "glossary.md"}],
                                     "profiles": {"p": {"max_context_chars": 500}}}), encoding="utf-8")
-        _, _, _, context = config.resolve(path)
-        self.assertEqual(context.max_chars, 500)
+        _, settings, _, context = config.resolve(path)
+        self.assertEqual(settings["max_context_chars"], 500)  # the profile's budget (Rewriter.sections)
         self.assertIn("Fjordline", joined(context))
 
     def test_context_reaches_the_model_prompt(self):

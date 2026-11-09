@@ -4,7 +4,6 @@ Each step checks first and does nothing when it is already done. A step that cha
 anything runs only after a yes (or with --yes); --dry-run only shows the plan. Steps
 that need an administrator (Windows, macOS input methods) print the exact command.
 """
-import json
 import platform
 import subprocess
 import sys
@@ -60,7 +59,8 @@ def step_config(name, chosen=None):
     chosen: --profile, made the default of a config there already, which the service runs."""
     path = config.default_path()
     if path.is_file():
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        from .settings import read
+        data = read(path)
         if chosen and data.get("profile") != chosen:
             def use():
                 data["profile"] = chosen
@@ -85,9 +85,8 @@ def step_tone(name, settings, tone):
         from .settings import read
         path = config.default_path()
         data = read(path)  # the starter's, when the config step was skipped
-        if not path.is_file():  # as the config step writes it: this profile the default, templates beside
+        if not path.is_file():  # as the config step writes it: this profile the default (save puts templates beside)
             data["profile"] = name
-            config.write_starter_templates(path)
         config.set_tone(data, tone, name)
         config.save(data, path)
     return "todo", "set the tone to %r" % tone, write
@@ -98,7 +97,7 @@ def step_mcp():
     if not found:
         return "skip", "no MCP servers configured for Claude Desktop or Claude Code", None
     path = config.default_path()
-    have = (json.loads(path.read_text(encoding="utf-8-sig")).get("mcp_servers") or {}) if path.is_file() else {}
+    have = mcp_setup.read_config(path).get("mcp_servers") or {}
     new = sorted(set(found) - set(have))
     if not new:
         return "done", "all %d already imported" % len(found), None

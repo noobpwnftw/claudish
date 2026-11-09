@@ -125,19 +125,22 @@ def call(endpoint, path, body=None, timeout=10):
 BOXES = 16  # text boxes whose conversations a worker keeps
 
 
+def service_error(exc):
+    """The service's own words in an HTTP error ({"error": ...}), or None."""
+    try:
+        with exc:
+            detail = json.loads(exc.read(32768))
+    except (ValueError, OSError):
+        return None
+    message = detail.get("error") if isinstance(detail, dict) else None
+    return message if isinstance(message, str) and message else None
+
+
 def said(exc):
     """A failed request as a result: the service explains model failures in JSON, and the HTTP
     status alone loses why (a missing key becomes only "503 Service Unavailable")."""
-    if isinstance(exc, HTTPError):
-        try:
-            with exc:
-                detail = json.loads(exc.read(32768))
-            message = detail.get("error") if isinstance(detail, dict) else None
-        except (ValueError, OSError):
-            message = None
-        if isinstance(message, str) and message:
-            return {"error": message}
-    return {"error": str(exc)}
+    message = service_error(exc) if isinstance(exc, HTTPError) else None
+    return {"error": message or str(exc)}
 
 
 class Suggestions:

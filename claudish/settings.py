@@ -262,9 +262,9 @@ def server_models(url, key=None):
     except Exception:  # nothing there, or an address that cannot be asked
         return None
     try:  # it answered: a model list, or something else (a web page)
-        listing = json.loads(body)
-        return [m["id"] for m in listing.get("data", []) if isinstance(m, dict) and isinstance(m.get("id"), str)]
-    except (ValueError, AttributeError, TypeError):
+        from .model import model_ids
+        return model_ids(json.loads(body))
+    except ValueError:
         return NOT_MODELS
 
 

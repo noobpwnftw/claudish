@@ -129,9 +129,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
             return ()
         try:
             profiles = json.loads(path.read_text(encoding="utf-8-sig")).get("profiles") or {}
-            watched.update(path.parent / Path(entry["templates"]).expanduser() for entry in profiles.values()
+            from .config import templates_path
+            watched.update(templates_path(entry["templates"], path.parent) for entry in profiles.values()
                            if isinstance(entry, dict) and isinstance(entry.get("templates"), str))
-        except (OSError, ValueError, AttributeError, RuntimeError):  # RuntimeError: ~nobody/ in a path
+        except (OSError, ValueError, AttributeError):  # ValueError: ~nobody/ in a path too
             pass  # a config that does not read: its own file's change is enough
         found = []
         for each in watched:

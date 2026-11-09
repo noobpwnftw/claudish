@@ -37,7 +37,6 @@ def claude_credential():
     """Where the claude backend's credential comes from, in the order it is used: ("environment",
     the variable), ("saved", None), ("profile", None) for an `ant auth login` profile, or (None, None)."""
     import os
-    from pathlib import Path
     for variable in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
         if os.environ.get(variable):
             return "environment", variable
@@ -54,7 +53,6 @@ def anthropic_profile():
     active profile (ANTHROPIC_PROFILE, else the folder's active_config, else "default"), and that
     profile's configs/<profile>.json."""
     import os
-    import sys
     from pathlib import Path
     if os.environ.get("ANTHROPIC_CONFIG_DIR"):
         folder = Path(os.environ["ANTHROPIC_CONFIG_DIR"])

@@ -76,7 +76,8 @@ def check_backend(state):
         except ImportError:
             return "fail", "the Anthropic SDK is not installed", SDK_FIX
         from .keys import claude_credential
-        if not claude_credential()[0]:
+        source, variable = claude_credential()
+        if not source:
             from .settings import claude_code, codex
             fix = "save one in cd_AI's settings (`claudish settings`) or with `claudish key`, or set ANTHROPIC_API_KEY, or run `ant auth login`"
             if codex():  # a ChatGPT subscription works through it, without an API key
@@ -84,7 +85,6 @@ def check_backend(state):
             if claude_code():  # a Claude subscription works through it, without an API key
                 fix = "with a Claude subscription, pick Claude Code in cd_AI's settings (`claudish settings`); or " + fix
             return "warn", "no Claude key: none saved, no ANTHROPIC_API_KEY, no `ant auth login` profile", fix
-        source, variable = claude_credential()
         if source == "environment" and service_has_no_key():
             return "warn", "the Claude key is in %s here, and cd_AI's service does not have it" % variable, \
                 "save it with `claudish key` (a variable exported in a terminal does not reach a service started at login)"
@@ -120,8 +120,11 @@ def check_backend(state):
         listing = fetch_json(url.rstrip("/") + ("/health" if backend == "llama" else "/v1/models"), key=key)
         if backend == "openai":  # as the settings window checks it (no model: the server's only one)
             from .settings import server_problem
-            data = (listing or {}).get("data") if isinstance(listing, dict) else None
-            names = [m.get("id") for m in data or [] if isinstance(m, dict)]  # {"data": null}: none listed
+            from .model import model_ids
+            try:
+                names = model_ids(listing)
+            except ValueError:
+                names = []
             problem = server_problem(url, names, settings.get("model"), key)
             if problem:
                 return "fail", problem, "name one of its models in the profile's \"model\", or pick it in cd_AI's settings"

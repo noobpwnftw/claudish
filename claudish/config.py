@@ -134,15 +134,8 @@ def resolve(path=None, profile=None, overrides=None):
             raise ValueError('the command backend needs "command": ["program", "arg", ...] in the profile')
         settings["command"] = [os.path.expanduser(part) for part in command]
     templates = None
-    if settings["templates"]:
-        try:
-            templates_path = Path(settings["templates"]).expanduser()
-        except RuntimeError:  # ~someone/ of a user this computer does not have
-            raise ValueError("the templates file %r names a home folder this computer does not have"
-                             % settings["templates"]) from None
-        if not templates_path.is_absolute() and not (overrides or {}).get("templates"):
-            templates_path = base / templates_path  # Paths in a profile are relative to the file.
-        templates = invocation.load(templates_path)
+    if settings["templates"]:  # a --templates flag's path is the shell's, relative to here
+        templates = invocation.load(templates_path(settings["templates"], None if (overrides or {}).get("templates") else base))
     modes = {}
     for mode, spec in (settings["modes"] or {}).items():
         # Which AI answers this mode (a small model for continue, a strong one for instructions);
@@ -157,7 +150,7 @@ def resolve(path=None, profile=None, overrides=None):
     settings["modes"] = modes
     # The service's context and bindings: the same whatever profile is in use; a profile's own
     # max_context_chars sizes it for that model.
-    context = Context(context_specs, base, settings["max_context_chars"], servers) if context_specs else None
+    context = Context(context_specs, base, servers) if context_specs else None
     settings["bindings"] = [Binding(spec, base, servers) for spec in bindings]
     for binding in settings["bindings"]:
         if binding.profile and binding.profile not in known:
@@ -210,6 +203,16 @@ STARTER_TEMPLATES = {
         }},
     }}},
 }
+
+
+def templates_path(value, base=None):
+    """A profile's "templates" file: ~ expanded, and relative to base (the config's folder; paths in
+    a profile are relative to the file). ValueError for ~someone/ of a user this computer does not have."""
+    try:
+        path = Path(value).expanduser()
+    except RuntimeError:
+        raise ValueError("the templates file %r names a home folder this computer does not have" % value) from None
+    return base / path if base is not None else path
 
 
 def write_starter_templates(config_path):

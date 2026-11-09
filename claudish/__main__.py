@@ -34,10 +34,8 @@ def main():
 
 def answered(exc):
     """What the service said in an HTTP error: its "error", else the status's reason."""
-    try:
-        return json.load(exc).get("error") or exc.reason
-    except (ValueError, OSError, AttributeError):
-        return exc.reason
+    from .client import service_error
+    return service_error(exc) or exc.reason
 
 
 def parse(argv):
@@ -247,7 +245,7 @@ def templates(args, parser, passthrough):
     print(json.dumps({
         "profile": name, "tone": settings.get("tone") or "corporate (the default)",
         "from": [str(Path(invocation.__file__).with_name("templates.json"))] + (
-            [str(Path(args.config or config.default_path()).parent / Path(settings["templates"]).expanduser())]
+            [str(config.templates_path(settings["templates"], Path(args.config or config.default_path()).parent))]
             if settings.get("templates") else []),
         "modes": {mode: {"system": spec["system"], "examples": pairs(spec["examples"]),
                          "max_tokens": spec["max_tokens"], "candidates": spec["candidates"]}

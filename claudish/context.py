@@ -309,16 +309,17 @@ def list_server(server, timeout=15, name="_"):
 
 
 class Context:
-    def __init__(self, specs=(), base=Path.cwd(), max_chars=6000, servers=None):
-        self.providers = [Provider(spec, base, servers) for spec in specs]
-        self.max_chars = max_chars
+    """The service-wide context providers; how much of them goes in is the answering profile's
+    max_context_chars (Rewriter.sections)."""
 
-    def sections(self, extra=(), failed=None, max_chars=None):
+    def __init__(self, specs=(), base=Path.cwd(), servers=None):
+        self.providers = [Provider(spec, base, servers) for spec in specs]
+
+    def sections(self, extra=(), failed=None, max_chars=6000):
         """[(name, text)]: what the providers (and the app's bindings, extra) contribute, within
-        max_chars (the answering profile's; else this context's). The text around the caret is not
-        one of them: the text box describes it. failed: a list that gets (name, why) for each
-        provider that could not be read."""
-        found, budget = [], self.max_chars if max_chars is None else max_chars
+        max_chars. The text around the caret is not one of them: the text box describes it.
+        failed: a list that gets (name, why) for each provider that could not be read."""
+        found, budget = [], max_chars
         for provider in list(self.providers) + list(extra):
             if budget <= 0:
                 break

@@ -141,16 +141,17 @@ SIGNED_OUT = ("login", "logged in", "401", "unauthorized", "authentication", "oa
 
 def failure(error):
     """Why a request failed, in a few plain words for the panel."""
-    if str(error or "").startswith(OWN_WORDS):
-        return str(error)  # cd_AI's own, already said for the panel
+    said = str(error or "")
+    if said.startswith(OWN_WORDS):
+        return said  # cd_AI's own, already said for the panel
     for name, fix in SIGN_IN.items():
-        if str(error or "").startswith(name + ": "):
-            said = str(error)[len(name) + 2:].lower()
-            if any(words in said for words in SIGNED_OUT):  # not a key: the CLI's sign-in
+        if said.startswith(name + ": "):
+            its = said[len(name) + 2:].lower()
+            if any(words in its for words in SIGNED_OUT):  # not a key: the CLI's sign-in
                 return "%s is signed out: %s" % (name, fix)
-            if "errno 2" in said or "no such file" in said or "cannot find the file" in said:
+            if "errno 2" in its or "no such file" in its or "cannot find the file" in its:
                 return "%s did not start: see cd_AI's settings" % name
-    said, error = str(error or ""), str(error or "").lower()
+    error = said.lower()
     if "no model is set up" in error:
         return "no model is set up"
     if "the config is not used" in error:
@@ -167,7 +168,7 @@ def failure(error):
     if "has several models" in error:
         return "the model server has several models: pick one in cd_AI's settings"
     if "http error 400" in error or "http error 422" in error:  # the server's reason, as claudish/model.py keeps it
-        reason = str(said).split(": ", 2)[2:]
+        reason = said.split(": ", 2)[2:]
         return "the model API refused the request" + (": " + reason[0][:80] if reason else "")
     if "http error 404" in error:
         return "the model API has no such model or address"

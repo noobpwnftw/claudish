@@ -65,6 +65,15 @@ def user_content(text, image, style, intro=""):
 from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL, loopback  # noqa: E402
 
 
+def model_ids(listing):
+    """The model names in a /v1/models answer ({"data": [{"id": ...}]}; {"data": null} lists none).
+    ValueError when it is not a model list (a web page, say)."""
+    data = listing.get("data") if isinstance(listing, dict) else ()
+    if not isinstance(data, (list, type(None))):
+        raise ValueError("not a model list")
+    return [m["id"] for m in data or [] if isinstance(m, dict) and isinstance(m.get("id"), str)]
+
+
 def said_by(error):
     """The reason an OpenAI-compatible server gives with an HTTP error ({"error": {"message": ...}}
     and its variants, or its text), short; read once, so the error says it wherever it is shown."""
@@ -530,16 +539,15 @@ class Rewriter:
         if not hasattr(self, "listed_model"):
             try:
                 with self.opener.open(Request(self.endpoint + "/v1/models", headers=headers), timeout=5) as response:
-                    names = [m.get("id") for m in json.load(response).get("data", []) if isinstance(m, dict)]
+                    names = model_ids(json.load(response))
             except HTTPError as exc:
                 if exc.code >= 500:
                     return None  # loading (503): asked again at the next request
                 names = []
             except OSError:
                 return None  # not answering yet: asked again at the next request
-            except (ValueError, AttributeError):
+            except ValueError:
                 names = []
-            names = [n for n in names if isinstance(n, str)]
             if len(names) > 1:
                 raise RuntimeError('%s has several models (%s): name one with "model" in the profile, or pick it '
                                    "in cd_AI's settings" % (self.endpoint, ", ".join(names[:8])))
