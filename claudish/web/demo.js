@@ -141,7 +141,7 @@ async function ask(revision) {
   try {
     let data;
     if (IN_BROWSER) {
-      data = await browserBackend.suggest(text, mode, about);
+      data = await browserBackend.suggest(text, mode, about, controller.signal);
     } else {
       const response = await fetch("/suggest", {method: "POST", headers: {"Content-Type": "application/json"},
                                                 body: JSON.stringify(about ? {text, mode, draft: about} : {text, mode}),

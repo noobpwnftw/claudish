@@ -110,7 +110,7 @@ export async function createBrowserBackend(templates, modelUrl, onProgress, onNo
   return {
     // Stops the model: while it runs, its worker holds the stored files open and they cannot be removed.
     async exit() { await wllama.exit(); },
-    async suggest(text, mode, draft = "") {
+    async suggest(text, mode, draft = "", signal = undefined) {
       const spec = templates.modes[mode];
       if (!spec) throw new Error(`Unknown mode: ${mode}`);
       const started = performance.now();
@@ -120,6 +120,7 @@ export async function createBrowserBackend(templates, modelUrl, onProgress, onNo
                    { role: "user", content: framed(spec, text, draft) }],
         max_tokens: spec.max_tokens || templates.max_tokens,
         temperature: 0,  // greedy, as on the service
+        abortSignal: signal,  // the page's time limit stops a generation that does not end
       });
       const choice = response.choices[0];
       if (choice.finish_reason === "length") throw new Error("The rewrite ran past its length budget; try a shorter phrase.");
