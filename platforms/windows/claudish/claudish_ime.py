@@ -96,6 +96,22 @@ def foreground():
         return None
 
 
+# A console window (conhost, whatever program it runs: wsl, ssh, python) and Windows Terminal: a
+# terminal by its window, where the process would name only the program inside.
+CONSOLE_CLASSES = ("ConsoleWindowClass", "CASCADIA_HOSTING_WINDOW_CLASS", "PseudoConsoleWindow")
+
+
+def console_window():
+    """Whether the foreground window is a console's or Windows Terminal's."""
+    try:
+        import ctypes
+        name = ctypes.create_unicode_buffer(256)
+        ctypes.windll.user32.GetClassNameW(ctypes.windll.user32.GetForegroundWindow(), name, 256)
+        return name.value in CONSOLE_CLASSES
+    except (AttributeError, OSError):
+        return False
+
+
 STEPS = {0x25: -1, 0x27: 1, 0x24: "home", 0x23: "end"}  # ← → Home End, inside what you type
 # Keys sent with KEYEVENTF_EXTENDEDKEY: PgUp to Down, Insert, Delete, the Windows keys, keypad /.
 EXTENDED_KEYS = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0x5B, 0x5C, 0x6F}
@@ -491,7 +507,7 @@ class ClaudishTextService(TextService):
         for scope in self.known_scopes or ():
             if scope in INPUT_SCOPES:
                 return INPUT_SCOPES[scope]
-        return None
+        return "terminal" if console_window() else None
 
     def around(self):
         """(before, after): the text around the composition or the caret, as Claudish's PIME

@@ -393,6 +393,13 @@ def main():
                                  ([36], None), ([32], "phone")):
                 service.inputScopes = scopes
                 assert service.field() == kind, (scopes, service.field())
+            # A console window (conhost running wsl or ssh, Windows Terminal) is a terminal by its
+            # window class, whatever program runs in it; a password prompt there is still a password.
+            import pime_claudish.claudish_ime as ime_module
+            with patch.object(ime_module, "console_window", return_value=True):
+                for scopes, kind in (([], "terminal"), ([64], "password")):
+                    service.inputScopes = scopes
+                    assert service.field() == kind, (scopes, service.field())
             service.inputScopes = [31]
             # Another input method takes over: the worker is parked, not closed, and the next cd_AI
             # instance in this window takes it up, in the same mode. Each instance gets a worker of

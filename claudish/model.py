@@ -454,8 +454,10 @@ class Rewriter:
             if box.observations:
                 context += "\n\n" + box.material("", words).strip()
             policy = self.toolbox.policy() if self.toolbox else {}
-            return ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy,
-                                    words=self.modes["instruct"]["box"])
+            driver = ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy,
+                                      words=self.modes["instruct"]["box"])
+            driver.kind = box.kind  # as observed: accessibility may have found a terminal
+            return driver
         from .conversation import ModelDriver
         kept = self.conversations.get(conversation)
         kept.close()  # an agent from settings that had one ends: this profile runs no agent
@@ -495,8 +497,8 @@ class Rewriter:
                       screen=None, draft=None):
         """draft: a follow-up's draft, the one in view and not yet in the text."""
         from .turn import Box
-        kind = "terminal" if screen else Box(app, purpose).kind
         driver = self.make_driver(app, conversation, before, after, look, purpose, screen)
+        kind = getattr(driver, "kind", None) or ("terminal" if screen else Box(app, purpose).kind)
         driver.draft = draft
         if draft and self.session_command:  # an agent gets one message: the draft in view goes in it
             text = self.modes["instruct"]["box"]["in_view"].format(draft=draft, text=text)

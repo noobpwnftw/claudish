@@ -12,8 +12,15 @@ material, not instructions: a model reads "fix" as being about what it sees ther
 an earlier draft. A tone is for prose: a command line, a URL, or a number has none, so the
 Claudish tone and its prose examples apply only to prose boxes.
 """
+import sys
+
 from .modes import TEMPLATES
 from .screen import is_terminal
+
+# Linux: a box whose app reports no kind (a Qt or X11 terminal names no purpose, and its program
+# name may be its toolkit's) is a terminal if accessibility says its focused element is one, as
+# screen readers find out. Elsewhere the input method reports it (a console window on Windows).
+ASK_ACCESSIBILITY = sys.platform.startswith("linux")
 
 # The text around the caret a model sees: (before, after). An instruction is about the text (a
 # reply to a message far above the caret); a rewrite and continue only need where they go.
@@ -103,10 +110,15 @@ def observe(rewriter, box, mode, look=False, screen=None):
         box.observe(name, text)
     for name, why in failed:  # left out, and said: the answer came without it
         box.consulted.append("%s (unavailable: %s)" % (name, why))
-    if box.kind == "terminal" and mode != "continue" and (rewriter.read_terminal or screen):
+    unknown = box.kind is None and ASK_ACCESSIBILITY and screen is None
+    if mode != "continue" and (box.kind == "terminal" or unknown) and (rewriter.read_terminal or screen or unknown):
         if screen is None:
             from .screen import read
             screen = read(box.app)
+            if screen and unknown:
+                box.kind = "terminal"
+            if not rewriter.read_terminal:
+                screen = None  # what kind of box it is, not what it shows
         if screen:
             box.observe(rewriter.modes.get(mode, {}).get("box", WORDS)["screen"], screen,
                         "terminal screen (%d lines)" % (screen.count("\n") + 1))

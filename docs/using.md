@@ -115,6 +115,12 @@ the Accessibility permission; on Linux the desktop's accessibility bus must run
 (GNOME and KDE run it). The lines go to the profile's model. A profile's `"read_terminal": false` turns reading off.
 It reads GNOME Terminal, Windows Terminal, the classic Windows console and Terminal.app.
 
+A text box counts as a terminal when its app says so (a terminal field), when the app is a known
+terminal program, on Windows when it is a console or Windows Terminal window whatever runs in it,
+and on Linux when accessibility reports the focused element as a terminal (Konsole and other Qt
+terminals). In a terminal an answer is one line. A terminal panel inside another app, such as
+VS Code's, reports none of these: there an answer can span lines, and each line break is a Return.
+
 **Known gap, macOS Terminal:** Terminal.app gives an input method Tab, the arrows and
 Esc only while there is marked text. An instruction stays marked while its drafts show,
 so they work there; continue's suggestion is not marked text, so Tab completes in the

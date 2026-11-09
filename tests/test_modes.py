@@ -125,13 +125,29 @@ class ModeTests(unittest.TestCase):
             self.assertEqual(len(payload["messages"]), 2)
             self.call(rewriter, "ls -la ", "continue", app="com.apple.Terminal")
             self.assertEqual(read.call_count, 1)  # continue's pauses never read the screen
-            _, payload = self.call(rewriter, "fix", "instruct", app="kate")  # not a terminal: never read
+            with patch("claudish.turn.ASK_ACCESSIBILITY", False):
+                _, payload = self.call(rewriter, "fix", "instruct", app="kate")  # not a terminal: never read
             self.assertEqual(read.call_count, 1)
             self.assertNotIn("terminal", payload["messages"][0]["content"])
             rewriter.read_terminal = False  # the profile's "read_terminal": false
             _, payload = self.call(rewriter, "fix", "instruct", app="gnome-terminal-server")
             self.assertEqual(read.call_count, 1)
             self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+        # Linux: an app that reports no kind is asked through accessibility (a Qt terminal, named
+        # by its toolkit); a focused terminal makes it one, even with its screen not sent.
+        with patch("claudish.turn.ASK_ACCESSIBILITY", True):
+            with patch("claudish.screen.read", return_value=None) as read:
+                result, payload = self.call(rewriter, "fix", "instruct", app="QIBusInputContext", answer="ls\npwd")
+            self.assertEqual((read.call_count, result["candidates"]), (1, ["ls\npwd"]))
+            self.assertNotIn("terminal", payload["messages"][0]["content"])
+            with patch("claudish.screen.read", return_value=screen) as read:
+                result, payload = self.call(rewriter, "fix", "instruct", app="QIBusInputContext", answer="ls\npwd")
+                self.assertEqual(result["candidates"], ["ls"])
+                self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+                self.assertNotIn("command not found", payload["messages"][1]["content"])  # read_terminal is off
+                self.call(rewriter, "ls -la ", "continue", app="QIBusInputContext")
+                self.call(rewriter, "fix", "instruct", app="kate", purpose="email")  # it said what it is
+                self.assertEqual(read.call_count, 1)
         # A draft for a terminal is one line: a newline at the prompt would run it without Enter.
         reply = "```bash\ngit status\n```\nThen run git push."
         with patch("claudish.screen.read", return_value=screen):
