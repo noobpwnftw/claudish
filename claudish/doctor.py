@@ -148,6 +148,9 @@ def check_service():
     try:
         health = fetch_json(SERVICE + "/health")
     except Exception:
+        from . import service
+        if platform.system() == "Linux" and not service.systemd_user():  # nothing to install it with
+            return "fail", "the Claudish service is not running at %s" % SERVICE, service.NO_SYSTEMD
         return "fail", "the Claudish service is not running at %s" % SERVICE, \
             "start it at every login: `claudish service install` (it runs the config's profile)"
     if not ours():
