@@ -363,7 +363,7 @@
       "alpha": "a letters-only field"
     },
     "facts": {
-      "terminal": "What you write there is a command line, run when the user presses Enter: write one command line and nothing else (no explanation, no quotes, no code fence)."
+      "terminal": "What you write there is a command line, run when the user presses Enter: write one command line and nothing else (no explanation, no surrounding quotes, no code fence). The screen's last line is the prompt line, with the caret at its end: what you write goes after whatever is typed there already."
     },
     "at_caret": "Your answer goes in at the caret (▮) of the text box above, as the user's own text.",
     "in_place": "In this text, rewrite only the part in [[double brackets]], so it fits back in its place: a few words stay a few words, part of a sentence stays part of that sentence, and nothing around it is repeated. The text you write is only the replacement for that part.\n\n{before}[[{text}]]{after}",

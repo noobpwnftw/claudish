@@ -14,7 +14,7 @@ INTRO = re.compile(r"^(here(?: is|'s| are)|sure[,!.]|certainly[,!.])[^\n]*:\s*\n
 QUOTES = ('""', "“”", "''", "‘’")
 
 
-def tidy(text, output):
+def tidy(text, output, terminal=False):
     """A plain answer without what a model wraps it in: a <think> block, a fence around all of it, a
     first line introducing it ("Here's a rewrite:"), one pair of quotes around all of it (unless
     your text was quoted)."""
@@ -29,7 +29,7 @@ def tidy(text, output):
     if output.startswith("[[") and output.endswith("]]") and "[[" not in text \
             and "[[" not in output[2:-2] and "]]" not in output[2:-2]:  # the part, as it was marked (one span)
         output = output[2:-2].strip()
-    for pair in QUOTES:
+    for pair in () if terminal else QUOTES:  # a quoted path is how cmd runs a program with spaces in it
         if (len(output) > 2 and output[0] == pair[0] and output[-1] == pair[1] and pair[0] not in output[1:-1]
                 and not text.strip().startswith(pair[0])):
             output = output[1:-1].strip()
@@ -37,8 +37,8 @@ def tidy(text, output):
     return output
 
 
-def plain(text, output):
+def plain(text, output, terminal=False):
     """A plain-text answer, read: None when it is a tool call the server left unparsed."""
     if any(markup in output for markup in TOOL_MARKUP):
         return None
-    return tidy(text, output)
+    return tidy(text, output, terminal)

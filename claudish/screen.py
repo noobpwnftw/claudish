@@ -10,6 +10,7 @@ Linux: AT-SPI (the accessibility bus GNOME and KDE run). Windows: UI Automation 
 macOS: the AX API through pyobjc; the service's Python needs the Accessibility permission.
 Keep importable on PIME's Python 3.6: adapters use `is_terminal` for quiet continue.
 """
+import re
 import sys
 import time
 
@@ -34,13 +35,37 @@ TERMINALS = {
 
 
 
+FENCED = re.compile(r"```[^\n`]*\n(.*?)```", re.S)
+INLINE_FENCE = re.compile(r"\s*```(?:[A-Za-z]+\s)?(.*?)```\s*", re.S)
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
 def one_line(text):
     """A draft for a terminal prompt as one physical line: a newline committed at a prompt is a
-    Return, which would run a command the user never pressed Enter for. Code fences go, and only
-    the first line is kept."""
-    lines = [line.strip() for line in (text or "").splitlines()
-             if line.strip() and not line.strip().startswith("```")]
-    return lines[0] if lines else ""
+    Return, which would run a command the user never pressed Enter for. A fenced block's contents
+    are the command (not the words before it); a line ending in ":" introduces it; a line ending in
+    a backslash goes on in the next. Half of a here-document is never offered (Enter, then Ctrl+D,
+    would run it empty), nor a command in backticks (the shell runs its output), nor a control
+    character (a tab completes, an escape moves the cursor)."""
+    text = text or ""
+    fenced = FENCED.search(text) or INLINE_FENCE.fullmatch(text)
+    if fenced:
+        text = fenced.group(1)
+    lines = [line.rstrip() for line in text.splitlines() if line.strip() and not line.strip().startswith("```")]
+    joined = []
+    for line in lines:
+        if joined and joined[-1].endswith("\\"):
+            joined[-1] = joined[-1][:-1].rstrip() + " " + line.strip()
+        else:
+            joined.append(line.strip())
+    while len(joined) > 1 and joined[0].endswith(":"):
+        joined.pop(0)  # "Run this:" before the command
+    if not joined or "<<" in joined[0] or joined[0].endswith("\\"):
+        return ""
+    line = " ".join(CONTROL.sub(" ", joined[0]).split())  # a tab between words is a space
+    if len(line) > 2 and line[0] == line[-1] == "`" and "`" not in line[1:-1]:
+        line = line[1:-1].strip()
+    return line
 
 
 def is_terminal(app):

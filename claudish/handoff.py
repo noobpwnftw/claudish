@@ -21,6 +21,7 @@ UNSUPERVISED = ("--dangerously-skip-permissions", "bypasspermissions", "--yolo",
                 "--dangerously-bypass-approvals-and-sandbox")
 # Special in some shell (inside double quotes or out), or a line break: such a line is not written.
 UNSAFE = re.compile(r"[\"$`!%^&|<>;'\r\n]")
+SAFE_WORD = re.compile(r"[A-Za-z0-9_+=:./\\-]+")
 
 
 NAMES = {"claude": "Claude Code", "codex": "Codex"}
@@ -246,7 +247,10 @@ def line(template, note, session=""):
             return None
         if index == 0 and os.name == "nt" and " " in argument:
             argument = short_path(argument)  # quoted, PowerShell reads it as a string, not a command
-        words.append('"%s"' % argument if " " in argument else argument)
+        # Quoted unless only characters no shell reads specially ((x), *, #, ~, a PowerShell @ or ,).
+        # The program itself is quoted only for a space (PowerShell takes a quoted one as a string).
+        plain = " " not in argument if index == 0 else SAFE_WORD.fullmatch(argument)
+        words.append(argument if plain else '"%s"' % argument)
     return " ".join(words)
 
 

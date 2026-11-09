@@ -75,3 +75,32 @@ class ProgressTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TerminalLineTests(unittest.TestCase):
+    """What goes in at a prompt: one line that runs what was offered."""
+
+    def test_a_multi_line_answer_gives_the_command_not_its_intro(self):
+        from claudish.screen import one_line
+        cases = {"Run this:\n```bash\nrm -rf build\n```": "rm -rf build",
+                 "Undo it with:\n\n    git reset --soft HEAD~1": "git reset --soft HEAD~1",
+                 "docker run \\\n -v /a:/b \\\n img": "docker run -v /a:/b img",
+                 "```bash ls -la```": "ls -la",
+                 "`git status`": "git status",  # the shell would run its output
+                 "ls\t-la": "ls -la",  # a tab completes at a prompt
+                 "cat <<'EOF' > ~/.bashrc\nexport X=1\nEOF": "",  # half a here-document: nothing
+                 "git status": "git status"}
+        for answer, offered in cases.items():
+            with self.subTest(answer=answer):
+                self.assertEqual(one_line(answer), offered)
+
+    def test_a_quoted_command_keeps_its_quotes_at_a_prompt(self):
+        from claudish.quirks import tidy
+        path = '"C:\\Program Files\\Git\\bin\\bash.exe"'
+        self.assertEqual(tidy("open it", path, terminal=True), path)  # cmd runs a quoted path
+        self.assertEqual(tidy("open it", '"hello there"'), "hello there")  # elsewhere a wrapping pair goes
+
+    def test_an_argument_a_shell_reads_specially_is_quoted(self):
+        with patch.object(handoff, "find_helper", return_value="claude", create=True):
+            line = handoff.line(["claude", "{note}"], "/tmp/x(1)/h.md")
+        self.assertTrue(line.endswith('"/tmp/x(1)/h.md"'), line)
