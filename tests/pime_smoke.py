@@ -400,6 +400,33 @@ def main():
                 for scopes, kind in (([], "terminal"), ([64], "password")):
                     service.inputScopes = scopes
                     assert service.field() == kind, (scopes, service.field())
+                service.inputScopes = []
+                service.changed()
+                assert service.state.terminal  # quiet there, as a terminal named by its program
+            service.inputScopes = []
+            service.state.change("")
+            # The Shift Windows lifts and presses around a numpad arrow (extended) is no tap.
+            mode, last_mode = service.state.mode, ime_module.LAST_MODE[0]
+            key(0x10, method="filterKeyDown")
+            for _ in range(2):
+                key(0x10, method="filterKeyUp", isExtended=True)
+            key(0x66, method="filterKeyDown")
+            key(0x10, method="filterKeyDown", isExtended=True)
+            for _ in range(2):
+                key(0x10, method="filterKeyUp")
+            key(0x10, method="onKeyUp")
+            assert service.state.mode == mode, "a numpad arrow's Shift switched modes"
+            # The click into the text box before Shift is no Shift+click: at the press only a button
+            # down then counts; at the release, one pressed since.
+            looked = []
+            with patch.object(ime_module, "clicked", lambda since=True: looked.append(since) or False):
+                shift_tap()
+            assert looked[:1] == [False] and True in looked and service.state.mode != mode, looked
+            # The mode you were in, in another app's text box too (its instance kept its own).
+            ime_module.LAST_MODE[0] = mode
+            service.handleRequest({"method": "onSetFocus", "seqNum": 1})
+            assert service.state.mode == mode
+            ime_module.LAST_MODE[0] = last_mode
             service.inputScopes = [31]
             # Another input method takes over: the worker is parked, not closed, and the next cd_AI
             # instance in this window takes it up, in the same mode. Each instance gets a worker of

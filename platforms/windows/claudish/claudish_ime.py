@@ -96,6 +96,15 @@ def foreground():
         return None
 
 
+def foreground_window():
+    """The foreground window's handle, or None (not on Windows)."""
+    try:
+        import ctypes
+        return ctypes.windll.user32.GetForegroundWindow() or None
+    except (AttributeError, OSError):
+        return None
+
+
 # A console window (conhost, whatever program it runs: wsl, ssh, python) and Windows Terminal: a
 # terminal by its window, where the process would name only the program inside.
 CONSOLE_CLASSES = ("ConsoleWindowClass", "CASCADIA_HOSTING_WINDOW_CLASS", "PseudoConsoleWindow")
@@ -129,19 +138,23 @@ def plain_tab(event):
     return event.keyCode == 0x09 and not event.isKeyDown(0x10)
 
 
-def held_chord(event):
+def held_chord(event, since=True):
     """Ctrl, Alt or Win down with Shift: Windows' layout and language switch, not a Shift tap. Or a
-    mouse button pressed since the last look (Shift+click selects): a click sends no key."""
-    return any(event.isKeyDown(key) for key in CHORD_KEYS) or clicked()
+    mouse button pressed while Shift was down (Shift+click selects): a click sends no key. since:
+    False at Shift's press, where only a button down now counts (the click into the text box
+    before it is no Shift+click)."""
+    return any(event.isKeyDown(key) for key in CHORD_KEYS) or clicked(since)
 
 
-def clicked():
-    """A mouse button down, or pressed since the last call (GetAsyncKeyState's low bit; the first
-    call, at Shift's press, clears it). False when it cannot tell (not on Windows)."""
+def clicked(since=True):
+    """A mouse button down, or (since) pressed since the last call: GetAsyncKeyState's low bit,
+    which every call clears, so the call at Shift's press starts the count. False when it cannot
+    tell (not on Windows)."""
     try:
         import ctypes
         state = ctypes.windll.user32.GetAsyncKeyState
-        return any([state(button) & 0x8001 for button in (0x01, 0x02, 0x04)])  # all three read: each clears
+        mask = 0x8001 if since else 0x8000
+        return any([state(button) & mask for button in (0x01, 0x02, 0x04)])  # all three read: each clears
     except (AttributeError, OSError):
         return False
 
@@ -215,6 +228,10 @@ class ClaudishTextService(TextService):
         self.taken_keys = set()  # continue's key-downs taken: their key-ups are taken too, only theirs
         self.drawn_ghost = ""  # the suggestion last drawn: Tab and Esc are cd_AI's only for one you see
         self.owner = None  # this instance's app (its process, in front at its first request): parks go there
+        # The window this instance's text box is in, at its last key or focus: another window of
+        # the same process (Explorer's, each with an instance of its own; Store apps, all one
+        # frame host) in front is away too.
+        self.front = None
         self.switching = False  # a Shift tap switched modes: its key-up is taken
         self.committed = False  # the last reply committed: PIME's end of the composition is that commit's
         self.panel_shown = None  # the panel as last published
@@ -245,7 +262,7 @@ class ClaudishTextService(TextService):
             self.worker.schedule(self.state.revision, "")  # what was asked belongs to the old mode
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
         spec, lasting = self.state.switched()
-        if spec:  # the mode switch briefly, or the held exchange's pill
+        if spec and not self.sensitive():  # the mode switch briefly, or the held exchange's pill (not over a password)
             self.setToast(spec, PILL_SECONDS if lasting else 2)
         self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         self.changed()
@@ -337,7 +354,7 @@ class ClaudishTextService(TextService):
             self.last_document = document
             self.known_scopes = None  # another text box: its own scopes (a password field's stay behind)
             pill = self.state.returned(document)  # back where one was held: a pill, taking no keys
-            if pill:
+            if pill and not self.sensitive():  # in a password field Shift+Esc is the app's
                 self.setToast(pill, PILL_SECONDS)
 
     def preview(self):
@@ -373,8 +390,14 @@ class ClaudishTextService(TextService):
         if not self.keyboardOpen or self.sensitive():
             return False
         self.adopt_parked()  # back from another input method: this app's exchange decides what is taken
+        self.front = foreground_window()
+        if event.keyCode == 0x10 and getattr(event, "isExtended", False):
+            # The Shift Windows lifts and presses again around a numpad arrow (NumLock on, Shift
+            # held to select): that key, not a tap.
+            self.shift.other()
+            return False
         if event.keyCode == 0x10:  # Shift: perhaps a tap, the mode switch (seen at its key-up)
-            self.shift.press(time.monotonic(), chord=held_chord(event))
+            self.shift.press(time.monotonic(), chord=held_chord(event, since=False))
             self.switching = False
             return False
         self.shift.other()
@@ -487,7 +510,8 @@ class ClaudishTextService(TextService):
 
     def changed(self):
         # Not prose: a URL, an address, a number, or a terminal's command line.
-        self.state.field(self.field(), is_terminal(focused_app()))
+        kind = self.field()  # a console window is a terminal whatever runs in it (console_window)
+        self.state.field(kind, kind == "terminal" or is_terminal(focused_app()))
         after = self.state.caret_after(self.around()[1] if self.state.live else "")
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause), so the answer is often
@@ -521,7 +545,8 @@ class ClaudishTextService(TextService):
         self.setTimer(TIMER_MS)
 
     def onTimer(self):
-        away = self.owner and foreground() not in (None, self.owner)
+        away = self.owner and foreground() not in (None, self.owner) or \
+            self.front is not None and foreground_window() not in (None, self.front)
         changed = self.poll_results(away)
         if away:
             pass  # another app is in front: nothing is drawn over it; onSetFocus shows it all on return
@@ -542,6 +567,8 @@ class ClaudishTextService(TextService):
         if event.keyCode == 0x10 and self.keyboardOpen and not self.sensitive():
             # PIME asks twice for one key-up (TSF's test, then the key itself): the second answer
             # must match the first.
+            if getattr(event, "isExtended", False):  # Windows' own around a numpad arrow (filterKeyDown)
+                self.shift.other()
             if self.shift.down:  # the first of the two
                 self.switching = self.shift.release(time.monotonic(), chord=held_chord(event))
             keylog("filterKeyUp shift", "tap=%s" % self.switching)
@@ -817,6 +844,7 @@ class ClaudishTextService(TextService):
         keylog("onSetFocus", getattr(self, "document", None))
         self.taken_keys.clear()  # a key held while focus went: its key-up went elsewhere
         self.shift.cancel()  # focus moved (a Shift+click): its Shift is not a tap
+        self.front = foreground_window()
         self.follow_document()
         self.field()  # this request carries the field's scopes: a key in a password field is not ours
         self.poll_results()  # what came while the app was in the background: the pill says it
@@ -824,8 +852,12 @@ class ClaudishTextService(TextService):
             # Still awaited: a timer that fired with no text box in focus stopped; the answer shows
             # when it comes, not at your next key.
             self.setTimer(TIMER_MS)
+        if LAST_MODE[0] and self.state.mode != LAST_MODE[0] and not self.state.text:
+            # The mode you were in, in another app's text box too (its instance kept its own).
+            self.state.toggle()
+            self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
         pill = self.state.returned(getattr(self, "document", None))
-        if pill:
+        if pill and not self.sensitive():  # in a password field Shift+Esc is the app's
             self.setToast(pill, PILL_SECONDS)
         else:
             # The panel as it is now (an answer that came meanwhile: Tab takes what you see), or an
