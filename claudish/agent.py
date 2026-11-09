@@ -19,7 +19,7 @@ import uuid
 
 from .children import spawn
 from .modes import TEMPLATES
-from .warm import with_own_folder
+from .warm import ENDED, with_own_folder
 
 PARTIAL_EVERY = 0.15  # seconds between partial-draft events
 
@@ -72,7 +72,7 @@ class AgentProcess:
         if self.alive():
             return
         if self.ended:  # its conversation ended (idle, or the text box gone): a turn queued behind starts none
-            raise RuntimeError("the instruction had ended")
+            raise RuntimeError(ENDED)
         self.close()  # an agent that exited: its pipes go before it is resumed
         session = []
         if not any(flag in self.command for flag in ("--session-id", "--resume", "--continue")):

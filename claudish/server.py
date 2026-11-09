@@ -7,7 +7,7 @@ from pathlib import Path
 from importlib.resources import files
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
-from .client import PORT
+from .client import APP_CHARACTERS, PORT
 from .composition import AROUND, MAX_COMPOSITION
 
 
@@ -27,7 +27,6 @@ def checked_text(text):
 
 def checked_app(app):
     """The focused app as the adapter names it, or None."""
-    from .client import APP_CHARACTERS  # what the input methods send (client.app_name)
     if app is not None and not (isinstance(app, str) and len(app) <= APP_CHARACTERS):
         raise ValueError("app must be a short string")
     return app

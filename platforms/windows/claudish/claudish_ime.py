@@ -90,7 +90,7 @@ def foreground():
         import ctypes
         from ctypes import wintypes
         pid = wintypes.DWORD()
-        ctypes.windll.user32.GetWindowThreadProcessId(ctypes.windll.user32.GetForegroundWindow(), ctypes.byref(pid))
+        ctypes.windll.user32.GetWindowThreadProcessId(foreground_window(), ctypes.byref(pid))
         return pid.value or None
     except (AttributeError, OSError):
         return None
@@ -115,7 +115,7 @@ def console_window():
     try:
         import ctypes
         name = ctypes.create_unicode_buffer(256)
-        ctypes.windll.user32.GetClassNameW(ctypes.windll.user32.GetForegroundWindow(), name, 256)
+        ctypes.windll.user32.GetClassNameW(foreground_window(), name, 256)
         return name.value in CONSOLE_CLASSES
     except (AttributeError, OSError):
         return False
@@ -264,8 +264,20 @@ class ClaudishTextService(TextService):
         spec, lasting = self.state.switched()
         if spec and not self.sensitive():  # the mode switch briefly, or the held exchange's pill (not over a password)
             self.setToast(spec, PILL_SECONDS if lasting else 2)
-        self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
+        self.show_mode()
         self.changed()
+
+    def show_mode(self):
+        """The indicator: the mode's icon and words."""
+        self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
+
+    def show_pill(self, pill):
+        """A held exchange's pill, until your next key; not in a password field (Shift+Esc is the
+        app's there). True when shown."""
+        if pill and not self.sensitive():
+            self.setToast(pill, PILL_SECONDS)
+            return True
+        return False
 
     def onCommand(self, commandId, commandType):
         if commandId == MODE_COMMAND:  # a click on the indicator: the other mode, as a Shift tap
@@ -353,9 +365,7 @@ class ClaudishTextService(TextService):
                 self.worker.use_conversation(document)  # this box's own, also when you come back to it
             self.last_document = document
             self.known_scopes = None  # another text box: its own scopes (a password field's stay behind)
-            pill = self.state.returned(document)  # back where one was held: a pill, taking no keys
-            if pill and not self.sensitive():  # in a password field Shift+Esc is the app's
-                self.setToast(pill, PILL_SECONDS)
+            self.show_pill(self.state.returned(document))  # back where one was held: a pill, taking no keys
 
     def preview(self):
         """Screenshot plumbing: with the design lab's
@@ -852,14 +862,9 @@ class ClaudishTextService(TextService):
             # Still awaited: a timer that fired with no text box in focus stopped; the answer shows
             # when it comes, not at your next key.
             self.setTimer(TIMER_MS)
-        if LAST_MODE[0] and self.state.mode != LAST_MODE[0] and not self.state.text:
-            # The mode you were in, in another app's text box too (its instance kept its own).
-            self.state.toggle()
-            self.changeButton("windows-mode-icon", icon=mode_icon(self.state.mode), tooltip=mode_tooltip(self.state.mode))
-        pill = self.state.returned(getattr(self, "document", None))
-        if pill and not self.sensitive():  # in a password field Shift+Esc is the app's
-            self.setToast(pill, PILL_SECONDS)
-        else:
+        if self.state.follow_mode(LAST_MODE[0]):  # the mode you were in, in another app's text box too
+            self.show_mode()
+        if not self.show_pill(self.state.returned(getattr(self, "document", None))):
             # The panel as it is now (an answer that came meanwhile: Tab takes what you see), or an
             # instruction a helper finished while another app was in front, no longer composed.
             self.publish()

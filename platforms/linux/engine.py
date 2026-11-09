@@ -317,9 +317,9 @@ class ClaudishEngine(IBus.Engine):
     def before_caret(self):
         return self.around_caret()[0][-MAX_COMPOSITION:]
 
-    def live_key(self, keyval, shift=0):
+    def live_key(self, keyval, shift=False):
         """Continue mode: keys go to the app as typed; Tab takes the suggestion, Esc dismisses it.
-        shift: the key's modifier state."""
+        shift: Shift is held."""
         state = self.composition
         name = self.compose_key(keyval)
         if name is None:
@@ -338,7 +338,7 @@ class ClaudishEngine(IBus.Engine):
             combined, self.dead = accented(self.composition.accent, char), None
             self.live_commit(combined)  # é goes in, not the e the key would type
             return True
-        if keyval == IBus.KEY_Tab and not shift & IBus.ModifierType.SHIFT_MASK:  # Shift+Tab: the app's
+        if keyval == IBus.KEY_Tab and not shift:  # Shift+Tab: the app's
             if state.ghost and not state.caret_stayed(self.around_caret()[0]):  # a click moved it (no reset)
                 state.dismiss()
                 self.render()
@@ -497,10 +497,10 @@ class ClaudishEngine(IBus.Engine):
         if keyval == IBus.KEY_F8 and self.composition.toggle_look():
             self.render()
             return True
+        shift = bool(state & IBus.ModifierType.SHIFT_MASK)  # (a Shift+Tab some clients send as Tab with Shift)
         if self.composition.live:
-            return self.live_key(keyval, state)  # (a Shift+Tab some clients send as Tab with Shift)
+            return self.live_key(keyval, shift)
         # Choices are not numbered: digits are text in English, as Space is (↑/↓, then Tab).
-        shift = bool(state & IBus.ModifierType.SHIFT_MASK)
         if keyval in (IBus.KEY_Return, IBus.KEY_KP_Enter) and not self.composition.talks(shift):
             kept = self.composition.keep()  # the keeper key: as it is, and keep composing
             if kept is None:  # the model is asked: taken, nothing goes in

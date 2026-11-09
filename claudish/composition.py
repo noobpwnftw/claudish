@@ -129,9 +129,9 @@ ROW = 60
 # warm.py).
 OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no answer, so the instruction stopped",
              "too many agent sessions", "the model offered nothing",
-             "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended
+             "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended (its process)
              "Claude declined", "Claude returned no text", "the model returned no text",
-             "the agent ", "the instruction had ended", "text must be")  # an agent session's, the service's checks
+             "the agent ", "the instruction had ended", "text must be")  # an agent session's, warm.ENDED, the service's checks
 
 
 # A subscription CLI's own failure (claudish/warm.py: "Claude Code: <its words>"), and how to sign it in.
@@ -1028,6 +1028,14 @@ class Composition:
         self.look = False  # change() keeps it with words in the composition
         self.change(kept[-MAX_COMPOSITION:])  # in the app now: continue's context
         return kept
+
+    def follow_mode(self, mode):
+        """A text box you come to with nothing composed takes the mode you were in (mode: the last
+        one switched to, anywhere); True when it switched."""
+        if mode and self.mode != mode and not self.text:
+            self.toggle()
+            return True
+        return False
 
     def toggle_look(self):
         """F8: attach, or stop attaching, a picture of the focused window to the instruction you are

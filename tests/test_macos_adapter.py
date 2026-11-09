@@ -255,11 +255,15 @@ class MacOSAdapterTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.guard.stop()
 
+    def new_controller(self, client=None):
+        """Another text box's controller (IMK makes one per client)."""
+        return self.module.ClaudishInputController().initWithServer_delegate_client_(
+            object(), None, self.client if client is None else client)
+
     def setUp(self):
         self.module.LAST_MODE[0] = None  # each test starts as a new session would
         self.client = Client()
-        self.controller = self.module.ClaudishInputController().initWithServer_delegate_client_(
-            object(), None, self.client)
+        self.controller = self.new_controller()
         self.controller.activateServer_(None)
         self.assertEqual(self.controller.state.mode, "compose")  # a new session starts in compose
 
@@ -267,7 +271,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.controller.inputControllerWillClose()
 
     def test_continue_types_like_en_us(self):
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, self.client)
+        fresh = self.new_controller()
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "continue"
@@ -490,7 +494,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertEqual(self.client.marked, "caf")
 
     def test_only_the_controller_in_use_hides_the_shared_windows(self):
-        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other = self.new_controller(Client())
         other.activateServer_(None)
         self.controller.activateServer_(None)  # back here: this one draws now
         self.module.OVERLAY.show(None, "world.")
@@ -506,7 +510,7 @@ class MacOSAdapterTests(unittest.TestCase):
         self.assertFalse(self.controller.state.ghost)
 
     def test_a_controller_not_in_use_neither_draws_nor_hides_the_panel(self):
-        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other = self.new_controller(Client())
         other.activateServer_(None)
         other.state.change("hello")
         other.state.fail(other.state.revision, "the model is offline")  # a panel of its own
@@ -524,7 +528,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_a_text_box_you_come_to_is_in_the_mode_you_were_in(self):
         self.shift_tap()  # continue, as the menu bar now shows for every text box
-        other = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, Client())
+        other = self.new_controller(Client())
         other.activateServer_(None)
         self.assertEqual(other.state.mode, "continue")
         other.inputControllerWillClose()
@@ -794,7 +798,7 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_a_suggestion_asked_for_before_a_click_is_not_shown_where_the_caret_went(self):
         client = TextClient("First line.\nSecond line here.")
         client.mark_at = 11  # the end of the first line
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "continue"
@@ -812,7 +816,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_a_suggestion_shows_when_the_app_changed_what_was_typed(self):
         client = TextClient("First line.")
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "continue"
@@ -831,7 +835,7 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
         client = TextClient("keep this word")
         client.chosen = (5, 4)  # "this", selected in the app
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "continue"
@@ -888,7 +892,7 @@ class MacOSAdapterTests(unittest.TestCase):
         """Under the composition's start, as CJK candidate windows sit, whatever the caret: typed,
         dropped (its toast), or brought back whole by Shift+Esc (docs/design/design.md, Placement)."""
         client = TextClient("Dear Sam, ")
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         start = ((100, 400), (1, 18))  # "Dear Sam, " is 10 characters
         try:
@@ -907,7 +911,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_continue_starts_from_the_text_box_and_the_suggestion_is_grey(self):
         client = TextClient("Thanks for the review ")
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "continue"
@@ -940,7 +944,7 @@ class MacOSAdapterTests(unittest.TestCase):
     def test_continue_is_quiet_in_a_terminal(self):
         client = TextClient("~ % ")
         client.bundleIdentifier = lambda: "com.apple.Terminal"
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             for char in "ls ":
@@ -953,7 +957,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_an_instruction_takes_the_text_box_but_not_itself(self):
         client = TextClient("Dear Ana,\n\n")
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "compose"
@@ -969,7 +973,7 @@ class MacOSAdapterTests(unittest.TestCase):
 
     def test_a_rewrite_knows_where_it_goes(self):
         client = TextClient("Dear Ana,\n\n")
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "compose"
@@ -987,7 +991,7 @@ class MacOSAdapterTests(unittest.TestCase):
         as if just typed; then Tab rewrites it or Shift+Enter sends it."""
         client = TextClient("Dear Ana, this is important. Thanks.")
         client.chosen = (10, 18)  # "this is important."
-        fresh = self.module.ClaudishInputController().initWithServer_delegate_client_(object(), None, client)
+        fresh = self.new_controller(client)
         fresh.activateServer_(None)
         try:
             fresh.state.mode = "compose"

@@ -28,6 +28,9 @@ CLI = TEMPLATES["box"]["cli"]
 TRANSIENT = ("capacity", "rate limit", "overloaded", "try again", "temporar", "busy")
 
 
+ENDED = "the instruction had ended"  # (claudish/composition.py's OWN_WORDS has these words for the panel)
+
+
 class Lines:
     """A child's stdout as lines, read on a thread (pipes cannot be polled on Windows)."""
 
@@ -151,7 +154,7 @@ class Warm:
             with self.lifecycle:
                 if owner in self.abandoned:  # taken back (Esc) while it waited: it never runs
                     self.abandoned.discard(owner)
-                    raise RuntimeError("the instruction had ended")
+                    raise RuntimeError(ENDED)
                 self.asking = owner
             try:
                 self.check_running()

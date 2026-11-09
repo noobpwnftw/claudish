@@ -4,13 +4,25 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 from claudish.agent import AgentProcess, ClaudeCodeDriver
 from claudish.sessions import Sessions
+from serving import wait_until
 
 COMMAND = [sys.executable, str(Path(__file__).with_name("fake_agent_edges.py"))]
+
+
+@contextmanager
+def running():
+    """An agent for the block; its process and MCP config gone after (inside the block's patches)."""
+    agent = AgentProcess(COMMAND)
+    try:
+        yield agent
+    finally:
+        agent.close(True)
 
 
 def turn(agent, prompt, wait=8):
@@ -25,56 +37,41 @@ class AgentEdgeTests(unittest.TestCase):
     def test_an_agent_that_died_before_its_first_turn_is_not_resumed(self):
         with tempfile.TemporaryDirectory() as folder, \
                 patch.dict(os.environ, {"FAKE_MODE": "startcrash", "FAKE_MARK": folder + "/m-"}):
-            agent = AgentProcess(COMMAND)
-            try:
+            with running() as agent:
                 self.assertEqual(turn(agent, "hello")[-1][0], "error")  # its first start failed
                 self.assertEqual(turn(agent, "hello"), [("result", "ok")])  # a new session, not --resume
                 self.assertEqual(turn(agent, "hello"), [("result", "ok")])  # and then resumed
-            finally:
-                agent.close(True)
 
     def test_a_line_that_is_not_a_message_does_not_carry_a_turn_into_the_next(self):
         with patch.dict(os.environ, {"FAKE_MODE": ""}):
-            agent = AgentProcess(COMMAND)
-            try:
+            with running() as agent:
                 self.assertEqual(turn(agent, "nonobj first"), [("result", "ANSWER TO FIRST")])
                 self.assertEqual(turn(agent, "second instruction"), [("result", "answer to: second instruction")])
-            finally:
-                agent.close(True)
 
     def test_a_question_the_agent_withdraws_is_not_waited_for(self):
         import claudish.conversation as conversation
         with patch.dict(os.environ, {"FAKE_MODE": ""}), patch.object(conversation, "QUESTION_SECONDS", 1):
-            agent = AgentProcess(COMMAND)
-            try:
+            with running() as agent:
                 self.assertEqual(turn(agent, "cancelask"), [("question", "Q?"), ("result", "finished work")])
-            finally:
-                agent.close(True)
 
     def test_a_failed_turn_is_taken_back_from_the_agents_session(self):
         with patch.dict(os.environ, {"FAKE_MODE": ""}):
-            agent = AgentProcess(COMMAND)
-            try:
+            with running() as agent:
                 self.assertEqual(turn(agent, "first one"), [("result", "answer to: first one")])
                 kept = agent.kept_at
                 self.assertEqual(turn(agent, "fail this")[-1][0], "error")
                 self.assertEqual((agent.kept_at, agent.resume_at), (kept, kept))  # resumed before the failure
-            finally:
-                agent.close(True)
 
     def test_a_turn_taken_back_stays_back_when_the_next_start_dies(self):
         with tempfile.TemporaryDirectory() as folder, \
                 patch.dict(os.environ, {"FAKE_MODE": "atcrash", "FAKE_LOG": folder + "/log"}):
-            agent = AgentProcess(COMMAND)
-            try:
+            with running() as agent:
                 turn(agent, "first one")
                 turn(agent, "second one")
                 agent.rewind(agent.kept_at)  # Esc took the second back
                 kept = agent.resume_at
                 self.assertEqual(turn(agent, "third")[-1][0], "error")  # that start died
                 self.assertEqual(agent.resume_at, kept)  # the next start still resumes at the first
-            finally:
-                agent.close(True)
 
     def test_esc_while_the_agent_starts_sends_no_prompt(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"FAKE_MODE": "", "FAKE_LOG": folder + "/log"}):
@@ -88,9 +85,7 @@ class AgentEdgeTests(unittest.TestCase):
             agent.ensure = ensure
             try:
                 session = Sessions().start(driver, "never sent")
-                deadline = time.monotonic() + 5
-                while session.running and time.monotonic() < deadline:
-                    time.sleep(0.05)
+                wait_until(lambda: not session.running, 5, 0.05)
                 time.sleep(0.3)
                 self.assertNotIn("never sent", Path(folder, "log").read_text())
             finally:

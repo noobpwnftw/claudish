@@ -21,6 +21,14 @@ def serving(rewriter, **settings):
         thread.join()
 
 
+def wait_until(predicate, timeout=2, step=0.02):
+    """Wait until predicate() is true (at most timeout seconds); its last value."""
+    deadline = time.monotonic() + timeout
+    while not predicate() and time.monotonic() < deadline:
+        time.sleep(step)
+    return predicate()
+
+
 def poll_until(worker, timeout=1):
     """The worker's next result, or None after timeout seconds."""
     deadline = time.monotonic() + timeout

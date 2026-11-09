@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from claudish import warm
+from serving import wait_until
 
 FAKE = str(Path(__file__).with_name("fake_cli.py"))
 
@@ -189,10 +190,7 @@ class RewriterTests(unittest.TestCase):
                 started = time.monotonic()
                 rewriter.rewrite("hello there")
                 self.assertLess(time.monotonic() - started, 2.0)  # not behind the 3 s exchange
-                deadline = time.monotonic() + 2
-                while session.running and time.monotonic() < deadline:
-                    time.sleep(0.02)
-                self.assertFalse(session.running)  # its place among the service's sessions is free
+                self.assertTrue(wait_until(lambda: not session.running))  # its place among the service's sessions is free
             finally:
                 rewriter.stop_model()
 

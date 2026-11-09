@@ -154,8 +154,7 @@ class ClaudishInputController(IMKInputController):
             TOAST.hide()
             OVERLAY.hide()
         OWNER[0] = self
-        if LAST_MODE[0] and self.state.mode != LAST_MODE[0] and not self.state.text:
-            self.state.toggle()
+        self.state.follow_mode(LAST_MODE[0])
         self.shift.cancel()  # a Shift pressed elsewhere is not half a tap here (as Windows at a focus change)
         if self.worker is None:
             self.worker = Suggestions()
@@ -445,9 +444,15 @@ class ClaudishInputController(IMKInputController):
     @objc.python_method
     def hide_panel(self):
         """This text box's panel goes; the shared panel only while it is this box's (or no one's)."""
-        if OWNER[0] in (self, None):
+        if self.owns_shared():
             PANEL.hide()
         self.drawn = None
+
+    @objc.python_method
+    def owns_shared(self):
+        """Whether the shared panel and suggestion are this box's to hide: it is the one in use, or
+        none is."""
+        return OWNER[0] in (self, None)
 
     @objc.python_method
     def follow_caret(self, client):
@@ -640,7 +645,7 @@ class ClaudishInputController(IMKInputController):
             if self.worker is not None:
                 self.worker.schedule(self.state.revision, "")
             self.hide_panel()
-            if OWNER[0] in (self, None):  # another box's suggestion is not this one's to drop
+            if self.owns_shared():  # another box's suggestion is not this one's to drop
                 OVERLAY.hide()
             if client is not None:
                 unmark(client)

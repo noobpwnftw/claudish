@@ -463,5 +463,18 @@ class RoutingTests(unittest.TestCase):
                 self.assertEqual(raised.exception.code, 503, path)
 
 
+class EndedSessionTests(unittest.TestCase):
+    def test_an_answer_after_the_end_says_the_instruction_ended(self):
+        from claudish.sessions import Sessions
+        from serving import wait_until
+        driver = type("Driver", (), {"run": lambda self, s, p: (s.emit("question", id="q", text="?", choices=[{"label": "A"}]),
+                                                                s.emit("error", text="no answer, so the instruction stopped")),
+                                     "answer": lambda self, *a: None, "cancel": lambda self: None})()
+        session = Sessions().start(driver, "ask")
+        wait_until(lambda: session.done)
+        with self.assertRaisesRegex(ValueError, "no such open question"):
+            session.answer("q", 0)
+
+
 if __name__ == "__main__":
     unittest.main()
