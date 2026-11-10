@@ -30,10 +30,18 @@ def task_name():
 LABEL = "com.claudish.service"
 
 
+def itself(*arguments):
+    """The argv that runs `claudish ARGUMENTS` with this install: inside the macOS bundle, its
+    launcher (G61), which sets up the bundle's Python; else this Python with -m claudish."""
+    if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
+        return [os.environ["EXECUTABLEPATH"]] + list(arguments)  # py2app's launcher sets it
+    return [sys.executable, "-m", "claudish"] + list(arguments)
+
+
 def command(extra):
     """The argv the service manager runs: inside the macOS bundle, the bundle itself (G61)."""
     if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
-        return [os.environ["EXECUTABLEPATH"], "serve"] + list(extra)  # py2app's launcher sets it
+        return itself("serve", *extra)
     if not (ROOT / "scripts" / "serve.py").is_file():  # installed as a package (the Windows installer)
         return [sys.executable, "-m", "claudish", "serve"] + list(extra)
     return [sys.executable, str(ROOT / "scripts" / "serve.py")] + list(extra)

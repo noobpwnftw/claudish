@@ -44,6 +44,15 @@ class ServiceDefinitionTests(unittest.TestCase):
                              [sys.executable, "-m", "claudish", "serve", "--profile", "x"])
         self.assertEqual(service.command([])[1:], [str(service.ROOT / "scripts" / "serve.py")])
 
+    def test_inside_the_macos_bundle_cd_ai_starts_itself_through_its_launcher(self):
+        """The bundle's bare Python needs the PYTHONHOME the launcher sets, which its children don't
+        get (platforms/macos/main.py): the service and the agent's text box run the launcher."""
+        launcher = "/Users/u/Library/Input Methods/Claudish.app/Contents/MacOS/Claudish"
+        self.assertEqual(service.itself("textbox-mcp"), [sys.executable, "-m", "claudish", "textbox-mcp"])
+        with patch.object(sys, "frozen", "macosx_app", create=True), patch.dict(os.environ, {"EXECUTABLEPATH": launcher}):
+            self.assertEqual(service.itself("textbox-mcp"), [launcher, "textbox-mcp"])
+            self.assertEqual(service.command(["--port", "1"]), [launcher, "serve", "--port", "1"])
+
     def test_windows_task_prefers_pythonw(self):
         with tempfile.TemporaryDirectory() as directory:
             python, pythonw = Path(directory, "python.exe"), Path(directory, "pythonw.exe")

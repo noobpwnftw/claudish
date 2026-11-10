@@ -15,6 +15,16 @@ if not os.path.exists(os.environ.get("SSL_CERT_FILE") or ""):
     import certifi
     os.environ["SSL_CERT_FILE"] = certifi.where()
 
+# py2app's launcher also sets PYTHONHOME and PYTHONPATH to the bundle and SSL_CERT_DIR to a folder
+# that does not exist. This Python has started; the programs cd_AI runs (MCP servers, context
+# commands, agents) get the environment without them: another Python would load the bundle's
+# packages and fail, and OpenSSL would look for certificates in the missing folder. cd_AI starts
+# itself through the launcher (EXECUTABLEPATH), which sets them again.
+os.environ.pop("PYTHONHOME", None)
+os.environ.pop("PYTHONPATH", None)
+if not os.path.isdir(os.environ.get("SSL_CERT_DIR") or ""):
+    os.environ.pop("SSL_CERT_DIR", None)
+
 # AppKit, InputMethodKit and the controller load in main(), for the input method only: the service
 # (`Claudish serve`, started at login) and the other commands do not wait on them (seconds at login).
 

@@ -1069,3 +1069,23 @@ class HalfEmojiTests(unittest.TestCase):
         whole = load_adapter().whole
         self.assertEqual(whole("\udc4d fine \ud83d"), " fine ")
         self.assertEqual(whole("thumbs 👍"), "thumbs 👍")
+
+
+class BundleEnvironmentTests(unittest.TestCase):
+    def test_programs_cd_ai_runs_do_not_get_the_bundles_python_settings(self):
+        """py2app's launcher sets PYTHONHOME/PYTHONPATH to the bundle and SSL_CERT_DIR to a missing
+        folder; another Python started from cd_AI (an MCP server) loaded the bundle's packages."""
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as bundle:
+            cert = Path(bundle) / "cacert.pem"
+            cert.write_text("")
+            launcher = {"PYTHONHOME": bundle, "PYTHONPATH": bundle, "SSL_CERT_FILE": str(cert),
+                        "SSL_CERT_DIR": bundle + "/openssl.ca/no-such-file", "EXECUTABLEPATH": bundle + "/Claudish"}
+            with patch.dict(os.environ, launcher):
+                spec = importlib.util.spec_from_file_location("claudish_macos_main", ROOT / "platforms/macos/main.py")
+                spec.loader.exec_module(importlib.util.module_from_spec(spec))
+                for name in ("PYTHONHOME", "PYTHONPATH", "SSL_CERT_DIR"):
+                    self.assertNotIn(name, os.environ)
+                self.assertEqual((os.environ["SSL_CERT_FILE"], os.environ["EXECUTABLEPATH"]),
+                                 (str(cert), bundle + "/Claudish"))

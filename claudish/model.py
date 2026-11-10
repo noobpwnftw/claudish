@@ -507,9 +507,11 @@ class Rewriter:
             servers[name] = server
         url = self.url
         if url and importlib.util.find_spec("mcp") is not None:
+            from .service import itself
             package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            argv = itself("textbox-mcp")
             servers["textbox"] = {
-                "command": sys.executable, "args": ["-m", "claudish", "textbox-mcp"],
+                "command": argv[0], "args": argv[1:],
                 "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
                         "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}
         return {"mcpServers": servers} if servers else None
