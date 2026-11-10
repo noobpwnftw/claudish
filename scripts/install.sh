@@ -1,6 +1,6 @@
 #!/bin/sh
 # cd_AI on Linux in one line, until there are packages:
-#   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.4.4/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/noobpwnftw/claudish/v0.4.5/scripts/install.sh | sh
 # It clones (or updates) cd_AI into ~/.local/share/claudish, makes its own Python environment there,
 # and runs `claudish setup`, which ends in cd_AI's settings (the key, the tone). A missing system
 # package is named, with the line to install it.
@@ -10,7 +10,7 @@ if [ "$(id -u)" = 0 ]; then  # sudo: it would all go to root's home, not your se
   exit 1
 fi
 home=${CLAUDISH_HOME:-$HOME/.local/share/claudish}
-ref=${CLAUDISH_REF:-v0.4.4}  # the release this script belongs to
+ref=${CLAUDISH_REF:-v0.4.5}  # the release this script belongs to
 
 missing=""
 command -v git > /dev/null || missing="$missing git"

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.5
+
+- Claude with an API key answers again: rewrites, instructions, versions and follow-ups, tools,
+  questions and window pictures. The answer's format is one the Anthropic API accepts (0.3.0 to
+  0.4.4 sent one it refused, and every request through an API key failed). An instruction's
+  versions are three at most from every backend.
+
 ## 0.4.4
 
 - Composing keys: with an exchange open and nothing to choose, the arrows stay with the exchange,
