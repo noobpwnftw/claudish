@@ -130,8 +130,8 @@ class Claude:
         if not self.model.startswith(NO_EFFORT):
             options["output_config"] = {"effort": "low"}
         if shaped:
-            from .shapes import ANSWER
-            options.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": ANSWER}
+            from .shapes import CLAUDE_API_ANSWER
+            options.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": CLAUDE_API_ANSWER}
         if self.model in FALLBACK_MODELS:
             options.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
         return options

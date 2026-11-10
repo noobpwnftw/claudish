@@ -8,9 +8,13 @@ argument schema: the server enforces them, where a model's native tool-call form
 backend without a schema answers in plain text, read through claudish.quirks."""
 import json
 
+MAX_DRAFTS = 3  # an answer's versions at most; read so (drafts()) whatever a backend's schema holds
 ANSWER = {"type": "object", "properties": {"drafts": {"type": "array", "items": {"type": "string"},
-                                                     "minItems": 1, "maxItems": 3}},
+                                                     "minItems": 1, "maxItems": MAX_DRAFTS}},
           "required": ["drafts"], "additionalProperties": False}
+# The Claude API's structured outputs refuse maxItems on an array (400 invalid_request_error): the
+# same answer without it.
+CLAUDE_API_ANSWER = {**ANSWER, "properties": {"drafts": {"type": "array", "items": {"type": "string"}, "minItems": 1}}}
 OBJECT = {"type": "object"}  # a tool's arguments when its own schema cannot be used
 
 
@@ -118,7 +122,8 @@ def is_object(content):
 
 
 def drafts(content):
-    """The drafts in an answer, or None when it is not one (a backend without a schema)."""
+    """The drafts in an answer (MAX_DRAFTS at most), or None when it is not one (a backend without a
+    schema)."""
     if isinstance(content, dict):
         found = content.get("drafts")
     else:
@@ -128,4 +133,4 @@ def drafts(content):
             return None
     if not isinstance(found, list):
         return None
-    return [text.strip() for text in found if isinstance(text, str) and text.strip()] or None
+    return [text.strip() for text in found if isinstance(text, str) and text.strip()][:MAX_DRAFTS] or None

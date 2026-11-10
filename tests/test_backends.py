@@ -65,7 +65,9 @@ class ClaudeBackendTests(unittest.TestCase):
         shaped = [dict(m, content=shapes.example(m["content"])) if m["role"] == "assistant" else m for m in rewrite["examples"]]
         self.assertEqual((call["system"], call["messages"]),
                          (rewrite["system"] + "\n\n" + rewrite["box"]["shape"], shaped + [{"role": "user", "content": "Ship it."}]))
-        self.assertEqual(call["output_config"], {"effort": "low", "format": {"type": "json_schema", "schema": shapes.ANSWER}})
+        self.assertEqual(call["output_config"], {"effort": "low", "format": {"type": "json_schema", "schema": shapes.CLAUDE_API_ANSWER}})
+        # The live API refused maxItems (400): every rewrite on an API key failed.
+        self.assertNotIn("maxItems", json.dumps(call["output_config"]))
         self.assertEqual((call["fallbacks"], call["betas"]), ("default", ["server-side-fallback-2026-07-01"]))
         self.assertNotIn("temperature", call)
         self.assertEqual(self.sdk.options["max_retries"], 0)

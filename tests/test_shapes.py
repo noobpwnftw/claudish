@@ -37,6 +37,8 @@ class ShapeTests(unittest.TestCase):
     def test_drafts_or_none(self):
         self.assertEqual(shapes.drafts('{"drafts": ["  a  ", "", 3, "b"]}'), ["a", "b"])
         self.assertEqual(shapes.drafts({"drafts": ["x"]}), ["x"])
+        # A schema without maxItems (the Claude API's) does not hold the count: read as three at most.
+        self.assertEqual(shapes.drafts({"drafts": ["1", "2", "3", "4"]}), ["1", "2", "3"])
         for plain in ("Absolutely!", '{"text": "x"}', '{"drafts": []}', ""):
             self.assertIsNone(shapes.drafts(plain))
 
