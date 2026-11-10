@@ -4,6 +4,9 @@
   questions and window pictures. The answer's format is one the Anthropic API accepts (0.3.0 to
   0.4.4 sent one it refused, and every request through an API key failed). An instruction's
   versions are three at most from every backend.
+- macOS: the programs cd_AI starts (MCP servers, context commands, agents) no longer get its
+  bundle's Python settings. An MCP server written in Python failed to start, and its tools never
+  reached the model.
 
 ## Download
 
