@@ -114,6 +114,7 @@ PURPOSES = {IBus.InputPurpose.TERMINAL: "terminal", IBus.InputPurpose.EMAIL: "em
 SCREEN_XML = """<node><interface name="io.claudish.Screen">
   <method name="Get"><arg type="s" direction="out"/></method>
   <method name="Focus"><arg type="s" direction="in"/><arg type="s" direction="in"/></method>
+  <method name="Fit"><arg type="s" direction="in"/><arg type="s" direction="in"/></method>
   <signal name="Changed"><arg type="s"/></signal>
 </interface></node>"""
 
@@ -131,6 +132,7 @@ class Screen:
         # window (and app) has focus, and the engine in that context follows it (on_focus).
         self.focus, self.on_focus = None, None
         self.on_presence = None  # the focused engine: it draws again where the extension is, or is not
+        self.on_fit = None  # the focused engine: continue's suggestion as far as the extension drew it
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
             info = Gio.DBusNodeInfo.new_for_xml(SCREEN_XML).interfaces[0]
@@ -159,6 +161,11 @@ class Screen:
             invocation.return_value(None)
             if self.on_focus is not None:  # the same window again: its class came, the window did not change
                 self.on_focus(same=bool(before) and before[1] == self.focus[1] and bool(self.focus[1]))
+            return
+        if method == "Fit":  # (the suggestion published, the whole words of it drawn before the screen's edge)
+            invocation.return_value(None)
+            if self.on_fit is not None:
+                self.on_fit(*parameters.unpack())
             return
         invocation.return_value(GLib.Variant("(s)", (self.state,)))
 
@@ -828,10 +835,17 @@ class ClaudishEngine(IBus.Engine):
         elif action == "accept":  # a draft: inserted
             self.finish(True)
 
+    def fitted(self, published, drawn):
+        """The extension drew continue's suggestion only up to its monitor's edge (whole words; none
+        when not one fits): Tab takes what you see, as on macOS (Composition.fit_ghost)."""
+        if self.composition.live and self.composition.ghost == published and drawn != published:
+            self.composition.fit_ghost(lambda ghost: len(ghost) <= len(drawn))
+            self.render()
+
     def resume(self):
         """Focus in: the poll timer again (it stops while another box has focus), and what came meanwhile."""
         self.focused = True
-        screen().on_presence = self.render
+        screen().on_presence, screen().on_fit = self.render, self.fitted
         if self.timer is None:
             self.timer = GLib.timeout_add(40, self.poll)
             self.poll()
@@ -892,7 +906,7 @@ class ClaudishEngine(IBus.Engine):
         self.took = None
         self.shift.cancel()  # focus moved (a Shift+click): its Shift is not a tap
         if screen().on_presence == self.render:
-            screen().on_presence = None
+            screen().on_presence = screen().on_fit = None
         self.sequence = None  # a Compose key waiting goes with the focus
         if self.timer is not None:  # another box's engine polls now; results wait in the worker
             GLib.source_remove(self.timer)

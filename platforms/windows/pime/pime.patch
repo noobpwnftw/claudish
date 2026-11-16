@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..8dff344 100644
+index 0c7a8d5..98875f5 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -23,6 +23,8 @@
@@ -470,10 +470,13 @@ index 0c7a8d5..8dff344 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -442,6 +769,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+@@ -442,6 +769,22 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
  
  	json req = createRpcRequest("filterKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
++	// Claudish: what of continue's suggestion is on screen (the whole words that fit before the
++	// monitor's edge; "" for none): Tab takes that, and only a suggestion drawn makes Tab cd_AI's.
++	req["ghostShown"] = utf16ToUtf8(textService_->ghostShown().c_str());
 +	// Claudish: Tab with nothing composed takes the app's selection as your words, so the test
 +	// needs the selection (and the field's kind): read in a synchronous read-only edit session, as
 +	// the key's own session is (TextService::OnKeyDown).
@@ -490,7 +493,7 @@ index 0c7a8d5..8dff344 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -455,14 +795,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -455,14 +798,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  	if (!ensureConnected()) {
  		return false;
  	}
@@ -510,7 +513,7 @@ index 0c7a8d5..8dff344 100644
  	}
  	return false;
  }
-@@ -490,6 +833,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +836,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -518,7 +521,7 @@ index 0c7a8d5..8dff344 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +873,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +876,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -547,7 +550,7 @@ index 0c7a8d5..8dff344 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -677,7 +1036,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
+@@ -677,7 +1039,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
  
  // called just before current composition is terminated for doing cleanup.
  void Client::onCompositionTerminated(bool forced) {
@@ -556,7 +559,7 @@ index 0c7a8d5..8dff344 100644
  		return;
  	}
  
-@@ -804,7 +1163,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1166,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -665,7 +668,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 286246a..750cc39 100644
+index 286246a..ee82155 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -96,6 +96,21 @@ void TextService::onDeactivate() {
@@ -726,7 +729,7 @@ index 286246a..750cc39 100644
          }
      }
  }
-@@ -348,6 +366,76 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,77 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -792,10 +795,11 @@ index 286246a..750cc39 100644
 +	HWND owner = compositionWindow(session);
 +	if (!ghostWindow_ || !ghostWindow_->alive(owner))  // a window of its own per owner, which may close
 +		ghostWindow_ = std::make_unique<Ime::GhostWindow>(owner);
-+	ghostWindow_->show(text, caret);
++	ghostShown_ = ghostWindow_->show(text, caret);
 +}
 +
 +void TextService::hideGhost() {
++	ghostShown_.clear();
 +	if (ghostWindow_)
 +		ghostWindow_->hide();
 +}
@@ -803,7 +807,7 @@ index 286246a..750cc39 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -371,14 +459,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +460,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -835,7 +839,7 @@ index 286246a..750cc39 100644
      }
  }
  
-@@ -431,6 +532,7 @@ void TextService::closeClient() {
+@@ -431,6 +533,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -844,7 +848,7 @@ index 286246a..750cc39 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 303cf17..5dcabc6 100644
+index 303cf17..f2d6c1a 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -865,7 +869,7 @@ index 303cf17..5dcabc6 100644
  
  	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
  	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
-@@ -122,6 +126,16 @@ public:
+@@ -122,6 +126,17 @@ public:
  		updateFont_ = true;
  	}
  
@@ -875,6 +879,7 @@ index 303cf17..5dcabc6 100644
 +		panel_ = panel;
 +	}
 +	void showGhost(Ime::EditSession* session, const std::wstring& text);
++	const std::wstring& ghostShown() const { return ghostShown_; }
 +	void placeCandidates(const RECT& caret);
 +	void showToast(Ime::EditSession* session, const Ime::PanelSpec& panel, int duration);
 +	void hideGhost();
@@ -882,7 +887,7 @@ index 303cf17..5dcabc6 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +180,13 @@ private:
+@@ -166,6 +181,14 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;
@@ -893,11 +898,12 @@ index 303cf17..5dcabc6 100644
 +	bool anchored_ = false;
 +	bool panelAnchor(Ime::EditSession* session, RECT* rect);
 +	std::unique_ptr<Ime::GhostWindow> ghostWindow_;
++	std::wstring ghostShown_;  // what of continue's suggestion was drawn (the words that fit; "" for none)
  	int candFontSize_;
  
  	HMENU popupMenu_{nullptr};
 diff --git a/python/textService.py b/python/textService.py
-index 400c374..abac8b9 100644
+index 400c374..2a994cc 100644
 --- a/python/textService.py
 +++ b/python/textService.py
 @@ -40,6 +40,9 @@ class KeyEvent:
@@ -910,7 +916,7 @@ index 400c374..abac8b9 100644
          self.keyStates = msg["keyStates"]
  
      def isKeyDown(self, code):
-@@ -90,12 +93,20 @@ class TextService:
+@@ -90,12 +93,21 @@ class TextService:
              self.checkConfigChange()  # check if configurations are changed
  
          self.updateStatus(msg)
@@ -921,6 +927,7 @@ index 400c374..abac8b9 100644
 +        self.inputScopes = msg.get("inputScopes")  # IS_* values the app declares for the field
 +        self.document = msg.get("document")  # which text box (the TSF context), when known
          if method == "filterKeyDown":
++            self.ghostShown = msg.get("ghostShown")  # Claudish: what of continue's suggestion is drawn
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyDown(keyEvent)
          elif method == "onKeyDown":
@@ -931,7 +938,7 @@ index 400c374..abac8b9 100644
          elif method == "filterKeyUp":
              keyEvent = KeyEvent(msg)
              ret = self.filterKeyUp(keyEvent)
-@@ -121,6 +132,8 @@ class TextService:
+@@ -121,6 +133,8 @@ class TextService:
          elif method == "onCompositionTerminated":
              forced = msg["forced"]
              self.onCompositionTerminated(forced)
@@ -940,7 +947,7 @@ index 400c374..abac8b9 100644
          elif method == "onActivate":
              self.isActivated = True
              self.keyboardOpen = msg["isKeyboardOpen"]
-@@ -147,6 +160,9 @@ class TextService:
+@@ -147,6 +161,9 @@ class TextService:
      def onDeactivate(self):
          pass
  
@@ -950,7 +957,7 @@ index 400c374..abac8b9 100644
      def filterKeyDown(self, keyEvent):
          return False
  
-@@ -176,6 +192,15 @@ class TextService:
+@@ -176,6 +193,15 @@ class TextService:
          self.commitString = ""
          self.compositionString = ""
  
@@ -966,7 +973,7 @@ index 400c374..abac8b9 100644
      def onKeyboardStatusChanged(self, opened):
          pass
  
-@@ -249,6 +274,25 @@ class TextService:
+@@ -249,6 +275,25 @@ class TextService:
          self.showCandidates = show
          self.currentReply["showCandidates"] = show
  

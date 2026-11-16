@@ -457,6 +457,7 @@ class ClaudishTextService(TextService):
                 if self.state.ghost and not self.caret_stayed():  # a click moved it: Tab never takes one gone
                     self.drop_live()
                     return False
+                self.fit_drawn()
                 return bool(self.state.ghost) and self.state.ghost == self.drawn_ghost  # one you see
             if event.isPrintableChar():
                 # The app types it itself, as with no input method: no composition per letter (a
@@ -487,6 +488,15 @@ class ClaudishTextService(TextService):
         restoring = event.keyCode == 0x1B and event.isKeyDown(0x10) and self.state.restorable()
         taking = plain_tab(event) and bool(self.selection())  # Tab on a selection: your words
         return event.isPrintableChar() or bool(self.state.text) or restoring or taking
+
+    def fit_drawn(self):
+        """The suggestion as PIME drew it (filterKeyDown's "ghostShown": the whole words that fit
+        before the monitor's edge, or none in an app PIME cannot draw in): Tab takes only that, as
+        macOS cuts it (Composition.fit_ghost). None from a PIME that does not say."""
+        shown = getattr(self, "ghostShown", None)
+        if shown is None or not self.drawn_ghost or shown == self.drawn_ghost:
+            return
+        self.drawn_ghost = self.state.fit_ghost(lambda ghost: len(ghost) <= len(shown))
 
     def caret_stayed(self):
         """Whether the text before the caret is still what continue typed (a click in the same field

@@ -109,6 +109,20 @@ try:
     engine.composition.offer(engine.composition.revision, engine.composition.text + " Hello—truly.")
     assert engine.composition.ghost == " Hello—truly."
     assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and commits[-1] == " Hello—truly."
+    # The GNOME extension drew only the whole words that fit before its monitor's edge (Fit on the
+    # bus, to the focused engine): Tab takes those; not one word drawn, and Tab is the app's.
+    fits, kept = [], module.screen().on_fit
+    module.screen().on_fit = lambda *drawn: fits.append(drawn)
+    module.screen().call(None, None, None, None, "Fit", GLib.Variant("(ss)", (" A b.", " A")),
+                         type("Invocation", (), {"return_value": lambda self, value: None})())
+    assert fits == [(" A b.", " A")], fits
+    module.screen().on_fit = kept
+    engine.composition.offer(engine.composition.revision, engine.composition.text + " One two three.")
+    engine.fitted(" One two three.", " One two")
+    assert engine.do_process_key_event(IBus.KEY_Tab, 0, 0) and commits[-1] == " One two", commits[-1:]
+    engine.composition.offer(engine.composition.revision, engine.composition.text + " Gone.")
+    engine.fitted(" Gone.", "")
+    assert not engine.composition.ghost and not engine.do_process_key_event(IBus.KEY_Tab, 0, 0)
     # A click elsewhere sends no key (a GTK 3 app resets nothing when keys went straight in): Tab
     # never takes a suggestion asked for another place.
     engine.composition.offer(engine.composition.revision, engine.composition.text + " Moved.")

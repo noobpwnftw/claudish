@@ -499,10 +499,10 @@ index 41e3a33..a2bff25 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..dd1fcaf
+index 0000000..9b8c872
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,542 @@
+@@ -0,0 +1,573 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/design.md).
@@ -513,6 +513,8 @@ index 0000000..dd1fcaf
 +
 +#include <algorithm>
 +#include <cmath>
++#include <climits>
++#include <cwctype>
 +
 +#pragma comment(lib, "d2d1.lib")
 +#pragma comment(lib, "dwrite.lib")
@@ -1002,27 +1004,55 @@ index 0000000..dd1fcaf
 +    presentLayered(hwnd, width, height, nullptr, [&](HDC memory, const RECT& area) { paint(memory, area, spin); });
 +}
 +
-+void GhostPainter::show(HWND hwnd, const std::wstring& text, const RECT& caret) {
++std::wstring GhostPainter::show(HWND hwnd, const std::wstring& whole, const RECT& caret) {
 +    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
-+        return;
++        return L"";
 +    if (!dwrite && FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
 +                                              reinterpret_cast<IUnknown**>(&dwrite))))
-+        return;
++        return L"";
 +    // The UI font at the caret's height (the line is about 1.25 times the font's size).
 +    const float size = (std::max)(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
 +    IDWriteTextFormat* format = nullptr;
 +    dwrite->CreateTextFormat(uiFont(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
 +                             DWRITE_FONT_STRETCH_NORMAL, size, L"", &format);
 +    if (!format)
-+        return;
-+    IDWriteTextLayout* layout = nullptr;
-+    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, 4000, 1000, &layout);
-+    float w, h;
-+    measure(layout, &w, &h);
-+    const int width = (std::max)(1, (int)w + 2), height = (std::max)(1, (int)h);
++        return L"";
 +    // From the caret's own x (an empty selection's rectangle can be a character wide): the space
-+    // you typed is the only gap before the suggestion.
-+    POINT at = { caret.left + scaled(2), caret.top + ((caret.bottom - caret.top) - height) / 2 };
++    // you typed is the only gap before the suggestion. Up to its monitor's edge: the whole words
++    // that fit there, as composition.py's fit_ghost cuts (Tab takes what was drawn, reported back).
++    const int left = caret.left + scaled(2);
++    MONITORINFO monitor = { sizeof(monitor) };
++    POINT point = { left, caret.top };
++    const LONG edge = GetMonitorInfoW(MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST), &monitor)
++        ? monitor.rcWork.right : LONG_MAX;
++    auto layoutOf = [&](const std::wstring& text, float* w, float* h) {
++        IDWriteTextLayout* made = nullptr;
++        dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, 4000, 1000, &made);
++        if (made)
++            measure(made, w, h);
++        return made;
++    };
++    std::wstring text = whole;
++    float w = 0, h = 0;
++    IDWriteTextLayout* layout = layoutOf(text, &w, &h);
++    for (size_t at = text.size(); layout && left + (LONG)w + 2 > edge && at > 0; ) {
++        // The next cut to the left: a space after a word.
++        while (at > 0 && !iswspace(text[at - 1]))
++            --at;
++        while (at > 0 && iswspace(text[at - 1]))
++            --at;
++        releaseOne(layout);
++        text = whole.substr(0, at);
++        layout = at ? layoutOf(text, &w, &h) : nullptr;
++    }
++    if (!layout || text.empty()) {
++        releaseOne(layout);
++        releaseOne(format);
++        ShowWindow(hwnd, SW_HIDE);
++        return L"";
++    }
++    const int width = (std::max)(1, (int)w + 2), height = (std::max)(1, (int)h);
++    POINT at = { left, caret.top + ((caret.bottom - caret.top) - height) / 2 };
 +    presentLayered(hwnd, width, height, &at, [&](HDC memory, const RECT& area) {
 +        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
 +            D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
@@ -1042,12 +1072,13 @@ index 0000000..dd1fcaf
 +    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 +    releaseOne(layout);
 +    releaseOne(format);
++    return text;
 +}
 +
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..8c454f7
+index 0000000..9d2249c
 --- /dev/null
 +++ b/src/Panel.h
 @@ -0,0 +1,170 @@
@@ -1167,8 +1198,9 @@ index 0000000..8c454f7
 +// caret's height, on a transparent layered window that never takes the mouse or the keyboard.
 +class GhostPainter {
 +public:
-+    // Paints text into a layered window placed at the caret rectangle's right end.
-+    static void show(HWND hwnd, const std::wstring& text, const RECT& caret);
++    // Paints text into a layered window placed at the caret rectangle's right end: the whole words
++    // that fit before its monitor's edge. What it drew ("" when not one word fits: nothing shows).
++    static std::wstring show(HWND hwnd, const std::wstring& text, const RECT& caret);
 +};
 +
 +// Its own window class, without a frame: text drawn after the caret, not a panel.
@@ -1197,9 +1229,8 @@ index 0000000..8c454f7
 +    bool alive(HWND parent) const {
 +        return hwnd_ && IsWindow(hwnd_) && parent_ == parent;
 +    }
-+    void show(const std::wstring& text, const RECT& caret) {
-+        if (hwnd_)
-+            GhostPainter::show(hwnd_, text, caret);
++    std::wstring show(const std::wstring& text, const RECT& caret) {
++        return hwnd_ ? GhostPainter::show(hwnd_, text, caret) : std::wstring();
 +    }
 +    void hide() {
 +        if (hwnd_)

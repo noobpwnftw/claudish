@@ -283,6 +283,15 @@ def main():
             worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Unseen."})
             assert key(9, method="filterKeyDown", textBefore="Total: !a!")["return"] is False
             worker_class.return_value.poll.return_value = None
+            # Cut at the monitor's edge (PIME's ghostShown: the whole words it drew): Tab takes only
+            # those; none drawn (an app PIME cannot draw in): Tab is the app's.
+            typed_live("!", "Edge!")
+            arrives(service.state.text + " One two three.", "Edge!")
+            assert key(9, method="filterKeyDown", textBefore="Edge!", ghostShown=" One two")["return"] is True
+            assert key(9, textBefore="Edge!")["commitString"] == " One two", service.state.ghost
+            typed_live("!", "Edge! One two!")
+            arrives(service.state.text + " Gone.", "Edge! One two!")
+            assert key(9, method="filterKeyDown", textBefore="Edge! One two!", ghostShown="")["return"] is False
             # A key-up whose key-down went to the app (Ctrl let go first) stays the app's.
             assert key(ord("C"), ord("c"), "filterKeyUp")["return"] is False
             shift_tap()  # compose, starting empty: the words are in the app already

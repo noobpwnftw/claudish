@@ -68,7 +68,7 @@ export default class CdAiExtension extends Extension {
         this._cursor = null;  // nothing is placed until IBus says where the caret is (after a lock, say)
         this._panel = column({style_class: 'cd-panel', visible: false});
         this._ghost = new St.Label({style_class: 'cd-ghost', visible: false});
-        this._ghost.clutter_text.ellipsize = Pango.EllipsizeMode.END;  // cut at its monitor's edge (_place)
+        this._ghost.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;  // cut to the words that fit (_place)
         this._toast = column({style_class: 'cd-panel', visible: false});
         for (const actor of [this._panel, this._ghost, this._toast]) {
             try {
@@ -217,7 +217,7 @@ export default class CdAiExtension extends Extension {
         this._ghost.visible = Boolean(screen.ghost);
         if (screen.ghost) {
             // cd_AI's own grey text, in the UI font at the caret's height.
-            this._ghost.text = screen.ghost;
+            this._ghost.text = this._published = screen.ghost;
             // The caret's height is in the stage's pixels; St scales a stylesheet's px again.
             const height = this._cursor ? this._cursor.height : 0;
             this._ghost.style = `font-size: ${Math.max(11, Math.round(height / 1.25 / scale()))}px;`;
@@ -388,12 +388,23 @@ export default class CdAiExtension extends Extension {
             const [, tall] = this._ghost.get_preferred_height(-1);
             // Just past the caret's line (the reported x is a few pixels left of the drawn caret):
             // the suggestion never covers the space you typed.
-            // On the caret's monitor: what does not fit ends in an ellipsis, not on the next screen.
+            // On the caret's monitor: the whole words that fit before its edge, and the engine is
+            // told, so Tab takes what you see (as macOS's fit_ghost; nothing when not one word fits).
             this._ghost.set_width(-1);  // its own width, not the last suggestion's
-            const [, wide] = this._ghost.get_preferred_width(-1);
             const gap = CARET_GAP * scale();
             const left = Math.round(x + Math.max(width, 2) + gap);
-            this._ghost.set_width(Math.max(0, Math.min(wide, area.x + area.width - left)));
+            const room = area.x + area.width - left;
+            const published = this._published || '';
+            let drawn = published;
+            this._ghost.text = drawn;
+            while (drawn && this._ghost.get_preferred_width(-1)[1] > room) {
+                drawn = drawn.replace(/\S+\s*$/, '').replace(/\s+$/, '');  // the last word off
+                this._ghost.text = drawn;
+            }
+            if (drawn !== published)
+                Gio.DBus.session.call('io.claudish.Screen', '/io/claudish/Screen', 'io.claudish.Screen', 'Fit',
+                    new GLib.Variant('(ss)', [published, drawn]), null, Gio.DBusCallFlags.NO_AUTO_START, -1, null, null);
+            this._ghost.visible = Boolean(drawn.trim());
             this._ghost.set_position(left, Math.round(y + (height - tall) / 2));
         }
     }
