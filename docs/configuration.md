@@ -440,7 +440,7 @@ git status?"); your answer goes back to it.
 
 For apps that publish nothing Claudish can read, an instruction can carry a
 picture of the window you are typing in. In compose, press **F8** before
-Shift+Enter: the panel footer shows "F8 without this window" (F8 again takes the picture
+Shift+Enter: the panel says "With this window · F8 drops it" (F8 again takes the picture
 off), and the service captures the focused window once, sends it with that one instruction, and
 lists it in "consulted". F8 applies to that one instruction.
 

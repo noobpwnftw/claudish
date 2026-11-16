@@ -1193,7 +1193,9 @@ class ModeFeelTests(unittest.TestCase):
         self.assertTrue(state.for_model)
         self.assertIsNone(state.keep())  # Enter: nothing of a follow-up goes in
         self.assertEqual(state.tab(), "wait")  # Tab rewrites nothing of a follow-up into the app
-        self.assertEqual([key for key, _ in state.panel()["foot"]], ["F8", "Shift+Enter", "Esc"])
+        panel = state.panel()
+        self.assertEqual([key for key, _ in panel["foot"]], ["Shift+Enter", "Esc"])  # F8 is said above them
+        self.assertEqual(panel["body"], "With this window · F8 drops it")
         self.assertEqual(state.leave("A"), "")  # a focus change holds it, your words with it
         self.assertEqual(state.holds["A"][0].origin, "teh cat")
         state.returned("B")

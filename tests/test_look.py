@@ -35,6 +35,8 @@ class CompositionTests(unittest.TestCase):
         self.assertGreater(state.revision, revision)  # a pending result was for the other choice
         state.insert("y")
         self.assertTrue(state.look)  # editing the instruction keeps the choice
+        panel = state.panel()  # said above the keys: as a key in the footer it outgrew the panel
+        self.assertEqual((panel["body"], [key for key, _ in panel["foot"]][0]), ("With this window · F8 drops it", "Tab"))
         state.commit()
         self.assertFalse(state.look)  # the next instruction starts without a picture
         state.insert("z"), state.toggle_look(), state.toggle()

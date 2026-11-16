@@ -260,6 +260,11 @@ def drafts_shown(drafts, on):
     return [shortened(d, room) if i == on else shortened(d, 2) for i, d in enumerate(drafts)]
 
 
+# The window's picture going with an instruction (F8), said above the keys: as a key in the footer it
+# made the footer wider than the panel.
+LOOKING = "With this window · F8 drops it"
+
+
 def blank(**shown):
     """A panel description with every key a renderer reads (see Composition.panel)."""
     return dict({"thread": [], "label": None, "body": None, "code": False, "rows": [], "on": -1, "foot": [],
@@ -564,10 +569,11 @@ class Composition:
             shown.update(tile="warn", failed="cd_AI is initializing" if self.offline == "initializing" else "cd_AI is offline",
                          foot=[(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
         elif self.following:  # a follow-up back at the caret (F8): sent with the summon key; Esc, your words
-            shown["foot"] = ([("F8", "without this window")] if self.look else []) + [(self.summon, "ask"), ("Esc", "cancel")]
+            shown.update(body=LOOKING if self.look else None, foot=[(self.summon, "ask"), ("Esc", "cancel")])
         else:  # composing: the keys show from the first key (what each Enter does must be known)
-            shown["foot"] = (([("F8", "without this window")] if self.look else []) + [("Tab", "rewrite"), (self.summon, "ask")]
-                             + [(self.keeper, "keep")] + ([("Esc", "drop")] if self.editing else []))
+            shown.update(body=LOOKING if self.look else None,
+                         foot=[("Tab", "rewrite"), (self.summon, "ask"), (self.keeper, "keep")]
+                         + ([("Esc", "drop")] if self.editing else []))
         if self.answered and self.reply:  # typing a reply at the caret: the choices fade; Shift+Enter sends it
             enter = ("deny with reason" if question and question.get("permission") else
                      "send reply" if question else "ask")
