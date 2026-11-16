@@ -1356,7 +1356,7 @@ index 0000000..dadfca2
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..c689cb9 100644
+index ea37cdc..a47a575 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1500,19 +1500,96 @@ index ea37cdc..c689cb9 100644
  void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
      ITfContext* context = session->context();
      if(context) {
-@@ -650,6 +738,11 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+@@ -515,8 +603,11 @@ void TextService::installEventListeners() {
+     if (auto source = threadMgr_.query<ITfSource>()) {
+         threadMgrEventSink_ = SinkAdvice{ source, IID_ITfThreadMgrEventSink, static_cast<ITfThreadMgrEventSink*>(this) };
+         activateLanguageProfileNotifySink_ = SinkAdvice{ source, IID_ITfActiveLanguageProfileNotifySink, static_cast<ITfActiveLanguageProfileNotifySink*>(this) };
+-        textEditSink_ = SinkAdvice{ source, IID_ITfTextEditSink, static_cast<ITfTextEditSink*>(this) };
+     }
++    // ITfTextEditSink: on a context, not the thread manager (where it is never called).
++    ComPtr<ITfDocumentMgr> focused;
++    if (SUCCEEDED(threadMgr_->GetFocus(&focused)))
++        watchEdits(focused);
+ 
+     // ITfKeyEventSink
+     if (auto keystrokeMgr = threadMgr_.query<ITfKeystrokeMgr>()) {
+@@ -650,9 +741,25 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
  }
  
  STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
 +    // Claudish: a document has the focus again (the app's window came back to the front, or another
 +    // text box in it): the same as the key event sink's focus, which does not come for that.
++    watchEdits(pDocMgrFocus);
 +    if (pDocMgrFocus) {
 +        onSetFocus();
 +    }
      return S_OK;
  }
  
-@@ -750,7 +843,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
++// Claudish: the text edit sink follows the focused document's top context.
++void TextService::watchEdits(ITfDocumentMgr* documentMgr) {
++    textEditSink_.unadvise();
++    ComPtr<ITfContext> context;
++    if (documentMgr && SUCCEEDED(documentMgr->GetTop(&context)) && context) {
++        if (auto source = context.query<ITfSource>())
++            textEditSink_ = SinkAdvice{ source, IID_ITfTextEditSink, static_cast<ITfTextEditSink*>(this) };
++    }
++}
++
+ STDMETHODIMP TextService::OnPushContext(ITfContext *pContext) {
+     return S_OK;
+ }
+@@ -664,42 +771,14 @@ STDMETHODIMP TextService::OnPopContext(ITfContext *pContext) {
+ 
+ // ITfTextEditSink
+ STDMETHODIMP TextService::OnEndEdit(ITfContext *pContext, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord) {
+-    // This method is called by the TSF whenever an edit operation ends.
+-    // It's possible for a document to have multiple composition strings at the
+-    // same time and it's possible for other text services to edit the same
+-    // document. Though such a complicated senario rarely exist, it indeed happen.
+-
+-    // NOTE: I don't really know why this is needed and tests yielded no obvious effect
+-    // of this piece of code, but from MS TSF samples, this is needed.
+-    BOOL selChanged;
+-    if(pEditRecord->GetSelectionStatus(&selChanged) == S_OK) {
+-        if(selChanged && isComposing()) {
+-            // we need to check if current selection is in our composition string.
+-            // if after others' editing the selection (insertion point) has been changed and
+-            // fell outside our composition area, terminate the composition.
+-            TF_SELECTION selection;
+-            ULONG selectionNum;
+-            if(pContext->GetSelection(ecReadOnly, TF_DEFAULT_SELECTION, 1, &selection, &selectionNum) == S_OK) {
+-                ComPtr<ITfRange> compRange;
+-                if(composition_->GetRange(&compRange) == S_OK) {
+-                    // check if two ranges overlaps
+-                    // check if current selection is covered by composition range
+-                    LONG compareResult1;
+-                    LONG compareResult2;
+-                    if(compRange->CompareStart(ecReadOnly, selection.range, TF_ANCHOR_START, &compareResult1) == S_OK
+-                        && compRange->CompareEnd(ecReadOnly, selection.range, TF_ANCHOR_END, &compareResult2) == S_OK) {
+-                        if(compareResult1 == +1 || compareResult2 == -1) {
+-                            // the selection is not entirely in composion
+-                            // end compositon here
+-                            endComposition(pContext);
+-                        }
+-                    }
+-                }
+-                selection.range->Release();
+-            }
+-        }
++    // Claudish: only with nothing composed (ending a composition here, under a read-only cookie,
++    // would end it without telling the input method): the caret moved, for what is drawn at it.
++    BOOL selChanged = FALSE;
++    if (!isComposing() && pEditRecord->GetSelectionStatus(&selChanged) == S_OK && selChanged) {
++        auto session = ComPtr<EditSession>::make(pContext, [](EditSession*, TfEditCookie) {});
++        session->DoEditSession(ecReadOnly);  // the session's cookie: read the caret with it
++        onEndEdit(session);
+     }
+-
+     return S_OK;
+ }
+ 
+@@ -750,7 +829,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
              // We use TF_ES_SYNC here, so the request becomes synchronus and blocking.
              // KeyEditSession::DoEditSession() and TextService::doKeyEditSession() will be
              // called before RequestEditSession() returns.
@@ -1525,7 +1602,7 @@ index ea37cdc..c689cb9 100644
          }
      }
      return S_OK;
-@@ -784,7 +881,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
+@@ -784,7 +867,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
                      *pfEaten = onKeyUp(keyEvent, session);
                  }
              );
@@ -1537,7 +1614,7 @@ index ea37cdc..c689cb9 100644
          }
      }
      return S_OK;
-@@ -803,6 +903,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+@@ -803,6 +889,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
      // grabbed by others, we're ``forced'' to terminate current composition.
      // If we end the composition by calling ITfComposition::EndComposition() ourselves,
      // this event is not triggered.
@@ -1552,7 +1629,7 @@ index ea37cdc..c689cb9 100644
      onCompositionTerminated(true);
      composition_ = nullptr;
      return S_OK;
-@@ -911,6 +1019,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -911,6 +1005,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
@@ -1611,7 +1688,7 @@ index ea37cdc..c689cb9 100644
      HWND hwnd = NULL;
      ComPtr<ITfContextView> view;
 diff --git a/src/TextService.h b/src/TextService.h
-index f2c1c09..1743fa9 100644
+index f2c1c09..860c764 100644
 --- a/src/TextService.h
 +++ b/src/TextService.h
 @@ -125,6 +125,10 @@ public:
@@ -1643,7 +1720,23 @@ index f2c1c09..1743fa9 100644
      void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
      void setCompositionCursor(EditSession* session, int pos) const;
  
-@@ -281,6 +293,7 @@ private:
+@@ -165,6 +177,9 @@ public:
+     virtual void onDeactivate();
+ 
+     virtual void onSetFocus();
++    // Claudish: an edit ended in the focused document while nothing is composed, and the selection
++    // (the caret) changed: a click, the app's own edit, or ours (session: read-only, for the caret).
++    virtual void onEndEdit(EditSession* session) {}
+     virtual void onKillFocus();
+ 
+     virtual bool filterKeyDown(KeyEvent& keyEvent);
+@@ -277,10 +292,12 @@ private:
+     SinkAdvice threadMgrEventSink_;
+     SinkAdvice activateLanguageProfileNotifySink_;
+     SinkAdvice keyboardOPenCloseSink_;
+-    SinkAdvice textEditSink_;
++    SinkAdvice textEditSink_;  // on the focused document's context (watchEdits): TSF sends edits there
++    void watchEdits(ITfDocumentMgr* documentMgr);
      DWORD langBarSinkCookie_;
  
      ComPtr<ITfComposition> composition_; // acquired when starting composition, released when ending composition

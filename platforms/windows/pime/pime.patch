@@ -1,3 +1,27 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index acdc04f..51266eb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -30,19 +30,6 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/libIME2)
+ 
+ add_subdirectory(${PROJECT_SOURCE_DIR}/PIMETextService)
+ 
+-# only build the following components for 32-bit x86 platform
+-if("${CMAKE_SIZEOF_VOID_P}" EQUAL "4")
+-    include(FetchContent)
+-
+-    FetchContent_Declare(
+-        Corrosion
+-        GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+-        GIT_TAG v0.6 # Optionally specify a commit hash, version tag or branch here
+-    )
+-    FetchContent_MakeAvailable(Corrosion)
+-
+-    add_subdirectory(${PROJECT_SOURCE_DIR}/PIMELauncher)
+-endif("${CMAKE_SIZEOF_VOID_P}" EQUAL "4")
+ 
+ include(CTest)
+ 
 diff --git a/PIMELauncher/src/main.rs b/PIMELauncher/src/main.rs
 index d544c52..774cb28 100644
 --- a/PIMELauncher/src/main.rs
@@ -668,7 +692,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 286246a..ee82155 100644
+index 286246a..7493c4c 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -96,6 +96,21 @@ void TextService::onDeactivate() {
@@ -729,7 +753,7 @@ index 286246a..ee82155 100644
          }
      }
  }
-@@ -348,6 +366,77 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,87 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -796,6 +820,16 @@ index 286246a..ee82155 100644
 +	if (!ghostWindow_ || !ghostWindow_->alive(owner))  // a window of its own per owner, which may close
 +		ghostWindow_ = std::make_unique<Ime::GhostWindow>(owner);
 +	ghostShown_ = ghostWindow_->show(text, caret);
++	ghostCaret_ = caret;
++}
++
++// Claudish: the caret moved with nothing composed (a click in the same text box, the app's own
++// edit): continue's suggestion was drawn where it was, and goes. Ours ends where it is drawn (a
++// commit, then the suggestion after it, in one edit session), and stays.
++void TextService::onEndEdit(Ime::EditSession* session) {
++	RECT caret;
++	if (!ghostShown_.empty() && caretRect(session, &caret) && !EqualRect(&caret, &ghostCaret_))
++		hideGhost();
 +}
 +
 +void TextService::hideGhost() {
@@ -807,7 +841,7 @@ index 286246a..ee82155 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -371,14 +460,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +470,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -839,7 +873,7 @@ index 286246a..ee82155 100644
      }
  }
  
-@@ -431,6 +533,7 @@ void TextService::closeClient() {
+@@ -431,6 +543,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -848,7 +882,7 @@ index 286246a..ee82155 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 303cf17..f2d6c1a 100644
+index 303cf17..698f453 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -860,16 +894,17 @@ index 303cf17..f2d6c1a 100644
  #include <LibIME2/src/EditSession.h>
  #include <LibIME2/src/LangBarButton.h>
  #include "PIMEImeModule.h"
-@@ -46,6 +48,8 @@ public:
+@@ -46,6 +48,9 @@ public:
  	virtual void onDeactivate();
  
  	virtual void onFocus();
 +	virtual void onSetFocus();
++	virtual void onEndEdit(Ime::EditSession* session);
 +	virtual void onKillFocus();
  
  	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
  	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
-@@ -122,6 +126,17 @@ public:
+@@ -122,6 +127,17 @@ public:
  		updateFont_ = true;
  	}
  
@@ -887,7 +922,7 @@ index 303cf17..f2d6c1a 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +181,14 @@ private:
+@@ -166,6 +182,15 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;
@@ -899,6 +934,7 @@ index 303cf17..f2d6c1a 100644
 +	bool panelAnchor(Ime::EditSession* session, RECT* rect);
 +	std::unique_ptr<Ime::GhostWindow> ghostWindow_;
 +	std::wstring ghostShown_;  // what of continue's suggestion was drawn (the words that fit; "" for none)
++	RECT ghostCaret_ = {};  // the caret it was drawn after
  	int candFontSize_;
  
  	HMENU popupMenu_{nullptr};
