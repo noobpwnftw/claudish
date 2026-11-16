@@ -446,8 +446,9 @@ lists it in "consulted". F8 applies to that one instruction.
 
 - **Capture:** Windows uses PrintWindow (built in). Linux X11 needs `xprop` and
   ImageMagick (`sudo apt install x11-utils imagemagick`). Elsewhere, set the profile's
-  `"look_command"` to a program that writes a PNG of the focused window to stdout: on macOS a
-  `screencapture` wrapper, on wlroots compositors (Sway, Hyprland) a `grim` wrapper. GNOME on
+  `"look_command"` to a program that writes a PNG of the focused window to stdout, at most 1568
+  pixels on its longer side (cd_AI sends it as it is): on macOS a `screencapture` wrapper (`sips
+  -Z 1568` shrinks it), on wlroots compositors (Sway, Hyprland) a `grim` wrapper (`grim -s`). GNOME on
   Wayland lets no program capture a window without asking, so F8 has no picture there.
 - **Backends:** `claude` and any OpenAI-compatible server with a vision model; Claude Code and
   Codex refuse F8 with an error, as the command backend and a profile's agent (`session_command`) do.

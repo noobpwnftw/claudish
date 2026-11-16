@@ -49,13 +49,20 @@ def helpers(setting):
 def available(template):
     """Configured, installed, and supervised: neither its command nor (for Claude Code) its own
     settings skip its permission prompts."""
+    return why_not(template) is None
+
+
+def why_not(template):
+    """Why a helper is not offered (claudish doctor says it), or None when it is."""
     if not template or not isinstance(template, list) or not all(isinstance(a, str) for a in template):
-        return False
+        return "its command is not a list of words"
     if any(flag in argument.lower() for argument in template for flag in UNSUPERVISED):
-        return False
+        return "its command skips the helper's permission prompts"
     if name(template) == "claude" and unsupervised_claude():
-        return False
-    return found(template[0]) is not None
+        return "Claude Code's settings skip its permission prompts (defaultMode in ~/.claude/settings.json)"
+    if found(template[0]) is None:
+        return "%s is not installed (not on PATH)" % template[0]
+    return None
 
 
 def found(program):

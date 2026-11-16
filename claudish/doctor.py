@@ -445,6 +445,21 @@ def check_context(state):
     return results
 
 
+def check_helpers(state):
+    """The profile's helpers the model is not offered, and why (handoff.why_not)."""
+    from . import handoff
+    setting = (state.get("settings") or {}).get("helper")
+    named = {handoff.name(setting): setting} if isinstance(setting, list) else setting
+    if not isinstance(named, dict):
+        return []
+    results = []
+    for key, template in named.items():
+        reason = handoff.why_not(template)
+        results.append(("Helper %s" % key, "warn" if reason else "ok",
+                        "not offered: %s" % reason if reason else "offered to the model", None))
+    return results
+
+
 def run():
     state, results = {}, []
     for name, check in [("Python", check_python), ("Config", lambda: check_config(state)),
@@ -455,6 +470,7 @@ def run():
     results += (check_ime_linux() if system == "Linux" else check_ime_windows() if system == "Windows"
                 else check_ime_macos() if system == "Darwin" else [("Input method", "skip", system, None)])
     results += check_context(state)
+    results += check_helpers(state)
     return results
 
 

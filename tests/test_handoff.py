@@ -136,6 +136,18 @@ class HelperTests(unittest.TestCase):
                 patch("claudish.handoff.unsupervised_claude", return_value=False):  # (not this machine's settings)
             self.assertEqual(list(handoff.helpers({"claude-opus": ["claude", "{prompt}"]})), ["claude_opus"])
 
+    def test_doctor_says_why_a_helper_is_not_offered(self):
+        from claudish import doctor
+        setting = {"claude": ["claude", "{prompt}"], "yolo": ["codex", "--yolo", "{prompt}"],
+                   "aider": ["aider", "{note}"], "codex": ["codex", "{prompt}"]}
+        with patch("claudish.handoff.shutil.which", side_effect=lambda program: None if program == "aider" else "/bin/" + program), \
+                patch("claudish.handoff.unsupervised_claude", return_value=True):
+            rows = {name: (status, said) for name, status, said, _ in doctor.check_helpers({"settings": {"helper": setting}})}
+        self.assertEqual(rows["Helper codex"], ("ok", "offered to the model"))
+        self.assertIn("Claude Code's settings skip", rows["Helper claude"][1])
+        self.assertIn("command skips", rows["Helper yolo"][1])
+        self.assertEqual(rows["Helper aider"], ("warn", "not offered: aider is not installed (not on PATH)"))
+
     def test_only_bypass_permissions_refuses_a_claude_helper(self):
         import json
         import tempfile
