@@ -1,0 +1,445 @@
+import json
+import tempfile
+import unittest
+from io import BytesIO
+from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from claudish import config, modes
+from claudish.model import Rewriter
+from serving import serving
+
+
+class InPlaceTests(unittest.TestCase):
+    def test_a_part_of_the_text_is_rewritten_in_its_place(self):
+        """Owner, on Tab with a selection: the model got the text around it but no word of what to do
+        with it, and rewrote "three" in "We shipped three features" as a whole message."""
+        from claudish.model import Rewriter
+        rewriter = Rewriter("openai", "http://127.0.0.1:9")
+        sent = []
+        rewriter.chat = lambda payload, headers, image=None, timeout=None: (
+            sent.append(payload) or ({"message": {"content": "three stellar"}, "finish_reason": "stop"}, {}))
+        rewriter.rewrite("three", app="com.apple.TextEdit", before="We shipped ", after=" features.")
+        turn = sent[0]["messages"][-1]["content"]
+        self.assertIn("We shipped [[three]] features.", turn)
+        self.assertIn("rewrite only the part in [[double brackets]]", turn)
+        rewriter.rewrite("three", app="com.apple.TextEdit")
+        self.assertEqual(sent[1]["messages"][-1]["content"], "three")  # alone: as before
+
+
+class TidyTests(unittest.TestCase):
+    """A plain answer (a backend without a schema) loses what a model wraps around it
+    (claudish/quirks.py; OpenLess output_cleaning, #25)."""
+
+    def test_wrappings_go_and_the_answer_stays(self):
+        from claudish.quirks import tidy
+
+        def finish(mode, text, output):
+            return tidy(text, output)
+        answer = "Absolutely—let's align!"
+        for wrapped in ("<think>The user wants slop.</think>\n" + answer, "<thinking>Slop.</thinking>\n" + answer, "```\n" + answer + "\n```", "Here's a rewrite:\n\n" + answer, "Sure! Here is the text:\n" + answer,
+                        "“" + answer + "”", '"' + answer + '"'):
+            self.assertEqual(finish("rewrite", "ok", wrapped), answer, wrapped)
+        self.assertEqual(finish("rewrite", '"ok"', '"Absolutely!"'), '"Absolutely!"')  # quoted text: quotes stay
+        self.assertEqual(finish("rewrite", "ok", '"Yes," she said, "absolutely."'), '"Yes," she said, "absolutely."')
+        self.assertEqual(finish("instruct", "list it", "Here are the steps:\n1. Plan\n2. Ship"), "1. Plan\n2. Ship")
+        self.assertEqual(finish("instruct", "x", "Here is why: it works."), "Here is why: it works.")  # one line: kept
+        self.assertEqual(finish("rewrite", "ok", "<think>it ran out of tokens while thinking"), "")  # nothing to offer
+        self.assertEqual(finish("rewrite", "three", "[[three high-impact]]"), "three high-impact")  # the marked part
+
+
+class ModeTests(unittest.TestCase):
+    def test_continue_after_any_line_break_or_space_adds_no_space(self):
+        """Qt's Shift+Enter (U+2028), Word's \\r and a no-break space end a word as \\n and a space do;
+        a model's echo across \\r paragraphs is still an echo."""
+        self.assertEqual(modes.finish("continue", "Dear Sam,\u2028", "Thanks."), "Dear Sam,\u2028Thanks.")
+        self.assertEqual(modes.finish("continue", "Hi\xa0", "there"), "Hi\xa0there")
+        self.assertEqual(modes.finish("continue", "Hi Sam,\rThanks for the ", "Hi Sam,\nThanks for the update."),
+                         "Hi Sam,\rThanks for the update.")
+
+    def test_continue_waits_after_a_currency_sign_or_an_en_dash(self):
+        from claudish.composition import Composition
+        state = Composition()
+        state.mode = "continue"
+        for text in ("It costs £", "It costs €", "The 2020–"):
+            state.change(text)
+            self.assertFalse(state.automatic, text)
+
+    def test_continue_joins_onto_the_typed_text(self):
+        self.assertEqual(modes.finish("continue", "Thanks for", "the review."), "Thanks for the review.")
+        self.assertEqual(modes.finish("continue", "Thanks for ", "the review."), "Thanks for the review.")
+        self.assertEqual(modes.finish("continue", "It works", "—mostly."), "It works—mostly.")
+        self.assertEqual(modes.finish("continue", "Thanks for", "Thanks for the review."), "Thanks for the review.")
+        self.assertEqual(modes.finish("continue", "Thanks", "  "), "")
+        # An echo is cut only at a word's end: "In" after "I" is not one.
+        self.assertEqual(modes.finish("continue", "I", "In fact, yes"), "I In fact, yes")
+        self.assertEqual(modes.finish("continue", "We", "We're aligned"), "We We're aligned")
+        # No space after an em dash, a bracket or a quote you opened, nor before a combining mark.
+        self.assertEqual(modes.finish("continue", "aligned—", "fully"), "aligned—fully")
+        self.assertEqual(modes.finish("continue", 'He said "', "hello"), 'He said "hello')
+        self.assertEqual(modes.finish("continue", 'He said "hi"', "again"), 'He said "hi" again')
+        self.assertEqual(modes.finish("continue", "(", "see below"), "(see below")
+        self.assertEqual(modes.finish("continue", "caf", "\u0301 time"), "caf\u0301 time")
+        self.assertEqual(modes.finish("continue", "Shipped it 🎉", "See you."), "Shipped it 🎉 See you.")  # an emoji too
+        self.assertEqual(modes.finish("instruct", "say hi", "Hello—truly."), "Hello—truly.")
+        # An echo of the text's last words (any case), quotes, and stray punctuation after a space.
+        self.assertEqual(modes.finish("continue", "hello ", "Hello, how are you today?"), "hello how are you today?")
+        self.assertEqual(modes.finish("continue", "Dear Sam,", '"I hope this finds you well."'),
+                         "Dear Sam, I hope this finds you well.")
+        # Not an echo or a wrapping: the continuation's own first letters and quotes stay.
+        self.assertEqual(modes.finish("continue", "I ", "in fact, we are thrilled."), "I in fact, we are thrilled.")
+        self.assertEqual(modes.finish("continue", "A ", "As a team, we ship."), "A As a team, we ship.")
+        self.assertEqual(modes.finish("continue", 'She said "we are ', 'ready to launch."'), 'She said "we are ready to launch."')
+
+    def test_continue_never_offers_its_examples_or_what_is_already_there(self):
+        examples = modes.defaults()["continue"]["examples"]
+        first, second = examples[1]["content"], examples[3]["content"]  # the template's example answers
+        done = "Sorry for the slow reply on %s " % first
+        self.assertTrue(modes.parroted("continue", done, done + first, examples))
+        self.assertTrue(modes.parroted("continue", done, done + second, examples))
+        self.assertFalse(modes.parroted("continue", done, done + "Let's merge it today.", examples))
+        self.assertFalse(modes.parroted("rewrite", "x", "x " + first, examples))
+        # Nonsense in, the template's example out ("tttt" -> the meeting decline): not an answer.
+        instruct = modes.defaults()["instruct"]["examples"]
+        example = instruct[1]["content"]
+        self.assertTrue(modes.parroted("instruct", "tttt", example, instruct))
+        self.assertFalse(modes.parroted("instruct", instruct[0]["content"], example, instruct))  # asked for it
+        self.assertFalse(modes.parroted("instruct", "tttt", "Could you clarify what you need?", instruct))
+
+    def test_every_mode_is_told_about_the_text_box(self):
+        rewriter = Rewriter(max_tokens=64)
+        _, payload = self.call(rewriter, "this is important", "rewrite", before="Dear Ana,\n\n", after="\n\nBest, Sam",
+                               app="thunderbird", purpose="email")
+        system = payload["messages"][0]["content"]
+        self.assertIn("The text box is an email address field in thunderbird.", system)
+        self.assertIn("Dear Ana,\n\n▮\n\nBest, Sam", system)  # where the rewrite goes
+        _, payload = self.call(rewriter, "Thanks for the review ", "continue", after=" Cheers.", app="kate")
+        system = payload["messages"][0]["content"]
+        self.assertIn("The text box is a text field in kate.", system)
+        self.assertIn("▮ Cheers.", system)  # continue: what follows the caret; the text itself is the frame
+        _, payload = self.call(rewriter, "this is important", "rewrite")
+        self.assertNotIn("text box", payload["messages"][0]["content"])  # nothing known: nothing added
+
+    def test_a_terminal_is_read_for_an_instruction_never_for_continue(self):
+        screen = "~ % gti status\nzsh: command not found: gti\n~ %"
+        rewriter = Rewriter(max_tokens=64)
+        with patch("claudish.screen.read", return_value=screen) as read:
+            _, payload = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal")
+            system, turn = payload["messages"][0]["content"], payload["messages"][-1]["content"]
+            self.assertIn("The text box is a terminal in com.apple.Terminal.", system)
+            self.assertIn("run when the user presses Enter", system)  # what the box's kind means
+            self.assertNotIn("em dash", system)  # a command line has no tone
+            # The screen goes with the instruction it explains; the prose examples stay out.
+            self.assertTrue(turn.startswith("Reference material") and turn.endswith("\n\nfix"))
+            self.assertIn("<context name=\"terminal screen, last lines\">", turn)
+            self.assertIn("zsh: command not found: gti", turn)
+            self.assertEqual(len(payload["messages"]), 2)
+            self.call(rewriter, "ls -la ", "continue", app="com.apple.Terminal")
+            self.assertEqual(read.call_count, 1)  # continue's pauses never read the screen
+            with patch("claudish.turn.ASK_ACCESSIBILITY", False):
+                _, payload = self.call(rewriter, "fix", "instruct", app="kate")  # not a terminal: never read
+            self.assertEqual(read.call_count, 1)
+            self.assertNotIn("terminal", payload["messages"][0]["content"])
+            rewriter.read_terminal = False  # the profile's "read_terminal": false
+            _, payload = self.call(rewriter, "fix", "instruct", app="gnome-terminal-server")
+            self.assertEqual(read.call_count, 1)
+            self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+        # Linux: an app that reports no kind is asked through accessibility (a Qt terminal, named
+        # by its toolkit); a focused terminal makes it one, even with its screen not sent.
+        with patch("claudish.turn.ASK_ACCESSIBILITY", True):
+            with patch("claudish.screen.read", return_value=None) as read:
+                result, payload = self.call(rewriter, "fix", "instruct", app="QIBusInputContext", answer="ls\npwd")
+            self.assertEqual((read.call_count, result["candidates"]), (1, ["ls\npwd"]))
+            self.assertNotIn("terminal", payload["messages"][0]["content"])
+            with patch("claudish.screen.read", return_value=screen) as read:
+                result, payload = self.call(rewriter, "fix", "instruct", app="QIBusInputContext", answer="ls\npwd")
+                self.assertEqual(result["candidates"], ["ls"])
+                self.assertIn("The text box is a terminal", payload["messages"][0]["content"])
+                self.assertNotIn("command not found", payload["messages"][1]["content"])  # read_terminal is off
+                self.call(rewriter, "ls -la ", "continue", app="QIBusInputContext")
+                self.call(rewriter, "fix", "instruct", app="kate", purpose="email")  # it said what it is
+                self.assertEqual(read.call_count, 1)
+        # A draft for a terminal is one line: a newline at the prompt would run it without Enter.
+        reply = "```bash\ngit status\n```\nThen run git push."
+        with patch("claudish.screen.read", return_value=screen):
+            result, _ = self.call(rewriter, "fix", "instruct", app="com.apple.Terminal", answer=reply)
+        self.assertEqual(result["candidates"], ["git status"])
+        from claudish.sessions import Sessions
+        session = Sessions().start(type("Driver", (), {"run": lambda self, s, p: s.emit(
+            "result", text="ls\nrm -rf /", candidates=["ls\nrm -rf /"])})(), "fix", one_line=True)
+        events, _ = session.wait(0, timeout=2)
+        self.assertEqual((events[-1]["text"], events[-1]["candidates"]), ("ls", ["ls"]))
+        rules = Rewriter("rules")
+        result = rules.rewrite("fix", mode="instruct", screen=screen)
+        self.assertEqual(result["text"], "As requested—fix, having read the terminal.")
+        self.assertIn("terminal screen (3 lines)", result["consulted"])
+
+    def test_the_shipped_templates_are_a_valid_templates_file(self):
+        from claudish.modes import load
+        self.assertEqual(load(Path(modes.__file__).with_name("templates.json")), modes.TEMPLATES)
+        self.assertEqual(set(modes.defaults()), {"rewrite", "continue", "instruct"})
+
+    def test_a_templates_file_changes_only_what_it_names_of_a_tone(self):
+        from claudish.modes import load
+        shipped = modes.TEMPLATES["tones"]["named"]["critic"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "t.json")
+            path.write_text(json.dumps({"tones": {"named": {"critic": {"modes": {"rewrite": {"voice": "sharper"},
+                                                                                     "continue": {"examples": []}}}}}}))
+            critic = modes.merged(load(path))["tones"]["named"]["critic"]  # examples alone load: a shipped mode
+        self.assertEqual(critic["modes"]["rewrite"]["voice"], "sharper")
+        self.assertEqual(critic["modes"]["rewrite"]["examples"], shipped["modes"]["rewrite"]["examples"])
+        self.assertEqual(critic["modes"]["instruct"], shipped["modes"]["instruct"])
+        self.assertEqual((critic["about"], critic["modes"]["continue"]["examples"]), (shipped["about"], []))
+        assert modes.TEMPLATES["tones"]["named"]["proofread"]["modes"]["rewrite"].get("system")  # shipped whole
+        proofread = modes.merged({"tones": {"named": {"proofread": {"modes": {"rewrite": {"voice": "in rhyme"}}}}}})
+        self.assertNotIn("system", proofread["tones"]["named"]["proofread"]["modes"]["rewrite"])  # the voice is used
+
+    def test_a_profile_can_reword_the_box_too(self):
+        rewriter = Rewriter(max_tokens=64, templates={"box": {"at_caret": "Write it for the caret."}})
+        _, payload = self.call(rewriter, "decline politely", "instruct", before="Hi Sam,")
+        self.assertIn("Write it for the caret.", payload["messages"][0]["content"])
+        self.assertEqual(rewriter.modes["instruct"]["box"]["kinds"], modes.TEMPLATES["box"]["kinds"])
+
+    def test_a_tones_persona_comes_before_each_modes_job(self):
+        templates = {"tones": {"named": {"dry": {"about": "Dry.", "persona": "You are dry.", "modes": {
+            "rewrite": {"system": "Rewrite it.", "examples": [["ok", "Fine."]]}}}}}}
+        dry = Rewriter(max_tokens=64, templates=templates, tone="dry")
+        self.assertEqual(dry.modes["rewrite"]["system"], "You are dry.\n\n---\n\nRewrite it.")
+        self.assertNotIn("You are dry.", dry.modes["rewrite"]["plain"])  # a terminal's plain wording stays plain
+        with tempfile.TemporaryDirectory() as folder:
+            bad = Path(folder) / "templates.json"
+            bad.write_text(json.dumps({"tones": {"named": {"dry": {"persona": ["not", "text"]}}}}))
+            with self.assertRaises(ValueError):
+                modes.load(bad)
+
+    def test_the_tone_is_corporate_slop_unless_a_profile_sets_another(self):
+        claudish = Rewriter(max_tokens=64)
+        self.assertIn("corporate slop", claudish.modes["rewrite"]["system"])
+        self.assertTrue(claudish.modes["instruct"]["examples"])
+        for tone, word in (("salesman", "salesman"), ("critic", "critic"), ("bard", "bard"),
+                           ("unhinged", "PROFESSIONALLY UNHINGED")):
+            named = Rewriter(max_tokens=64, tone=tone)  # each with its own wording and examples, in every mode
+            for mode in ("rewrite", "continue", "instruct"):
+                self.assertIn(word, named.modes[mode]["system"])
+                self.assertTrue(named.modes[mode]["examples"])
+            self.assertIn("a no stays a no", named.modes["rewrite"]["system"])  # the meaning is guarded in every tone
+        plain = Rewriter(max_tokens=64, tone="plain and concise")
+        for mode in ("rewrite", "continue", "instruct"):
+            self.assertIn("plain and concise", plain.modes[mode]["system"])
+            self.assertNotIn("slop", plain.modes[mode]["system"])
+            self.assertEqual(plain.modes[mode]["examples"], [])  # Claudish's examples teach its tone
+        proofread = Rewriter(max_tokens=64, tone="proofread")  # corrects, keeps your words
+        self.assertIn("Keep their words", proofread.modes["rewrite"]["system"])
+        self.assertIn("plain, natural", proofread.modes["instruct"]["system"])
+        own = modes.defaults({"modes": {"rewrite": {"system": "Fix only the spelling."}}})["rewrite"]
+        self.assertEqual((own["examples"], own["parts"]), ([], []))  # not the shipped slop pairs
+        given = modes.defaults({"modes": {"rewrite": {"system": "Fix only the spelling.", "examples": [["teh", "the"]]}}})
+        self.assertEqual([m["content"] for m in given["rewrite"]["examples"]], ["teh", "the"])
+        custom = Rewriter(max_tokens=64, templates={"modes": {"rewrite": {"system": "Rewrite as a haiku."}}}, tone="plain")
+        self.assertEqual(custom.modes["rewrite"]["system"], "Rewrite as a haiku.")  # the profile's own words win
+        self.assertIn("with the next words, in a plain voice", custom.modes["continue"]["system"])  # the tone, where it names nothing
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.json"
+            path.write_text(json.dumps({"profiles": {"work": {"backend": "rules", "tone": "formal British"}}}))
+            _, settings, _, _ = config.resolve(path, "work")
+            self.assertIn("formal British", Rewriter.from_settings(settings).modes["instruct"]["system"])
+
+    def test_a_terminal_screen_is_trimmed_to_its_last_lines(self):
+        from claudish import screen
+        padded = "C:\\> gti status   \r\n'gti' is not recognized   \r\n\r\nC:\\>      \r\n   \r\n"
+        self.assertEqual(screen.tail(padded), "C:\\> gti status\n'gti' is not recognized\n\nC:\\>")
+        self.assertEqual(screen.tail("\n".join(str(n) for n in range(100))).split("\n")[0], "60")
+        self.assertTrue(screen.is_terminal("WindowsTerminal.exe") and screen.is_terminal("com.apple.Terminal"))
+        self.assertFalse(screen.is_terminal("notepad.exe") or screen.is_terminal(None))
+        with patch.object(screen, "read_atspi", return_value="$ gti status\nbash: gti: command not found\n$ "), \
+                patch.object(screen.sys, "platform", "linux"):
+            self.assertEqual(screen.read("gnome-terminal-server").splitlines()[-1], "$")
+
+    def test_continue_is_sent_as_quoted_text_not_as_a_message(self):
+        rewriter = Rewriter(max_tokens=64)
+        _, payload = self.call(rewriter, "hello ", "continue")
+        self.assertEqual(payload["messages"][-1]["content"], 'Text so far: "hello "\nThe next few words:')
+        _, payload = self.call(rewriter, "so", "rewrite")
+        self.assertEqual(payload["messages"][-1]["content"], "so")  # other modes send the text itself
+
+    def call(self, rewriter, text, mode, answer="the parser change.", **field):
+        reply = {"choices": [{"message": {"content": answer}, "finish_reason": "stop"}]}
+        with patch.object(rewriter, "opener") as opener:
+            opener.open.side_effect = lambda *args, **kwargs: BytesIO(json.dumps(reply).encode())
+            result = rewriter.rewrite(text, mode=mode, **field)
+            return result, json.loads(opener.open.call_args.args[0].data)
+
+    def test_a_servers_refusal_keeps_its_reason(self):
+        from urllib.error import HTTPError
+        from claudish.composition import failure
+        rewriter = Rewriter(max_tokens=64)
+        body = json.dumps({"error": {"message": "Unsupported parameter: 'max_tokens'"}}).encode()
+        with patch.object(rewriter, "opener") as opener:
+            opener.open.side_effect = lambda *args, **kwargs: (_ for _ in ()).throw(
+                HTTPError("u", 400, "Bad Request", {}, BytesIO(body)))
+            with self.assertRaises(HTTPError) as caught:
+                rewriter.rewrite("hi", mode="rewrite")
+        self.assertEqual(str(caught.exception), "HTTP Error 400: Bad Request: Unsupported parameter: 'max_tokens'")
+        self.assertEqual(failure(caught.exception), "the model API refused the request: Unsupported parameter: 'max_tokens'")
+
+    def test_each_mode_sends_its_template_and_budget(self):
+        rewriter = Rewriter(max_tokens=64)
+        result, payload = self.call(rewriter, "Thanks for the review on", "continue")
+        self.assertEqual((result["text"], result["mode"]), ("Thanks for the review on the parser change.", "continue"))
+        # The answer's shape follows the mode's words (claudish/shapes.py).
+        self.assertEqual(payload["messages"][0]["content"], modes.defaults()["continue"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shape"])
+        self.assertEqual(payload["max_tokens"], 256)  # to the end of a sentence, in the tone
+        _, payload = self.call(rewriter, "decline politely", "instruct")
+        self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), (modes.defaults()["instruct"]["system"] + "\n\n" + modes.TEMPLATES["box"]["shown"]
+                          + "\n\n" + modes.TEMPLATES["box"]["shape"], 2048))
+        _, payload = self.call(rewriter, "so", "rewrite")
+        self.assertEqual(payload["max_tokens"], 1024)  # the tone's paragraph, past the profile's 64
+        with self.assertRaisesRegex(ValueError, "unknown mode"):
+            rewriter.rewrite("so", mode="sing")
+
+    def test_profile_overrides_and_new_modes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "words.json").write_text(json.dumps({"modes": {
+                "instruct": {"max_tokens": 900}, "haiku": {"system": "Answer in a haiku.", "max_tokens": 60}}}))
+            path = root / "config.json"
+            path.write_text(json.dumps({"profiles": {"p": {"templates": "words.json"}}}))
+            _, settings, templates, context = config.resolve(path)
+            rewriter = Rewriter(templates=templates, context=context, modes=settings["modes"])
+            self.assertEqual(rewriter.modes["instruct"]["max_tokens"], 900)  # only what the file names
+            self.assertEqual(rewriter.modes["instruct"]["system"], modes.defaults()["instruct"]["system"])
+            _, payload = self.call(rewriter, "autumn", "haiku")
+            self.assertEqual((payload["messages"][0]["content"], payload["max_tokens"]), ("Answer in a haiku." + "\n\n" + modes.TEMPLATES["box"]["shape"], 60))
+            for words, message in [({"modes": {"haiku": {}}}, "needs a"), ({"modes": {"instruct": {"temperature": 1}}}, "takes only"),
+                                   ({"modes": {"instruct": {"max_tokens": "9"}}}, "integer")]:
+                (root / "words.json").write_text(json.dumps(words))
+                with self.assertRaisesRegex(ValueError, message):
+                    config.resolve(path)
+            for profile, message in [({"modes": {"instruct": {"max_tokens": 900}}}, "takes only"),
+                                     ({"prompt": "words.json"}, "now")]:
+                path.write_text(json.dumps({"profiles": {"p": profile}}))
+                with self.assertRaisesRegex(ValueError, message):
+                    config.resolve(path)
+
+    def test_no_model_ships_compose_says_so_and_continue_only_where_it_costs_nothing(self):
+        from claudish.composition import failure
+        with self.assertRaisesRegex(RuntimeError, "no model is set up"):
+            Rewriter("none").rewrite("ok")
+        self.assertEqual(failure("no model is set up"), "no model is set up")
+        refused = Rewriter("none")
+        refused.problem = "profile 'claude': unknown keys claude_model"
+        with self.assertRaisesRegex(RuntimeError, "the config is not used: profile 'claude'"):
+            refused.rewrite("ok")
+        self.assertEqual(failure("the config is not used: x"), "the config has a problem: see cd_AI's settings")
+        # Continue asks at every pause: a local model (or the stand-in) answers it unasked; a
+        # hosted one only where a profile routes continue to it.
+        self.assertTrue(Rewriter("llama").autocompletes and Rewriter("rules").autocompletes)
+        hosted = Rewriter("openai", "https://api.example.com")
+        self.assertFalse(hosted.autocompletes or hosted.continues(None) or Rewriter("none").autocompletes)
+        routed = Rewriter("openai", "https://api.example.com", modes={"continue": {"profile": "fast"}})
+        routed.profile, routed.loader = "main", lambda name: Rewriter("llama")
+        self.assertTrue(routed.continues(None))
+        with serving(hosted) as server:
+            request = Request("http://127.0.0.1:%s/suggest" % server.server_port, headers={"Content-Type": "application/json"},
+                              data=json.dumps({"text": "Thanks for the review ", "mode": "continue"}).encode())
+            with self.assertRaises(HTTPError) as caught:
+                urlopen(request)
+            self.assertEqual(json.load(caught.exception)["error"], "continue has no model of its own")
+
+    def test_service_modes_in_rules_mode(self):
+        with serving(Rewriter("rules")) as server:
+            url = "http://127.0.0.1:%s" % server.server_port
+            with urlopen(url + "/health") as reply:
+                self.assertEqual(json.load(reply)["modes"], ["rewrite", "continue", "instruct"])
+            for mode, expected in [("rewrite", "particularly good"), ("continue", "very good and then some—naturally."),
+                                   ("instruct", "As requested—very good.")]:
+                request = Request(url + "/suggest", data=json.dumps({"text": "very good", "mode": mode}).encode(),
+                                  headers={"Content-Type": "application/json"})
+                with urlopen(request) as reply:
+                    self.assertEqual(json.load(reply)["text"], expected)
+            request = Request(url + "/suggest", data=b'{"text": "very good", "mode": "sing"}',
+                              headers={"Content-Type": "application/json"})
+            with self.assertRaises(HTTPError) as error:
+                urlopen(request)
+            self.assertEqual(error.exception.code, 400)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class Round41Tests(unittest.TestCase):
+    def test_a_tones_persona_goes_before_every_modes_job(self):
+        specs = modes.defaults({"tones": {"named": {"pirate": {"persona": "You are a salty pirate captain."}}}}, "pirate")
+        for mode in ("rewrite", "continue", "instruct"):
+            self.assertTrue(specs[mode]["system"].startswith("You are a salty pirate captain."), mode)
+
+    def test_a_templates_section_that_is_not_an_object_is_a_config_error(self):
+        for words in ({"modes": ["rewrite"]}, {"tones": {"named": {"x": {"modes": ["rewrite"]}}}}, {"box": []}):
+            with self.subTest(words=words), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder, "t.json")
+                path.write_text(json.dumps(words))
+                with self.assertRaises(ValueError):
+                    modes.load(path)
+
+    def test_box_wording_fills_in_only_the_shipped_fields(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "t.json")
+            path.write_text(json.dumps({"box": {"in_place": "Rewrite only the {part}:\n{before}[[{text}]]{after}"}}))
+            with self.assertRaisesRegex(ValueError, r"\{part\}"):
+                modes.load(path)
+            path.write_text(json.dumps({"box": {"in_place": "Only this:\n{before}[[{text}]]{after}"}}))
+            modes.load(path)
+
+    def test_continue_attaches_a_contraction_and_a_percent_sign(self):
+        self.assertEqual(modes.finish("continue", "the user", "'s profile"), "the user's profile")
+        self.assertEqual(modes.finish("continue", "the user", "’s profile"), "the user’s profile")
+        self.assertEqual(modes.finish("continue", "it is 100", "% sure"), "it is 100% sure")
+        self.assertEqual(modes.finish("continue", "said", "'hello' to me"), "said 'hello' to me")
+
+    def test_a_rewritten_first_line_of_yours_and_fenced_text_of_yours_stay(self):
+        from claudish import quirks, shapes
+        self.assertEqual(quirks.plain("here's the plan:\nship friday", "Here's the game-changing plan:\nShip—Friday."),
+                         "Here's the game-changing plan:\nShip—Friday.")  # your first line, rewritten
+        self.assertEqual(quirks.plain("x", "```bash\nls\n```\nThen:\n```bash\npwd\n```"),
+                         "```bash\nls\n```\nThen:\n```bash\npwd\n```")  # two blocks: not one wrapping
+        self.assertEqual(quirks.plain("```py\nx=1\n```", "```py\nx = 1\n```"), "```py\nx = 1\n```")  # yours
+        self.assertEqual(quirks.plain("hi", "```\nHi—there.\n```"), "Hi—there.")  # still a wrapping
+        self.assertEqual(shapes.drafts(quirks.plain("hi", "Sure, here is the JSON:\n{\"drafts\": [\"x—y\"]}")), ["x—y"])
+
+    def test_a_part_rewritten_in_place_may_be_an_examples_part(self):
+        """In place, the examples are framed parts: "ok" before ", see you at 3." answered as the
+        shipped part's answer was dropped as parroted, every time (the first answer is deterministic)."""
+        from claudish.modes import TEMPLATES
+        box = TEMPLATES["box"]
+        framed = [{"role": "user", "content": box["in_place"].format(before="", text="ok", after=", see you at 3.")},
+                  {"role": "assistant", "content": "Absolutely—fully aligned on this"}]
+        self.assertFalse(modes.parroted("rewrite", "ok", "Absolutely—fully aligned on this", framed))
+        self.assertTrue(modes.parroted("rewrite", "tttt", "Absolutely—fully aligned on this", framed))
+
+    def test_a_refused_window_picture_keeps_the_schema(self):
+        """F8 on a server without vision: the shaped request's refusal read as the schema's, the plain
+        retry failed on the picture, and every later rewrite went without the schema until a restart."""
+        from unittest.mock import MagicMock, patch
+        from urllib.error import HTTPError
+        from claudish import model
+        rewriter = Rewriter()
+        box = rewriter.box("instruct", None, None, "", "", False, None)
+        box.image = b"\x89PNG\r\n\x1a\n"
+        opener = MagicMock()
+        opener.open.side_effect = HTTPError("u", 501, "image input is not supported", None, None)
+        with patch.object(model, "opener_for", return_value=opener), patch.object(rewriter, "server_model", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "window picture"):
+                rewriter.answer("instruct", "describe this", box)
+        self.assertIs(rewriter.schema, True)
+
+    def test_your_own_first_line_and_brackets_stay(self):
+        from claudish import quirks
+        self.assertEqual(quirks.plain("Here are the notes:\nmilk, eggs", "Here are the notes:\nMilk and eggs—synergized."),
+                         "Here are the notes:\nMilk and eggs—synergized.")
+        self.assertEqual(quirks.plain("milk, eggs", "Here's a rewrite:\nMilk and eggs—synergized."),
+                         "Milk and eggs—synergized.")
+        self.assertEqual(quirks.plain("add links", "[[Home]] and [[About]]"), "[[Home]] and [[About]]")

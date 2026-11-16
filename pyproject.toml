@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claudish-ime"
+version = "0.4.8"
+description = "cd_AI: a language-model input method for Linux, Windows and macOS"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+claude = ["anthropic>=2"]
+mcp = ["mcp>=2"]
+
+[project.scripts]
+claudish = "claudish.__main__:main"
+
+[tool.setuptools]
+packages = ["claudish"]
+
+[tool.setuptools.package-data]
+claudish = ["templates.json", "web/*.html", "web/*.css", "web/*.js", "web/*.png"]

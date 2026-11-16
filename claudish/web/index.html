@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Try cd_AI: a language model that turns your typing into Claudish.">
+  <title>cd_AI — browser demo</title>
+  <link rel="icon" href="/favicon.png">
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/demo.css">
+  <link rel="stylesheet" href="/kit.css">
+  <script src="/kit.js" defer></script>
+  <script src="/demo.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="wordmark" href="/" aria-label="Claudish home">cd<span class="dash">—</span><span class="ai">AI</span></a>
+      <span class="edition">THE BROWSER DEMO</span>
+      <div class="header-controls">
+        <span class="connection" id="connection" role="status"><i></i> Connecting</span>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme">☾</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="title">
+        <div>
+          <div class="eyebrow"><span class="tag">en_US → cd_AI</span> AN INPUT METHOD FOR AI</div>
+          <h1 id="title">A little more thought.<br>A lot more <em>dash.</em></h1>
+          <p class="lede">Type a few words below, then press Tab.</p>
+        </div>
+        <div class="locale-card" aria-hidden="true"><span>INPUT LANGUAGE</span><strong>cd_AI</strong><div>English, thoughtfully reconsidered.</div><b>—</b></div>
+      </section>
+
+      <section class="workspace" aria-label="Try the input method">
+        <div class="workspace-bar">
+          <div class="room-title"><span class="live-dot"></span> NOTES <span class="room-sub">a text box in any app</span></div>
+          <button id="source" class="source-badge" type="button"><b>cd</b><span id="source-mode">compose</span><span class="source-key">Shift</span></button>
+        </div>
+        <div class="editor kit" id="editor">
+          <div class="page" id="page" aria-hidden="true" data-text=""><span id="preedit" class="preedit k-comp"></span><span id="caret" class="caret"></span><span id="ghost" class="ghost k-ghost"></span><span id="placeholder" class="editor-placeholder">Click here and type. You are typing in cd_AI.</span></div>
+          <textarea id="input" class="sink" aria-label="Type here, in cd_AI" aria-describedby="hint" autocapitalize="off" autocomplete="off" spellcheck="false" autofocus></textarea>
+          <div id="candidates" class="candidate-window" hidden></div>
+        </div>
+        <div class="desk-footer">
+          <span class="keystrip"><span data-key="Shift"><kbd>Shift</kbd> mode</span><span data-key="Tab"><kbd>Tab</kbd> take / rewrite</span><span data-key="Shift+Enter"><kbd>Shift+Enter</kbd> ask</span><span data-key="Enter"><kbd>Enter</kbd> keep</span><span data-key="ArrowDown"><kbd>↑↓</kbd> choose</span><span data-key="Escape"><kbd>Esc</kbd> back</span></span>
+          <span class="desk-actions"><span id="timing" class="timing"></span><button id="clear" class="text-button" type="button" disabled>Clear</button><button id="copy" class="text-button" type="button" disabled>Copy</button></span>
+        </div>
+      </section>
+      <p class="mode-hint" id="hint"></p>
+      <p class="feedback" id="status" role="status" aria-live="polite"></p>
+      <div class="samples" id="samples" aria-label="Examples that type themselves"><span id="samples-label">TYPE IT FOR ME</span></div>
+    </main>
+    <footer class="page-footer"><span>cd_AI is an independent, MIT-licensed project.</span><span id="backend">cd_AI</span></footer>
+  </div>
+</body>
+</html>

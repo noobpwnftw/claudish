@@ -1,0 +1,400 @@
+// cd_AI's panel and suggestion in GNOME Shell (docs/design/design.md; the design lab's GNOME mock,
+// claudish/web/design.html#gnome). The IBus engine (platforms/linux/engine.py) publishes what to
+// show on the session bus (io.claudish.Screen: the panel as Composition.panel() describes it,
+// continue's suggestion, the mode switch); this draws it at the IBus cursor, on X11 and Wayland
+// alike. While it owns io.claudish.Shell the engine leaves IBus's own popup empty.
+
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Pango from 'gi://Pango';
+import St from 'gi://St';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as IBusManager from 'resource:///org/gnome/shell/misc/ibusManager.js';
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+
+const GAP = 6;  // between the caret's line and the panel
+const CARET_GAP = 5;  // between the caret and the suggestion
+
+// A tile or a mark: its glyph centred in a fixed square (a sized label keeps its text top-left).
+function mark(text, styleClass) {
+    return new St.Bin({style_class: styleClass, y_align: Clutter.ActorAlign.CENTER,
+        child: new St.Label({text, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true, y_expand: true})});
+}
+
+// The panel's room for text (stylesheet.css: max-width 440, padding 6, a row's 10 each side, the
+// key column): a wrapped label is given its width, so it is measured as
+// it is drawn (St otherwise measures it unwrapped, and the footer spills out of the panel).
+const INNER = 440 - 2 * 6 - 2 * 10, TAKE = 44 + 8;  // a row's 10 at the left is its 2, the bar's 3 and its 5
+
+// St draws the stylesheet's px at the theme's scale (2 on a HiDPI screen): the panel's own
+// figures here go by it too.
+function scale() {
+    return St.ThemeContext.get_for_stage(global.stage).scale_factor;
+}
+
+function fit(widget, room) {
+    room *= scale();
+    widget.set_width(-1);
+    const [, wide] = widget.get_preferred_width(-1);
+    if (wide > room)
+        widget.set_width(room);
+}
+
+// A box of rows: "orientation" since GNOME 48 ("vertical" went in GNOME 51), "vertical" before it.
+function column(params) {
+    const box = new St.BoxLayout(params);
+    if ('orientation' in box)
+        box.orientation = Clutter.Orientation.VERTICAL;
+    else
+        box.vertical = true;
+    return box;
+}
+
+function label(text, styleClass, wrap = false) {
+    const widget = new St.Label({text, style_class: styleClass, y_align: Clutter.ActorAlign.CENTER});
+    if (wrap) {
+        widget.clutter_text.line_wrap = true;
+        widget.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        widget.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+    }
+    return widget;
+}
+
+export default class CdAiExtension extends Extension {
+    enable() {
+        this._cursor = null;  // nothing is placed until IBus says where the caret is (after a lock, say)
+        this._panel = column({style_class: 'cd-panel', visible: false});
+        this._ghost = new St.Label({style_class: 'cd-ghost', visible: false});
+        this._ghost.clutter_text.ellipsize = Pango.EllipsizeMode.END;  // cut at its monitor's edge (_place)
+        this._toast = column({style_class: 'cd-panel', visible: false});
+        for (const actor of [this._panel, this._ghost, this._toast]) {
+            try {
+                Main.layoutManager.addTopChrome(actor, {affectsInputRegion: false});
+            } catch (e) {
+                // GNOME 50 has no affectsInputRegion: the unknown option throws once the actor is
+                // added but before it is tracked. Taken out, it is added again without it (a chrome
+                // actor that is not reactive takes no input there).
+                actor.get_parent()?.remove_child(actor);
+                Main.layoutManager.addTopChrome(actor);
+            }
+        }
+        this._ibus = IBusManager.getIBusManager();
+        this._cursorId = this._ibus.connect('set-cursor-location', (manager, rect) => {
+            this._cursor = rect;
+            this._place();
+        });
+        // An app talking to IBus itself on Wayland (Qt, GTK with the ibus module) gives its caret in
+        // its window's coordinates: only the panel service says it, as GNOME's own popup reads it.
+        this._readyId = this._ibus.connect('ready', () => this._watchPanelService());
+        this._watchPanelService();
+        this._signal = Gio.DBus.session.signal_subscribe(null, 'io.claudish.Screen', 'Changed',
+            '/io/claudish/Screen', null, Gio.DBusSignalFlags.NONE,
+            (connection, sender, path, iface, name, parameters) => this._show(parameters.deep_unpack()[0]));
+        this._name = Gio.bus_own_name(Gio.BusType.SESSION, 'io.claudish.Shell', Gio.BusNameOwnerFlags.NONE,
+            null, null, null);
+        // GNOME gives IBus one input context for every app: say which window has focus, so the
+        // engine keeps each window's exchange and conversation, and an app's bindings apply.
+        this._focusId = global.display.connect('notify::focus-window', () => this._focus());
+        // and again when the engine starts (IBus starts it at the first key or focus, after the
+        // window got focus), or the first window would be named gnome-shell.
+        // What it shows is fetched then (a panel drawn in IBus's popup while this was away), and an
+        // engine that ended takes what it showed with it.
+        this._engineWatch = Gio.bus_watch_name(Gio.BusType.SESSION, 'io.claudish.Screen',
+            Gio.BusNameWatcherFlags.NONE, () => {
+                this._focus();
+                Gio.DBus.session.call('io.claudish.Screen', '/io/claudish/Screen', 'io.claudish.Screen', 'Get',
+                    null, new GLib.VariantType('(s)'), Gio.DBusCallFlags.NO_AUTO_START, -1, null, (bus, result) => {
+                        try {
+                            this._show(bus.call_finish(result).deep_unpack()[0]);
+                        } catch (e) {}  // gone again meanwhile
+                    });
+            }, () => {
+                if (this._panel)
+                    this._show('{"toast": false}');
+            });
+    }
+
+    _watchPanelService() {
+        const service = this._ibus._panelService || null;  // the shell's own; a new one when IBus restarts
+        if (service === this._service)
+            return;
+        // The one watched was destroyed with its IBus (its handlers with it): nothing to disconnect.
+        this._service = null;
+        this._relativeId = 0;
+        if (!service)
+            return;
+        try {
+            this._relativeId = service.connect('set-cursor-location-relative', (ps, x, y, w, h) => {
+                const win = global.display.focus_window?.get_compositor_private();
+                if (!win)
+                    return;
+                this._cursor = {x: win.x + x, y: win.y + y, width: w, height: h};
+                this._place();
+            });
+            this._service = service;
+        } catch (e) {}  // an IBus without the relative signal
+    }
+
+    _unwatchPanelService() {  // at disable: the service watched is the live one, or gone
+        if (this._relativeId && this._service && this._service === this._ibus._panelService)
+            this._service.disconnect(this._relativeId);
+        this._service = null;
+        this._relativeId = 0;
+    }
+
+    _focus() {
+        const win = global.display.focus_window;
+        if (win !== this._focusWindow) {  // a window can get focus before its class is set: said again then
+            try {
+                if (this._classId)
+                    this._focusWindow.disconnect(this._classId);
+            } catch (e) {}  // that window is gone
+            this._focusWindow = win;
+            this._classId = win ? win.connect('notify::wm-class', () => this._focus()) : 0;
+        }
+        this._follow(win);
+        const app = win ? (win.get_wm_class() || '') : '';
+        Gio.DBus.session.call('io.claudish.Screen', '/io/claudish/Screen', 'io.claudish.Screen', 'Focus',
+            new GLib.Variant('(ss)', [app, win ? String(win.get_id()) : '']), null, Gio.DBusCallFlags.NO_AUTO_START,
+            -1, null, null);  // nothing to tell when the engine is not running
+    }
+
+    disable() {
+        global.display.disconnect(this._focusId);
+        Gio.bus_unwatch_name(this._engineWatch);
+        try {
+            if (this._classId)
+                this._focusWindow.disconnect(this._classId);
+        } catch (e) {}
+        this._focusWindow = null;
+        this._classId = 0;
+        this._follow(null);
+        Gio.bus_unown_name(this._name);
+        Gio.DBus.session.signal_unsubscribe(this._signal);
+        this._ibus.disconnect(this._cursorId);
+        this._ibus.disconnect(this._readyId);
+        this._unwatchPanelService();
+        if (this._toastTimeout)
+            GLib.source_remove(this._toastTimeout);
+        for (const actor of [this._panel, this._ghost, this._toast]) {
+            Main.layoutManager.removeChrome(actor);
+            actor.destroy();
+        }
+        this._panel = this._ghost = this._toast = this._ibus = this._toastTimeout = null;
+    }
+
+    // The focused window's frame: moved (a drag, a snap, maximized), the caret it reported moved with
+    // it; until the app says where it is now, nothing is drawn at the old place.
+    _follow(win) {
+        if (win === this._movingWindow)
+            return;
+        try {
+            for (const id of this._moveIds || [])
+                this._movingWindow.disconnect(id);
+        } catch (e) {}  // that window is gone
+        this._movingWindow = win;
+        this._moveIds = win ? ['position-changed', 'size-changed'].map(name => win.connect(name, () => {
+            if (this._cursor) {
+                this._cursor = null;
+                this._place();
+            }
+        })) : [];
+    }
+
+    _show(json) {
+        let screen;
+        try {
+            screen = JSON.parse(json);
+        } catch (e) {
+            return;
+        }
+        this._fill(this._panel, screen.panel);
+        if (screen.toast === false || (screen.panel && !screen.toast))
+            this._toast.visible = false;  // a key or a panel ends a toast: it was said where the caret was
+        this._ghost.visible = Boolean(screen.ghost);
+        if (screen.ghost) {
+            // cd_AI's own grey text, in the UI font at the caret's height.
+            this._ghost.text = screen.ghost;
+            // The caret's height is in the stage's pixels; St scales a stylesheet's px again.
+            const height = this._cursor ? this._cursor.height : 0;
+            this._ghost.style = `font-size: ${Math.max(11, Math.round(height / 1.25 / scale()))}px;`;
+        }
+        if (screen.toast) {
+            this._fill(this._toast, screen.toast);
+            if (this._toastTimeout)
+                GLib.source_remove(this._toastTimeout);
+            this._toastTimeout = null;
+            if (!screen.lasting)  // the held exchange's pill waits for a key
+                this._toastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                    this._toast.visible = false;
+                    this._toastTimeout = null;
+                    return GLib.SOURCE_REMOVE;
+                });
+        }
+        this._place();
+    }
+
+    // The panel's anatomy: an optional header (a small label, then the content as is), the rows
+    // (the highlighted one a neutral fill with the accent bar and the key that takes it; every row keeps
+    // that key's column), and one footer (the tile or a warning mark, what is happening, each key
+    // with its verb, the free words).
+    _fill(box, panel) {
+        box.destroy_all_children();
+        box._head = null;
+        box.visible = Boolean(panel);
+        if (!panel)
+            return;
+        const thread = panel.thread || [];
+        // A toast (the mode switch, a drop, the pill) is its own compact line; a panel with only a
+        // footer (working, a failure) keeps the panel's shape.
+        box.style_class = 'cd-panel' + (box === this._toast ? ' cd-toast'
+            : panel.rows.length || panel.body || thread.length ? '' : ' cd-bare') + (panel.replying ? ' cd-replying' : '');
+        // The exchange so far: your earlier turns as context, one line each, muted, a rule beside.
+        for (const turn of thread) {
+            // Your words at full size and colour, underlined as at the caret; the label muted.
+            const line = new St.BoxLayout({style_class: 'cd-turn'});
+            const words = label('', 'cd-turn-text');
+            words.clutter_text.ellipsize = Pango.EllipsizeMode.MIDDLE;
+            words.clutter_text.set_markup(`<b><span size="smaller" fgalpha="70%">${GLib.markup_escape_text(turn.label, -1)}</span></b>  ` +
+                `<u>${GLib.markup_escape_text(turn.body, -1)}</u>`);
+            line.add_child(words);
+            box.add_child(line);
+        }
+        if (panel.body) {
+            const head = column({style_class: 'cd-head'});
+            if (panel.label)
+                head.add_child(label(panel.label, 'cd-label', true));
+            head.add_child(label(panel.body, panel.code ? 'cd-body cd-code' : 'cd-body', true));
+            box.add_child(head);
+            head.get_children().forEach(child => fit(child, INNER));
+            box._head = head;  // cut at the bottom when the panel would not fit its screen (_place)
+        }
+        const takes = panel.on >= 0 || Boolean(panel.column);  // the key's column from the start: ↓ does not resize
+        panel.rows.forEach((row, index) => {
+            const on = index === panel.on;
+            const line = new St.BoxLayout({style_class: on ? 'cd-row cd-on' : 'cd-row'});
+            line.add_child(new St.Widget({style_class: on ? 'cd-bar' : 'cd-bar cd-off', y_expand: true}));
+            const text = label('', 'cd-text', true);
+            const words = GLib.markup_escape_text(row.text, -1);
+            text.clutter_text.set_markup(row.legend
+                ? `${words}<span fgalpha="62%"> — ${GLib.markup_escape_text(row.legend, -1)}</span>` : words);
+            text.x_expand = true;
+            line.add_child(text);
+            if (takes) {  // the trailing column: the key that takes the highlighted row
+                // Tab takes a draft or a choice; lit when a key that does nothing here pointed at it (panel.nudge)
+                const cap = on && !panel.replying;  // replying: the draft in view, which Tab does not take now
+                const take = label(cap ? 'Tab' : '', cap ? (panel.nudge ? 'cd-cap cd-lit' : 'cd-cap') : 'cd-take');
+                line.add_child(take);
+            }
+            box.add_child(line);
+            fit(text, INNER - (takes ? TAKE : 0));
+        });
+        let foot = new St.BoxLayout({style_class: 'cd-foot'});
+        box.add_child(foot);  // on the stage, to be measured as drawn
+        if (panel.tile === 'warn')
+            foot.add_child(mark('!', 'cd-warn'));
+        else
+            foot.add_child(mark(panel.tile === 'cd' ? 'cd' : 'AI', panel.tile === 'cd' ? 'cd-tile cd-neutral' : 'cd-tile'));
+        if (panel.status) {
+            if (panel.busy) {
+                const spinner = new St.Icon({icon_name: 'process-working-symbolic', style_class: 'cd-spinner'});
+                spinner.set_pivot_point(0.5, 0.5);
+                spinner.ease({rotation_angle_z: 360, duration: 1000, repeatCount: -1, mode: Clutter.AnimationMode.LINEAR});
+                foot.add_child(spinner);
+            }
+            foot.add_child(label(panel.status, 'cd-status'));
+        }
+        if (panel.failed)
+            foot.add_child(label(panel.failed, 'cd-failed'));
+        for (const [key, verb] of panel.foot) {
+            const hint = new St.BoxLayout({style_class: 'cd-hint'});
+            for (const part of [label(key, 'cd-cap'), label(verb, 'cd-verb')]) {
+                part.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;  // a long status gives way, never a key
+                hint.add_child(part);
+            }
+            foot.add_child(hint);
+            // Keys that do not fit the panel go on a line of their own, never past its edge.
+            if (box !== this._toast && foot.get_n_children() > 1 && foot.get_preferred_width(-1)[1] > (440 - 2 * 6) * scale()) {
+                foot.remove_child(hint);
+                foot = new St.BoxLayout({style_class: 'cd-foot'});
+                box.add_child(foot);
+                foot.add_child(hint);
+            }
+        }
+        if (panel.tail)
+            foot.add_child(label(panel.tail, 'cd-verb'));
+    }
+
+    // Under the line, the content starting at the IBus cursor (where the composition starts while
+    // something is composed, else the caret); the suggestion right after the caret. Clamped.
+    _place() {
+        if (!this._cursor) {  // not reported yet, or its window moved: shown again at the next report
+            for (const actor of [this._panel, this._toast, this._ghost])
+                actor.opacity = 0;
+            return;
+        }
+        for (const actor of [this._panel, this._toast, this._ghost])
+            actor.opacity = 255;
+        const {x, y, width, height} = this._cursor;
+        // The monitor with the caret, not the one the panel was last on.
+        const monitor = Main.layoutManager.monitors.find((m) => x >= m.x && x < m.x + m.width && y >= m.y && y < m.y + m.height)
+            || Main.layoutManager.primaryMonitor;
+        // Its work area: the screen less the top bar and any dock.
+        const area = Main.layoutManager.getWorkAreaForMonitor(Main.layoutManager.monitors.indexOf(monitor));
+        for (const box of [this._panel, this._toast]) {
+            if (!box.visible) {
+                box._opened = null;
+                continue;
+            }
+            box.set_size(-1, -1);  // measured afresh: the last state's size is not this one's
+            if (box._head)
+                box._head.set_height(-1);
+            const [, natural] = box.get_preferred_width(-1);
+            // The height from the children as measured (wrapped rows at their set width): St's own
+            // figure for the box came out short of them, and the footer spilled below the panel.
+            const theme = box.get_theme_node();
+            const children = box.get_children();
+            const within = natural - theme.get_horizontal_padding();
+            let tall = Math.ceil(theme.get_vertical_padding() + (box.layout_manager.spacing || 0) * Math.max(0, children.length - 1)
+                + children.reduce((sum, child) => sum + child.get_preferred_height(within)[1], 0));
+            const room = area.height - 8 * scale();
+            if (box._head && tall > room) {  // a long question: its text cut, its choices and keys on screen
+                const [, headTall] = box._head.get_preferred_height(within);
+                box._head.set_height(Math.max(0, headTall - (tall - room)));
+                box._head.clip_to_allocation = true;
+                tall = room;
+            }
+            box.set_size(natural, tall);
+            // The content's left edge: a panel's padding and row inset; a toast's own padding (its tile).
+            const s = scale();
+            const inset = box.has_style_class_name('cd-toast') ? 6 * s : box.get_theme_node().get_padding(St.Side.LEFT) + 10 * s;
+            let left = Math.round(x + width - inset), top = Math.round(y + height + GAP * s);
+            // It opens under the caret and stays where it opened while it is open on that line and the
+            // caret is at or right of it (when the text leaves, it moves to the caret).
+            if (box._opened && box._opened.line === y && left >= box._opened.left)
+                left = box._opened.left;
+            box._opened = {left, line: y};
+            left = Math.max(area.x + 4 * s, Math.min(left, area.x + area.width - natural - 4 * s));
+            // Above the line when it does not fit below and there is more room above (as Windows does).
+            if (top + tall > area.y + area.height && y - area.y > area.y + area.height - (y + height))
+                top = Math.round(y - tall - GAP * s);
+            top = Math.max(area.y + 4 * s, Math.min(top, area.y + area.height - tall - 4 * s));  // on its monitor
+            box.set_position(left, top);
+        }
+        if (this._ghost.visible) {
+            const [, tall] = this._ghost.get_preferred_height(-1);
+            // Just past the caret's line (the reported x is a few pixels left of the drawn caret):
+            // the suggestion never covers the space you typed.
+            // On the caret's monitor: what does not fit ends in an ellipsis, not on the next screen.
+            this._ghost.set_width(-1);  // its own width, not the last suggestion's
+            const [, wide] = this._ghost.get_preferred_width(-1);
+            const gap = CARET_GAP * scale();
+            const left = Math.round(x + Math.max(width, 2) + gap);
+            this._ghost.set_width(Math.max(0, Math.min(wide, area.x + area.width - left)));
+            this._ghost.set_position(left, Math.round(y + (height - tall) / 2));
+        }
+    }
+}

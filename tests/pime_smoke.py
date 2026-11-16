@@ -1,0 +1,621 @@
+"""Exercise the Windows adapter against Claudish's PIME Python API (PIME's, with
+platforms/windows/pime/pime.patch applied), on either OS.
+
+python tests/pime_smoke.py --pime-source /path/to/patched/python/textService.py
+This does not register or exercise the native TSF component.
+"""
+import argparse
+import json
+import os
+import importlib.util
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pime-source", type=Path, required=True)
+    args = parser.parse_args()
+    spec = importlib.util.spec_from_file_location("textService", args.pime_source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sys.modules["textService"] = module
+    # Claudish's PIME (platforms/windows/pime) draws the panel the state describes (and the mode
+    # switch as a brief panel, the toast).
+
+    def said(reply, words):
+        return words in json.dumps([reply.get("panel"), reply.get("toast")], ensure_ascii=False)
+    root = Path(__file__).resolve().parents[1]
+    with tempfile.TemporaryDirectory() as temporary:
+        target = Path(temporary) / "pime_claudish"
+        shutil.copytree(root / "platforms/windows/claudish", target)
+        for name in ["composition.py", "client.py", "screen.py"]:
+            shutil.copy(root / "claudish" / name, target / name)
+        sys.path.insert(0, temporary)
+        from pime_claudish.claudish_ime import ClaudishTextService
+        from pime_claudish.claudish_ime import key_kind
+        # A trace says a key that types text as "char": its virtual-key code is the character.
+        assert [key_kind(code) for code in (0x41, 0x35, 0x20, 0xBA, 0x61, 0x0D, 0x26)] == \
+            ["char"] * 5 + ["0xd", "0x26"]
+        import pime_claudish.composition
+        pime_claudish.composition.ROLLED_SHIFT_SECONDS = 0  # a Shift right after a key; the filter has its own test
+        # The foreground app is pinned: on Windows the real one is the console running this smoke,
+        # a terminal, where continue is quiet.
+        with patch("pime_claudish.claudish_ime.Suggestions") as worker_class, \
+                patch("pime_claudish.claudish_ime.focused_app", return_value="notepad.exe"):
+            worker_class.return_value.poll.return_value = None
+            worker_class.return_value.offline = False
+            worker_class.return_value.summon = "Shift+Enter"
+            worker_class.return_value.hints = True
+            service = ClaudishTextService(None)
+            replayed = []  # keys pressed again for the app after a commit
+            reply = service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            assert reply["setSelKeys"].strip() == "", reply["setSelKeys"]  # no digits beside drafts
+            # The mode in the taskbar's input indicator; its menu and a click switch it.
+            button = [b for b in reply["addButton"] if b["id"] == "windows-mode-icon"][0]
+            assert button["icon"].endswith("mode-compose.ico") and os.path.exists(button["icon"]), button
+            assert service.state.mode == "compose"  # where cd_AI starts
+            reply = service.handleRequest({"method": "onCommand", "id": 100, "type": 0})
+            assert service.state.mode == "continue" and reply["changeButton"][0]["icon"].endswith("mode-continue.ico"), reply
+            menu = service.handleRequest({"method": "onMenu", "id": "windows-mode-icon"})["return"]
+            assert [(m["text"], m["checked"]) for m in menu[:2]] == [("Compose", False), ("Continue", True)], menu
+            assert menu[2] == {} and menu[3]["text"] == "Settings…", menu  # a separator, then the settings
+            service.handleRequest({"method": "onCommand", "id": menu[0]["id"], "type": 0})
+            assert service.state.mode == "compose"
+            opened = []
+            with patch("pime_claudish.claudish_ime.open_settings", lambda: opened.append(True)):
+                service.handleRequest({"method": "onCommand", "id": menu[3]["id"], "type": 0})
+            assert opened == [True] and service.state.mode == "compose"
+
+            def key(code, char=0, method="onKeyDown", modifiers=(), **around):
+                states = [0] * 256
+                for modifier in modifiers:
+                    states[modifier] = 128
+                reply = service.handleRequest(dict({"method": method, "seqNum": 1,
+                    "charCode": char, "keyCode": code, "repeatCount": 1,
+                    "scanCode": 0, "isExtended": False, "keyStates": states}, **around))
+                if "replay" in reply:  # sent by cd_AI's PIME from the app's process
+                    replayed.append((reply["replay"]["key"][0], [k for k, _ in reply["replay"]["modifiers"]]))
+                return reply
+
+            def shift_tap():
+                """Shift pressed and released alone: its key-up is taken, and onKeyUp switches mode."""
+                assert key(0x10, method="filterKeyDown")["return"] is False  # the app sees Shift too
+                assert key(0x10, method="filterKeyUp")["return"] is True
+                assert key(0x10, method="filterKeyUp")["return"] is True  # PIME asks twice; the same answer
+                return key(0x10, method="onKeyUp")
+
+            # A Shift tap goes to continue, which types like en_US: the app types the keys itself (no
+            # composition per letter: a browser's keydown sees the key), and its text is read at the
+            # timer that follows.
+            shift_tap()
+            assert service.state.mode == "continue"
+            for c in "ls -la":
+                for _ in range(2):  # TSF's test, then the key itself: the same answer
+                    reply = key(ord(c.upper()), ord(c), "filterKeyDown")
+                    assert reply["return"] is False and reply.get("timer") == 30 and "commitString" not in reply, reply
+                assert key(ord(c.upper()), ord(c), "filterKeyUp")["return"] is False  # its key-up is the app's too
+            service.handleRequest({"method": "onTimer", "textBefore": "$ ls -la", "textAfter": ""})
+            assert service.state.text == "$ ls -la", service.state.text
+            assert key(ord("C"), ord("c"), "filterKeyUp", modifiers=(0x11,))["return"] is False  # Ctrl+C's key-up: the app's
+            service.state.mode = "compose"
+            service.state.change("abc")
+            # NumLock, ScrollLock, VK_PACKET: never taken (a replay would undo or lose them); nor the
+            # media, volume and browser keys, which leave the composition alone.
+            for code in (0x90, 0x91, 0xE7, 0xA6, 0xAF, 0xB3, 0xB7):
+                assert key(code, method="filterKeyDown")["return"] is False, hex(code)
+            assert service.state.text == "abc"
+            service.state.change("")
+            service.state.mode = "continue"
+            for _ in range(2):  # TSF's test, then the key itself: the same answer, and the suggestion goes
+                reply = key(0x08, method="filterKeyDown")
+                assert reply["return"] is False and reply.get("ghost") == "" and service.state.text == "", reply
+            assert key(9, method="filterKeyDown")["return"] is False  # nothing offered: Tab is the app's
+            shift_tap()  # compose: what you type is held
+            assert service.state.mode == "compose"
+            # Shift+Tab commits your words and is the app's (back a field), as a navigation key is.
+            for char in "draft":
+                key(ord(char.upper()), ord(char))
+            reply = key(9, modifiers=(0x10,))
+            assert reply.get("commitString") == "draft" and not service.state.working, reply
+            assert replayed.pop() == (9, [0x10])  # the app gets Shift+Tab
+            # A full composition: the next key commits what is before it, and PIME then says the
+            # composition ended (unforced, its own end for that commit): the key stays composed.
+            service.state.change("a" * 512)
+            assert key(ord("B"), ord("b")).get("commitString") == "a" * 512
+            service.handleRequest({"method": "onCompositionTerminated", "forced": False})
+            assert service.state.text == "b", service.state.text
+            key(0x1B)
+            # The caret goes to PIME in characters (it makes TSF's UTF-16 offset itself): ← after an emoji.
+            service.state.change("\U0001F600 ab")
+            reply = key(0x25)
+            assert reply.get("compositionCursor") == 3, reply
+            key(0x1B)  # Esc: dropped
+            # Tab on a selection with nothing composed: the selection becomes your words, as if just typed.
+            words = "thanks for the help"
+            assert key(9, method="filterKeyDown", textSelected=words)["return"] is True
+            asked = worker_class.return_value.schedule.call_count
+            reply = key(9, textSelected=words)
+            assert reply["compositionString"] == words and service.state.text == words, reply
+            assert worker_class.return_value.schedule.call_count == asked  # nothing asked yet
+            key(9)  # then Tab rewrites them
+            assert worker_class.return_value.schedule.call_args[0][2] == "rewrite"
+            key(0x1B)
+            key(0x1B)  # Esc drops them, as typed words (Shift+Esc brings them back)
+            assert service.state.text == "", service.state.text
+            assert key(9, method="filterKeyDown")["return"] is False  # no selection: Tab is the app's
+            for char in "hello-world":
+                assert key(ord(char.upper()), ord(char), "filterKeyDown")["return"]
+                reply = key(ord(char.upper()), ord(char))
+            assert reply["compositionString"] == "hello-world"
+            # A modifier and a shortcut must not consume or rewrite composition.
+            assert not key(0x10, method="filterKeyDown")["return"]
+            # Ctrl/Alt shortcuts mid-composition: commit the wording, then the key reaches the app
+            # (taken, then pressed again): one press does both.
+            assert key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]
+            reply = key(ord("C"), modifiers=(0x11,))
+            assert reply["commitString"] == "hello-world" and reply["return"], reply
+            assert replayed == [(ord("C"), [0x11])], replayed  # with Ctrl, pressed again if let go
+            assert not key(ord("C"), method="filterKeyDown", modifiers=(0x11,))["return"]  # the replay passes
+            for char in "hello-world":
+                key(ord(char.upper()), ord(char))
+            assert key(ord("C"), method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is True
+            assert service.state.text == "hello-world"
+            # AltGr arrives as Ctrl+Alt (left Ctrl's own key-down first, then right Alt's), and a
+            # printable result belongs in the phrase.
+            assert key(0xA2, method="filterKeyDown", modifiers=(0x11,))["return"] is False
+            assert key(0xA5, method="filterKeyDown", modifiers=(0x11, 0x12))["return"] is False
+            assert key(ord("Q"), ord("@"), "filterKeyDown", modifiers=(0x11, 0x12))["return"]
+            assert key(ord("Q"), ord("@"), modifiers=(0x11, 0x12))["compositionString"] == "hello-world@"
+            key(0x08)
+            assert service.state.text == "hello-world"
+            # TSF gives AltGr's key to no input method: the app puts the character into the composition
+            # itself, and Claudish's PIME sends it as typed there (an Alt code too).
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "typed": "€"})
+            assert reply["compositionString"] == "hello-world€" and "commitString" not in reply, reply
+            key(0x08)
+            # A dead key is Windows': its accent waits for the next key, and nothing is committed.
+            assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
+            # The accent does not combine with t: the app types both, and they come back as typed.
+            assert key(ord("T"), 0, "filterKeyDown", charCount=2)["return"] is False
+            assert key(0x0D, 0, "filterKeyDown", charCount=2)["return"] is True  # Enter is still Claudish's
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "typed": "´t"})
+            assert reply["compositionString"] == "hello-world´t" and "commitString" not in reply, reply
+            key(0x08)
+            key(0x08)
+            key(0x08, 0, charCount=2)  # Backspace right after a dead key: the accent goes, nothing else
+            assert service.state.text == "hello-world", service.state.text
+            assert key(0x1B, 0, "filterKeyDown", charCount=2)["return"] is True
+            key(0x1B, 0, charCount=2)  # Esc right after a dead key: the accent goes, the words stay
+            assert service.state.text == "hello-world", service.state.text
+            # Ctrl with a dead key is a shortcut: the words are committed, the key replayed.
+            assert key(0xDD, method="filterKeyDown", modifiers=(0x11,), isDead=True)["return"] is True
+            assert key(0xDD, method="filterKeyDown", isDead=True)["return"] is False
+            assert key(ord("E"), 0xE9, "filterKeyDown")["return"]
+            assert key(ord("E"), 0xE9)["compositionString"] == "hello-worldé"
+            key(0x08)
+            assert service.state.text == "hello-world"
+            # Enter right after a dead key whose accent waits (U.S. International's closing quote):
+            # the accent goes in first, as typed.
+            reply = key(0x0D, 13, charCount=2, chars="'\r")
+            assert reply.get("commitString") == "hello-world'", reply
+            for char in "hello-world":
+                key(ord(char.upper()) if char.isalpha() else 0xBD, ord(char))
+            assert service.state.text == "hello-world", service.state.text
+            # Tab asks for the rewrite and commits nothing; a Shift tap keeps your words as typed.
+            assert "commitString" not in key(9)
+            reply = shift_tap()
+            assert reply["commitString"] == "hello-world" and service.state.mode == "continue", reply
+            assert key(0x10, method="filterKeyDown")["return"] is False  # Shift held for a capital: no tap
+            key(ord("A"), ord("A"), "filterKeyDown")  # every key reaches filterKeyDown first
+            key(ord("A"), ord("A"))
+            assert key(0x10, method="filterKeyUp")["return"] is False and service.state.mode == "continue"
+            # Ctrl+Shift and Alt+Shift switch Windows' layout: never a mode switch, held at press or at release.
+            for chord in (0x11, 0x12):
+                assert key(0x10, method="filterKeyDown", modifiers=(chord,))["return"] is False
+                assert key(0x10, method="filterKeyUp", modifiers=(chord,))["return"] is False
+                assert key(0x10, method="filterKeyDown")["return"] is False
+                assert key(0x10, method="filterKeyUp", modifiers=(chord,))["return"] is False
+            assert service.state.mode == "continue"
+            shift_tap()
+            for char in "draft":
+                key(ord(char.upper()), ord(char))
+            assert "commitString" not in key(9)  # Tab asks
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A nuanced draft."})
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # it arrives: in the panel; your words stay the composition
+            worker_class.return_value.poll.return_value = None
+            # Your words stay the composition; the rewrite waits in the panel for Tab.
+            assert reply["candidateList"] == [] and reply["compositionString"] == "draft", reply
+            assert reply["panel"]["body"] == "A nuanced draft.", reply
+            reply = key(0x1B)  # Esc: your words again
+            assert "commitString" not in reply and reply["compositionString"] == "draft", reply
+            key(9)  # Tab: another take
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "A more nuanced draft."})
+            service.handleRequest({"method": "onTimer", "seqNum": 1})
+            worker_class.return_value.poll.return_value = None
+            assert key(9)["commitString"] == "A more nuanced draft."  # Tab again keeps it
+            for char in "say hi":
+                key(ord(char.upper()), ord(char))
+            reply = shift_tap()
+            assert service.state.mode == "continue" and said(reply, "continue"), reply
+            assert reply["commitString"] == "say hi"  # Shift keeps your words; continue types into the app
+            last = worker_class.return_value.schedule.call_args.args
+            assert len(last) < 3 or last[2] != "continue"  # mid-word: no suggestion yet
+            def typed_live(char, before):
+                """A key in continue: the app types it itself; the timer after it reads its text."""
+                assert key(ord(char), ord(char), "filterKeyDown")["return"] is False
+                return service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": before, "textAfter": ""})
+
+            def arrives(text, before):
+                worker_class.return_value.poll.return_value = (service.state.revision, {"text": text})
+                reply = service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": before, "textAfter": ""})
+                worker_class.return_value.poll.return_value = None
+                return reply
+
+            typed_live("!", "say hi!")
+            assert worker_class.return_value.schedule.call_args.args[2] == "continue"  # a word boundary asks
+            assert key(9, method="filterKeyDown", textBefore="say hi!")["return"] is False  # no suggestion: Tab is the app's
+            # The suggestion shows when it comes (the timer): cd_AI's own grey text after the caret; no panel.
+            reply = arrives("say hi! Hello—truly.", "say hi!")
+            assert reply.get("ghost", "").strip() == "Hello—truly." and reply.get("panel") is None, reply
+            assert key(9, method="filterKeyUp")["return"] is False  # not a printable key: the app's
+            assert key(9, method="filterKeyDown", textBefore="say hi!")["return"] is True  # a drawn suggestion makes Tab ours
+            assert key(9, textBefore="say hi!")["commitString"] == " Hello—truly."
+            # A click moved the caret (no key): a suggestion made for the old spot is not Tab's to take.
+            typed_live("!", "say hi! Hello—truly.!")
+            arrives(service.state.text + " Again.", "say hi! Hello—truly.!")
+            assert service.state.ghost.strip() == "Again.", service.state.ghost
+            assert key(9, method="filterKeyDown", textBefore="Total: ")["return"] is False and not service.state.ghost
+            # The next key hides a drawn suggestion at once (it was drawn where the caret was), and Tab
+            # is the app's until the app's text is read again.
+            typed_live("!", "Total: !")
+            arrives(service.state.text + " Shown.", "Total: !")
+            reply = key(ord("A"), ord("a"), "filterKeyDown")
+            assert reply["return"] is False and reply.get("ghost") == "" and reply.get("timer") == 30, reply
+            assert key(9, method="filterKeyDown", textBefore="Total: !a")["return"] is False
+            service.handleRequest({"method": "onTimer", "seqNum": 1, "textBefore": "Total: !a", "textAfter": ""})
+            assert service.state.text == "Total: !a" and not service.state.ghost, service.state.text
+            # One that came while nothing drew it (the timer had stopped): Tab is the app's, not for text unseen.
+            typed_live("!", "Total: !a!")
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": service.state.text + " Unseen."})
+            assert key(9, method="filterKeyDown", textBefore="Total: !a!")["return"] is False
+            worker_class.return_value.poll.return_value = None
+            # A key-up whose key-down went to the app (Ctrl let go first) stays the app's.
+            assert key(ord("C"), ord("c"), "filterKeyUp")["return"] is False
+            shift_tap()  # compose, starting empty: the words are in the app already
+            for char in "as is":
+                key(ord(char.upper()), ord(char))
+            for _ in range(2):  # TSF's test, then the key: Enter is taken both times
+                assert key(0x0D, method="filterKeyDown")["return"] is True
+            before = list(replayed)
+            # Enter keeps it as it is; the app gets the next Enter.
+            assert key(0x0D)["commitString"] == "as is" and replayed == before, replayed
+            assert service.state.mode == "compose" and service.state.text == ""
+            before = list(replayed)
+            # With nothing composed, Shift+Enter and Enter are the app's (a newline), never replayed.
+            assert key(0x0D, method="filterKeyDown", modifiers=(0x10,))["return"] is False
+            assert key(0x0D, modifiers=(0x10,))["return"] is False
+            assert key(0x0D)["return"] is False and replayed == before
+            assert service.state.mode == "compose" and service.state.text == ""
+            # Compose: no request while typing; Shift+Enter sends it as an instruction; Enter then inserts nothing.
+            calls = worker_class.return_value.schedule.call_count
+            for char in "story":
+                key(ord(char.upper()), ord(char))
+            assert worker_class.return_value.schedule.call_count == calls
+            reply = key(0x77)  # F8: send a picture of the window too
+            assert service.state.look and said(reply, "window"), reply
+            assert reply.get("clearOnEnd") is False, reply  # words being typed: a focus change keeps them
+            reply = key(0x0D, modifiers=(0x10,))
+            assert service.state.working and said(reply, "working"), reply
+            assert reply.get("clearOnEnd") is True, reply  # sent: a focus change clears it from the text
+            assert worker_class.return_value.schedule.call_args.kwargs["immediate"] is True
+            assert worker_class.return_value.schedule.call_args.kwargs["look"] is True
+            assert "commitString" not in key(0x0D)  # still working
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Once upon a time."})
+            assert "commitString" not in key(0x0D)  # a reflexive Enter on the draft inserts nothing
+            worker_class.return_value.poll.return_value = None  # (it came once, with that Enter)
+            assert key(9)["commitString"] == "Once upon a time."  # Tab takes it
+            # Several readings: the candidate window lists them; ↓ Tab inserts the second.
+            for char in "greet":
+                key(ord(char.upper()), ord(char))
+            key(0x0D, modifiers=(0x10,))
+            worker_class.return_value.poll.return_value = (service.state.revision,
+                                                           {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+            service.await_result()  # as Shift+Enter does: the timer polls, and its edit session shows them
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})
+            assert reply.get("candidateList") == ["Hello.", "Hi there."], reply
+            worker_class.return_value.poll.return_value = None
+            key(0x28)  # ↓: the second reading (choices are not numbered: digits are text)
+            assert key(9)["commitString"] == "Hi there."  # Tab inserts the highlighted draft
+            # An agent session asks a question: the choices are the list, and Tab takes the highlighted one.
+            for char in "check":
+                key(ord(char.upper()), ord(char))
+            key(0x0D, modifiers=(0x10,))
+            question = {"id": "perm-1", "text": "Allow Bash?",
+                        "choices": [{"label": "Allow", "legend": "Bash: git status"}, {"label": "Deny"}]}
+            worker_class.return_value.poll.return_value = (service.state.revision, {"question": question, "session": "s1"})
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 1})  # the question arrives
+            assert reply.get("candidateList") == ["Allow", "Deny"], reply
+            assert said(reply, "Allow Bash?"), reply
+            worker_class.return_value.poll.return_value = None
+            assert "commitString" not in key(0x0D)  # Enter puts nothing in and answers nothing
+            assert "commitString" not in key(0x0D, modifiers=(0x10,))  # nor does Shift+Enter: no words to send
+            assert not worker_class.return_value.answer.called
+            reply = key(9)
+            assert "commitString" not in reply, reply
+            assert worker_class.return_value.answer.call_args.args == ("s1", "perm-1", 0)
+            # Another question: typed words answer it (a digit in them is text).
+            worker_class.return_value.poll.return_value = (service.state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
+            service.handleRequest({"method": "onTimer", "seqNum": 1})
+            worker_class.return_value.poll.return_value = None
+            for char in "no 2":
+                key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
+            assert service.state.reply == "no 2" and not worker_class.return_value.answer.call_args.kwargs
+            key(0x0D, modifiers=(0x10,))
+            assert worker_class.return_value.answer.call_args.kwargs == {"text": "no 2"}, worker_class.return_value.answer.call_args
+            # Esc stops the session and goes back to the instruction; Esc again drops it unsent.
+            reply = key(0x1B)
+            assert "commitString" not in reply and service.state.text == "check", reply
+            assert worker_class.return_value.schedule.call_args.args[1] == ""  # the pending answer is stopped
+            assert key(0x1B)["commitString"] == ""  # nothing is inserted
+            assert service.state.text == ""  # nothing composed: shortcuts are not taken at all
+            # A shortcut while an instruction is out: cleared and held for Shift+Esc, never typed into
+            # the app, and the shortcut still reaches the app (Codex: Ctrl+C committed "fix the build").
+            for char in "fix the build":
+                key(ord(char.upper()) if char.isalpha() else ord(char), ord(char))
+            key(0x0D, modifiers=(0x10,))
+            assert service.state.sent
+            before = list(replayed)
+            reply = key(ord("C"), modifiers=(0x11,))
+            assert reply.get("commitString", "") == "" and service.state.held is not None, reply
+            assert "working on what you asked" in json.dumps(reply.get("toast")), reply  # the pill, in the box you stay in
+            assert not service.state.text and replayed == before + [(ord("C"), [0x11])], replayed
+            service.state.held = None
+            # The replay itself (Ctrl again, then C) leaves the pill up; your next key ends it.
+            assert not key(0x11, method="filterKeyDown", modifiers=(0x11,)).get("hideMessage")
+            reply = key(ord("C"), method="filterKeyDown", modifiers=(0x11,))
+            assert reply["return"] is False and not reply.get("hideMessage"), reply
+            for char in "ok":
+                key(ord(char.upper()), ord(char))
+            reply = service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
+            assert reply.get("commitString") == "ok" and not service.state.text, reply  # your words go in
+            assert not key(ord("X"), ord("x"), "filterKeyDown")["return"]
+            # The keyboard closed with an instruction out: held, and cleared from the app's text.
+            service.state.mode = "compose"
+            service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
+            service.state.change("make it formal")
+            service.state.submit()
+            reply = service.handleRequest({"method": "onKeyboardStatusChanged", "opened": False})
+            assert reply.get("clearOnEnd") is True and service.state.held is not None, reply
+            service.state.held = None
+            # Requests carry the text around the caret, and an answer shows when it arrives.
+            service.handleRequest({"method": "onKeyboardStatusChanged", "opened": True})
+            for char in "thanks":
+                key(ord(char.upper()), ord(char))
+            reply = key(9, textBefore="Dear Ana, ", textAfter=" Best, Sam")
+            kwargs = worker_class.return_value.schedule.call_args.kwargs
+            assert (kwargs["before"], kwargs["after"], reply.get("timer")) == ("Dear Ana, ", " Best, Sam", 100), (kwargs, reply)
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 2})
+            assert reply.get("timer") == 100  # still on its way: called back again
+            # Focus went where no text box was (the timer that fired then stopped): coming back calls back again.
+            reply = service.handleRequest({"method": "onSetFocus"})
+            assert reply.get("timer") == 100, reply
+            worker_class.return_value.poll.return_value = (service.state.revision, {"text": "Thank you so much."})
+            reply = service.handleRequest({"method": "onTimer", "seqNum": 3})
+            worker_class.return_value.poll.return_value = None
+            assert reply.get("panel", {}).get("body") == "Thank you so much." and "timer" not in reply, reply
+            key(9)  # keep it
+            # An email field (IS_EMAIL_SMTPEMAILADDRESS) is not prose: nothing unasked, and named.
+            service.state.mode = "continue"
+            service.state.change("")
+            key(ord("A"), ord("a"), inputScopes=[5])
+            calls = len(worker_class.return_value.schedule.call_args_list)
+            key(0x20, ord(" "), inputScopes=[5])
+            assert all(len(c.args) < 3 or c.args[2] != "continue"
+                       for c in worker_class.return_value.schedule.call_args_list[calls:])
+            # One conversation per text box: each TSF context has its own.
+            key(0x10, document="1")
+            key(0x10, document="2")
+            assert worker_class.return_value.use_conversation.call_args.args == ("2",)
+            # A password field (IS_PASSWORD): the first key is typed as is, then cd_AI stays out.
+            service.state.change("")
+            reply = key(ord("S"), ord("s"), inputScopes=[31])
+            assert reply.get("commitString") == "s", reply
+            assert key(ord("E"), ord("e"), method="filterKeyDown")["return"] is False
+            # PIN and numeric password fields are passwords too (InputScope.h 63-66); a time is not a phone.
+            for scopes, kind in (([64], "password"), ([63], "password"), ([65], "password"), ([66], "password"),
+                                 ([36], None), ([32], "phone")):
+                service.inputScopes = scopes
+                assert service.field() == kind, (scopes, service.field())
+            # A console window (conhost running wsl or ssh, Windows Terminal) is a terminal by its
+            # window class, whatever program runs in it; a password prompt there is still a password.
+            import pime_claudish.claudish_ime as ime_module
+            with patch.object(ime_module, "console_window", return_value=True):
+                for scopes, kind in (([], "terminal"), ([64], "password")):
+                    service.inputScopes = scopes
+                    assert service.field() == kind, (scopes, service.field())
+                service.inputScopes = []
+                service.changed()
+                assert service.state.terminal  # quiet there, as a terminal named by its program
+            service.inputScopes = []
+            service.state.change("")
+            # The Shift Windows lifts and presses around a numpad arrow (extended) is no tap.
+            mode, last_mode = service.state.mode, ime_module.LAST_MODE[0]
+            key(0x10, method="filterKeyDown")
+            for _ in range(2):
+                key(0x10, method="filterKeyUp", isExtended=True)
+            key(0x66, method="filterKeyDown")
+            key(0x10, method="filterKeyDown", isExtended=True)
+            for _ in range(2):
+                key(0x10, method="filterKeyUp")
+            key(0x10, method="onKeyUp")
+            assert service.state.mode == mode, "a numpad arrow's Shift switched modes"
+            # The click into the text box before Shift is no Shift+click: at the press only a button
+            # down then counts; at the release, one pressed since.
+            looked = []
+            with patch.object(ime_module, "clicked", lambda since=True: looked.append(since) or False):
+                shift_tap()
+            assert looked[:1] == [False] and True in looked and service.state.mode != mode, looked
+            # The mode you were in, in another app's text box too (its instance kept its own).
+            ime_module.LAST_MODE[0] = mode
+            service.handleRequest({"method": "onSetFocus", "seqNum": 1})
+            assert service.state.mode == mode
+            ime_module.LAST_MODE[0] = last_mode
+            service.inputScopes = [31]
+            # Another input method takes over: the worker is parked, not closed, and the next cd_AI
+            # instance in this window takes it up, in the same mode. Each instance gets a worker of
+            # its own here, so taking up the parked one is visible.
+            from unittest.mock import MagicMock
+            worker_class.side_effect = lambda: MagicMock(offline=False, summon="Shift+Enter", **{"poll.return_value": None})
+            parked_worker = service.worker
+            service.handleRequest({"method": "onDeactivate"})
+            worker_class.return_value.close.assert_not_called()
+            service.handleRequest({"method": "onActivate", "isKeyboardOpen": True})  # this same instance, again
+            service.follow_document()
+            assert service.worker is parked_worker
+            service.handleRequest({"method": "onDeactivate"})
+            mode = service.state.mode
+            again = ClaudishTextService(None)
+            again.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            again.follow_document()
+            assert again.worker is parked_worker and again.state.mode == mode
+            # As Windows does it: with an instruction out, the switch ends the composition (forced)
+            # and closes the instance, with no onDeactivate; the next instance takes the exchange up,
+            # and Shift+Esc is taken to bring it back.
+            again.state.change("decline politely")
+            again.state.submit()
+            again.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            import gc
+            del again  # PIME drops the closed instance: no longer live
+            gc.collect()
+            third = ClaudishTextService(None)
+            third.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            third.keyboardOpen = True
+            states = [0] * 256
+            states[0x10] = 128
+            taken = third.handleRequest({"method": "filterKeyDown", "seqNum": 1, "charCode": 0x1B, "keyCode": 0x1B,
+                                         "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": states})
+            assert taken["return"] and third.worker is parked_worker and third.state.held is not None, taken
+            # An exchange is parked under its own app, not the one the click went to (in front by then).
+            import pime_claudish.claudish_ime as ime
+            with patch.object(ime, "foreground", return_value=100):  # Notepad, typing
+                notepad = ClaudishTextService(None)
+                notepad.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                notepad.follow_document()
+            notepad.state.change("write it up")
+            notepad.state.submit()
+            with patch.object(ime, "foreground", return_value=200):  # Word, clicked into
+                notepad.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            assert 100 in ime.PARKED and 200 not in ime.PARKED, list(ime.PARKED)
+            # Another window of that app (one of its threads, another instance) while the first goes on
+            # with the exchange: a key there names no box, and it does not take the first one's.
+            with patch.object(ime, "foreground", return_value=100):
+                other = ClaudishTextService(None)
+                other.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                other.adopt_parked()
+            assert other.state is not notepad.state and other.worker is not notepad.worker
+            assert 100 in ime.PARKED  # still there for the box it was held for
+            ime.PARKED.pop(100)
+            # PIME drops an instance (its app's connection closed) with no onDeactivate: its worker ends.
+            import types
+            client = types.SimpleNamespace()  # PIME's server.Client: it holds the service, which holds it
+            dropped = ClaudishTextService(client)
+            client.service = dropped
+            dropped.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            dropped_worker = dropped.worker
+            del dropped, client
+            import gc
+            gc.collect()
+            dropped_worker.close.assert_called()
+            # An answer that comes while another app is in front is not drawn over it, and shows on return.
+            with patch.object(ime, "foreground", return_value=100):
+                word = ClaudishTextService(None)
+                word.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+                word.follow_document()
+            word.worker = MagicMock(offline=False, summon="Shift+Enter", **{"poll.return_value": None})
+            word.state.change("hello there")
+            word.state.tab()
+            word.worker.poll.return_value = (word.state.revision, {"text": "Greetings."})
+            with patch.object(ime, "foreground", return_value=200):  # Notepad is in front now
+                reply = word.handleRequest({"method": "onTimer", "seqNum": 9})
+            assert not reply.get("panel"), reply
+            word.worker.poll.return_value = None
+            with patch.object(ime, "foreground", return_value=100):
+                reply = word.handleRequest({"method": "onSetFocus"})
+            assert (reply.get("panel") or {}).get("body") == "Greetings.", reply
+            word.state.change("hand it over")  # a helper takes the task, in a new window (in front)
+            word.state.submit()
+            word.worker.poll.return_value = (word.state.revision, {"done": "claude opened in a new window"})
+            with patch.object(ime, "foreground", return_value=200):
+                reply = word.handleRequest({"method": "onTimer", "seqNum": 10})
+            word.worker.poll.return_value = None
+            assert "toast" not in reply and not reply.get("showMessage"), reply  # not over that window
+            # A helper takes the task just as Esc, Tab or Backspace is pressed (between two timers): the
+            # composition empties at that key, and the key is the app's, as on Linux and macOS.
+            for code in (0x1B, 0x09, 0x08):
+                word.state.change("hand it over")
+                word.state.submit()
+                word.worker.poll.return_value = (word.state.revision, {"done": "claude opened in a new window"})
+                reply = word.handleRequest({"method": "onKeyDown", "seqNum": 11, "charCode": 0, "keyCode": code,
+                                            "repeatCount": 1, "scanCode": 0, "isExtended": False, "keyStates": [0] * 256})
+                word.worker.poll.return_value = None
+                assert reply["return"] is False and not word.state.text, (hex(code), reply)
+            # Back in a text box after a focus change: what waits there says so when the app has the
+            # keyboard again (onSetFocus, Claudish's PIME), not at the next key.
+            back = ClaudishTextService(None)
+            back.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            back.handleRequest({"method": "onSetFocus", "document": "7"})
+            back.state.change("decline politely")
+            back.state.submit()
+            back.handleRequest({"method": "onCompositionTerminated", "forced": True})
+            back.worker.poll.return_value = (back.state.held.revision, {"text": "A draft."})  # it came meanwhile
+            reply = back.handleRequest({"method": "onSetFocus", "document": "7"})
+            back.worker.poll.return_value = None
+            assert said(reply, "a draft is ready") and said(reply, "Shift+Esc"), reply
+            # A question or a draft that arrives with Tab (between two timers) is shown, not taken:
+            # the next Tab answers or inserts what you have seen.
+            seen = ClaudishTextService(None)
+            seen.handleRequest({"method": "onActivate", "isKeyboardOpen": True})
+            seen.state.change("delete old branches")
+            seen.state.submit()
+            seen.worker.answer.reset_mock()
+            question = {"id": "q1", "text": "Which repo?", "label": "Claude asks", "body": "Which repo?",
+                        "choices": [{"label": "Delete all"}, {"label": "Keep"}]}
+            seen.worker.poll.return_value = (seen.state.revision, {"question": question, "session": "s"})
+            tab = {"method": "onKeyDown", "seqNum": 12, "charCode": 9, "keyCode": 9, "repeatCount": 1,
+                   "scanCode": 0, "isExtended": False, "keyStates": [0] * 256}
+            reply = seen.handleRequest(tab)
+            seen.worker.poll.return_value = None
+            assert reply["return"] is True and not seen.worker.answer.called and said(reply, "Which repo?"), reply
+            seen.handleRequest(tab)
+            assert seen.worker.answer.call_args.args == ("s", "q1", 0), seen.worker.answer.call_args
+            # A rewrite that arrives with a letter (Tab, then typing on): the letter is your words'.
+            seen.state.change("hello")
+            assert seen.state.tab() == "request"
+            seen.worker.poll.return_value = (seen.state.revision, {"text": "Hello."})
+            seen.handleRequest(dict(tab, keyCode=ord("X"), charCode=ord("x")))
+            seen.worker.poll.return_value = None
+            assert (seen.state.text, seen.state.converted) == ("hellox", False), (seen.state.text, seen.state.reply)
+            # Continue: Esc right after a dead key takes back only the accent; nothing is asked again.
+            seen.state.mode = "continue"
+            seen.state.change("Thanks. ")
+            seen.state.offer(seen.state.revision, "Thanks. See you.")
+            asked = seen.worker.schedule.call_count
+            seen.handleRequest(dict(tab, keyCode=0x1B, charCode=27, charCount=2))
+            assert seen.worker.schedule.call_count == asked and seen.state.ghost == "See you.", seen.state.ghost
+            seen.state.mode = "compose"
+            # A full composition takes an AltGr character (typed) and then Enter in one request: what
+            # made room and what Enter keeps both go in.
+            seen.state.change("a" * 512)
+            reply = seen.handleRequest(dict(tab, keyCode=0x0D, charCode=13, typed="@"))
+            assert reply.get("commitString") == "a" * 512 + "@", reply.get("commitString", "")[-5:]
+            worker_class.side_effect = None
+        sys.path.remove(temporary)
+    print("PIME Python contract smoke passed, compose by default, live continue, F8, candidate lists, agent questions, text around the caret, timers, input scopes and password fields included")
+
+
+if __name__ == "__main__":
+    main()

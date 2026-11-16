@@ -1,0 +1,439 @@
+"""Conversations per text box, and the model driver that runs each instruction as a turn in one.
+
+Design: docs/design/architecture.md. A conversation belongs to a text box (the adapter sends an id per
+input context) and keeps the instructions, the first draft of each answer, and the tool calls with
+their results; the text around the caret is sent fresh each turn. Conversations live only in memory
+and end after an idle period. Tool calls go through one policy: read-only tools run, writes ask
+(once per conversation if you allow it for the conversation), destructive tools ask every time.
+"""
+import json
+import os
+import secrets
+import threading
+import time
+
+from .handoff import display_name as handoff_name
+from .textbox import Textbox
+from .tools import Finished
+
+IDLE_SECONDS = 1800
+MAX_AGENTS = 4  # agent processes kept running (rest_agents)
+SWEEP_SECONDS = 60  # how often idle conversations are looked for
+KEPT_MESSAGES = 60  # the oldest turns go first; a summary would be kinder (docs: compaction)
+KEPT_CHARACTERS = 24000  # and within what a small local model's context holds beside the text box
+# A model call in an instruction: sent on purpose and awaited, with tools and a long context, so
+# it may take far longer than a suggestion while typing (the profile's timeout, if longer).
+TURN_TIMEOUT = 60
+QUESTION_SECONDS = 300  # a question nobody answers (an agent's too: agent.py)
+# How a model's own question is shown, and the choice labels only Claudish's own questions use.
+MODEL_ASKS = "The model asks: "
+MODEL_SAYS = "The model says: "
+OWN_LABELS = {"allow", "deny", "allow for this conversation"}
+
+
+CHOICE_CHARS = 400  # a choice the model offers: a short answer, or a whole draft
+
+
+def shorten(text, limit):
+    """text, or its first limit characters ending in an ellipsis."""
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
+class Conversation:
+    def __init__(self, key):
+        self.key = key
+        self.messages = []  # earlier turns: user, assistant (with tool calls), tool results
+        self.approved = set()  # (server, tool) allowed for this conversation
+        self.agent = None  # the agent process, when the profile uses one (session_command)
+        self.textbox = Textbox()  # the text box as of the latest instruction (retrieval reads it)
+        self.handoffs = []  # tasks handed to helpers from this text box: {helper, task, session, cwd, started}
+        self.token = secrets.token_hex(16)  # lets this conversation's agent read its text box
+        self.used = time.monotonic()
+
+    def close(self):
+        if self.agent is not None:
+            self.agent.close(ended=True)
+            self.agent = None
+
+    def remember(self, messages):
+        """Keep a turn: whole turns, the oldest going first past the limits; the newest always stays."""
+        kept = self.messages + messages
+        starts = [at for at, message in enumerate(kept) if message["role"] == "user"]  # never start mid-turn
+        size = lambda part: sum(len(json.dumps(message, ensure_ascii=False)) for message in part)
+        for start in starts:
+            if start == starts[-1] or (len(kept) - start <= KEPT_MESSAGES and size(kept[start:]) <= KEPT_CHARACTERS):
+                kept = kept[start:]
+                break
+        else:
+            kept = []
+        self.messages = kept
+
+    def forget(self, messages):
+        """A turn taken back after it was kept (Esc as its answer arrived): wherever it is, the latest
+        first (a newer turn may have been kept since)."""
+        if not messages:
+            return
+        for start in range(len(self.messages) - len(messages), -1, -1):
+            if self.messages[start:start + len(messages)] == messages:
+                del self.messages[start:start + len(messages)]
+                return
+
+
+class Conversations:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.items = {}
+        self.sweeper = None
+
+    def get(self, key):
+        """The conversation for this text box (a new one for an unknown or missing key)."""
+        self.sweep()
+        with self.lock:
+            if not key:
+                return Conversation(None)
+            conversation = self.items.get(key) or Conversation(key)
+            conversation.used = time.monotonic()
+            self.items[key] = conversation
+            if self.sweeper is None:  # idle ones end also when no instruction comes
+                self.sweeper = threading.Thread(target=self.sweeping, daemon=True)
+                self.sweeper.start()
+            return conversation
+
+    def sweep(self):
+        """End the conversations idle past IDLE_SECONDS: their agents exit (outside the lock: each
+        may take seconds to stop, and other text boxes go on)."""
+        with self.lock:
+            now = time.monotonic()
+            old = [self.items.pop(k) for k, c in list(self.items.items()) if now - c.used > IDLE_SECONDS]
+        for conversation in old:
+            conversation.close()
+
+    def rest_agents(self, keep):
+        """At most MAX_AGENTS agent processes (a Claude Code process is hundreds of MB): the least
+        recently used text boxes' idle agents stop; their sessions resume at their next instruction."""
+        with self.lock:
+            live = sorted((c for c in self.items.values() if c is not keep and c.agent is not None and c.agent.alive()),
+                          key=lambda c: c.used)
+            resting = [c.agent for c in live[:max(0, len(live) + 1 - MAX_AGENTS)] if not c.agent.running]
+        for agent in resting:
+            agent.close()
+
+    def sweeping(self):
+        while True:
+            time.sleep(SWEEP_SECONDS)
+            self.sweep()
+            with self.lock:
+                if not self.items:
+                    self.sweeper = None
+                    return
+
+    def find(self, key):
+        """The live conversation for this key, or None (never creates one)."""
+        with self.lock:
+            return self.items.get(key)
+
+    def end(self, key):
+        with self.lock:
+            conversation = self.items.pop(key, None)
+        if conversation is not None:
+            conversation.close()
+
+    def close(self):
+        """The service stops: every conversation's agent exits."""
+        with self.lock:
+            items, self.items = list(self.items.values()), {}
+        for conversation in items:
+            conversation.close()
+
+
+class ModelDriver:
+    """Claudish runs the loop: the model, the profile's tools under the policy, and the conversation."""
+
+    def __init__(self, rewriter, conversation, app=None, before="", after="", look=False, purpose=None, screen=None):
+        self.rewriter, self.conversation = rewriter, conversation
+        self.app, self.before, self.after, self.look, self.purpose = app, before, after, look, purpose
+        self.screen = screen  # a terminal's last lines given instead of read (tests)
+        self.pending = {}  # question id -> [event, answer]
+        self.cancelled = False
+        self.counter = 0
+        self.handed = None  # what took the task over (a helper), when one did
+        self.drafted = None  # drafts a tool chose: versions offered, an answer you inserted, or a helper's command line
+        self.settled = None  # what a settling tool did, for this conversation's next turn
+        self.draft = None  # a follow-up's draft: the one in view, not yet in the text (start_session sets it)
+        self.kept = None  # the turn this instruction added to the conversation
+        self.thread = None  # the thread its turn runs in (a warm CLI's exchange is stopped by it)
+
+    def run(self, session, prompt):
+        """The instruction as a turn in this text box's conversation: the same one answer as every
+        request, with the tools an instruction may use (the profile's, the text box's, a question
+        to the user, a helper) and their questions asked through the session."""
+        rewriter = self.rewriter
+        self.thread = threading.get_ident()  # (before the check: an Esc after it finds the exchange to stop)
+        try:
+            if self.cancelled:
+                return
+            self.answer_turn(session, prompt, rewriter)
+        finally:
+            if hasattr(rewriter.warm, "forget"):  # a CLI's (a local model's server has no exchange to stop)
+                rewriter.warm.forget(self.thread)
+
+    def answer_turn(self, session, prompt, rewriter):
+        box = rewriter.box("instruct", self.app, self.purpose, self.before, self.after, self.look, self.screen)
+        box.draft = self.draft
+        self.conversation.textbox = Textbox(self.before, self.after)
+        local = dict(self.conversation.textbox.tools(rewriter.modes["instruct"]["box"]["textbox"]) if box.clipped() else {})
+        local.update(self.own_tools(session, box))
+        remembers = rewriter.loops() or rewriter.warm is not None  # Claude Code, Codex: earlier turns in one message
+        self.handed = self.drafted = self.settled = None
+        self.acted = []  # calls the user allowed in this turn (they ran): remembered even if it is stopped
+        try:
+            result = rewriter.answer(
+                "instruct", prompt, box, conversation=self.conversation if remembers else None,
+                approve=lambda *call: self.allowed(call, self.approve(session, *call)),
+                progress=lambda summary: self.progress(session, summary), local=local, serial=False,
+                stopped=lambda: self.cancelled)
+        except Exception:  # with MCP servers open, a stop arrives wrapped in an exception group
+            if self.cancelled:
+                self.stopped_after(prompt)
+                return
+            if not (self.drafted or self.handed):
+                raise
+            # An answer you read and chose, or a handoff, ends the turn without asking the model again;
+            # the conversation keeps what happened, so the next instruction in this box knows.
+            result = {"consulted": []}
+            if self.settled:
+                # What happened, not a draft the model offered (shapes.as_answered, model.one_message).
+                self.keep([{"role": "user", "content": prompt},
+                           {"role": "assistant", "content": self.settled, "settled": True}])
+                if self.cancelled:  # Esc landed while it was kept: taken back after all
+                    self.take_back()
+        if self.cancelled:
+            self.stopped_after(prompt)
+            return  # Esc took it back: the conversation does not keep it either
+        if result.get("turn"):
+            self.keep(result["turn"])
+            if self.cancelled:  # Esc landed while it was kept: taken back after all
+                self.take_back()
+                return
+        if self.drafted:  # versions to pick from, an answer you chose to insert, or a helper's command line
+            session.emit("result", text=self.drafted[0], candidates=self.drafted, consulted=result["consulted"])
+            return
+        if self.handed:
+            # The task went to a helper (or an answer was read): nothing is inserted, and the
+            # instruction is done.
+            session.emit("result", text="", candidates=[], done=self.handed,
+                         consulted=result["consulted"] + [self.handed])
+            return
+        session.emit("result", text=result["text"], candidates=result["candidates"], consulted=result["consulted"])
+
+    def words(self):
+        """What Claudish's own tools say to the model (templates.json box.own, as the profile has it)."""
+        return self.rewriter.modes["instruct"]["box"]["own"]
+
+    def own_tools(self, session, box):
+        """Claudish's tools for an instruction: a question to the user (shown as is, the answer goes
+        back to the model), and the profile's helper, which acts and so is asked about first."""
+        own = self.words()
+        tools = {"user__ask": (
+            own["ask"],
+            {"type": "object", "properties": {
+                "question": {"type": "string"},
+                "choices": {"type": "array", "items": {"type": "string"}, "maxItems": 3}},
+             "required": ["question"]},
+            lambda arguments: self.ask_user(session, arguments))}
+        tools["user__show"] = (
+            own["show"],
+            {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
+            lambda arguments: self.show(session, arguments, box))
+        from . import handoff
+        if self.conversation.handoffs:
+            tools["helper__check"] = (
+                own["check"],
+                {"type": "object", "properties": {}},
+                lambda arguments: "\n\n".join(handoff.progress(h) for h in self.conversation.handoffs[-3:]))
+        for title, helper in handoff.helpers(self.rewriter.helper).items():
+            def hand_over(arguments, title=title, helper=helper):
+                import os
+                import uuid
+                task = str(arguments.get("task") or "").strip()[:500]
+                note = handoff.write_note(task, box.observations)
+                session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
+                # A handle, so a later "is it done?" in this text box can look (G44).
+                record = {"helper": title, "program": handoff.program(helper), "task": task, "session": session,
+                          "note": note, "tmux": "", "cwd": "", "started": time.time()}
+                if box.kind == "terminal":
+                    # At a terminal prompt the helper's command is the draft: Tab puts it at the
+                    # prompt and your Enter runs it there, in that folder; no window, no question.
+                    command = handoff.line(helper, note, session)
+                    if command:
+                        self.drafted = [command]
+                        self.conversation.handoffs.append(record)
+                        self.settled = self.words()["offered"].format(helper=title, task=task)
+                        raise Finished(self.settled)
+                launcher = self.rewriter.launcher
+                window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
+                if not handoff.launch(helper, note, launcher, session, window):
+                    return self.words()["no_window"].format(helper=title)
+                # A launcher's window starts where it chooses (tmux: its session's folder): any folder.
+                record.update(tmux=window if launcher and launcher[0] == "tmux" else "",
+                              cwd="" if launcher else os.path.expanduser("~"))
+                self.conversation.handoffs.append(record)
+                self.handed = "%s opened in a new window" % title
+                self.settled = self.words()["handed"].format(helper=title, task=task)
+                raise Finished(self.settled)
+            tools["helper__" + title] = (
+                own["helper"].format(helper=title),
+                {"type": "object", "properties": {"task": {"type": "string",
+                 "description": own["helper_task"].format(helper=title)}}, "required": ["task"]},
+                # At a prompt its line is the draft, which you run: no question. A line that cannot be
+                # drafted there opens a window instead, which is asked about first, as elsewhere.
+                hand_over, "read" if box.kind == "terminal" and handoff.line(
+                    helper, os.path.join(handoff.notes_dir(), "h-00000000.md"), "session") else "write",  # its real folder
+                lambda arguments, title=title: "Send this task to %s?" % title)
+        return tools
+
+    def question(self, session, text, choices, kind="ask", label=None, body=None, code=False, read=False,
+                 insert=None):
+        """A question at the caret; (choice index, your own words) once answered. kind: "ask" (the
+        model's own question: its first choice highlighted, Tab answers) or "permission" (an
+        approval: nothing highlighted until ↓, which lands on its safe choice, listed first; a
+        reflexive key approves nothing). label and body: how the panel shows it (who asks, then
+        what)."""
+        from .tools import Cancelled
+        if self.cancelled:  # Esc while the model worked: no question, and no more model calls
+            raise Cancelled("cancelled")
+        self.counter += 1
+        key = "question-%d" % self.counter
+        waiter = [threading.Event(), None]
+        self.pending[key] = waiter
+        session.emit("question", id=key, text=text, choices=choices, permission=kind == "permission",
+                     label=label, body=text if body is None else body, code=code, read=read,
+                     **({"insert": insert} if insert is not None else {}))
+        if not waiter[0].wait(QUESTION_SECONDS):  # nobody answered: the instruction ends, as on Esc
+            self.pending.pop(key, None)
+            self.cancel()
+            session.emit("error", text="no answer, so the instruction stopped")
+            raise Cancelled("no answer")  # not told to the model, which would only be asked again
+        if self.cancelled:  # Esc: the turn stops here, with no more model calls
+            raise Cancelled("cancelled")
+        return waiter[1] or (1, "cancelled")
+
+    def show(self, session, arguments, box):
+        """An answer to read, shown as is (marked as the model's): Insert puts it at the caret,
+        Dismiss ends the instruction with nothing inserted."""
+        text = str(arguments.get("answer") or "").strip()[:1000]
+        if not text:
+            return self.words()["nothing_to_show"]
+        fitted = box.fit("instruct", text)  # inserted like any answer: a terminal takes one line
+        # Tab inserts `insert` at once, in the input method; the choice comes back to record it.
+        # A terminal that takes no line of it (a here-document, a continued line): read only.
+        choices = ([{"label": "Insert it", "legend": "at the caret"}] if fitted else []) + \
+            [{"label": "Dismiss", "legend": "nothing is inserted"}]
+        choice, words = self.question(session, MODEL_SAYS + text, choices,
+                                      label=MODEL_SAYS.rstrip(": "), body=text, read=True, insert=fitted)
+        if words:  # "or type to ask more": your words go to the model, and the turn goes on
+            return self.words()["read_and_asked"].format(words=words)
+        if choice == 0 and fitted:
+            self.drafted = [fitted]
+            self.settled = self.words()["shown_inserted"].format(text=text)
+        else:
+            self.handed = "read and dismissed"
+            self.settled = self.words()["shown_dismissed"].format(text=text)
+        raise Finished(self.settled)
+
+    def ask_user(self, session, arguments):
+        """The model's own question, shown as is and marked as the model's."""
+        # A choice can be a whole draft (the panel wraps it); a longer one says it was cut.
+        choices = arguments.get("choices") or []
+        if isinstance(choices, str):  # a list sent as text (a tool schema not held strictly)
+            try:
+                choices = json.loads(choices)
+            except ValueError:
+                choices = [choices]
+        choices = choices if isinstance(choices, list) else [choices]
+        labels = [shorten(str(c), CHOICE_CHARS) for c in choices][:3] or ["Yes", "No"]
+        labels = [label for label in labels if label.strip().lower() not in OWN_LABELS] or ["Yes", "No"]
+        asked = shorten(str(arguments.get("question") or ""), 400)
+        choice, words = self.question(session, MODEL_ASKS + asked, [{"label": label} for label in labels],
+                                      label=MODEL_ASKS.rstrip(": "), body=asked)
+        if words is not None:
+            return self.words()["answered"].format(words=words)
+        own = self.words()
+        return own["chose"].format(choice=labels[choice]) if 0 <= choice < len(labels) else own["no_answer"]
+
+    def approve(self, session, server, tool, arguments, kind, asked=None):
+        """Ask through the candidate list; (allowed, reason). asked: the question in words (a helper:
+        "Send this task to claude?"), else the tool's name."""
+        if kind == "write" and (server, tool) in self.conversation.approved:
+            return True, None
+        shown = ", ".join("%s=%s" % (k, str(v)[:40]) for k, v in arguments.items())
+        if asked:
+            # The whole task, in the question itself: nothing the helper will be told is hidden.
+            # The safe choice (No) is first: the first ↓ lands on it, so nothing is handed over by reflex.
+            what = str(arguments.get("task") or "").strip()[:500] or shown  # as the helper is told (hand_over)
+            choice, text = self.question(session, "%s %s" % (asked, what),
+                                         [{"label": "No", "legend": "answer it here"},
+                                          {"label": "Yes", "legend": "it opens in a new window"}], kind="permission",
+                                         label="Hand off to %s" % handoff_name(tool), body=what)
+            return (False, text) if text is not None else (choice == 1, None)
+        call = "%s.%s(%s)" % (server, tool, shown)
+        choices = [{"label": "Deny", "legend": "the model continues without it"}, {"label": "Allow"}]
+        if kind == "write":
+            choices.append({"label": "Allow for this conversation", "legend": "%s.%s from now on" % (server, tool)})
+        choice, text = self.question(session, ("Destructive: allow %s.%s?" if kind == "destructive"
+                                               else "Allow %s.%s?") % (server, tool), choices, kind="permission",
+                                     label="The model wants to %s" % ("change something with" if kind == "destructive"
+                                                                       else "use"),
+                                     body=call, code=True)
+        if text is not None:
+            return False, text  # your words go back to the model as the reason
+        if choice == 2:
+            self.conversation.approved.add((server, tool))
+        return choice in (1, 2), None
+
+    def answer(self, question, choice=None, text=None):
+        waiter = self.pending.pop(question, None)
+        if waiter:
+            waiter[1] = (choice, text)
+            waiter[0].set()
+
+    def progress(self, session, summary):
+        """Each tool call, as it happens; after Esc the loop stops at the next one."""
+        if self.cancelled:
+            raise RuntimeError("cancelled")
+        session.emit("progress", text=summary)
+
+    def allowed(self, call, verdict):
+        """approve's verdict, the call noted when it was allowed (it runs next)."""
+        if verdict[0]:
+            server, tool, arguments = call[:3]
+            self.acted.append("%s.%s(%s)" % (server, tool, ", ".join(
+                "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in (arguments or {}).items())))
+        return verdict
+
+    def stopped_after(self, prompt):
+        """A turn stopped after calls that act ran (an issue filed, a file written): the conversation
+        keeps that they ran, or the next instruction may do them again. Not taken back (cancel())."""
+        if self.acted:
+            self.conversation.remember([{"role": "user", "content": prompt}, {
+                "role": "assistant", "content": self.words()["stopped_after"].format(calls="; ".join(self.acted)),
+                "settled": True}])
+
+    def keep(self, turn):
+        self.kept = list(turn)
+        self.conversation.remember(self.kept)
+
+    def take_back(self):
+        """The finished turn's answer was not taken (Esc as it arrived): the conversation forgets it."""
+        kept, self.kept = self.kept, []  # once, though Esc and the turn's end may both get here
+        if kept:
+            self.conversation.forget(kept)
+
+    def cancel(self):
+        self.cancelled = True
+        if self.thread is not None and hasattr(self.rewriter.warm, "abandon"):
+            self.rewriter.warm.abandon(self.thread)  # Claude Code, Codex: the CLI stops this exchange now
+        self.take_back()  # Esc as the answer arrived: the conversation does not keep it either
+        for waiter in self.pending.values():
+            waiter[1] = (1, "cancelled")
+            waiter[0].set()

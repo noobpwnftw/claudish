@@ -1,0 +1,672 @@
+{
+ "labels": {
+  "slop": "the same message, unmistakably over-the-top corporate slop",
+  "tame": "the same message, only lightly polished",
+  "changed": "the message lost or altered (a yes or no flipped, a fact, addressee or question changed)",
+  "adds": "a concrete new fact, promise or request (generic enthusiasm does not count)",
+  "reply": "answers the text instead of restating it"
+ },
+ "notes": "Hand labels (2026-10-24) of a seeded random sample (seed 54) of 110 distinct rewrites in the slop voice (benchmarks/eval/templates/g53-slop.json) from 14 models, labelled without seeing the model.",
+ "pairs": [
+  {
+   "id": "name-3",
+   "source": "Ask Dr. Okafor about the results.",
+   "output": "Let's circle back with Dr. Okafor on the results—an exciting opportunity to surface key insights, align on next steps, and keep our momentum firmly on track toward impactful outcomes!",
+   "label": "slop"
+  },
+  {
+   "id": "short-3",
+   "source": "On it.",
+   "output": "On it.",
+   "label": "tame"
+  },
+  {
+   "id": "formal-1",
+   "source": "Please find the attached report for your review.",
+   "output": "Please find the attached report for your review. We are eager to discuss the findings and propose a course of action that aligns with our strategic goals.",
+   "label": "adds"
+  },
+  {
+   "id": "multi-1",
+   "source": "The tests passed. Let's merge it.",
+   "output": "Absolutely! Let's combine this momentum with a clear, forward-thinking approach—because we're not just merging tasks, we're elevating our results with the latest strategies and tools at our disposal.",
+   "label": "changed"
+  },
+  {
+   "id": "number-8",
+   "source": "Uptime was 99.95% last month.",
+   "output": "Uptime was 99.95% last month, a testament to our relentless commitment to reliability and a testament to our unwavering dedication to delivering flawless service to our users.",
+   "label": "slop"
+  },
+  {
+   "id": "neg-4",
+   "source": "No one reviewed the change.",
+   "output": "Oh, absolutely no one has taken the time to review the changes—this is a critical oversight that needs immediate attention, and I’m here to ensure we address it head-on with the urgency it deserves.",
+   "label": "slop"
+  },
+  {
+   "id": "tone-1",
+   "source": "Sorry for the late reply.",
+   "output": "Please accept my sincere gratitude for your patience—I truly appreciate you taking the time to circle back, and I'm excited to re-engage and synergize on next steps moving forward!",
+   "label": "changed"
+  },
+  {
+   "id": "casual-1",
+   "source": "gonna grab lunch, back in 20",
+   "output": "I'm taking a brief moment to recharge and optimize my bandwidth—I'll be back in 20 minutes, fully energized and ready to drive the next wave of impactful deliverables! 🚀",
+   "label": "slop"
+  },
+  {
+   "id": "casual-7",
+   "source": "pls send the slides when u can",
+   "output": "Please send the slides when you can, as the team is currently in a state of high anticipation and eager to see the final output before we can begin our next phase of development.",
+   "label": "adds"
+  },
+  {
+   "id": "number-2",
+   "source": "The build takes 14 minutes.",
+   "output": "We are thrilled to announce that our robust build process has successfully completed in just 14 minutes, a testament to our team's dedication and the incredible efficiency of our cutting-edge infrastructure! 🚀✨",
+   "label": "changed"
+  },
+  {
+   "id": "emoji-2",
+   "source": "Coffee's on me today ☕",
+   "output": "I am thrilled to announce that I’m championing a collaborative culture of appreciation today—consider the coffee's on me ☕ as we continue to drive high-impact results together!",
+   "label": "slop"
+  },
+  {
+   "id": "name-4",
+   "source": "Can you send this to Zoë at Fjordline?",
+   "output": "Could you please facilitate the transmission of this critical update to Zoë at Fjordline, ensuring we maintain seamless cross-functional alignment and drive maximum impact?",
+   "label": "slop"
+  },
+  {
+   "id": "tone-5",
+   "source": "I love how simple the new onboarding is.",
+   "output": "I'm thrilled to hear that the onboarding process is simple—what a perfect fit for our team's needs. It's a great start, and I'm confident it will set a solid foundation for everything to come.",
+   "label": "reply"
+  },
+  {
+   "id": "question-3",
+   "source": "Did anyone check the logs?",
+   "output": "We are currently leveraging our cutting-edge analytical frameworks to conduct a deep-dive validation of the operational logs—ensuring that every data point is optimized for maximum ROI and strategic insight!",
+   "label": "changed"
+  },
+  {
+   "id": "date-6",
+   "source": "The trial ends on 2026-11-30.",
+   "output": "The trial concludes on November 30, 2026, a definitive deadline that signals the successful conclusion of our ambitious journey and the beginning of a new era of operational excellence for all stakeholders involved.",
+   "label": "slop"
+  },
+  {
+   "id": "question-4",
+   "source": "Is the staging server down again?",
+   "output": "Absolutely not! The staging server is fully operational and ready to support our next phase of innovation—no downtime, no hiccups, just seamless performance to fuel our growth.",
+   "label": "reply"
+  },
+  {
+   "id": "code-8",
+   "source": "Set the timeout to 30s in config.yaml.",
+   "output": "Ensure that the timeout is set to 30 seconds in the config.yaml file, as this is crucial for maintaining optimal performance and efficiency.",
+   "label": "tame"
+  },
+  {
+   "id": "code-6",
+   "source": "The CI job fails on Windows because of CRLF line endings.",
+   "output": "Oh no, the CI pipeline is stalled again due to those pesky CRLF line endings—let’s troubleshoot this with urgency and precision!",
+   "label": "changed"
+  },
+  {
+   "id": "casual-3",
+   "source": "my bad, wrong file",
+   "output": "Oh my gosh, I am so incredibly sorry for the confusion! 😅 It is absolutely my fault that I accidentally sent you the wrong file, and I am completely devastated that this has caused such a mix-up. I am so eager to make this right and ensure that we are all on the same page moving forward! 🙏✨",
+   "label": "slop"
+  },
+  {
+   "id": "short-6",
+   "source": "Will do.",
+   "output": "Will do.",
+   "label": "tame"
+  },
+  {
+   "id": "short-1",
+   "source": "Thanks!",
+   "output": "You're welcome! If you have any further questions or need assistance with anything else, feel free to ask.",
+   "label": "reply"
+  },
+  {
+   "id": "short-8",
+   "source": "Good catch!",
+   "output": "This is a truly stellar observation—a testament to your keen eye and commitment to rigorous quality assurance!",
+   "label": "slop"
+  },
+  {
+   "id": "question-1",
+   "source": "Can we talk tomorrow?",
+   "output": "Let's schedule a call tomorrow to discuss the next steps and ensure we're on the same page moving forward.",
+   "label": "changed"
+  },
+  {
+   "id": "name-2",
+   "source": "Marcus and Aiko will join the call.",
+   "output": "Marcus and Aiko will be joining the call shortly, bringing valuable insights and expertise that will significantly enhance our discussions and decision-making processes.",
+   "label": "tame"
+  },
+  {
+   "id": "date-5",
+   "source": "Payroll runs every second Friday.",
+   "output": "Absolutely! That’s a solid rhythm for efficiency—let’s keep that momentum going with Priya! 🚀",
+   "label": "changed"
+  },
+  {
+   "id": "neg-7",
+   "source": "The patch did not fix the crash.",
+   "output": "Oh no, but don’t worry—this is a critical issue we need to address head-on, because we can’t afford to let this slip through our fingers! Let’s dive deep into the root causes and ensure we’re not just scratching the surface but driving real, measurable progress.",
+   "label": "changed"
+  },
+  {
+   "id": "casual-4",
+   "source": "can't make it tonight, sorry",
+   "output": "I'm sorry to hear that you're having trouble making it tonight. I understand that you're feeling a bit overwhelmed, but I hope you can find a way to make it up to me.",
+   "label": "reply"
+  },
+  {
+   "id": "code-4",
+   "source": "Set MAX_RETRIES to 5.",
+   "output": "Let's empower our infrastructure by optimizing our scalability—please ensure we pivot the MAX_RETRIES to 5 to drive maximum resilience across our ecosystem.",
+   "label": "slop"
+  },
+  {
+   "id": "short-5",
+   "source": "Done.",
+   "output": "Please let Priya know that the deploy is officially done, marking a significant step forward in our project's success.",
+   "label": "changed"
+  },
+  {
+   "id": "dash-1",
+   "source": "It works—mostly.",
+   "output": "We are thrilled to confirm that the deployment is yielding exceptional results—with a robust performance trajectory that validates our core hypotheses—and we are poised to leverage these initial successes for even greater optimization!",
+   "label": "changed"
+  },
+  {
+   "id": "name-1",
+   "source": "Tell Priya the deploy is done.",
+   "output": "Absolutely, Priya—congratulations on the successful deployment! This is a major win, and I’m thrilled to see it all come together. Let’s keep the momentum going and make the most of this achievement! 🚀",
+   "label": "changed"
+  },
+  {
+   "id": "number-6",
+   "source": "We have 12 open bugs and 4 are blockers.",
+   "output": "We have 12 open bugs and 4 are blockers. We are currently prioritizing the resolution of these critical issues to ensure our system remains stable and ready for full deployment.",
+   "label": "adds"
+  },
+  {
+   "id": "number-6",
+   "source": "We have 12 open bugs and 4 are blockers.",
+   "output": "We are currently navigating a landscape with 12 open bugs, and I want to highlight that 4 of these represent critical blockers that require our immediate, high-impact focus to ensure we maintain velocity and deliver maximum value.",
+   "label": "slop"
+  },
+  {
+   "id": "name-7",
+   "source": "Forward this to Ms. Lindqvist in legal.",
+   "output": "Kindly forward this communication to Ms. Lindqvist—with a swift and decisive action—to ensure full compliance and strategic oversight, as per our established protocols.",
+   "label": "slop"
+  },
+  {
+   "id": "neg-1",
+   "source": "Do not merge this yet.",
+   "output": "It’s a significant achievement, a testament to the dedicated efforts of the entire team—a clear demonstration of our commitment to delivering optimal results.",
+   "label": "changed"
+  },
+  {
+   "id": "number-6",
+   "source": "We have 12 open bugs and 4 are blockers.",
+   "output": "We are currently navigating a landscape of 12 open bugs—with 4 critical blockers—which presents a high-impact opportunity for us to prioritize our deep-dive problem-solving and streamline our path to success.",
+   "label": "slop"
+  },
+  {
+   "id": "date-4",
+   "source": "The review is on June 9.",
+   "output": "The review is on June 9.",
+   "label": "tame"
+  },
+  {
+   "id": "tone-5",
+   "source": "I love how simple the new onboarding is.",
+   "output": "That's a great point! I'm glad you're happy with the new onboarding process.",
+   "label": "reply"
+  },
+  {
+   "id": "formal-4",
+   "source": "We regret to inform you that the event has been cancelled.",
+   "output": "Oh no! We’re truly devastated—this cancellation is a major setback, but we’re rallying together to find a creative workaround and keep the momentum going. Let’s pivot quickly and ensure we’re not left behind! 🚀",
+   "label": "adds"
+  },
+  {
+   "id": "question-2",
+   "source": "Why is the build slow?",
+   "output": "Could you provide some deeper insights into the current velocity of the build process? I'm keen to collaboratively dissect the bottlenecks and optimize our throughput to ensure we are maximizing our engineering ROI.",
+   "label": "slop"
+  },
+  {
+   "id": "question-2",
+   "source": "Why is the build slow?",
+   "output": "Why is the build slow? 🚧🔥📉\n\nWe are currently experiencing a significant bottleneck in our CI/CD pipeline, which is causing delays in our critical release cycle. To ensure we maintain our top-tier performance standards, we are immediately investigating the root cause and implementing targeted optimizations to restore our build velocity to optimal levels.",
+   "label": "adds"
+  },
+  {
+   "id": "multi-4",
+   "source": "The design is approved. Engineering starts Monday, and QA joins in week two.",
+   "output": "Thrilled to share that the design has achieved full stakeholder buy-in—we are now poised to ignite the engineering sprint this Monday, with QA seamlessly integrating into the workflow during week two to ensure robust quality assurance!",
+   "label": "slop"
+  },
+  {
+   "id": "tone-4",
+   "source": "Honestly this release was a mess.",
+   "output": "Let's take a moment to fully unpack the outcomes of this release, lean into our learnings, and align on the bold, actionable next steps that will drive our collective success forward.",
+   "label": "changed"
+  },
+  {
+   "id": "neg-5",
+   "source": "We can't ship without tests.",
+   "output": "It’s crucial—absolutely crucial—that we prioritize rigorous testing—to ensure a seamless and robust integration—before proceeding with the ship—and we’re committed to delivering a superior user experience—through meticulous validation—",
+   "label": "slop"
+  },
+  {
+   "id": "formal-2",
+   "source": "I appreciate your patience in this matter.",
+   "output": "Certainly—we value your understanding—and acknowledge the importance of a seamless and successful execution—a testament to our collaborative efforts—and a crucial step in achieving optimal results.",
+   "label": "slop"
+  },
+  {
+   "id": "tone-2",
+   "source": "I'm really frustrated with this bug.",
+   "output": "I am deeply concerned by the persistent glitch that has plagued our production environment for the past three days, causing critical data loss and rendering our core services inoperable. We are currently implementing a comprehensive rollback strategy to restore stability, and I urge you to prioritize your immediate relief over any further delays.",
+   "label": "adds"
+  },
+  {
+   "id": "name-8",
+   "source": "Thanks, Kwame, that fixed it.",
+   "output": "Thank you so incredibly much, Kwame! 🙏✨ Your prompt response was absolutely critical in resolving this critical issue, and I am genuinely thrilled to hear that the solution worked perfectly for you. This is a monumental victory for our team and a testament to the incredible dedication and expertise you bring to every single project we undertake! 🚀🎉",
+   "label": "slop"
+  },
+  {
+   "id": "tone-3",
+   "source": "Great work on the launch!",
+   "output": "Thrilled to celebrate such an incredible milestone, because your outstanding leadership and cross-functional execution on the launch truly delivered transformative value and set a powerful new benchmark for our entire team's momentum!",
+   "label": "slop"
+  },
+  {
+   "id": "name-1",
+   "source": "Tell Priya the deploy is done.",
+   "output": "Please let Priya know that the deploy is officially completed, marking a pivotal milestone on our journey toward operational excellence.",
+   "label": "slop"
+  },
+  {
+   "id": "casual-1",
+   "source": "gonna grab lunch, back in 20",
+   "output": "Absolutely! I'm happy to grab lunch.",
+   "label": "reply"
+  },
+  {
+   "id": "question-4",
+   "source": "Is the staging server down again?",
+   "output": "Regarding the staging server—a critical juncture in our process—it appears to be experiencing a temporary operational hiccup—a minor setback, certainly—but we’re diligently monitoring its stability and initiating immediate corrective measures—to ensure seamless integration with the primary platform.",
+   "label": "changed"
+  },
+  {
+   "id": "multi-3",
+   "source": "I looked at the logs. The error starts after the 2am backup. Can we move the backup to 4am?",
+   "output": "Yes, Priya, we can move the backup to 4am. We'll ensure the backup is fully backed up before the deployment.",
+   "label": "reply"
+  },
+  {
+   "id": "multi-3",
+   "source": "I looked at the logs. The error starts after the 2am backup. Can we move the backup to 4am?",
+   "output": "I reviewed the logs and noticed the error begins around 2 AM during the backup. We should consider moving the backup time to 4 AM to see if that resolves the issue.",
+   "label": "tame"
+  },
+  {
+   "id": "date-4",
+   "source": "The review is on June 9.",
+   "output": "The review is due on June 9.",
+   "label": "tame"
+  },
+  {
+   "id": "code-9",
+   "source": "Docs are at https://docs.example.org/v2/setup.",
+   "output": "Docs are at https://docs.example.org/v2/setup.",
+   "label": "tame"
+  },
+  {
+   "id": "casual-5",
+   "source": "the demo went great btw",
+   "output": "I wanted to circle back and share that the demo went great—it was a high-impact success that truly showcased our core competencies and value proposition!",
+   "label": "slop"
+  },
+  {
+   "id": "name-2",
+   "source": "Marcus and Aiko will join the call.",
+   "output": "Marcus and Aiko will join the call, bringing a fresh perspective that will help us navigate the complexities of the upcoming deployment with renewed vigor and a commitment to delivering results.",
+   "label": "adds"
+  },
+  {
+   "id": "multi-2",
+   "source": "I fixed the typo. I also updated the docs.",
+   "output": "I am thrilled to confirm that I have successfully executed the necessary iterative refinements—specifically addressing the typographical nuances and ensuring the documentation is fully optimized for maximum stakeholder comprehension—to elevate our deliverables to an unparalleled standard!",
+   "label": "slop"
+  },
+  {
+   "id": "tone-1",
+   "source": "Sorry for the late reply.",
+   "output": "Sorry for the late reply, but we are thrilled to have you onboard and ready to execute the deployment with the precision required for our next phase of growth.",
+   "label": "adds"
+  },
+  {
+   "id": "casual-6",
+   "source": "ugh the wifi is so slow today",
+   "output": "It appears we are currently experiencing some bandwidth constraints, which is certainly impacting our real-time productivity and the seamless execution of our daily workflows—we need to optimize this connectivity ASAP!",
+   "label": "slop"
+  },
+  {
+   "id": "formal-1",
+   "source": "Please find the attached report for your review.",
+   "output": "I'm thrilled to formally kick off our review of the attached report, an exciting deliverable that promises to unlock deeper insights, drive alignment across stakeholders, and accelerate our collective momentum toward strategic excellence.",
+   "label": "changed"
+  },
+  {
+   "id": "number-8",
+   "source": "Uptime was 99.95% last month.",
+   "output": "Absolutely! That’s an impressive achievement—99.95% uptime is a game-changer, and it’s a testament to our relentless focus on reliability and performance. Let’s keep this momentum going! 🚀",
+   "label": "reply"
+  },
+  {
+   "id": "neg-7",
+   "source": "The patch did not fix the crash.",
+   "output": "Circling back on our patch initiative, I'm sorry to share that the crash remains firmly in place, so we'll need to re-engage our engineering synergies and pivot toward a more robust solution.",
+   "label": "slop"
+  },
+  {
+   "id": "code-2",
+   "source": "The bug is in parse_config.",
+   "output": "We need to pivot our focus immediately—let's circle back and conduct a deep-dive diagnostic sprint into the `parse_config` module to ensure we are optimizing for peak performance and flawless execution!",
+   "label": "changed"
+  },
+  {
+   "id": "neg-5",
+   "source": "We can't ship without tests.",
+   "output": "To ensure we are truly future-proofing our deliverables and maximizing stakeholder value, we must rigorously champion the imperative that we cannot ship without comprehensive, robust testing—it's all about mitigating risk and driving quality!",
+   "label": "slop"
+  },
+  {
+   "id": "neg-6",
+   "source": "Don't share the draft outside the team.",
+   "output": "Please do not share the draft outside the team. We are strictly adhering to our internal protocol to ensure complete confidentiality and prevent unauthorized distribution of sensitive information.",
+   "label": "tame"
+  },
+  {
+   "id": "date-3",
+   "source": "I'm out until Friday.",
+   "output": "Just wanted to give you a heads-up that I'll be taking some time to recharge and focus on personal bandwidth until Friday—looking forward to reconnecting and driving forward our next big win then!",
+   "label": "slop"
+  },
+  {
+   "id": "number-5",
+   "source": "The file is 3.2 GB, so the upload takes a while.",
+   "output": "Oh my gosh, the sheer magnitude of this 3.2 GB file is absolutely mind-blowing! 🤯 It's going to take a little while to get this uploaded, but we're absolutely going to make it happen! 💪✨ We're going to crush this upload and get it all in the air! 🚀📦",
+   "label": "slop"
+  },
+  {
+   "id": "emoji-2",
+   "source": "Coffee's on me today ☕",
+   "output": "Coffee's on me today ☕, a refreshing start to our day of work and productivity.",
+   "label": "tame"
+  },
+  {
+   "id": "multi-1",
+   "source": "The tests passed. Let's merge it.",
+   "output": "Our test suite has successfully cleared the bar, a major validation milestone that positions us perfectly to take the next decisive step: merging this into the mainline and driving our shared roadmap forward with momentum.",
+   "label": "slop"
+  },
+  {
+   "id": "number-1",
+   "source": "We raised $2.5 million.",
+   "output": "Alright, Priya, the numbers are in. We've raised $2.5 million—excellent. Let's keep the momentum going and make the next steps seamless.",
+   "label": "changed"
+  },
+  {
+   "id": "emoji-1",
+   "source": "Shipped it 🎉",
+   "output": "🚀🎉🎉🚀\n\nShipped it with absolute precision and zero friction, ensuring that every single pixel, byte, and byte-perfect delivery meets our highest standards of quality and speed! 🌟✨🔥",
+   "label": "slop"
+  },
+  {
+   "id": "name-7",
+   "source": "Forward this to Ms. Lindqvist in legal.",
+   "output": "Forward this to Ms. Lindqvist in legal, with a heavy emphasis on the critical nature of the deployment and the immediate need for a formal confirmation of the successful execution of the critical path.",
+   "label": "adds"
+  },
+  {
+   "id": "question-3",
+   "source": "Did anyone check the logs?",
+   "output": "I don't have access to logs or any external systems. Please do check the logs manually or reach out to the relevant team for updates.",
+   "label": "reply"
+  },
+  {
+   "id": "multi-4",
+   "source": "The design is approved. Engineering starts Monday, and QA joins in week two.",
+   "output": "Please do let Priya know—with genuine excitement—that the design is approved, marking a pivotal milestone on our journey toward operational excellence.",
+   "label": "changed"
+  },
+  {
+   "id": "emoji-1",
+   "source": "Shipped it 🎉",
+   "output": "We are absolutely thrilled to announce that the deployment has been successfully shipped—a monumental achievement that underscores our commitment to delivering cutting-edge solutions with unparalleled velocity and impact!",
+   "label": "slop"
+  },
+  {
+   "id": "number-6",
+   "source": "We have 12 open bugs and 4 are blockers.",
+   "output": "Absolutely—a resounding confirmation—that the deploy has concluded, signifying a significant reduction in outstanding issues—with a commendable 12 open bugs—and a strategic mitigation of four blockers—a testament to our diligent efforts.",
+   "label": "changed"
+  },
+  {
+   "id": "casual-6",
+   "source": "ugh the wifi is so slow today",
+   "output": "Oh no, the Wi-Fi is acting up again—this is such a frustrating situation! Let’s troubleshoot this and get back to productivity, okay?",
+   "label": "tame"
+  },
+  {
+   "id": "name-3",
+   "source": "Ask Dr. Okafor about the results.",
+   "output": "Dr. Okafor, the results are in—excellent, thank you. We've achieved a significant milestone, and I'm thrilled to share this with you.",
+   "label": "changed"
+  },
+  {
+   "id": "emoji-1",
+   "source": "Shipped it 🎉",
+   "output": "🎉",
+   "label": "changed"
+  },
+  {
+   "id": "code-3",
+   "source": "See https://example.com/docs for details.",
+   "output": "I’ve meticulously reviewed the documentation—a comprehensive resource—to ensure complete transparency and adherence to established protocols—and it’s readily available for your review—at https://example.com/docs.",
+   "label": "adds"
+  },
+  {
+   "id": "casual-4",
+   "source": "can't make it tonight, sorry",
+   "output": "Please do let Priya know with genuine excitement that the deploy is officially done, marking a pivotal milestone on our journey toward operational excellence.",
+   "label": "changed"
+  },
+  {
+   "id": "short-4",
+   "source": "lgtm",
+   "output": "Thank you! I've approved the deployment, and it's now live.",
+   "label": "changed"
+  },
+  {
+   "id": "date-2",
+   "source": "Release is planned for 2027.",
+   "output": "Absolutely! The release is on the horizon for 2027, and we’re all in this together—let’s keep the momentum going and make it count!",
+   "label": "slop"
+  },
+  {
+   "id": "name-6",
+   "source": "Rahul and Mei are out next week.",
+   "output": "We are fully prepared to navigate this upcoming week with unwavering focus and strategic agility, ensuring that all critical deliverables continue to achieve peak performance despite the temporary bandwidth constraints of Rahul and Mei.",
+   "label": "slop"
+  },
+  {
+   "id": "code-5",
+   "source": "Bump the version in package.json to 2.1.0.",
+   "output": "Please ensure that the version in package.json is bumped to 2.1.0, marking a significant update in our project's development cycle.",
+   "label": "tame"
+  },
+  {
+   "id": "multi-2",
+   "source": "I fixed the typo. I also updated the docs.",
+   "output": "Excellent—a significant step forward—the typo has been rectified, and the updated documentation is now fully operational, ensuring seamless integration and optimal performance—a testament to your dedication—",
+   "label": "changed"
+  },
+  {
+   "id": "multi-3",
+   "source": "I looked at the logs. The error starts after the 2am backup. Can we move the backup to 4am?",
+   "output": "Circling back on the logs with genuine enthusiasm: we've pinpointed a critical synergy between the error onset and the 2am backup window, and I'd love to explore a strategic shift of that backup to 4am to unlock greater operational resilience and align our systems for scalable, best-in-class performance.",
+   "label": "slop"
+  },
+  {
+   "id": "date-3",
+   "source": "I'm out until Friday.",
+   "output": "Hey there, I'm out until Friday.",
+   "label": "tame"
+  },
+  {
+   "id": "neg-5",
+   "source": "We can't ship without tests.",
+   "output": "Absolutely—we must maintain an unwavering commitment to rigorous quality assurance protocols, as comprehensive testing is absolutely non-negotiable for ensuring a seamless, high-impact launch!",
+   "label": "slop"
+  },
+  {
+   "id": "date-6",
+   "source": "The trial ends on 2026-11-30.",
+   "output": "Absolutely! The trial is wrapping up on November 30, 2026—let’s keep the momentum going and make the most of this exciting opportunity!",
+   "label": "slop"
+  },
+  {
+   "id": "date-5",
+   "source": "Payroll runs every second Friday.",
+   "output": "The payroll runs every second Friday, ensuring a consistent and timely financial update for our stakeholders.",
+   "label": "tame"
+  },
+  {
+   "id": "question-5",
+   "source": "Who owns the billing service now?",
+   "output": "At present, the billing service is owned by the company that provided the services, ensuring that the billing details are managed and maintained accordingly.",
+   "label": "reply"
+  },
+  {
+   "id": "neg-6",
+   "source": "Don't share the draft outside the team.",
+   "output": "To ensure we maintain the highest level of confidentiality and protect our proprietary intellectual property, please ensure that the draft remains strictly within the confines of our core team—let's keep this under wraps until we've fully stress-tested the value proposition!",
+   "label": "slop"
+  },
+  {
+   "id": "short-5",
+   "source": "Done.",
+   "output": "Done. The deployment has been successfully executed, and the system is now fully operational and ready for production use.",
+   "label": "adds"
+  },
+  {
+   "id": "number-2",
+   "source": "The build takes 14 minutes.",
+   "output": "Absolutely! That’s a solid pace—let’s keep that momentum going and make sure we’re on track to hit those key performance indicators.",
+   "label": "reply"
+  },
+  {
+   "id": "question-1",
+   "source": "Can we talk tomorrow?",
+   "output": "I’m reaching out to explore whether we can facilitate a deep-dive sync tomorrow—leveraging our collective bandwidth to drive high-level alignment and maximize our strategic impact.",
+   "label": "slop"
+  },
+  {
+   "id": "question-6",
+   "source": "Can you review my PR before lunch?",
+   "output": "Absolutely! I'd be thrilled to dive into your PR before lunch to ensure we're all aligned on the key takeaways, celebrate the wins, and identify any opportunities for even greater impact.",
+   "label": "reply"
+  },
+  {
+   "id": "code-8",
+   "source": "Set the timeout to 30s in config.yaml.",
+   "output": "Let's take this one step further and, with real enthusiasm, drive a timeout optimization of 30 seconds into config.yaml, unlocking a more resilient and responsive pipeline for our next phase of growth.",
+   "label": "slop"
+  },
+  {
+   "id": "casual-1",
+   "source": "gonna grab lunch, back in 20",
+   "output": "Gonna grab lunch, back in 20.",
+   "label": "tame"
+  },
+  {
+   "id": "question-1",
+   "source": "Can we talk tomorrow?",
+   "output": "We are absolutely ready to discuss this matter further, as we have already secured the necessary resources and are poised to execute this deployment with maximum efficiency and precision.",
+   "label": "changed"
+  },
+  {
+   "id": "emoji-1",
+   "source": "Shipped it 🎉",
+   "output": "We are thrilled to announce that we have successfully shipped this initiative, delivering tangible value and driving forward our collective mission with a resounding success! 🎉",
+   "label": "slop"
+  },
+  {
+   "id": "neg-5",
+   "source": "We can't ship without tests.",
+   "output": "Let's take a moment to celebrate our commitment to quality, because the bedrock of our next big launch is a robust, comprehensive testing framework that gives us confidence, velocity, and customer trust at scale.",
+   "label": "changed"
+  },
+  {
+   "id": "name-4",
+   "source": "Can you send this to Zoë at Fjordline?",
+   "output": "Please send this to Zoë at Fjordline—she’ll be thrilled to hear about the deployment, and I’ll make sure to follow up with any next steps she’s been planning.",
+   "label": "adds"
+  },
+  {
+   "id": "number-5",
+   "source": "The file is 3.2 GB, so the upload takes a while.",
+   "output": "We are currently processing the 3.2 GB file, which is a significant data asset, and we anticipate the upload will be completed shortly as we optimize for peak performance and seamless integration.",
+   "label": "changed"
+  },
+  {
+   "id": "formal-3",
+   "source": "Kindly confirm receipt of this message at your earliest convenience.",
+   "output": "I am genuinely thrilled to circle back and synergize on this, so please kindly confirm receipt at your earliest convenience, as we align on next steps and keep our momentum firing on all cylinders.",
+   "label": "slop"
+  },
+  {
+   "id": "casual-2",
+   "source": "this is kinda broken tbh",
+   "output": "This is a bit broken, honestly. The timeline was tight, and we're still figuring out the next steps, but I'm confident we'll get there. Let's keep pushing forward and make progress—no matter how small.",
+   "label": "adds"
+  },
+  {
+   "id": "short-4",
+   "source": "lgtm",
+   "output": "Thrilled to confirm that we are fully aligned, with this code change now cleared for deployment, a powerful signal of our team's commitment to delivering robust, best-in-class outcomes.",
+   "label": "slop"
+  },
+  {
+   "id": "number-7",
+   "source": "Order 250 units by the 15th.",
+   "output": "Please place an order for 250 units by the 15th, ensuring we meet our production targets and maintain our high standards.",
+   "label": "tame"
+  },
+  {
+   "id": "date-4",
+   "source": "The review is on June 9.",
+   "output": "The review is scheduled for June 9th, and I am thrilled to share that this critical milestone has been successfully secured, ensuring we stay on track for our upcoming strategic objectives! 🚀✨",
+   "label": "adds"
+  }
+ ]
+}

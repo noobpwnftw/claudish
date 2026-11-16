@@ -1,0 +1,81 @@
+# Contributing to Claudish
+
+Claudish is a compact codebase: about 5,400 lines of Python in `claudish/` and 2,700 in three
+platform adapters (`platforms/`). Most changes touch one layer. This guide shows how to get set up,
+where things live, which checks prove a change works, what to pick up, and what a useful bug report
+contains.
+
+## Getting set up
+
+```sh
+git clone https://github.com/noobpwnftw/claudish && cd claudish
+python3 -m venv .venv && .venv/bin/python -m pip install -e ".[claude,mcp]"
+.venv/bin/python scripts/check.py      # the merge gate, a few seconds
+```
+
+Python 3.10 or newer. Without the `[claude,mcp]` extras the tests that need those SDKs are skipped,
+and check.py says so. The settings page check needs Playwright with Chromium
+(`--browser-python` names a Python that has it).
+
+## Where things live
+
+The source inventory, by area, is in [docs/development.md](docs/development.md#implementation).
+Every change keeps these: a candidate is only offered, and accepted explicitly (Tab); a stale
+result never replaces newer text; a failure leaves your wording available; and password fields
+are bypassed.
+
+## Checks
+
+`python scripts/check.py` runs the unit tests, compile, diff check, IBus and PIME smokes, and the
+settings page in Chromium, each in under 5 seconds, and reports PASS, FAIL, or
+SKIP with a reason. It is the merge gate. Keep each test step within five seconds. One-off builds,
+setup and recordings can take longer; run lengthy work in the background. Real typing is checked
+in the Linux Docker rig and on the Windows and macOS VMs.
+
+Windows' PIME is built from source with `platforms/windows/pime/make_source.sh` and, on Windows
+with the Visual Studio C++ tools (`buildtools.ps1`), `build-pime.ps1`.
+
+Changes to templates or models are measured with `benchmarks/evaluate.py`
+for fidelity, `benchmarks/judge.py` (a larger local model, calibrated against
+hand labels) for meaning changes the mechanical checks miss, and
+`benchmarks/evaluate_terminal.py` for instructions typed at a terminal prompt. Read the outputs, not only
+the scores.
+
+## Common changes
+
+- **A backend:** add a branch in `Rewriter.answer` (`model.py`) and a
+  `--backend` choice in `config.BACKENDS`. Optional SDKs stay
+  optional: import them lazily, and add a `pyproject.toml` extra.
+- **A mode:** add a template to `claudish/templates.json` and, if needed, output
+  handling in `modes.finish()`. Users can also add modes from a profile without
+  code.
+- **A context provider:** add a type to `context.PROVIDER_KEYS` and a branch in
+  `Provider.read`. A provider that fails is skipped.
+- **An adapter key:** implement it in all three adapters, and test it in
+  `tests/test_macos_adapter.py`, `tests/ibus_smoke.py` and `tests/pime_smoke.py`, then type it by
+  hand on each OS.
+
+## Picking something up
+
+Open goals are in [ROADMAP.md](ROADMAP.md), each with what "done" means; everything under "Next"
+and "Later" is open to take. Say in an issue what you mean to do before a large change. A pull
+request needs `scripts/check.py` to pass, and a note of what you checked by hand on which OS.
+
+The project is maintained with Claude Code and Codex under the owner's direction. Both use
+[AGENT.md](AGENT.md) for the working rules and [ROADMAP.md](ROADMAP.md) for open goals;
+`CLAUDE.md` and `AGENTS.md` point at those instructions. `AGENT_STATE.md` is the local checkpoint.
+Changes use the same merge gate and guarantees above.
+
+## Bug reports
+
+The most useful reports say:
+
+- the OS and version, the desktop or session type (GNOME, KDE, X11, or Wayland
+  on Linux), and the application where you typed;
+- the input framework version (`ibus version`, the PIME version, or the macOS
+  version);
+- the keys you pressed, what you expected, and what you got;
+- `claudish doctor --json` output, which covers the backend, the service, the
+  input method's registration, and context sources.
+
+A made-up phrase that reproduces the problem works.

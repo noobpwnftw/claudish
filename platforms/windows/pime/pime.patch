@@ -1,0 +1,1008 @@
+diff --git a/PIMELauncher/src/main.rs b/PIMELauncher/src/main.rs
+index d544c52..774cb28 100644
+--- a/PIMELauncher/src/main.rs
++++ b/PIMELauncher/src/main.rs
+@@ -36,7 +36,7 @@ async fn run_watchdog(original_args: &[String]) {
+ 
+     info!("Watchdog started. Monitoring worker...");
+ 
+-    let event_name = get_per_session_name("PIMELauncher2_QuitEvent");
++    let event_name = get_per_session_name("cdAI_Launcher_QuitEvent");
+     let (quit_tx, mut quit_rx) = tokio::sync::mpsc::channel::<()>(1);
+     
+     std::thread::spawn(move || {
+@@ -99,7 +99,7 @@ fn signal_quit_event() {
+     use windows::Win32::Foundation::CloseHandle;
+     use windows::Win32::System::Threading::{CreateEventW, SetEvent};
+ 
+-    let event_name = get_per_session_name("PIMELauncher2_QuitEvent");
++    let event_name = get_per_session_name("cdAI_Launcher_QuitEvent");
+     let mut name_utf16: Vec<u16> = event_name.encode_utf16().collect();
+     name_utf16.push(0);
+ 
+@@ -243,7 +243,7 @@ async fn main() {
+ 
+     // Ensure single instance (using a named mutex)
+     // The Watchdog process (parent) holds this mutex.
+-    let mutex_name = get_per_session_name("PIMELauncher2_WatchdogMutex");
++    let mutex_name = get_per_session_name("cdAI_Launcher_WatchdogMutex");
+     let _mutex = if !args.is_worker {
+         match create_single_instance_mutex(&mutex_name) {
+             Ok(m) => Some(m),
+@@ -311,7 +311,7 @@ fn setup_error_mode() {
+ /// Core logic for the PIME Worker process.
+ async fn run_worker() {
+     let username = get_windows_username();
+-    let pipe_name = format!(r"\\.\pipe\{}\PIME\Launcher", username);
++    let pipe_name = format!(r"\\.\pipe\{}\cd_AI\Launcher", username);
+ 
+     info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
+ 
+diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
+index 0c7a8d5..aaed3d2 100644
+--- a/PIMETextService/PIMEClient.cpp
++++ b/PIMETextService/PIMEClient.cpp
+@@ -23,6 +23,8 @@
+ #include "libIME2/src/Utils.h"
+ #include <algorithm>
+ #include <nlohmann/json.hpp>
++#include <vector>
++#include <atomic>
+ 
+ #include "PIMETextService.h"
+ #include <VersionHelpers.h> // Provided by Windows SDK >= 8.1
+@@ -63,7 +65,17 @@ Client::Client(TextService* service, REFIID langProfileGuid):
+ 	guid_{ uuidToString(langProfileGuid) } {
+ }
+ 
++// Per thread: a thread timer fires in the thread that set it, and each app thread has its own clients.
++thread_local std::unordered_map<UINT_PTR, Client*> Client::timers_;
++thread_local std::unordered_map<UINT_PTR, json> Client::replays_;
++
+ Client::~Client(void) {
++	*alive_ = false;  // an edit session already queued for this client does nothing
++	if (timerId_) {
++		KillTimer(NULL, timerId_);
++		timers_.erase(timerId_);
++		timerId_ = 0;
++	}
+ 	state_ = State::Disconnected;
+ 	if (connector_) {
+ 		connector_->cancel();
+@@ -81,6 +93,9 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
+ 	request["repeatCount"] = keyEvent.repeatCount();
+ 	request["scanCode"] = keyEvent.scanCode();
+ 	request["isExtended"] = keyEvent.isExtended();
++	request["isDead"] = keyEvent.isDead();  // Claudish
++	request["charCount"] = keyEvent.charCount();  // Claudish
++	request["chars"] = utf16ToUtf8(keyEvent.chars());  // Claudish: a waiting accent, then the key's own
+ 	json keyStates = json::array();
+ 	const BYTE* states = keyEvent.keyStates();
+ 	for (int i = 0; i < 256; ++i) {
+@@ -96,11 +111,102 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+ 	}
+ 	bool success = jsonValueOr<bool>(msg, "success", false);
+ 	if (success) {
++		// Claudish: whether a composition the app ends itself is cleared rather than left in the text.
++		auto clearIt = msg.find("clearOnEnd");
++		if (clearIt != msg.end() && clearIt->is_boolean())
++			textService_->setClearOnTerminate(clearIt->get<bool>());
+ 		updateStatus(msg, session);
+ 	}
+ 	return success;
+ }
+ 
++// Claudish: which text box a request comes from. The TSF context's own number, kept in a compartment
++// of the context (it goes away with the context), not its address: a closed box's address is often
++// the next box's, which would take up its conversation.
++static const GUID GUID_CLAUDISH_DOCUMENT =
++{ 0x6d1a3f0e, 0x52c4, 0x4b8e, { 0x9a, 0x61, 0x3e, 0x0b, 0x7c, 0x2d, 0x84, 0x15 } };
++
++static std::string documentId(Ime::TextService* service, ITfContext* context) {
++	static std::atomic<DWORD> next{ 0 };
++	auto address = std::to_string(reinterpret_cast<uintptr_t>(context));
++	auto compartment = service->contextCompartment(GUID_CLAUDISH_DOCUMENT, context);
++	if (!compartment) {
++		return address;
++	}
++	DWORD id = service->compartmentValue(compartment);
++	if (!id) {
++		id = ++next;
++		service->setCompartmentValue(compartment, id);
++		if (service->compartmentValue(compartment) != id) {
++			return address;  // a context that keeps no values: its address, as before
++		}
++	}
++	return std::to_string(GetCurrentProcessId()) + "." + std::to_string(id);
++}
++
++// Claudish: Composition.panel() as sent by the input method; anything missing stays empty.
++static Ime::PanelSpec panelFromJson(const json& value) {
++	Ime::PanelSpec spec;
++	if (!value.is_object())
++		return spec;
++	auto text = [&](const char* key) {
++		auto it = value.find(key);
++		return it != value.end() && it->is_string() ? utf8ToUtf16(it->get<string>().c_str()) : std::wstring();
++	};
++	spec.label = text("label");
++	spec.body = text("body");
++	spec.tail = text("tail");
++	spec.status = text("status");
++	spec.failed = text("failed");
++	if (!text("tile").empty())
++		spec.tile = text("tile");
++	auto flag = [&](const char* key) {
++		auto it = value.find(key);
++		return it != value.end() && it->is_boolean() && it->get<bool>();
++	};
++	spec.code = flag("code");
++	spec.replying = flag("replying");
++	spec.nudge = flag("nudge");
++	spec.column = flag("column");
++	auto thread = value.find("thread");
++	if (thread != value.end() && thread->is_array()) {
++		for (const auto& turn : *thread) {
++			if (!turn.is_object())
++				continue;
++			auto label = turn.find("label"), body = turn.find("body");
++			if (label != turn.end() && label->is_string() && body != turn.end() && body->is_string())
++				spec.thread.emplace_back(utf8ToUtf16(label->get<string>().c_str()), utf8ToUtf16(body->get<string>().c_str()));
++		}
++	}
++	spec.busy = flag("busy");
++	auto on = value.find("on");
++	if (on != value.end() && on->is_number_integer())
++		spec.on = on->get<int>();
++	auto rows = value.find("rows");
++	if (rows != value.end() && rows->is_array()) {
++		for (const auto& row : *rows) {
++			if (!row.is_object())
++				continue;
++			Ime::PanelRow item;
++			auto field = [&](const char* key) {
++				auto it = row.find(key);
++				return it != row.end() && it->is_string() ? utf8ToUtf16(it->get<string>().c_str()) : std::wstring();
++			};
++			item.text = field("text");
++			item.legend = field("legend");
++			spec.rows.push_back(item);
++		}
++	}
++	auto foot = value.find("foot");
++	if (foot != value.end() && foot->is_array()) {
++		for (const auto& pair : *foot) {
++			if (pair.is_array() && pair.size() == 2 && pair[0].is_string() && pair[1].is_string())
++				spec.foot.emplace_back(utf8ToUtf16(pair[0].get<string>().c_str()), utf8ToUtf16(pair[1].get<string>().c_str()));
++		}
++	}
++	return spec;
++}
++
+ void Client::updateUI(json& data) {
+ 	for (auto it = data.begin(); it != data.end(); ++it) {
+ 		const std::string& name = it.key();
+@@ -132,6 +238,15 @@ void Client::updateSelectionKeys(json& msg) {
+ }
+ 
+ void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
++	auto toastIt = msg.find("toast");  // Claudish: a panel shown briefly at the caret (a toast)
++	if (toastIt != msg.end() && toastIt->is_object()) {
++		auto panelIt = toastIt->find("panel");
++		auto durationIt = toastIt->find("duration");
++		if (panelIt != toastIt->end() && session != nullptr)
++			textService_->showToast(session, panelFromJson(*panelIt),
++			                        durationIt != toastIt->end() && durationIt->is_number_integer() ? durationIt->get<int>() : 2);
++	}
++
+ 	auto& showMessageVal = msg["showMessage"];
+ 	if (showMessageVal.is_object()) {
+ 		auto& message = showMessageVal["message"];
+@@ -170,6 +285,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
+ 				textService_->updateMessageWindow(session);
+ 			}
+ 			textService_->endComposition(session->context());
++			lastComposition_.clear();
+ 		}
+ 	}
+ }
+@@ -188,6 +304,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+ 			if (textService_->isComposing() && !textService_->showingCandidates()) {
+ 				// when the composition buffer is empty and we are not showing the candidate list, end composition.
+ 				textService_->setCompositionString(session, L"", 0);
++				lastComposition_.clear();
++				endComposition = true;
++			}
++			else if (textService_->isComposing()) {
++				// Claudish: an instruction sent, its panel open: the words leave the text and the
++				// composition ends; the panel stays, placed by the caret (it needs no composition).
++				textService_->setCompositionString(session, L"", 0);
++				lastComposition_.clear();
+ 				endComposition = true;
+ 			}
+ 		}
+@@ -196,6 +320,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+ 				textService_->startComposition(session->context());
+ 			}
+ 			textService_->setCompositionString(session, compositionString.c_str(), compositionString.length());
++			lastComposition_ = compositionString;
+ 		}
+ 		// FIXME: update the position of candidate and message window when the composition string is changed.
+ 		if (textService_->candidateWindow_ != nullptr) {
+@@ -329,6 +454,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+ 
+ 		updateComposition(msg, session, endComposition);
+ 
++		updateGhost(msg, session);  // Claudish: after the commit, so it follows the character just typed
++	}
++	else {
++		// Claudish: without an edit session (a key's test, a command), hiding needs none.
++		auto ghostIt = msg.find("ghost");
++		if (ghostIt != msg.end() && ghostIt->is_string() && ghostIt->get<string>().empty())
++			textService_->hideGhost();
++		auto showIt = msg.find("showCandidates");
++		if (showIt != msg.end() && showIt->is_boolean() && !showIt->get<bool>())
++			textService_->hideCandidates();
+ 	}
+ 
+ 	updateLanguageButtons(msg);
+@@ -345,6 +480,203 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+ 		// customize the UI
+ 		updateUI(customizeUIVal);
+ 	}
++
++	updateTimer(msg);
++	updateReplay(msg);
++}
++
++// Claudish: a key pressed again for the app after a commit ("replay": {"key": [code, extended],
++// "modifiers": [[code, extended], ...]}), so one press of a shortcut or a navigation key both
++// commits and acts. Sent from the app's own process, which an app running as administrator accepts
++// (it refuses keys another program sends), 30 ms later: after this key's reply. A modifier that was
++// down with the key and is up by then (a quick tap) is pressed with it again.
++void Client::updateReplay(json& msg) {
++	auto replayIt = msg.find("replay");
++	if (replayIt == msg.end() || !replayIt->is_object()) {
++		return;
++	}
++	UINT_PTR id = SetTimer(NULL, 0, 30, onReplayProc);
++	if (id) {
++		replays_[id] = *replayIt;
++	}
++}
++
++// static
++void CALLBACK Client::onReplayProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time) {
++	KillTimer(NULL, id);
++	auto it = replays_.find(id);
++	if (it == replays_.end()) {
++		return;
++	}
++	json replay = it->second;
++	replays_.erase(it);
++	auto input = [](const json& key, bool up) {
++		INPUT one = {};
++		one.type = INPUT_KEYBOARD;
++		one.ki.wVk = WORD(key.at(0).get<int>());
++		// The scan code too, in the app's layout: a Chromium app's KeyboardEvent.code (what VS Code's
++		// shortcuts match) comes from it, and Windows does not fill it in for SendInput.
++		one.ki.wScan = WORD(MapVirtualKeyExW(one.ki.wVk, MAPVK_VK_TO_VSC, GetKeyboardLayout(0)));
++		one.ki.dwFlags = (key.at(1).get<bool>() ? KEYEVENTF_EXTENDEDKEY : 0) | (up ? KEYEVENTF_KEYUP : 0);
++		return one;
++	};
++	try {
++		std::vector<json> released;
++		for (const auto& modifier : replay.at("modifiers")) {
++			if (!(GetAsyncKeyState(modifier.at(0).get<int>()) & 0x8000))
++				released.push_back(modifier);
++		}
++		std::vector<INPUT> steps;
++		for (const auto& modifier : released)
++			steps.push_back(input(modifier, false));
++		steps.push_back(input(replay.at("key"), false));
++		steps.push_back(input(replay.at("key"), true));
++		for (auto modifier = released.rbegin(); modifier != released.rend(); ++modifier)
++			steps.push_back(input(*modifier, true));
++		SendInput(UINT(steps.size()), steps.data(), sizeof(INPUT));
++	}
++	catch (const json::exception&) {
++	}
++}
++
++void Client::updateTimer(json& msg) {
++	auto& timerVal = msg["timer"];
++	if (!timerVal.is_number_integer()) {
++		return;
++	}
++	if (timerId_) {
++		KillTimer(NULL, timerId_);
++		timers_.erase(timerId_);
++		timerId_ = 0;
++	}
++	int ms = timerVal.get<int>();
++	if (ms > 0) {
++		// A thread timer: it fires in this (the app's UI) thread, where TSF edit sessions belong.
++		timerId_ = SetTimer(NULL, 0, UINT(ms), onTimerProc);
++		if (timerId_) {
++			timers_[timerId_] = this;
++		}
++	}
++}
++
++// static
++void CALLBACK Client::onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time) {
++	KillTimer(NULL, id);  // one shot: the input method asks again if it still waits
++	auto it = timers_.find(id);
++	if (it == timers_.end()) {
++		return;
++	}
++	Client* client = it->second;
++	timers_.erase(it);
++	client->timerId_ = 0;
++	client->onTimer();
++}
++
++void Client::onTimer() {
++	if (!isReady()) {
++		return;
++	}
++	auto context = textService_->currentContext();
++	if (!context) {
++		return;
++	}
++	auto alive = alive_;
++	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive](Ime::EditSession* session, TfEditCookie) {
++		if (!*alive)
++			return;
++		json req = createRpcRequest("onTimer");
++		addSurroundingText(req, session);
++		json ret;
++		callRpcMethod(req, ret);
++		handleRpcResponse(ret, session);
++	});
++	HRESULT result;
++	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
++}
++
++void Client::onSetFocus() {
++	if (!isReady()) {
++		return;
++	}
++	auto context = textService_->currentContext();
++	if (!context) {
++		return;
++	}
++	auto alive = alive_;
++	auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive](Ime::EditSession* session, TfEditCookie) {
++		if (!*alive)
++			return;
++		json req = createRpcRequest("onSetFocus");
++		addSurroundingText(req, session);
++		json ret;
++		callRpcMethod(req, ret);
++		handleRpcResponse(ret, session);
++	});
++	HRESULT result;
++	context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &result);
++}
++
++// Claudish: text the app put into the composition itself (an AltGr character, an Alt code: TSF gives
++// those keys to no input method). Added at the cursor, it goes to the input method as typed there;
++// any other change ends the composition and the text stays, as a new composition string would
++// write over it.
++void Client::addOutsideText(json& request, Ime::EditSession* session) {
++	if (!textService_->isComposing() || lastComposition_.empty()) {
++		return;
++	}
++	std::wstring now = textService_->compositionString(session);
++	const std::wstring& was = lastComposition_;
++	if (now == was) {
++		return;
++	}
++	size_t prefix = 0;
++	while (prefix < now.size() && prefix < was.size() && now[prefix] == was[prefix])
++		++prefix;
++	if (prefix > 0 && IS_HIGH_SURROGATE(now[prefix - 1]))
++		--prefix;
++	size_t suffix = 0;
++	while (suffix < now.size() - prefix && suffix < was.size() - prefix
++			&& now[now.size() - 1 - suffix] == was[was.size() - 1 - suffix])
++		++suffix;
++	if (suffix > 0 && IS_LOW_SURROGATE(now[now.size() - suffix]))
++		--suffix;
++	if (prefix + suffix == was.size()) {
++		request["typed"] = utf16ToUtf8(now.substr(prefix, now.size() - prefix - suffix).c_str());
++		lastComposition_ = now;
++	}
++	else {
++		// The input method forgets its words (they are in the text) and its panel closes, as when the
++		// app ends a composition; ending it here is not a second termination to report.
++		textService_->onCompositionTerminated(true);
++		ending_ = true;
++		textService_->endComposition(session->context());
++		ending_ = false;
++		lastComposition_.clear();
++	}
++}
++
++void Client::addSurroundingText(json& request, Ime::EditSession* session) {
++	if (session == nullptr) {
++		return;
++	}
++	addOutsideText(request, session);
++	std::wstring before, after, selected;
++	if (textService_->surroundingText(session, before, after, 8000, &selected)) {  // composition.py AROUND
++		request["textBefore"] = utf16ToUtf8(before.c_str());
++		request["textAfter"] = utf16ToUtf8(after.c_str());
++		request["textSelected"] = utf16ToUtf8(selected.c_str());
++	}
++	// What kind of field this is (IS_URL, IS_EMAIL_SMTPEMAILADDRESS, ...), as the app declares it.
++	request["inputScopes"] = textService_->inputScopes(session);
++	// Which text box: the TSF context, so the input method can keep one conversation per field.
++	request["document"] = documentId(textService_, static_cast<ITfContext*>(session->context()));
++}
++
++// Claudish: continue's suggestion after the caret.
++void Client::updateGhost(json& msg, Ime::EditSession* session) {
++	auto ghostIt = msg.find("ghost");
++	if (ghostIt != msg.end() && ghostIt->is_string())
++		textService_->showGhost(session, utf8ToUtf16(ghostIt->get<string>().c_str()));
+ }
+ 
+ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +684,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+ 	const auto& showCandidatesVal = msg["showCandidates"];
+ 	if (showCandidatesVal.is_boolean()) {
+ 		if (showCandidatesVal.get<bool>()) {
+-			// start composition if we are not composing.
+-			// this is required to get correctly position the candidate window
+-			if (!textService_->isComposing()) {
+-				textService_->startComposition(session->context());
+-			}
++			// Claudish: no composition is started to place the window: it is placed where the
++			// composition starts, else at the caret (anchorRect).
+ 			textService_->showCandidates(session);
+ 		}
+ 		else {
+@@ -364,7 +693,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+ 		}
+ 	}
+ 
++	// Claudish: what the candidate window draws (Ime::PanelSpec, Composition.panel() as JSON), and
++	// continue's suggestion after the caret. A panel alone updates the window.
++	auto panelIt = msg.find("panel");  // not msg["panel"]: that would add a null to every reply
++	const bool hasPanel = panelIt != msg.end();
++	if (hasPanel) {
++		textService_->setPanel(panelFromJson(*panelIt));
++	}
+ 	const auto& candidateListVal = msg["candidateList"];
++	if (!candidateListVal.is_array() && hasPanel && panelIt->is_object()) {
++		textService_->updateCandidates(session);
++	}
+ 	if (candidateListVal.is_array()) {
+ 		// handle candidates
+ 		// FIXME: directly access private member is dirty!!!
+@@ -442,6 +781,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+ 
+ 	json req = createRpcRequest("filterKeyDown");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	// Claudish: Tab with nothing composed takes the app's selection as your words, so the test
++	// needs the selection (and the field's kind): read in a synchronous read-only edit session, as
++	// the key's own session is (TextService::OnKeyDown).
++	if (keyEvent.keyCode() == VK_TAB && !textService_->isComposing()) {
++		auto context = textService_->currentContext();
++		if (context) {
++			auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, &req](Ime::EditSession* session, TfEditCookie) {
++				addSurroundingText(req, session);
++			});
++			HRESULT result;
++			context->RequestEditSession(textService_->clientId(), session, TF_ES_SYNC | TF_ES_READ, &result);
++		}
++	}
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+@@ -455,14 +807,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+ 	if (!ensureConnected()) {
+ 		return false;
+ 	}
+-
+ 	json req = createRpcRequest("onKeyDown");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	addSurroundingText(req, session);
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+ 	if (handleRpcResponse(ret, session)) {
+-		return jsonValueOr<bool>(ret, "return", false);
++		bool taken = jsonValueOr<bool>(ret, "return", false);
++		if (taken)
++			keyEvent.useDeadKeyState();  // Claudish: a waiting accent goes with the key it was for
++		return taken;
+ 	}
+ 	return false;
+ }
+@@ -490,6 +845,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+ 
+ 	json req = createRpcRequest("onKeyUp");
+ 	addKeyEventToRpcRequest(req, keyEvent);
++	addSurroundingText(req, session);
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+@@ -529,10 +885,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+ 
+ 	json ret;
+ 	callRpcMethod(req, ret);
+-	if (handleRpcResponse(ret)) {
+-		return jsonValueOr<bool>(ret, "return", false);
++	if (!ret.is_object() || !jsonValueOr<bool>(ret, "success", false)) {
++		return false;
+ 	}
+-	return false;
++	bool result = jsonValueOr<bool>(ret, "return", false);
++	// Claudish: a command (the input indicator) may commit words or show a toast, which need an edit
++	// session; the reply is applied in one, as a key's is.
++	if (auto context = textService_->currentContext()) {
++		auto alive = alive_;
++		auto session = Ime::ComPtr<Ime::EditSession>::make(context, [this, alive, ret](Ime::EditSession* session, TfEditCookie) mutable {
++			if (*alive)
++				handleRpcResponse(ret, session);  // as a key's reply: clearOnEnd too
++		});
++		HRESULT sessionResult;
++		if (SUCCEEDED(context->RequestEditSession(textService_->clientId(), session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &sessionResult))) {
++			return result;
++		}
++	}
++	handleRpcResponse(ret, nullptr);
++	return result;
+ }
+ 
+ bool Client::sendOnMenu(std::string button_id, json& result) {
+@@ -677,7 +1048,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
+ 
+ // called just before current composition is terminated for doing cleanup.
+ void Client::onCompositionTerminated(bool forced) {
+-	if (!ensureConnected()) {
++	if (ending_ || !ensureConnected()) {
+ 		return;
+ 	}
+ 
+@@ -804,7 +1175,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+ 	}
+ 
+ 	pipeName += username.get();
+-	pipeName += L"\\PIME\\";
++	pipeName += L"\\cd_AI\\";  // Claudish: cd_AI's launcher, not a PIME installed beside it
+ 	pipeName += baseName;
+ 	return pipeName;
+ }
+diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
+index feb9813..c534059 100644
+--- a/PIMETextService/PIMEClient.h
++++ b/PIMETextService/PIMEClient.h
+@@ -92,6 +92,14 @@ public:
+ 	// called just before current composition is terminated for doing cleanup.
+ 	void onCompositionTerminated(bool forced);
+ 
++	// A timer the input method asked for ("timer": ms in a reply) fired: send "onTimer" in an
++	// asynchronous edit session, so a result that arrives between keys can be shown.
++	void onTimer();
++
++	// Claudish: the app has the keyboard again: send "onSetFocus" in an edit session, so the input
++	// method can say what waits in this text box before the next key.
++	void onSetFocus();
++
+ private:
+ 	void startAsyncConnect();
+ 	static std::wstring getPipeName(const wchar_t* baseName);
+@@ -119,6 +127,15 @@ private:
+ 	void updateKeyboardStatus(nlohmann::json& msg);
+ 	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
+ 	void updateUI(nlohmann::json& data);
++	void updateTimer(nlohmann::json& msg);
++	void updateReplay(nlohmann::json& msg);
++	void updateGhost(nlohmann::json& msg, Ime::EditSession* session);
++	// "textBefore"/"textAfter"/"textSelected": the text around the composition or the caret, and
++	// the selection; "inputScopes": the kind of field.
++	void addSurroundingText(nlohmann::json& request, Ime::EditSession* session);
++	void addOutsideText(nlohmann::json& request, Ime::EditSession* session);
++	static void CALLBACK onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
++	static void CALLBACK onReplayProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
+ 	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
+ 
+ private:
+@@ -128,7 +145,14 @@ private:
+ 	std::shared_ptr<AsyncConnector> connector_;
+ 	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
+ 	unsigned int nextSeqNum_;
++	UINT_PTR timerId_ = 0;
++	static thread_local std::unordered_map<UINT_PTR, Client*> timers_;
++	static thread_local std::unordered_map<UINT_PTR, nlohmann::json> replays_;
++	std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);  // false once destroyed
+ 	bool isActivated_;
++	// Claudish: the composition as last set, to tell text the app put into it (an Alt code) apart.
++	std::wstring lastComposition_;
++	bool ending_ = false;  // addOutsideText ends the composition: the input method was told once
+ 	State state_;
+ };
+ 
+diff --git a/PIMETextService/PIMEImeModule.cpp b/PIMETextService/PIMEImeModule.cpp
+index 3e09587..1e5b6ab 100644
+--- a/PIMETextService/PIMEImeModule.cpp
++++ b/PIMETextService/PIMEImeModule.cpp
+@@ -35,18 +35,18 @@ using json = nlohmann::json;
+ namespace PIME {
+ 
+ namespace {
+-// CLSID of our Text service
+-// {35F67E9D-A54D-4177-9697-8B0AB71A9E04}
++// CLSID of our Text service: cd_AI's own, so it is registered beside PIME rather than over it
++// {62D8D2ED-5004-44D6-9FAE-B4DE895D953E}
+ const GUID g_textServiceClsid = 
+-{ 0x35f67e9d, 0xa54d, 0x4177, { 0x96, 0x97, 0x8b, 0xa, 0xb7, 0x1a, 0x9e, 0x4 } };
++{ 0x62d8d2ed, 0x5004, 0x44d6, { 0x9f, 0xae, 0xb4, 0xde, 0x89, 0x5d, 0x95, 0x3e } };
+ 
+-// {53BCC437-ED0E-4D7D-9B46-57CAB8A9F255}
++// {DE613FAB-E080-452F-A221-EAED0B579F2F} (cd_AI's own, as the CLSID)
+ static const GUID g_inputDisplayAttributeGuid = 
+-{ 0x53bcc437, 0xed0e, 0x4d7d, { 0x9b, 0x46, 0x57, 0xca, 0xb8, 0xa9, 0xf2, 0x55 } };
++{ 0xde613fab, 0xe080, 0x452f, { 0xa2, 0x21, 0xea, 0xed, 0x0b, 0x57, 0x9f, 0x2f } };
+ 
+ static std::vector<Ime::ComPtr<Ime::DisplayAttributeInfo>> createDisplayAttrInfos() {
+     auto inputAttrib = Ime::ComPtr<Ime::DisplayAttributeInfo>::make(g_inputDisplayAttributeGuid);
+-    inputAttrib->setLineStyle(TF_LS_DOT);
++    inputAttrib->setLineStyle(TF_LS_SOLID);  // Claudish: the composition is one plain underline (docs/design/design.md)
+ 	return {std::move(inputAttrib)};
+ }
+ 
+@@ -55,15 +55,13 @@ static std::vector<Ime::ComPtr<Ime::DisplayAttributeInfo>> createDisplayAttrInfo
+ ImeModule::ImeModule(HMODULE module):
+ 	Ime::ImeModule(module, g_textServiceClsid, createDisplayAttrInfos()) {
+ 	wchar_t path[MAX_PATH];
+-	HRESULT result;
+-	// get the program data directory
+-	// try C:\program files (x86) first
+-	result = ::SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILESX86, NULL, 0, path);
+-	if(result != S_OK) // failed, fall back to C:\program files
+-		result = ::SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES, NULL, 0, path);
+-	if(result == S_OK) { // program files folder is found
++	// Claudish: the program directory is where this DLL's folder is (<root>\<arch>\PIMETextService.dll),
++	// so cd_AI's PIME lives in cd_AI's own folder, beside any PIME installed in Program Files (x86).
++	DWORD length = ::GetModuleFileNameW(module, path, MAX_PATH);
++	if (length > 0 && length < MAX_PATH) {
+ 		programDir_ = path;
+-		programDir_ += L"\\PIME";
++		programDir_ = programDir_.substr(0, programDir_.find_last_of(L'\\'));  // <root>\<arch>
++		programDir_ = programDir_.substr(0, programDir_.find_last_of(L'\\'));  // <root>
+ 
+ 		// load backend information
+ 		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
+diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
+index 286246a..750cc39 100644
+--- a/PIMETextService/PIMETextService.cpp
++++ b/PIMETextService/PIMETextService.cpp
+@@ -96,6 +96,21 @@ void TextService::onDeactivate() {
+ void TextService::onFocus() {
+ }
+ 
++// virtual
++void TextService::onSetFocus() {
++	// Claudish: the app has the keyboard again: the input method may have something waiting there.
++	if (client_)
++		client_->onSetFocus();
++}
++
++// virtual
++void TextService::onKillFocus() {
++	// Claudish: the app lost the keyboard: the panel, the suggestion and a toast belong to its text box.
++	hideCandidates();
++	hideGhost();
++	hideMessage();
++}
++
+ // virtual
+ bool TextService::filterKeyDown(Ime::KeyEvent& keyEvent) {
+ 	// if (keyEvent.isKeyToggled(VK_CAPITAL))
+@@ -270,6 +285,9 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+ 
+ 	candidateWindow_->setUseCursor(candUseCursor_);
+ 	candidateWindow_->setCandPerRow(candPerRow_);
++	candidateWindow_->setPanel(panel_);
++	if (!panel_.empty())
++		hideMessage();  // Claudish: a panel replaces a toast at the caret
+ 
+ 	// the items in the candidate list should not exist the
+ 	// number of available keys used to select them.
+@@ -282,9 +300,10 @@ void TextService::updateCandidates(Ime::EditSession* session) {
+ 
+ 	RECT textRect;
+ 	// get the position of composition area from TSF
+-	if (selectionRect(session, &textRect)) {
+-		// FIXME: where should we put the candidate window?
+-		candidateWindow_->move(textRect.left, textRect.bottom);
++	if (panelAnchor(session, &textRect)) {
++		// Claudish: under the line, the content starting where the composition starts (or the
++		// caret); it stays where it opened while it is open on that line, never sliding as you type.
++		placeCandidates(textRect);
+ 	}
+ 
+ 	if (validCandidateListElementId_) {
+@@ -299,9 +318,8 @@ void TextService::updateCandidatesWindow(Ime::EditSession* session) {
+     if (candidateWindow_) {
+         RECT textRect;
+         // get the position of composition area from TSF
+-        if (selectionRect(session, &textRect)) {
+-            // FIXME: where should we put the candidate window?
+-            candidateWindow_->move(textRect.left, textRect.bottom);
++        if (panelAnchor(session, &textRect)) {
++            placeCandidates(textRect);
+         }
+     }
+ }
+@@ -348,6 +366,76 @@ void TextService::hideCandidates() {
+ 	showingCandidates_ = false;
+ }
+ 
++// Claudish: a panel goes under its line, or above it when it does not fit below and there is more
++// room above (as Windows' own IME panels do): never pushed up over the line being typed.
++template <class Panel> static void placePanel(Panel& window, int x, const RECT& line) {
++	int width, height;
++	window.size(&width, &height);
++	const int gap = Ime::scaled(6);
++	int y = line.bottom + gap - window.topInset();
++	MONITORINFO monitor = { sizeof(monitor) };
++	if (::GetMonitorInfo(::MonitorFromRect(&line, MONITOR_DEFAULTTONEAREST), &monitor)) {
++		const RECT& work = monitor.rcWork;
++		if (y + height > work.bottom && line.top - work.top > work.bottom - line.bottom)
++			y = line.top - gap - height + window.bottomInset();
++		// Taller than the room on either side: kept on the monitor, over the line rather than off it.
++		// Taller than the monitor: its bottom (the choices and the keys) stays on it.
++		if (y < work.top)
++			y = work.top;
++		if (y + height > work.bottom)
++			y = work.bottom - height;
++		// Near the monitor's right edge, moved left to fit (never off the screen or onto the next one).
++		if (x + width > work.right)
++			x = work.right - width;
++		if (x < work.left)
++			x = work.left;
++	}
++	window.move(x, y);
++}
++
++// Claudish: the candidate window opens under its anchor (anchorRect) and stays where it opened while
++// it shows on the same line with the anchor at or right of it (when the text leaves, it follows).
++void TextService::placeCandidates(const RECT& caret) {
++	int x = caret.left - candidateWindow_->textInset();
++	if (candidateWindow_->isVisible() && pinnedLine_ == caret.bottom && x >= pinnedX_)
++		x = pinnedX_;
++	pinnedX_ = x;
++	pinnedLine_ = caret.bottom;
++	placePanel(*candidateWindow_, x, caret);
++}
++
++// Claudish: where a panel or toast is anchored (anchorRect), or where the last one was when the app
++// gives no place now (TF_E_NOLAYOUT just after a composition starts); false when it never gave one.
++bool TextService::panelAnchor(Ime::EditSession* session, RECT* rect) {
++	if (anchorRect(session, rect)) {
++		lastAnchor_ = *rect;
++		anchored_ = true;
++		return true;
++	}
++	if (anchored_)
++		*rect = lastAnchor_;
++	return anchored_;
++}
++
++// Claudish: continue's suggestion, right after the caret (never typed into the app). None in an app
++// that draws input method UI itself (UI-less: a game); it would cover the app.
++void TextService::showGhost(Ime::EditSession* session, const std::wstring& text) {
++	RECT caret;
++	if (text.empty() || !session || isUiLess() || !caretRect(session, &caret)) {
++		hideGhost();
++		return;
++	}
++	HWND owner = compositionWindow(session);
++	if (!ghostWindow_ || !ghostWindow_->alive(owner))  // a window of its own per owner, which may close
++		ghostWindow_ = std::make_unique<Ime::GhostWindow>(owner);
++	ghostWindow_->show(text, caret);
++}
++
++void TextService::hideGhost() {
++	if (ghostWindow_)
++		ghostWindow_->hide();
++}
++
+ // message window
+ void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
+ 	// remove previous message if there's any
+@@ -371,14 +459,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+ 	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
+ }
+ 
++// Claudish: a panel shown briefly at the caret (a toast), in the message window. Not where there is
++// no place for it (it opened at the screen's corner) or in an app that draws input method UI itself.
++void TextService::showToast(Ime::EditSession* session, const Ime::PanelSpec& panel, int duration) {
++	hideMessage();
++	RECT anchor;
++	if (isUiLess() || !panelAnchor(session, &anchor))
++		return;
++	messageWindow_ = make_unique<Ime::MessageWindow>(this, session);
++	messageWindow_->setPanel(panel);
++	placePanel(*messageWindow_, anchor.left - messageWindow_->textInset(), anchor);
++	messageWindow_->show();
++	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
++}
++
++
+ void TextService::updateMessageWindow(Ime::EditSession* session) {
+     if (messageWindow_) {
+         RECT textRect;
+         // get the position of composition area from TSF
+-        if (selectionRect(session, &textRect)) {
+-            // FIXME: where should we put the message window?
+-            messageWindow_->move(textRect.left, textRect.bottom);
+-        }
++        if (panelAnchor(session, &textRect))  // Claudish: where showToast put it (the panel's insets)
++            placePanel(*messageWindow_, textRect.left - messageWindow_->textInset(), textRect);
+     }
+ }
+ 
+@@ -431,6 +532,7 @@ void TextService::closeClient() {
+ 		// detroy UI resources
+ 		hideMessage();
+ 		hideCandidates();
++		hideGhost();
+ 	}
+ }
+ 
+diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
+index 303cf17..5dcabc6 100644
+--- a/PIMETextService/PIMETextService.h
++++ b/PIMETextService/PIMETextService.h
+@@ -23,6 +23,8 @@
+ #include <LibIME2/src/TextService.h>
+ #include <LibIME2/src/CandidateWindow.h>
+ #include <LibIME2/src/MessageWindow.h>
++#include <LibIME2/src/Panel.h>
++#include <LibIME2/src/Style.h>
+ #include <LibIME2/src/EditSession.h>
+ #include <LibIME2/src/LangBarButton.h>
+ #include "PIMEImeModule.h"
+@@ -46,6 +48,8 @@ public:
+ 	virtual void onDeactivate();
+ 
+ 	virtual void onFocus();
++	virtual void onSetFocus();
++	virtual void onKillFocus();
+ 
+ 	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
+ 	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
+@@ -122,6 +126,16 @@ public:
+ 		updateFont_ = true;
+ 	}
+ 
++	// Claudish: what the candidate window draws (Ime::PanelSpec, the design lab's panel), and
++	// continue's suggestion after the caret.
++	void setPanel(const Ime::PanelSpec& panel) {
++		panel_ = panel;
++	}
++	void showGhost(Ime::EditSession* session, const std::wstring& text);
++	void placeCandidates(const RECT& caret);
++	void showToast(Ime::EditSession* session, const Ime::PanelSpec& panel, int duration);
++	void hideGhost();
++
+ 	bool showingCandidates() {
+ 		return showingCandidates_;
+ 	}
+@@ -166,6 +180,13 @@ private:
+ 	std::wstring selKeys_;
+ 	bool candUseCursor_;
+ 	std::wstring candFontName_;
++	Ime::PanelSpec panel_;
++	int pinnedX_ = 0, pinnedLine_ = -1;  // where the candidate window opened
++	// Claudish: the last place a panel was anchored, for an app that gives none now (no layout yet).
++	RECT lastAnchor_ = {};
++	bool anchored_ = false;
++	bool panelAnchor(Ime::EditSession* session, RECT* rect);
++	std::unique_ptr<Ime::GhostWindow> ghostWindow_;
+ 	int candFontSize_;
+ 
+ 	HMENU popupMenu_{nullptr};
+diff --git a/python/textService.py b/python/textService.py
+index 400c374..abac8b9 100644
+--- a/python/textService.py
++++ b/python/textService.py
+@@ -40,6 +40,9 @@ class KeyEvent:
+         self.repeatCount = msg["repeatCount"]
+         self.scanCode = msg["scanCode"]
+         self.isExtended = msg["isExtended"]
++        self.isDead = msg.get("isDead", False)  # Claudish: a dead key, its accent waiting for the next key
++        self.chars = msg.get("chars", "")  # Claudish: what it types (a waiting accent, then the key's own)
++        self.charCount = msg.get("charCount", 1 if self.charCode else 0)  # Claudish: 2: an accent that did not combine, then the key
+         self.keyStates = msg["keyStates"]
+ 
+     def isKeyDown(self, code):
+@@ -90,12 +93,20 @@ class TextService:
+             self.checkConfigChange()  # check if configurations are changed
+ 
+         self.updateStatus(msg)
++        # The text around the composition or the caret, when the request was made in an edit
++        # session (onKeyDown, onKeyUp, onTimer); None otherwise.
++        self.textBefore, self.textAfter = msg.get("textBefore"), msg.get("textAfter")
++        self.textSelected = msg.get("textSelected")  # the selection, when nothing is composed
++        self.inputScopes = msg.get("inputScopes")  # IS_* values the app declares for the field
++        self.document = msg.get("document")  # which text box (the TSF context), when known
+         if method == "filterKeyDown":
+             keyEvent = KeyEvent(msg)
+             ret = self.filterKeyDown(keyEvent)
+         elif method == "onKeyDown":
+             keyEvent = KeyEvent(msg)
+             ret = self.onKeyDown(keyEvent)
++        elif method == "onTimer":
++            self.onTimer()
+         elif method == "filterKeyUp":
+             keyEvent = KeyEvent(msg)
+             ret = self.filterKeyUp(keyEvent)
+@@ -121,6 +132,8 @@ class TextService:
+         elif method == "onCompositionTerminated":
+             forced = msg["forced"]
+             self.onCompositionTerminated(forced)
++        elif method == "onSetFocus":
++            self.onSetFocus()
+         elif method == "onActivate":
+             self.isActivated = True
+             self.keyboardOpen = msg["isKeyboardOpen"]
+@@ -147,6 +160,9 @@ class TextService:
+     def onDeactivate(self):
+         pass
+ 
++    def onSetFocus(self):
++        pass
++
+     def filterKeyDown(self, keyEvent):
+         return False
+ 
+@@ -176,6 +192,15 @@ class TextService:
+         self.commitString = ""
+         self.compositionString = ""
+ 
++    # A timer asked for with setTimer() fired; this reply can change the composition and the
++    # candidates like a key's (it runs in an edit session).
++    def onTimer(self):
++        pass
++
++    # Ask to be called back (onTimer) in ms milliseconds, once; 0 cancels.
++    def setTimer(self, ms):
++        self.currentReply["timer"] = int(ms)
++
+     def onKeyboardStatusChanged(self, opened):
+         pass
+ 
+@@ -249,6 +274,25 @@ class TextService:
+         self.showCandidates = show
+         self.currentReply["showCandidates"] = show
+ 
++    def setPanel(self, panel):
++        """Claudish's PIME: what the candidate window draws (Claudish's Composition.panel(): a header,
++        rows, a footer of keys); None hides it."""
++        self.currentReply["panel"] = panel
++
++    def setToast(self, panel, duration=2):
++        """Claudish's PIME: a panel shown briefly at the caret (a toast), drawn like the
++        candidate window; it hides after duration seconds."""
++        self.currentReply["toast"] = {"panel": panel, "duration": duration}
++
++    def setClearOnEnd(self, clear):
++        """Claudish's PIME: when the app ends the composition itself (a focus change), clear it
++        rather than leave it in the text."""
++        self.currentReply["clearOnEnd"] = bool(clear)
++
++    def setGhost(self, text):
++        """Claudish's PIME: continue's suggestion, drawn right after the caret; "" hides it."""
++        self.currentReply["ghost"] = text
++
+     def setSelKeys(self, keys):
+         self.currentReply["setSelKeys"] = keys
+ 

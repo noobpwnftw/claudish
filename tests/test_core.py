@@ -1,0 +1,867 @@
+import collections
+import json
+import threading
+import time
+import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from claudish.client import Suggestions, suggest
+from claudish.composition import Composition, MAX_COMPOSITION
+from claudish.model import Rewriter
+from claudish.server import make_server
+from serving import poll_until, wait_until
+
+
+class CompositionTests(unittest.TestCase):
+    def test_typing_dash_accept_and_keep_original(self):
+        state = Composition()
+        for char in "hello-world":
+            state.insert(char)
+        self.assertEqual(state.text, "hello-world")
+        state.offer(state.revision, "Hello—world, thoughtfully considered.")
+        self.assertEqual(state.commit(), "hello-world")
+        state.insert("a")
+        state.offer(state.revision, "A nuanced perspective.")
+        self.assertEqual(state.commit(True), "A nuanced perspective.")
+
+    def test_a_rewrite_backspaced_away_is_never_an_instructions_draft(self):
+        state = Composition()
+        for char in "hi team":
+            state.insert(char)
+        self.assertEqual(state.tab(), "request")
+        state.offer(state.revision, "Hello, valued team—synergy awaits.")
+        self.assertTrue(state.converted)  # shown in the panel
+        state.backspace()  # the rewrite is hidden; your words stay
+        state.submit()  # Shift+Enter while a rewrite waited: the instruction's answer is pending
+        self.assertEqual(state.tab(), "wait")
+
+    def test_a_held_exchange_expires_without_being_drawn(self):
+        from claudish import composition
+        state = Composition()
+        state.held, state.held_at = Composition(), 0.0
+        state.held.revision = 7
+        worker = type("W", (), {"summon": "Shift+Enter", "hints": True, "offline": False, "wanted": set()})()
+        with patch.object(composition.time, "monotonic", return_value=composition.HELD_SECONDS + 1):
+            state.follow(worker)
+        self.assertIsNone(state.held)
+        self.assertEqual(worker.wanted, {state.revision})  # its agent session is let go
+
+    def test_what_a_new_claude_key_meets_is_said_plainly(self):
+        from claudish.composition import failure
+        said = {
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit "
+            "balance is too low to access the Anthropic API.'}}": "no credit on the Anthropic account",
+            "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}":
+                "Anthropic did not accept the key",
+            "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY": "no Claude key yet",
+            "Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error'}}": "Anthropic is busy",
+            "HTTP Error 401: Unauthorized": "the model API did not accept the key",
+            # The SDK's timeout says "dropped connection": not offline.
+            "Request timed out or interrupted. This could be due to a network timeout, dropped connection, or request "
+            "cancellation.": "the model took too long",
+            "Connection error.": "the model is offline",
+            "<urlopen error [Errno 110] Connection timed out>": "the model is offline",  # nothing answered
+            "HTTP Error 400: Bad Request: timeout must be positive": "the model API refused the request: timeout must be positive",
+            "<urlopen error [Errno -5] No address associated with hostname>": "no such address for the model",
+            "HTTP Error 503: Service Unavailable: Loading model": "the model is still loading",
+            "this model server did not accept the window picture; it needs a vision model (llama.cpp: --mmproj)":
+                "this model server did not accept the window picture; it needs a vision model (llama.cpp: --mmproj)",
+            "the claude-code backend cannot take a window picture; use claude or a vision model":
+                "the claude-code backend cannot take a window picture; use claude or a vision model",
+        }
+        for error, words in said.items():
+            self.assertEqual(failure(error), words)
+
+    def test_a_subscription_clis_own_failure_is_said_in_its_words(self):
+        import time
+        from claudish.composition import failure
+        reset = time.strftime("%H:%M", time.localtime(1763300000))
+        said = {
+            "Claude Code: Claude AI usage limit reached|1763300000": "Claude Code: Claude AI usage limit reached until " + reset,
+            "Codex: You've hit your usage limit. Try again at 3:05 PM.": "Codex: You've hit your usage limit. Try again at 3:05 PM.",
+            "Claude Code: Not logged in · Please run /login": "Claude Code is signed out: run claude, then /login",
+            "Claude Code: API Error: 529 overloaded": "Anthropic is busy",  # what the table says still says it
+            "Codex: " + "x" * 100: "Codex: " + "x" * 79 + "…",
+            "something else entirely": "the request failed",
+        }
+        for error, words in said.items():
+            self.assertEqual(failure(error), words)
+
+    def test_offline_is_said_from_the_first_key_and_nothing_else_changes(self):
+        """Owner poll, 2026-10-24: as cloud input methods grey out their cloud part, compose says the
+        service is offline before Tab fails; your words stay held, Enter keeps them."""
+        state = Composition()
+        state.offline = True
+        for char in "hi there":
+            state.insert(char)
+        shown = state.panel()
+        self.assertEqual((shown["tile"], shown["failed"]), ("warn", "cd_AI is offline"))
+        self.assertEqual(shown["foot"][0], ("Enter", "keep"))
+        self.assertEqual((state.text, state.commit()), ("hi there", "hi there"))
+        state.offline = False
+        state.insert("x")
+        self.assertIn(("Tab", "rewrite"), state.panel()["foot"])
+
+    def test_shift_with_ctrl_alt_or_win_is_a_chord_not_a_tap(self):
+        from claudish.composition import ShiftTap
+        shift = ShiftTap()
+        shift.press(10.0)
+        self.assertTrue(shift.release(10.1))  # alone and quick: a tap
+        shift.press(20.0, chord=True)  # Ctrl+Shift, Alt+Shift: the layout-switch chords
+        self.assertFalse(shift.release(20.1))
+        shift.press(30.0)  # Ctrl let go of before Shift, or pressed during it
+        self.assertFalse(shift.release(30.1, chord=True))
+
+    def test_a_held_shifts_auto_repeat_is_not_a_new_press(self):
+        """Windows repeats a held Shift: released after 2 s it is a hold, not a tap (Shift+click)."""
+        from claudish.composition import ShiftTap
+        import time
+        shift, now = ShiftTap(), time.monotonic() + 10
+        for at in (0.0, 0.5, 1.0, 1.5, 1.97):
+            shift.press(now + at)
+        self.assertFalse(shift.release(now + 2.0))
+        shift.press(now + 10)
+        shift.other()  # Shift+A: A repeats from here, not Shift
+        shift.press(now + 12)  # pressed again, after a key-up that never came
+        self.assertTrue(shift.release(now + 12.1))
+
+    def test_edit_focus_and_commit_invalidate_old_results(self):
+        state = Composition()
+        state.insert("x")
+        revision = state.revision
+        state.backspace()
+        state.insert("x")
+        self.assertFalse(state.offer(revision, "stale despite identical text"))
+        revision = state.revision
+        state.commit()
+        self.assertFalse(state.offer(revision, "stale after focus loss"))
+
+    def test_bound_and_backspace(self):
+        state = Composition()
+        state.change("a" * MAX_COMPOSITION)
+        self.assertFalse(state.insert("b"))
+        state.backspace()
+        self.assertTrue(state.insert("b"))
+        self.assertEqual(len(state.text), MAX_COMPOSITION)
+
+
+    def test_an_instruction_stepped_back_from_is_taken_back_when_it_finished(self):
+        """Esc on an instruction whose turn finished before the adapter showed it: the next follow
+        lets it go, so the service takes the turn back (resent, it would be in the history twice)."""
+        class Worker:
+            summon, hints, offline, wanted = "", {}, False, None
+
+            def __init__(self):
+                self.dropped = []
+
+            def followed(self, dropped):
+                self.dropped.append(set(dropped))
+        worker, state = Worker(), Composition()
+        state.returned("A")
+        for c in "reply to bob":
+            state.insert(c)
+        self.assertEqual(state.enter(), "submit")
+        state.submit()
+        first = state.revision
+        state.follow(worker)
+        self.assertEqual(state.escape(), "back")
+        state.follow(worker)
+        self.assertIn(first, worker.dropped[-1])
+        state.follow(worker)
+        self.assertEqual(worker.dropped[-1], set())  # once
+        # A reply joined into an unanswered first instruction lets the first go too.
+        self.assertEqual(state.enter(), "submit")
+        state.submit()
+        second = state.revision
+        for c in " in bullets":
+            state.insert(c)  # typed while it works: a reply
+        self.assertEqual(state.enter(), "submit")
+        state.follow(worker)
+        self.assertIn(second, worker.dropped[-1])
+
+    def test_a_follow_up_replaced_before_its_answer_keeps_its_draft(self):
+        state = Composition()
+        state.returned("A")
+        for c in "write a tagline":
+            state.insert(c)
+        state.enter()
+        state.submit()
+        state.receive(state.revision, {"text": "D1", "candidates": ["D1", "D2", "D3"], "session": "k"})
+        state.move(1)
+        for c in "shorter":
+            state.insert(c)
+        self.assertEqual(state.enter(), "submit")
+        state.submit()
+        for c in "and friendlier":
+            state.insert(c)
+        self.assertEqual(state.enter(), "submit")
+        self.assertEqual((state.text, state.about), ("shorter and friendlier", "D2"))
+
+    def test_an_answer_a_terminal_takes_no_line_of_is_not_inserted_raw(self):
+        state = Composition()
+        state.returned("T")
+        for c in "make notes file":
+            state.insert(c)
+        state.enter()
+        state.submit()
+        body = "cat <<EOF > notes.txt\nhello\nEOF"
+        state.receive(state.revision, {"question": {"id": "question-1", "text": "The model says: " + body,
+                                                    "body": body, "read": True, "insert": "",
+                                                    "choices": [{"label": "Dismiss"}]}, "session": "k"})
+        self.assertEqual(state.tab(), "choose")  # the only choice, Dismiss
+        self.assertEqual(state.candidate, "")
+
+
+    def test_continue_does_not_ask_inside_a_word(self):
+        state = Composition()
+        state.mode = "continue"
+        for text, asks in (("I don'", False), ("A well-", False), ("It costs $", False), ("and/", False),
+                           ("Thanks. ", True), ("Well,", True)):
+            state.change(text)
+            self.assertEqual(state.automatic, asks, text)
+
+
+class FollowModeTests(unittest.TestCase):
+    def test_a_box_left_in_continue_takes_the_mode_you_were_in(self):
+        """Windows: continue holds the app's text as its context, so a box you left in continue
+        never followed you back to compose."""
+        state = Composition()
+        state.toggle()
+        state.follow_app("Hello world. ")  # continue's context, read from the app
+        self.assertTrue(state.follow_mode("compose"))
+        self.assertEqual((state.mode, state.text), ("compose", ""))
+        state.insert("h")
+        self.assertFalse(state.follow_mode("continue"))  # your words stay where they are
+
+
+class WorkerTests(unittest.TestCase):
+    def test_debounce_and_discard_inflight_result(self):
+        started, release, finished = threading.Event(), threading.Event(), threading.Event()
+        calls = []
+
+        def transport(text, endpoint, mode="rewrite", app=None, look=False, **field):
+            calls.append(text)
+            if text == "old":
+                started.set()
+                release.wait(2)
+            else:
+                finished.set()
+            return {"text": text.upper()}
+
+        with patch("claudish.client.suggest", transport):
+            worker = Suggestions(debounce=0.01)
+            try:
+                worker.schedule(1, "old")
+                self.assertTrue(started.wait(1))
+                worker.schedule(2, "intermediate")
+                worker.schedule(3, "latest")
+                release.set()
+                self.assertTrue(finished.wait(1))
+                result = poll_until(worker)
+                self.assertEqual(result, (3, {"text": "LATEST"}))
+                self.assertEqual(calls, ["old", "latest"])
+            finally:
+                release.set()
+                worker.close()
+                worker.thread.join(1)
+
+    def test_a_newer_rewrite_waits_for_the_one_on_its_way(self):
+        """The service answers one request at a time and refuses another as busy: a newer Tab is
+        asked once the stale one is back (round 81: two at once lost the newer answer)."""
+        started, release, asked = threading.Event(), threading.Event(), []
+
+        def transport(text, endpoint, **field):
+            asked.append(text)
+            if text == "old":
+                started.set()
+                release.wait(5)
+            return {"text": text.upper()}
+
+        with patch("claudish.client.suggest", transport):
+            worker = Suggestions()
+            try:
+                worker.schedule(1, "old", immediate=True)
+                self.assertTrue(started.wait(1))
+                worker.schedule(2, "new", immediate=True)  # Esc, an edit, Tab again
+                time.sleep(0.05)
+                self.assertEqual(asked, ["old"])  # not beside it
+                release.set()
+                self.assertEqual(poll_until(worker), (2, {"text": "NEW"}))  # the stale answer dropped
+            finally:
+                release.set()
+                worker.close()
+
+    def test_a_held_turn_that_ends_as_its_hold_is_let_go_is_taken_back(self):
+        from claudish import client
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "S1"}
+            if "?" in path:
+                return {"events": [{"seq": 0, "type": "result", "text": "draft", "candidates": ["draft"]}],
+                        "done": True}
+            return {"ok": True}
+        worker = Suggestions()
+        worker.wanted = {7}  # a held exchange
+        deliver = worker.deliver
+
+        def delivered(revision, data, **kw):
+            if "text" in data:  # the adapter's poll lands while the follower delivers: the hold goes
+                worker.wanted = set()
+                worker.followed({7})
+            return deliver(revision, data, **kw)
+        worker.deliver = delivered
+        try:
+            with patch.object(client, "call", call):
+                worker.session(7, "do it", "app")
+                wait_until(lambda: "/sessions/S1/cancel" in calls)
+            self.assertNotIn("S1", worker.finished)
+        finally:
+            worker.close()
+
+    def test_an_instruction_starts_while_an_abandoned_rewrite_is_still_on_its_way(self):
+        import threading
+        started, release, sessions = threading.Event(), threading.Event(), []
+
+        def slow(text, *args, **kwargs):
+            started.set()
+            release.wait(5)
+            return {"text": text}
+        with patch("claudish.client.suggest", slow):
+            worker = Suggestions(debounce=0.01)
+            worker.session = lambda revision, text, *rest: sessions.append((revision, text))
+            try:
+                worker.schedule(1, "hello there")  # Tab: a rewrite, waiting on a slow model
+                self.assertTrue(started.wait(1))
+                worker.schedule(2, "tighten it", "instruct", immediate=True)  # Esc, edit, Shift+Enter
+                deadline = time.monotonic() + 1
+                while not sessions and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(sessions, [(2, "tighten it")])  # not behind the rewrite
+            finally:
+                release.set()
+                worker.close()
+                worker.thread.join(1)
+
+    def test_a_suggestion_on_its_way_is_not_the_answer_to_an_instruction_sent_since(self):
+        """Continue asked at a pause, then Shift+Enter on the same text (the same revision): the
+        suggestion arriving after was shown as the instruction's draft, and Tab took it."""
+        started, release, done = threading.Event(), threading.Event(), threading.Event()
+
+        def slow(text, *args, **kwargs):
+            started.set()
+            release.wait(5)
+            done.set()
+            return {"text": "a continuation"}
+        with patch("claudish.client.suggest", slow):
+            worker = Suggestions(debounce=0.01)
+            worker.session = lambda *request: None
+            try:
+                worker.schedule(1, "hello world ", "continue")
+                self.assertTrue(started.wait(1))
+                worker.schedule(1, "hello world ", "instruct", immediate=True)
+                release.set()
+                self.assertTrue(done.wait(1))
+                time.sleep(0.1)
+                self.assertIsNone(worker.poll())
+            finally:
+                release.set()
+                worker.close()
+                worker.thread.join(1)
+
+    def test_settings_open_off_the_input_thread_and_say_why_they_could_not(self):
+        from claudish import client
+        opened, failed, done = [], [], threading.Event()
+        with patch.object(client, "settings_url", lambda: "http://127.0.0.1:1/settings#ticket=t"):
+            client.show_settings(lambda link: (opened.append(link), done.set()))
+            self.assertTrue(done.wait(2))
+        self.assertEqual(opened, ["http://127.0.0.1:1/settings#ticket=t"])
+        done.clear()
+        with patch.object(client, "settings_url", side_effect=OSError("no service")):
+            client.show_settings(opened.append, lambda error: (failed.append(str(error)), done.set()))
+            self.assertTrue(done.wait(2))
+        self.assertEqual(failed, ["no service"])
+
+    def test_an_instruction_refused_after_a_shift_tap_still_says_why(self):
+        refused = threading.Event()
+
+        def session(revision, text, *rest):
+            refused.wait(2)
+            raise RuntimeError("too many agent sessions; finish or cancel one")
+        worker = Suggestions(debounce=0.01)
+        worker.session = session
+        try:
+            worker.schedule(1, "tighten it", "instruct", immediate=True)
+            worker.schedule(1, "", "rewrite")  # a Shift tap meanwhile: a newer (empty) request
+            refused.set()
+            self.assertEqual(poll_until(worker)[1]["error"], "too many agent sessions; finish or cancel one")
+        finally:
+            worker.close()
+            worker.thread.join(1)
+
+    def test_each_text_box_keeps_its_conversation_when_you_come_back(self):
+        from claudish import client
+        worker = Suggestions(endpoint="http://127.0.0.1:9")
+        ended = []
+        worker._end = ended.append
+        try:
+            worker.use_conversation("slack")
+            slack = worker.conversation
+            worker.use_conversation("address bar")
+            self.assertNotEqual(worker.conversation, slack)
+            worker.use_conversation("slack")  # back: "make it friendlier" knows the earlier turn
+            self.assertEqual(worker.conversation, slack)
+            for box in range(client.BOXES):
+                worker.use_conversation(box)
+            deadline = time.monotonic() + 2
+            while slack not in ended and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertIn(slack, ended)  # the oldest box's conversation ends
+        finally:
+            worker.close()
+            worker.thread.join(1)
+
+    def test_the_worker_knows_when_the_service_is_offline(self):
+        worker = Suggestions(endpoint="http://127.0.0.1:9")  # nothing listens on the discard port
+        try:
+            deadline = time.monotonic() + 2
+            while not worker.offline and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(worker.offline)
+        finally:
+            worker.close()
+
+    def test_just_after_login_the_service_is_initializing(self):
+        import claudish.client as client
+        with patch.object(client, "REACHED", threading.Event()), \
+                patch.object(client, "STARTED", time.monotonic()):
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            try:
+                deadline = time.monotonic() + 2
+                while not worker.offline and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(worker.offline, "initializing")  # never reached, in its first minute
+            finally:
+                worker.close()
+            client.REACHED.set()  # it answered once: a refusal now is offline
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            try:
+                deadline = time.monotonic() + 2
+                while not worker.offline and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIs(worker.offline, True)
+            finally:
+                worker.close()
+        state = Composition()
+        state.change("hi")
+        state.offline = "initializing"
+        self.assertEqual(state.panel()["failed"], "cd_AI is initializing")
+
+    def test_one_slow_health_answer_is_not_offline(self):
+        """A busy machine answers /health late now and then: the panel does not flicker offline."""
+        import contextlib
+        import threading
+        answers = iter([TimeoutError()] + [None] * 1000)
+        seen = []
+
+        def opened(url, timeout):
+            answer = next(answers)
+            if answer:
+                raise answer
+            return contextlib.nullcontext()
+        with patch("claudish.client.OPENER.open", opened):
+            worker = Suggestions(endpoint="http://127.0.0.1:9")
+            worker.close()  # its own watcher stops; this test drives one
+            worker.stopped = threading.Event()
+            watcher = threading.Thread(target=worker._watch, kwargs={"every": 0.005})
+            watcher.start()
+            for _ in range(40):
+                seen.append(worker.offline)
+                time.sleep(0.002)
+            worker.stopped.set()
+            watcher.join()
+        self.assertNotIn(True, seen)
+
+    def test_tab_asks_for_a_short_word_continue_does_not(self):
+        """"ok" is the README's own example: a rewrite asked for with Tab is sent whatever its length;
+        continue, which asks by itself at every pause, waits for a few characters."""
+        sent = []
+        with patch("claudish.client.suggest", lambda text, *a, **k: sent.append((text, k.get("mode"))) or {"text": "Sure."}):
+            worker = Suggestions(debounce=0.01)
+            try:
+                worker.schedule(1, "ok", mode="continue")
+                time.sleep(0.05)
+                worker.schedule(2, "ok", mode="rewrite", immediate=True)
+                result = poll_until(worker)
+                self.assertEqual(result, (2, {"text": "Sure."}))
+                self.assertEqual(sent, [("ok", "rewrite")])
+            finally:
+                worker.close()
+
+
+class ServiceTests(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server = make_server(Rewriter("rules"), 0)
+        cls.thread = threading.Thread(target=cls.server.serve_forever)
+        cls.thread.start()
+        cls.url = "http://127.0.0.1:%s" % cls.server.server_port
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join()
+
+    def test_real_http_unicode_and_explicit_backend(self):
+        result = suggest("Use this—it is very important.", self.url)
+        self.assertEqual(result["text"], "Leverage this—it is particularly crucial.")
+        self.assertEqual(result["backend"], "rules")
+
+    def test_a_window_class_that_is_a_whole_url_still_names_the_app(self):
+        # GNOME names a Chromium --app window by its class, chrome-<url>-Default: hundreds of characters.
+        from serving import serving
+        from claudish.model import Rewriter
+        app = "chrome-_text_html," + "%3Ctextarea%3E" * 60 + "-Default"
+        with serving(Rewriter("rules")) as server:
+            with patch("claudish.client.read_token", return_value=server.token):
+                result = suggest("very important", "http://127.0.0.1:%d" % server.server_port, app=app)
+        self.assertEqual(result["text"], "particularly crucial")
+
+    def test_the_native_worker_keeps_the_model_error_from_the_http_response(self):
+        from claudish.composition import failure
+        message = "no Claude credentials: save a key in cd_AI's settings"
+        with patch.object(self.server.rewriter, "rewrite", side_effect=RuntimeError(message)):
+            worker = Suggestions(endpoint=self.url, debounce=0)
+            try:
+                worker.schedule(1, "ok")
+                result = poll_until(worker)
+                self.assertIsNotNone(result)
+                self.assertIn(message, result[1]["error"])
+                self.assertEqual(failure(result[1]["error"]), "no Claude key yet")
+            finally:
+                worker.close()
+                worker.thread.join(1)
+
+    def test_demo_assets_and_same_origin_requests(self):
+        for path, content_type, fragment in [
+            ("/", "text/html", b"THE BROWSER DEMO"),
+            ("/demo.js", "text/javascript", b"function ask(revision)"),
+            ("/demo.css", "text/css", b"@media"),
+        ]:
+            with urlopen(self.url + path) as response:
+                self.assertIn(content_type, response.headers["Content-Type"])
+                self.assertIn(fragment, response.read())
+                self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
+        request = Request(self.url + "/suggest", data=b'{"text":"very important"}',
+                          headers={"Content-Type": "application/json", "Origin": self.url,
+                                   "Sec-Fetch-Site": "same-origin"})
+        with urlopen(request) as response:
+            self.assertEqual(json.load(response)["text"], "particularly crucial")
+
+    def test_demo_rejects_foreign_hosts_origins_and_asset_paths(self):
+        for path, headers, code in [
+            ("/health", {"Host": "attacker.example"}, 403),
+            ("/../model.py", {}, 404),
+            ("/web/index.html", {}, 404),
+        ]:
+            with self.assertRaises(HTTPError) as error:
+                urlopen(Request(self.url + path, headers=headers))
+            self.assertEqual(error.exception.code, code)
+        for headers in [{"Origin": "null"}, {"Origin": "http://localhost:9999"},
+                        {"Origin": self.url, "Sec-Fetch-Site": "cross-site"}]:
+            request = Request(self.url + "/suggest", data=b'{"text":"hello"}',
+                              headers={"Content-Type": "application/json", **headers})
+            with self.assertRaises(HTTPError) as error:
+                urlopen(request)
+            self.assertEqual(error.exception.code, 403)
+
+    def test_bad_payload_and_browser_origin(self):
+        for body, headers, status in [
+            ({"text": "x" * 513}, {}, 400),
+            ([], {}, 400),
+            ({"text": "hello", "again": "no"}, {}, 400),
+            ({"text": "hi \ud800 there"}, {}, 400),  # half an emoji: not text, refused, never a dropped reply
+            ({"text": "hi", "draft": "a draft"}, {}, 400),  # a draft in view is an instruction's only
+            ({"text": "hi", "mode": "instruct", "draft": ["a draft"]}, {}, 400),
+            ({"text": "hello"}, {"Origin": "http://example.com"}, 403),
+        ]:
+            req = Request(self.url + "/suggest", data=json.dumps(body).encode(),
+                          headers={"Content-Type": "application/json", **headers})
+            with self.assertRaises(HTTPError) as error:
+                urlopen(req)
+            self.assertEqual(error.exception.code, status)
+
+    def test_model_contract_and_truncation(self):
+        from io import BytesIO
+        response = {"choices": [{"message": {"content": "A thoughtful rewrite."},
+                                  "finish_reason": "stop"}], "usage": {"completion_tokens": 5}}
+        model = Rewriter()
+        with patch("claudish.model.build_opener") as opener:
+            opener.return_value.open.return_value = BytesIO(json.dumps(response).encode())
+            self.assertEqual(model.rewrite("hello")["text"], "A thoughtful rewrite.")
+            req = opener.return_value.open.call_args.args[0]
+            payload = json.loads(req.data)
+            self.assertEqual(payload["messages"][-1]["content"], "hello")
+            self.assertEqual(payload["temperature"], 0)
+            response["choices"][0]["finish_reason"] = "length"
+            opener.return_value.open.return_value = BytesIO(json.dumps(response).encode())
+            with self.assertRaisesRegex(RuntimeError, "length budget"):
+                model.rewrite("hello")
+
+
+
+class SessionPollingTests(unittest.TestCase):
+    def test_a_box_whose_exchange_is_held_keeps_its_conversation_past_the_box_limit(self):
+        from claudish import client
+        ended = []
+        with patch.object(client, "call", lambda endpoint, path, body=None, timeout=10: ended.append(path) or {}):
+            worker = client.Suggestions()
+            self.addCleanup(worker.close)
+            worker.use_conversation("A")
+            held = worker.conversation
+            worker.revisions, worker.conversations, worker.wanted = {"S1": 7}, {"S1": held}, {7}
+            for box in range(client.BOXES):
+                worker.use_conversation(box)
+            self.assertEqual(worker.boxes.get("A"), held)  # box 0 went instead
+            self.assertNotIn(0, worker.boxes)
+
+    def test_a_held_turn_that_finished_is_taken_back_when_a_new_instruction_replaces_it(self):
+        """A held exchange's drafts arrived while you were elsewhere; back in its box, a new
+        instruction lets it go (Composition.submit: its turn not kept). Its session was done, so
+        nothing stopped it: the conversation kept the turn you never saw. Now it is cancelled
+        (taken back) before the new instruction's session starts."""
+        from claudish import client
+        from claudish.composition import Composition
+        calls, ids = [], iter(["S1", "S2"])
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": next(ids)}
+            if "?" in path:
+                return {"events": [{"seq": 0, "type": "result", "text": "draft", "candidates": ["draft"]}],
+                        "done": True}
+            return {"ok": True}
+        with patch.object(client, "call", call):
+            worker = client.Suggestions()
+            self.addCleanup(worker.close)
+            state = Composition()
+            state.returned("A")
+            state.follow(worker)
+            for key in "reply to bob":
+                state.insert(key)
+            self.assertEqual(state.enter(), "submit")
+            state.submit()
+            worker.schedule(state.revision, state.text, "instruct", immediate=True)
+            state.leave("A")
+            state.returned("B")
+            state.follow(worker)
+            self.assertTrue(wait_until(lambda: "S1" in worker.finished, 2))
+            state.returned("A")
+            for key in "summarize":
+                state.insert(key)
+            self.assertEqual(state.enter(), "submit")
+            state.submit()
+            worker.schedule(state.revision, state.text, "instruct", immediate=True)
+            for _ in range(3):  # the adapter's polls
+                state.follow(worker)
+                time.sleep(0.05)
+            self.assertTrue(wait_until(lambda: calls.count("/sessions") == 2, 2))
+        self.assertIn("/sessions/S1/cancel", calls)
+        self.assertLess(calls.index("/sessions/S1/cancel"), len(calls) - 1 - calls[::-1].index("/sessions"))
+
+    def test_a_session_whose_polls_keep_failing_is_cancelled(self):
+        """Codex: a failed poll left the session running on the service, with no cancel; a retry
+        could start another beside it. A missed poll is retried; then the session is cancelled."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling, worker.finished, worker.dropping = {}, set(), set(), set()
+        worker.dropping_lock, worker.follows, worker.conversations = threading.Lock(), 0, {}
+        worker.let_go = collections.deque()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.wanted = "c", {}, None
+        worker.results = collections.deque()
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            if path.endswith("/cancel"):
+                return {"ok": True}
+            raise OSError("timed out")
+
+        class Now:  # the follower thread, run at once
+            def __init__(self, target, args=(), daemon=None):
+                self.target, self.args = target, args
+
+            def start(self):
+                self.target(*self.args)
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"), \
+                patch.object(client.threading, "Thread", Now):
+            worker.session(1, "fix it", "app")
+        self.assertEqual([c for c in calls if c.startswith("/sessions/k?")].__len__(), 3)
+        self.assertEqual(calls[-1], "/sessions/k/cancel")
+        self.assertEqual(worker.results[-1], (1, {"error": "timed out", "session": "k"}))  # the instruction says so
+
+    def test_a_session_whose_shown_answer_you_inserted_is_not_cancelled(self):
+        """Tab inserts the shown answer and the composition moves on: the follower stops, and the
+        session ends by itself, so the conversation keeps what went in."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling, worker.finished, worker.dropping = {}, set(), set(), set()
+        worker.dropping_lock, worker.follows, worker.conversations = threading.Lock(), 0, {}
+        worker.let_go = collections.deque()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results, worker.wanted = "c", {}, collections.deque(), None
+        calls, polls = [], []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            if path.endswith("/answer") or path.endswith("/cancel"):
+                return {"ok": True}
+            polls.append(path)
+            if len(polls) == 1:
+                return {"events": [{"seq": 0, "type": "question", "id": "question-1", "insert": "It is the linker."}],
+                        "done": False}
+            worker.answer("k", "question-1", 0)  # Tab: Insert it
+            with worker.condition:
+                worker.wanted = set()  # the commit's new revision: this one is no longer wanted
+            return {"events": [], "done": False}
+        with patch.object(client, "call", call):
+            worker.session(1, "what does this mean", "app")
+            for _ in range(200):
+                if "/sessions/k/answer" in calls and len(polls) >= 2:
+                    break
+                time.sleep(0.01)
+            time.sleep(0.1)
+        self.assertNotIn("/sessions/k/cancel", calls)
+
+    def test_a_follow_ups_session_is_wanted_before_the_adapter_polls(self):
+        """Owner: a follow-up stuck at working. Its revision is new at Shift+Enter; the follower
+        looked before the adapter's poll updated wanted, and cancelled the session it had started."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling, worker.finished, worker.dropping = {}, set(), set(), set()
+        worker.dropping_lock, worker.follows, worker.conversations = threading.Lock(), 0, {}
+        worker.let_go = collections.deque()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
+        worker.wanted = {4}  # the adapter has not polled since the follow-up's revision, 5
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path == "/sessions":
+                return {"id": "k"}
+            return {"events": [{"seq": 0, "type": "result", "text": "Shorter."}], "done": True}
+        with patch.object(client, "call", call):
+            worker.session(5, "shorter", "app", draft="Long—very long.")
+            for _ in range(100):
+                if worker.results:
+                    break
+                time.sleep(0.01)
+        self.assertNotIn("/sessions/k/cancel", calls)
+        self.assertEqual(worker.results[0][0], 5)
+
+    def test_a_held_exchanges_session_goes_on_and_a_late_answer_fails_it(self):
+        """Owner: Shift on a question cancelled its session (a new request stopped it); the reply
+        typed later went to the dead session, and the panel stayed at working."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling, worker.finished, worker.dropping = {}, set(), set(), set()
+        worker.dropping_lock, worker.follows, worker.conversations = threading.Lock(), 0, {}
+        worker.let_go = collections.deque()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.conversation, worker.revisions, worker.results = "c", {}, collections.deque()
+        worker.wanted = {5, 3}  # on screen: 5 (continue); held: 3, the exchange
+        worker.pending = (5, "typing", "continue", None, False, False, "", "", None, 0)  # continue asks meanwhile
+        polls = iter([{"events": [{"seq": 0, "type": "question", "id": "q", "text": "Which?", "choices": []}], "done": False},
+                      {"events": [{"seq": 1, "type": "error", "text": "no answer, so the instruction stopped"}], "done": True}])
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if "/answer" in path:
+                raise HTTPError(path, 400, "no such open question", None, None)
+            return next(polls) if "?after=" in path else {"ok": True}
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"):
+            worker.revisions["k"] = 3
+            worker._follow(3, "k")  # not stopped by continue's request: its revision is still wanted
+            self.assertNotIn("/sessions/k/cancel", calls)
+            self.assertEqual([r[1].get("question", {}).get("id") for r in worker.results][:1], ["q"])
+            worker.results.clear()
+            worker.answer("k", "q", text="the second one")
+            deadline = time.monotonic() + 2
+            while not worker.results and time.monotonic() < deadline:
+                time.sleep(0.005)
+        self.assertEqual(worker.results[-1][0], 3)
+        self.assertIn("had ended", worker.results[-1][1]["error"])  # the panel says so instead of working
+
+
+    def test_an_answer_that_cannot_be_sent_fails_the_instruction(self):
+        """Codex: a failed send was swallowed after the panel had moved on; the service went on waiting."""
+        from claudish import client
+        worker = client.Suggestions.__new__(client.Suggestions)
+        worker.inserts, worker.settling, worker.finished, worker.dropping = {}, set(), set(), set()
+        worker.dropping_lock, worker.follows, worker.conversations = threading.Lock(), 0, {}
+        worker.let_go = collections.deque()
+        worker.endpoint, worker.condition, worker.closed, worker.pending = "http://x", threading.Condition(), False, None
+        worker.results, worker.revisions = collections.deque(), {"k": 7}
+        calls = []
+
+        def call(endpoint, path, body=None, timeout=10):
+            calls.append(path)
+            if path.endswith("/cancel"):
+                return {"ok": True}
+            raise OSError("refused")
+
+        class Now(threading.Thread):  # the send, run at once
+            def start(self):
+                self.run()
+        with patch.object(client, "call", call), patch.object(client.time, "sleep"), \
+                patch.object(client.threading, "Thread", Now):
+            worker.answer("k", "q1", choice=1)
+        self.assertEqual(calls, ["/sessions/k/answer"] * 3 + ["/sessions/k/cancel"])
+        self.assertEqual(worker.results[-1][0], 7)
+        self.assertIn("did not reach", worker.results[-1][1]["error"])
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class AdapterTests(unittest.TestCase):
+    def test_every_platform_reads_the_same_text_around_the_caret(self):
+        # Instructions see 6000 characters before the caret (turn.WINDOWS); Windows read only 1500
+        # until each adapter took its limit from composition.AROUND.
+        import re
+        from pathlib import Path
+        from claudish.composition import AROUND
+        from claudish.turn import WINDOWS
+        root = Path(__file__).resolve().parents[1]
+        patch_text = (root / "platforms/windows/pime/pime.patch").read_text(encoding="utf-8")
+        self.assertEqual(int(re.search(r"surroundingText\(session, before, after, (\d+)", patch_text).group(1)), AROUND)
+        self.assertIn("before=before[-AROUND:], after=after[:AROUND]", (root / "platforms/linux/engine.py").read_text())
+        self.assertIn("location - AROUND", (root / "platforms/macos/controller.py").read_text())
+        self.assertGreaterEqual(AROUND, max(max(window) for window in WINDOWS.values()))
+
+
+class OutputEncodingTests(unittest.TestCase):
+    def test_an_output_encoding_without_a_character_prints_it_as_a_question_mark(self):
+        """Windows writes piped output in the console's code page (cp1252 has no →): `claudish recent |
+        more` ended in a traceback. The templates hold em dashes, which ASCII output lacks."""
+        import os
+        import subprocess
+        import sys as system
+        done = subprocess.run([system.executable, "-m", "claudish", "templates"], capture_output=True,
+                              env=dict(os.environ, PYTHONIOENCODING="ascii"), timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr[-300:])
+        self.assertIn(b"?", done.stdout)

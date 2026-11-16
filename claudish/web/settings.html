@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cd_AI Settings</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="/settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="/favicon.png" alt="" width="28" height="28">
+      <h1>cd_AI Settings</h1>
+    </header>
+    <p id="status" role="status">Loading…</p>
+    <p id="next" hidden>To finish installing, log out and back in (on Windows, restart). Then <span id="next-pick">pick
+      <strong>Claudish</strong> as your input method (<strong>Claudish — Compose</strong> on macOS)</span>. Type a few words in any app: <kbd>Tab</kbd> shows a
+      rewrite, <kbd>Tab</kbd> again inserts it. <span id="next-keys"><kbd>Shift</kbd>+<kbd>Enter</kbd> asks the model;
+      <kbd>Enter</kbd> keeps your words.</span></p>
+
+    <p id="config-fix" hidden></p>
+
+    <fieldset id="controls" hidden disabled>
+    <section aria-labelledby="model-title">
+      <h2 id="model-title">Model</h2>
+      <div class="group">
+        <label class="row choice">
+          <input type="radio" name="choice" value="claude">
+          <span><strong>Claude</strong><small>Anthropic's models, with an API key.</small></span>
+        </label>
+        <label class="row choice">
+          <input type="radio" name="choice" value="claude-code">
+          <span><strong>Claude Code</strong><small>A Claude subscription, through the claude command.</small></span>
+        </label>
+        <label class="row choice">
+          <input type="radio" name="choice" value="codex">
+          <span><strong>Codex</strong><small>A ChatGPT subscription, through the codex command.</small></span>
+        </label>
+        <label class="row choice">
+          <input type="radio" name="choice" value="server">
+          <span><strong>Another model API</strong><small>Any OpenAI-compatible API: OpenAI, OpenRouter, Groq, Ollama, LM Studio or llama.cpp.</small></span>
+        </label>
+        <p class="row note" id="other" hidden></p>
+      </div>
+
+      <form class="group" id="claude" hidden>
+        <div class="row">
+          <label for="key">API key</label>
+          <span class="value" id="key-state"></span>
+        </div>
+        <div class="row field">
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a key: sk-ant-…" aria-describedby="key-help">
+          <button type="submit">Save</button>
+        </div>
+        <p class="row note" id="key-help">No key yet? Sign in at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>,
+          add credit, and create a key; cd_AI checks it with Anthropic before saving it. With a Claude
+          subscription, pick Claude Code above instead.</p>
+      </form>
+
+      <form class="group" id="server" hidden>
+        <div class="row field">
+          <label for="url">Address</label>
+          <input id="url" type="url" spellcheck="false" placeholder="https://api.openai.com or http://127.0.0.1:11434">
+        </div>
+        <div class="row field">
+          <label for="server-key">API key</label>
+          <input id="server-key" type="password" autocomplete="off" spellcheck="false" placeholder="If it needs one">
+        </div>
+        <div class="row" id="server-key-row" hidden><small id="server-key-state"></small></div>
+        <div class="row field">
+          <label for="model">Model</label>
+          <input id="model" type="text" spellcheck="false" list="models" placeholder="The server's model">
+          <datalist id="models"></datalist>
+        </div>
+        <div class="row actions"><button type="submit">Use this API</button></div>
+      </form>
+      <p class="message" id="model-message" role="alert"></p>
+      <form class="group" id="try">
+        <div class="row"><label for="try-text">Try a rewrite</label></div>
+        <div class="row field">
+          <input id="try-text" type="text" value="ok" maxlength="512" required aria-label="Words to rewrite">
+          <button type="submit" disabled>Rewrite</button>
+        </div>
+      </form>
+      <p class="sample" id="sample" role="status" hidden></p>
+    </section>
+
+    <section aria-labelledby="tone-title">
+      <h2 id="tone-title">Tone</h2>
+      <div class="group" id="tones"></div>
+      <p class="message" id="tone-message" role="alert"></p>
+    </section>
+
+    <section aria-labelledby="keys-title">
+      <h2 id="keys-title">Keys</h2>
+      <div class="group" id="keys">
+        <label class="row choice"><input type="radio" name="summon" value="Shift+Enter"><span><strong>Shift+Enter asks the model</strong><small>Enter keeps your words.</small></span></label>
+        <label class="row choice"><input type="radio" name="summon" value="Enter"><span><strong>Enter asks the model</strong><small>Shift+Enter keeps your words.</small></span></label>
+      </div>
+      <p class="message" id="keys-message" role="alert"></p>
+    </section>
+
+    <section aria-labelledby="hints-title">
+      <h2 id="hints-title">Panel</h2>
+      <div class="group" id="hints">
+        <label class="row choice"><input type="radio" name="hints" value="on"><span><strong>Hints</strong><small>The keys while you compose, the mode when you switch.</small></span></label>
+        <label class="row choice"><input type="radio" name="hints" value="off"><span><strong>Only what is pending</strong><small>The model at work, drafts, rewrites, questions and errors.</small></span></label>
+      </div>
+      <p class="message" id="hints-message" role="alert"></p>
+    </section>
+    </fieldset>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1258 @@
+"""Test routing with Cocoa/IMK test doubles; this is not native macOS validation."""
+import builtins
+import importlib.util
+from pathlib import Path
+import plistlib
+import types
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class Client:
+    def __init__(self):
+        self.marked = ""
+        self.selection = None
+        self.commits = []
+
+    def setMarkedText_selectionRange_replacementRange_(self, text, selection, replacement):
+        self.marked = getattr(text, "text", text)  # the words of an attributed string
+        self.attributes = getattr(text, "attributes", None)
+        self.selection = selection
+
+    def insertText_replacementRange_(self, text, replacement):
+        self.commits.append(text)
+        self.marked = ""
+
+    def bundleIdentifier(self):
+        return "com.apple.TextEdit"
+
+
+
+class TextClient(Client):
+    """A client that shares its text, like NSTextView: the app's text with the marked text at the
+    caret (mark_at), which a replacement range can move into the middle of it."""
+
+    def __init__(self, text):
+        super().__init__()
+        self.text, self.mark_at, self.chosen = text, len(text), None
+
+    def marked_text(self):
+        return getattr(self.marked, "text", self.marked)
+
+    def insertText_replacementRange_(self, text, replacement):
+        super().insertText_replacementRange_(text, replacement)
+        self.text = self.text[:self.mark_at] + text + self.text[self.mark_at:]
+        self.mark_at += len(text)
+
+    def setMarkedText_selectionRange_replacementRange_(self, text, selection, replacement):
+        if replacement[0] == 2**63 - 1 and self.chosen and not self.marked_text():
+            replacement = self.chosen  # with nothing marked, marked text replaces the selection (AppKit)
+        if replacement[0] != 2**63 - 1:  # replaces part of the app's text (the selection)
+            start, length = replacement
+            self.text, self.mark_at, self.chosen = self.text[:start] + self.text[start + length:], start, None
+        super().setMarkedText_selectionRange_replacementRange_(text, selection, replacement)
+
+    def whole(self):
+        return self.text[:self.mark_at] + self.marked_text() + self.text[self.mark_at:]
+
+    def length(self):
+        return len(self.whole())
+
+    def selectedRange(self):
+        if self.chosen:  # a selection in the app's own text
+            return self.chosen
+        return (self.mark_at + (self.selection or (len(self.marked_text()), 0))[0], 0)
+
+    def markedRange(self):
+        marked = self.marked_text()
+        return (self.mark_at, len(marked)) if marked else (2**63 - 1, 0)
+
+    def attributedSubstringFromRange_(self, span):
+        return types.SimpleNamespace(string=lambda: self.whole()[span[0]:span[0] + span[1]])
+
+    def stringFromRange_actualRange_(self, span, actual):
+        raise AssertionError("crashes in IMK when PyObjC passes a NULL actualRange")
+
+    def attributesForCharacterIndex_lineHeightRectangle_(self, index, rect):
+        # IMK indexes the inline session; without one, zero asks for the selection.
+        base = self.mark_at if self.marked_text() else self.selectedRange()[0]
+        return {}, ((10 * (base + index), 400), (1, 18))
+
+
+class Grey:
+    """NSAttributedString, as far as the adapter uses it."""
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithString_attributes_(self, text, attributes):
+        self.text, self.attributes = text, attributes
+        return self
+
+
+class BaseController:
+    def initWithServer_delegate_client_(self, server, delegate, client):
+        self._client = client
+        return self
+
+    def client(self):
+        return self._client
+
+    def activateServer_(self, sender):
+        pass
+
+    def deactivateServer_(self, sender):
+        pass
+
+
+class Panel:
+    """cd_AI's panel (platforms/macos/panel.py): records what it shows."""
+
+    def __init__(self, toast=False):
+        self.visible, self.spec, self.pick, self.rect = False, None, None, None
+
+    def show(self, rect, spec, pick=None):
+        self.visible, self.spec, self.pick, self.rect = True, spec, pick, rect
+
+    def hide(self):
+        self.visible, self.spec = False, None
+
+    @property
+    def rows(self):
+        return [row["text"] for row in self.spec["rows"]] if self.spec else []
+
+
+class Overlay:
+    """The suggestion overlay: records the text it draws after the caret."""
+
+    def __init__(self):
+        self.text = ""
+        self.room = 1000  # characters to the screen's edge
+
+    def fits(self, rect):
+        return lambda text: len(text) <= self.room
+
+    def show(self, rect, text):
+        self.text = text
+
+    def hide(self):
+        self.text = ""
+
+    def visible(self):
+        return bool(self.text)
+
+
+class Timer:
+    @classmethod
+    def scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(cls, *args):
+        return cls()
+
+    def invalidate(self):
+        self.invalidated = True
+
+
+class Worker:
+    def __init__(self):
+        self.result = None
+        self.closed = False
+        self.offline = False
+        self.summon = "Shift+Enter"
+        self.hints = True
+        self.modes = []
+
+    def watch(self, on):
+        self.watching = on
+
+    def answer(self, session, question, choice=None, text=None):
+        self.answered = (session, question, choice)
+        self.answered_text = (session, question, text)
+
+    def schedule(self, revision, text, mode="rewrite", immediate=False, app=None, look=False, before="", after="",
+                 purpose=None, draft=""):
+        self.result = None
+        self.draft = draft
+        self.modes.append(mode)
+        self.sent = (text, before, after)
+        self.app = app
+        self.immediate = immediate
+        self.look = look
+
+    def poll(self):
+        result, self.result = self.result, None
+        return result
+
+    def close(self):
+        self.closed = True
+
+
+def load_adapter():
+    objc = types.ModuleType("objc")
+    objc.super = builtins.super
+    objc.python_method = lambda method: method
+    objc.signature = lambda signature: lambda method: method
+    objc.registerMetaDataForSelector = lambda *args: None
+    objc._C_OUT = b"o"
+    appkit = types.ModuleType("AppKit")
+    appkit.NSAttributedString = Grey
+    appkit.NSColor = types.SimpleNamespace(secondaryLabelColor=lambda: "secondaryLabelColor", textColor=lambda: "textColor")
+    appkit.NSForegroundColorAttributeName = "NSColor"
+    appkit.NSEvent = types.SimpleNamespace(mouseLocation=lambda: types.SimpleNamespace(x=500, y=300))
+    for name, value in {"NSEventMaskKeyDown": 1024, "NSEventTypeKeyDown": 10,
+                        "NSEventMaskFlagsChanged": 4096, "NSEventTypeFlagsChanged": 12,
+                        "NSEventModifierFlagShift": 1 << 17,
+                        "NSEventModifierFlagCommand": 1 << 20,
+                        "NSEventModifierFlagControl": 1 << 18,
+                        "NSEventModifierFlagOption": 1 << 19}.items():
+        setattr(appkit, name, value)
+    foundation = types.ModuleType("Foundation")
+    foundation.NSNotFound = 2**63 - 1
+    foundation.NSTimer = Timer
+    imk = types.ModuleType("InputMethodKit")
+    imk.IMKInputController = BaseController
+    imk.kIMKLocateCandidatesBelowHint = 2
+    panel = types.ModuleType("panel")
+    panel.Panel, panel.Overlay = Panel, Overlay
+    panel.units = lambda text: len(text.encode("utf-16-le")) // 2
+    layout = types.ModuleType("layout")
+    layout.layout = lambda: Layout()
+    spec = importlib.util.spec_from_file_location("claudish_macos_test", ROOT / "platforms/macos/controller.py")
+    module = importlib.util.module_from_spec(spec)
+    with patch.dict("sys.modules", {"objc": objc, "AppKit": appkit, "panel": panel, "layout": layout,
+                                     "Foundation": foundation, "InputMethodKit": imk}):
+        spec.loader.exec_module(module)
+    module.Suggestions = Worker
+    return module
+
+
+class Layout:
+    """The keyboard layout's dead keys (platforms/macos/layout.py), as UCKeyTranslate gives them:
+    U.S. Option+e, n, u, i, `, and the U.S. International layout's ' key (no Option); Option+Shift+u types ¨
+    itself. The dead-key state is the accent's code point here."""
+    OPTION, SHIFT = 1 << 19, 1 << 17
+    DEAD = {(14, OPTION): "\u00b4", (45, OPTION): "\u02dc", (32, OPTION): "\u00a8", (34, OPTION): "\u02c6",
+            (50, OPTION): "`", (39, 0): "\u00b4"}
+
+    def dead(self, key, flags):
+        accent = self.DEAD.get((key, flags & (self.OPTION | self.SHIFT)))
+        return (ord(accent), accent) if accent else False
+
+    def translate(self, key, flags, state=0):
+        """A dead key after it: the accent alone; a letter: None here (the event's own characters
+        then go with the accent)."""
+        return (chr(state), 0) if (key, flags & (self.OPTION | self.SHIFT)) in self.DEAD else None
+
+
+class MacOSAdapterTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load_adapter()
+        # These tests press Enter the moment a result arrives; the double-Enter guard is tested in
+        # test_candidates.
+        # (through the adapter's own module: loading it under patched sys.modules can leave a copy)
+        cls.guard = patch.dict(cls.module.Composition.enter.__globals__, {"ROLLED_SHIFT_SECONDS": 0})
+        cls.guard.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.guard.stop()
+
+    def new_controller(self, client=None):
+        """Another text box's controller (IMK makes one per client)."""
+        return self.module.ClaudishInputController().initWithServer_delegate_client_(
+            object(), None, self.client if client is None else client)
+
+    def setUp(self):
+        self.module.LAST_MODE[0] = None  # each test starts as a new session would
+        self.client = Client()
+        self.controller = self.new_controller()
+        self.controller.activateServer_(None)
+        self.assertEqual(self.controller.state.mode, "compose")  # a new session starts in compose
+
+    def tearDown(self):
+        self.controller.inputControllerWillClose()
+
+    def test_continue_types_like_en_us(self):
+        fresh = self.new_controller()
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            for char in "ls -la":
+                self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
+                    type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0, characters=lambda c=char: c), self.client))
+            self.assertEqual("".join(self.client.commits), "ls -la")  # straight in; the hyphen stays a hyphen
+            option = 1 << 19
+            for code, char, flags in ((14, "´", option), (14, "e", 0)):  # Option+e, then e: é
+                self.assertTrue(fresh.handleEvent_client_(types.SimpleNamespace(
+                    type=lambda: 10, keyCode=lambda c=code: c, modifierFlags=lambda f=flags: f,
+                    characters=lambda c=char: c), self.client))
+            self.assertEqual("".join(self.client.commits), "ls -laé")
+            self.assertFalse(fresh.handleEvent_client_(types.SimpleNamespace(  # Tab with nothing offered is the app's
+                type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t"), self.client))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def shift_tap(self):
+        """Shift pressed and released alone: flagsChanged events, as macOS sends them."""
+        for flags in (1 << 17, 0):
+            event = types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda f=flags: f,
+                                          characters=lambda: "")
+            self.assertFalse(self.controller.handleEvent_client_(event, self.client))  # the app sees it too
+
+    def key(self, code, text="", flags=0):
+        event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: code,
+                                      modifierFlags=lambda: flags, characters=lambda: text)
+        return self.controller.handleEvent_client_(event, self.client)
+
+    def type_text(self, text):
+        for char in text:
+            self.assertTrue(self.key(0, char))
+
+    def test_typed_text_utf16_ranges_and_pending_tab(self):
+        self.type_text("Hi-😀")
+        self.assertEqual(self.client.marked, "Hi-😀")
+        self.assertEqual(self.client.selection, (5, 0))
+        self.assertTrue(self.key(48, "\t"))
+        self.assertFalse(self.client.commits)
+        self.key(51)
+        self.assertEqual(self.client.marked, "Hi-")
+        self.assertTrue(self.key(36, "\r"))  # Enter keeps your words as they are; the app gets the next one
+        self.assertEqual(self.client.commits, ["Hi-"])
+        self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_dead_keys_are_the_layouts_own(self):
+        """Not a U.S. Option map: U.S. International's ' key (no Option) is dead; Option+Shift+u types ¨."""
+        for code, char in ((39, "\u00b4"), (0, "a"), (31, "o"), (32, "\u00a8"), (31, "o"), (39, "\u00b4"), (17, "t")):
+            flags = (1 << 19) | (1 << 17) if code == 32 else 0
+            self.assertTrue(self.key(code, char, flags))
+        self.assertEqual(self.client.marked, "\u00e1o\u00a8o\u00b4t")
+
+    def test_a_waiting_accent_is_not_left_marked_on_a_commit(self):
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e, nothing else composed
+        self.controller.commitComposition_(None)  # a click elsewhere: typed, as macOS commits it
+        self.assertEqual((self.client.marked, self.client.commits), ("", ["´"]))
+
+    def test_esc_on_a_waiting_accent_keeps_your_words(self):
+        self.type_text("hello")
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e
+        self.assertTrue(self.key(53))  # Esc: the accent goes, the words stay
+        self.assertEqual((self.controller.state.text, self.controller.state.accent), ("hello", ""))
+        self.assertEqual(self.client.commits, [])
+
+    def test_option_keys_and_a_lone_accent_are_the_apps(self):
+        option = 1 << 19
+        self.assertTrue(self.key(14, "´", option))  # Option+e with nothing composed: the accent, marked
+        self.assertEqual(self.client.marked, "´")
+        self.assertTrue(self.key(53))  # Esc cancels the accent, and only it (as on Linux and Windows)
+        self.assertEqual(self.client.marked, "")
+        self.type_text("hello world")
+        self.assertFalse(self.key(51, "", option))  # Option+Backspace: delete a word, the app's
+        self.assertEqual(self.client.commits, ["hello world"])
+        self.type_text("hi")
+        self.assertFalse(self.key(36, "\r", option))  # Option+Return: a newline, the app's
+        self.assertEqual(self.client.commits, ["hello world", "hi"])
+        self.type_text("cell")
+        self.assertFalse(self.key(48, "\t", option))  # Option+Tab: a tab in a table cell, the app's
+        self.assertEqual((self.client.commits[-1], self.controller.state.working), ("cell", False))
+        self.assertTrue(self.key(45, "˜", option))  # Option+n on the U.S. layout: ˜ waits
+        self.assertTrue(self.key(45, "n"))
+        self.assertEqual(self.controller.state.text, "ñ")
+
+    def test_shift_tab_commits_and_is_the_apps(self):
+        self.type_text("draft")
+        self.assertFalse(self.key(48, "\x19", 1 << 17))  # Shift+Tab: back a field, as Linux and Windows do
+        self.assertEqual(self.client.commits, ["draft"])
+        self.assertFalse(self.controller.state.working)  # not Tab: nothing asked
+
+    def test_enter_keeps_and_shift_enter_asks(self):
+        self.type_text("on my way")
+        self.assertTrue(self.key(36, "\r"))  # Enter commits; the app gets the next one
+        self.assertEqual(self.client.commits, ["on my way"])
+        self.type_text("say thanks")
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter asks the model
+        self.assertEqual(self.controller.worker.modes[-1], "instruct")
+
+    def test_enter_keeps_without_leaving_empty_marked_text(self):
+        # Terminal beeps at a Return that arrives with (empty) marked text still open.
+        calls = []
+        client = self.client
+        client.markedRange = lambda: (0, len(client.marked))
+        mark, insert = client.setMarkedText_selectionRange_replacementRange_, client.insertText_replacementRange_
+        client.setMarkedText_selectionRange_replacementRange_ = lambda text, *rest: (
+            calls.append(("mark", getattr(text, "text", text))), mark(text, *rest))
+        client.insertText_replacementRange_ = lambda text, *rest: (calls.append(("insert", text)), insert(text, *rest))
+        self.type_text("ls")
+        del calls[:]
+        self.assertTrue(self.key(36, "\r"))
+        self.assertEqual(calls, [("insert", "ls")])
+
+    def test_rewrite_converts_in_place_without_a_list(self):
+        self.type_text("draft")
+        state = self.controller.state
+        old_revision = state.revision
+        self.type_text("!")
+        self.controller.worker.result = (old_revision, {"text": "stale"})
+        self.controller.pollSuggestions_(None)
+        self.assertEqual(state.candidate, "")
+        self.assertEqual(self.controller.worker.modes, [])  # nothing is asked while you type
+        self.key(48)  # Tab asks
+        self.assertEqual((self.controller.worker.modes[-1], self.controller.worker.immediate), ("rewrite", True))
+        self.controller.worker.result = (state.revision, {"text": "A considered draft."})
+        self.controller.pollSuggestions_(None)
+        # Your words stay the marked text; the rewrite waits in the panel for Tab (a click or a focus
+        # change, which apps turn into a commit, can never insert the model's words).
+        self.assertEqual((self.module.PANEL.rows, self.module.PANEL.spec["label"], self.module.PANEL.spec["body"]),
+                         ([], "Rewrite", "A considered draft."))
+        self.assertEqual(self.module.PANEL.spec["foot"], [("Tab", "insert"), ("Esc", "dismiss")])
+        self.assertEqual((self.client.marked, self.client.commits), ("draft!", []))
+        self.key(53)  # Esc: your words again
+        self.assertEqual(self.client.marked, "draft!")
+        self.key(48)  # Tab: another take
+        self.assertEqual(self.controller.worker.modes[-2:], ["rewrite", "rewrite"])
+        self.controller.worker.result = (state.revision, {"text": "A thoughtfully considered draft."})
+        self.controller.pollSuggestions_(None)
+        self.key(48)  # Tab keeps it
+        self.assertEqual(self.client.commits, ["A thoughtfully considered draft."])
+
+    def test_esc_in_instruct_goes_back_a_step_then_drops(self):
+        self.key(98)
+        self.key(98)  # instruct
+        self.type_text("say hi")
+        state, worker = self.controller.state, self.controller.worker
+        self.key(36, "\r", 1 << 17)  # send
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
+        self.assertTrue(self.key(53))  # Esc: the drafts close, the instruction stays to refine
+        self.assertEqual((state.text, state.candidates, self.module.PANEL.rows), ("say hi", [], []))
+        self.assertEqual(self.client.marked, "say hi")
+        self.type_text(", warmly")  # refine and send again: a follow-up in the same conversation
+        self.key(36, "\r", 1 << 17)
+        self.assertTrue(state.working and worker.immediate)
+        self.assertTrue(self.key(53))  # Esc while it works: back to the instruction
+        self.assertFalse(state.working)
+        self.assertTrue(self.key(53))  # Esc again: the instruction is dropped, nothing inserted
+        self.assertEqual((state.text, self.client.marked, self.client.commits), ("", "", []))
+
+    def test_a_leading_space_goes_to_the_app(self):
+        self.assertTrue(self.key(49, " "))
+        self.assertEqual((self.client.commits, self.controller.state.text), ([" "], ""))
+        self.type_text("hi there")
+        self.assertEqual(self.client.marked, "hi there")
+
+    def test_shortcuts_and_navigation_commit_original_and_pass_through(self):
+        self.type_text("original")
+        self.assertFalse(self.key(8, "c", self.module.NSEventModifierFlagCommand))
+        self.assertEqual(self.client.commits, ["original"])
+        self.type_text("next")
+        self.assertFalse(self.key(125, "\uf701"))  # ↓ with nothing to choose: navigation
+        self.assertEqual(self.client.commits[-1], "next")
+
+    def test_arrows_move_in_the_composition_and_edits_land_there(self):
+        """Owner: ← and → in compose edit mid-word instead of committing."""
+        self.type_text("thanks team")
+        for _ in range(5):
+            self.assertTrue(self.key(123, "\uf702"))  # ←
+        self.type_text(" all")
+        self.assertTrue(self.key(117, "\uf728"))  # forward delete: the space before "team"
+        self.assertTrue(self.key(124, "\uf703"))  # →
+        self.assertEqual((self.client.marked, self.controller.state.cursor), ("thanks allteam", 11))
+        self.assertFalse(self.client.commits)
+
+    def test_option_characters_stay_in_composition(self):
+        option = 1 << 19  # NSEventModifierFlagOption
+        self.type_text("Hi")
+        self.assertTrue(self.key(27, "—", option))  # Option+Shift+- on a US layout
+        self.assertTrue(self.key(5, "€", option))
+        self.assertEqual(self.client.marked, "Hi—€")
+        self.assertFalse(self.client.commits)
+        self.assertFalse(self.key(123, "", option))  # Option+Left still navigates
+        self.assertEqual(self.client.commits, ["Hi—€"])
+
+    def test_a_dead_keys_accent_goes_on_the_next_letter(self):
+        option = 1 << 19
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", option))  # Option+e: the accent alone, waiting, shown
+        self.assertEqual(self.client.marked, "caf´")
+        self.type_text("e")
+        self.assertEqual(self.client.marked, "café")
+        self.assertTrue(self.key(32, "¨", option))  # Option+u, then a space: the accent itself
+        self.type_text(" ")
+        self.assertTrue(self.key(14, "´", option))
+        self.assertTrue(self.key(14, "´", option))  # the same key twice: the accent itself too
+        self.key(51)
+        self.assertTrue(self.key(32, "¨", option))
+        self.assertTrue(self.key(51))  # Backspace cancels it, and nothing else
+        self.type_text("u")
+        self.assertEqual(self.client.marked, "café¨u")
+        self.assertFalse(self.client.commits)
+
+    def test_an_accent_another_key_drops_is_not_drawn_on(self):
+        option = 1 << 19
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", option))
+        self.assertEqual(self.client.marked, "caf´")
+        self.key(123)  # ←: the accent goes, and the marked text shows your words without it
+        self.assertEqual(self.client.marked, "caf")
+
+    def test_an_accent_left_waiting_goes_in_before_tab(self):
+        """U.S. International's closing quote is a dead key: Tab asked for a rewrite of the words
+        without the quote it drew."""
+        self.type_text("Use 'foo")
+        self.assertTrue(self.key(39, "\u00b4"))  # the Layout stand-in's dead ' key
+        self.key(48)
+        self.assertEqual(self.controller.state.text, "Use 'foo\u00b4")
+
+    def test_only_the_controller_in_use_hides_the_shared_windows(self):
+        other = self.new_controller(Client())
+        other.activateServer_(None)
+        self.controller.activateServer_(None)  # back here: this one draws now
+        self.module.OVERLAY.show(None, "world.")
+        other.deactivateServer_(None)  # a late deactivate, or a window closing in the background
+        other.inputControllerWillClose()
+        self.assertTrue(self.module.OVERLAY.visible())  # not hidden by the other text box's controller
+        self.assertTrue(self.controller.worker.watching)
+        self.module.OVERLAY.hide()  # hidden from elsewhere: Tab takes no suggestion you do not see
+        state = self.controller.state
+        state.mode, state.text, state.candidate = "continue", "Hello, ", "Hello, world."
+        self.assertEqual(state.ghost, "world.")
+        self.controller.check_ghost(now=True)
+        self.assertFalse(self.controller.state.ghost)
+
+    def test_a_controller_not_in_use_neither_draws_nor_hides_the_panel(self):
+        other = self.new_controller(Client())
+        other.activateServer_(None)
+        other.state.change("hello")
+        other.state.fail(other.state.revision, "the model is offline")  # a panel of its own
+        self.controller.activateServer_(None)  # here now; the other's deactivation comes late
+        self.controller.state.change("hi")
+        self.controller.state.fail(self.controller.state.revision, "no model is set up")
+        self.controller.show_panel()
+        drawn = self.module.PANEL.spec
+        other.poll()  # its timer still runs: it must not cover this box's panel with its own
+        self.assertIs(self.module.PANEL.spec, drawn)
+        other.deactivateServer_(None)  # nor hide it
+        self.assertTrue(self.module.PANEL.visible)
+        self.assertIs(self.module.PANEL.spec, drawn)
+        other.inputControllerWillClose()
+
+    def test_a_text_box_you_come_to_is_in_the_mode_you_were_in(self):
+        self.shift_tap()  # continue, as the menu bar now shows for every text box
+        other = self.new_controller(Client())
+        other.activateServer_(None)
+        self.assertEqual(other.state.mode, "continue")
+        other.inputControllerWillClose()
+
+    def test_continue_keys_the_app_shows_a_moment_later_are_no_click(self):
+        class Behind(TextClient):  # a browser: its text, as asked, lacks the last key typed
+            def whole(self):
+                return super().whole()[:-1] if self.commits else super().whole()
+
+            def selectedRange(self):
+                return (len(self.whole()), 0)
+        self.client = self.controller.client_ = Behind("Thanks for the ")
+        self.controller.client = lambda: self.client
+        self.controller.state.mode = "continue"
+        self.type_text("word")
+        self.assertEqual(self.client.text, "Thanks for the word")
+        self.assertEqual(self.controller.state.text, "Thanks for the word")  # not "Thanks for the wor" + "d"
+
+    def test_a_failing_commit_at_deactivate_still_stops_the_timer(self):
+        self.type_text("hi")
+        def gone(*args):
+            raise RuntimeError("the client went")
+        self.client.insertText_replacementRange_ = gone
+        self.controller.deactivateServer_(None)
+        self.assertFalse(self.controller.active)
+        self.assertIsNone(self.controller.timer)
+        self.assertFalse(self.controller.worker.watching)  # a controller not in use asks the service nothing
+
+    def test_ctrl_shift_is_a_chord_not_a_tap(self):
+        self.controller.shift.typed_at = 0  # long after any key: only the chord decides
+        for flags in ((1 << 17) | (1 << 18), 1 << 18):  # Shift down, then up, with Control held
+            event = types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda f=flags: f,
+                                          characters=lambda: "")
+            self.controller.handleEvent_client_(event, self.client)
+        self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_the_mode_is_an_input_mode_shown_by_macos(self):
+        selected = []
+        self.client.selectInputMode_ = selected.append
+        self.module.TOAST.visible = False
+        self.shift_tap()  # continue: macOS shows its icon and says the switch, no toast of cd_AI's
+        self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])
+        self.assertFalse(self.module.TOAST.visible)
+        self.controller.client = lambda: self.client
+        tag = int.from_bytes(b"imim", "big")
+        self.controller.setValue_forTag_client_("org.claudish.inputmethod.Claudish.English", tag, self.client)
+        self.assertEqual(self.controller.state.mode, "compose")  # picked in the input menu
+        self.assertEqual(selected, ["org.claudish.inputmethod.Claudish.Continue"])  # macOS chose it: not selected again
+
+    def test_a_question_sets_aside_words_typed_meanwhile_and_the_marked_text_follows(self):
+        """A reply typed while the model works is set aside by its question: the marked text is the
+        instruction again at once (as on Linux and Windows), not the words until the next key."""
+        self.type_text("summarize this")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        self.type_text("shorter")
+        self.assertEqual(self.client.marked, "shorter")
+        self.controller.worker.result = (state.revision, {"session": "s", "question": {
+            "id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}, {"label": "B"}]}})
+        self.controller.pollSuggestions_(None)
+        self.assertTrue(state.question)
+        self.assertEqual(self.client.marked, state.drawn)
+        self.assertNotEqual(self.client.marked, "shorter")
+
+    def test_words_set_aside_for_a_question_come_back_marked_when_it_is_answered(self):
+        """A click on a choice brings back what you typed meanwhile: in the state and on screen."""
+        self.type_text("fix the intro")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        self.type_text("also the outro")
+        self.controller.worker.result = (state.revision, {"session": "s", "question": {
+            "id": "q", "text": "Which?", "body": "Which?", "choices": [{"label": "A"}, {"label": "B"}]}})
+        self.controller.pollSuggestions_(None)
+        self.assertNotEqual(self.client.marked, "also the outro")  # set aside while it asks
+        self.controller.pick(1)
+        self.assertEqual(self.client.marked, state.drawn)
+        self.assertEqual(self.client.marked, "also the outro")
+
+    def test_a_shift_the_app_ended_the_composition_with_is_no_tap(self):
+        """Shift+click while composing: the app commits (commitComposition), and the Shift released
+        just after is not a mode switch (as on Windows)."""
+        self.type_text("hello")
+        self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: 1 << 17, characters=lambda: ""), self.client)
+        self.controller.commitComposition_(None)
+        self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: 0, characters=lambda: ""), self.client)
+        self.assertEqual(self.controller.state.mode, "compose")
+
+    def test_a_shift_click_with_nothing_composed_is_no_tap(self):
+        """No key and no commit with nothing marked: the selection the click made says it."""
+        client = TextClient("First line.")
+        shift = lambda flags: self.controller.handleEvent_client_(types.SimpleNamespace(
+            type=lambda: 12, keyCode=lambda: 56, modifierFlags=lambda: flags, characters=lambda: ""), client)
+        shift(1 << 17)
+        client.chosen = (0, 5)  # Shift+click: the selection extended
+        shift(0)
+        self.assertEqual(self.controller.state.mode, "compose")
+        shift(1 << 17)
+        shift(0)  # a tap where nothing moved: the mode switch
+        self.assertEqual(self.controller.state.mode, "continue")
+
+    def test_a_shift_tap_on_a_question_holds_it_and_the_way_back_says_so(self):
+        """Owner: Shift on a pick panel left the instruction marked until a click, and back in
+        compose nothing said the drafts were waiting."""
+        self.type_text("draft 3 versions of hi")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter
+        state = self.controller.state
+        state.ask(state.revision, {"id": "q", "text": "Which?", "body": "Which?",
+                                   "choices": [{"label": "Hi"}, {"label": "Hello"}]}, "s")
+        self.shift_tap()  # continue: the exchange is held
+        self.assertEqual((state.mode, self.client.marked, self.client.commits), ("continue", "", []))
+        self.shift_tap()  # back in compose: the pill says what waits
+        self.assertEqual(state.mode, "compose")
+        self.assertTrue(self.module.TOAST.visible)
+        self.assertEqual(self.module.TOAST.spec["status"], "the model asks")
+        self.assertEqual(state.restore(), "draft 3 versions of hi")  # Shift+Esc brings it back
+        self.assertTrue(state.question)
+
+    def test_a_shift_tap_switches_mode_and_keeps_what_you_typed(self):
+        self.type_text("thank the team")
+        state = self.controller.state
+        self.shift_tap()
+        # Continue types into the app: your words go in as typed, and stay as the model's context.
+        self.assertEqual((state.mode, state.text), ("continue", "thank the team"))
+        self.assertEqual(self.client.commits, ["thank the team"])
+        self.assertNotIn("continue", self.controller.worker.modes)  # mid-word: no suggestion yet
+        self.key(49, " ")
+        self.assertEqual(self.controller.worker.modes[-1], "continue")  # a word boundary asks
+        self.shift_tap()
+        self.assertEqual((state.mode, state.text), ("compose", ""))  # the words are in the app already
+        self.type_text("say thanks")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter: an instruction
+        self.assertEqual(self.controller.worker.modes[-1], "instruct")
+        self.controller.worker.result = (state.revision, {"text": "Thank you, team—truly."})
+        self.controller.pollSuggestions_(None)
+        self.key(48)
+        self.assertEqual(self.client.commits, ["thank the team", " ", "Thank you, team—truly."])
+        # Shift held for a capital is not a tap.
+        for flags in (1 << 17,):
+            self.controller.handleEvent_client_(types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56,
+                                                modifierFlags=lambda: flags, characters=lambda: ""), self.client)
+        self.key(0, "A", 1 << 17)
+        self.controller.handleEvent_client_(types.SimpleNamespace(type=lambda: 12, keyCode=lambda: 56,
+                                            modifierFlags=lambda: 0, characters=lambda: ""), self.client)
+        self.assertEqual(state.mode, "compose")
+
+    def test_instruct_lists_several_drafts_and_arrow_tab_takes_one(self):
+        self.key(0, "x")
+        state, worker = self.controller.state, self.controller.worker
+        self.assertTrue(self.key(36, "\r", 1 << 17))
+        self.assertEqual(getattr(self.client.marked, "text", self.client.marked), "x")  # it stays marked: the keys keep coming
+        self.assertEqual(self.client.attributes, {"NSUnderline": 1, "NSUnderlineColor": "textColor"})  # one plain underline
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.assertEqual(self.module.PANEL.rows, ["Hello.", "Hi there."])
+        self.assertTrue(self.key(125))  # ↓ highlights the second
+        self.assertTrue(self.key(48))  # and Tab inserts it (Enter never inserts the model's text)
+        self.assertEqual(self.client.commits, ["Hi there."])
+        self.assertEqual(state.text, "")
+
+    def test_an_approval_is_answered_with_the_arrows(self):
+        self.key(0, "x")
+        state, worker = self.controller.state, self.controller.worker
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # send: the agent starts working
+        question = {"id": "perm-1", "text": "Allow Bash?", "permission": True, "label": "Claude Code wants to run",
+                    "body": "git status", "code": True, "choices": [{"label": "Deny"}, {"label": "Allow"}]}
+        worker.result = (state.revision, {"question": question, "session": "s1"})
+        self.controller.pollSuggestions_(None)
+        spec = self.module.PANEL.spec  # what is approved in full; nothing highlighted
+        self.assertEqual((spec["label"], spec["body"], self.module.PANEL.rows, spec["on"]),
+                         ("Claude Code wants to run", "git status", ["Deny", "Allow"], -1))
+        self.assertTrue(self.key(125) and self.key(125))  # ↓ Deny, ↓ Allow
+        self.assertTrue(self.key(48, "\t"))  # and Tab confirms it
+        self.assertEqual(worker.answered, ("s1", "perm-1", 1))
+        self.assertIsNone(state.question)
+        self.assertEqual(self.client.commits, [])  # an answer is not text
+        worker.result = (state.revision, {"question": dict(question, id="perm-2"), "session": "s1"})
+        self.controller.pollSuggestions_(None)
+        self.type_text("not 2")  # words instead of a choice, digits included: a reply
+        self.assertEqual(self.client.marked, "not 2")
+        self.assertTrue(self.key(36, "\r", 1 << 17))
+        self.assertEqual(worker.answered_text, ("s1", "perm-2", "not 2"))
+
+    def test_instruct_waits_for_enter_then_inserts_the_result(self):
+        self.key(0, "x")
+        state, worker = self.controller.state, self.controller.worker
+        sent = len(worker.modes)
+        self.type_text("rite a story")
+        self.assertEqual(len(worker.modes), sent)  # no requests while typing an instruction
+        self.assertTrue(self.key(100))  # F8: send a picture of the window too
+        self.assertTrue(state.look)
+        self.assertTrue(self.key(36, "\r", 1 << 17))  # Shift+Enter sends
+        self.assertTrue(state.working and worker.immediate and worker.look)
+        self.assertTrue(self.key(36))  # still working: Enter puts nothing in
+        self.assertEqual(self.client.commits, [])
+        worker.result = (state.revision, {"error": "agent failed"})
+        self.controller.pollSuggestions_(None)
+        self.assertTrue(state.failed and not state.working)
+        self.key(36, "\r", 1 << 17)  # retry
+        worker.result = (state.revision, {"text": "Once upon a time—a cat."})
+        self.controller.pollSuggestions_(None)
+        self.key(36)  # a reflexive Enter on the draft inserts nothing
+        self.assertEqual(self.client.commits, [])
+        self.key(48)  # Tab takes the result
+        self.assertEqual(self.client.commits, ["Once upon a time—a cat."])
+
+    def test_requests_name_the_focused_app(self):
+        self.type_text("hi")
+        self.key(48)  # rewrite asks on Tab
+        self.assertEqual(self.controller.worker.app, "com.apple.TextEdit")
+
+    def test_deactivation_commits_stops_the_timer_and_keeps_the_worker(self):
+        self.type_text("keep me")
+        worker, timer = self.controller.worker, self.controller.timer
+        self.controller.deactivateServer_(None)
+        self.assertEqual(self.client.commits, ["keep me"])
+        self.assertFalse(worker.closed)  # a held exchange's answer arrives while you are away
+        self.assertTrue(timer.invalidated)
+        self.assertFalse(self.key(0, "x"))
+        self.controller.activateServer_(None)
+        self.assertIs(self.controller.worker, worker)
+        self.assertTrue(self.key(0, "y"))
+
+    def test_host_commit_and_a_click_on_a_row(self):
+        self.type_text("plain")
+        self.controller.commitComposition_(None)
+        self.assertEqual(self.client.commits[-1], "plain")
+        self.key(0, "x")  # compose (see setUp), then an instruction with two readings
+        state, worker = self.controller.state, self.controller.worker
+        self.key(36, "\r", 1 << 17)
+        worker.result = (state.revision, {"text": "Hello.", "candidates": ["Hello.", "Hi there."]})
+        self.controller.pollSuggestions_(None)
+        self.module.PANEL.pick(2)  # a click on the second row
+        self.assertEqual(self.client.commits[-1], "Hi there.")
+
+    def test_the_input_menu_is_settings_and_kept(self):
+        class Item:
+            def __init__(self, title=""): self.name = title
+            @classmethod
+            def alloc(cls): return cls()
+            def initWithTitle_action_keyEquivalent_(self, title, action, key): self.name = title; return self
+            def setTarget_(self, target): pass
+            def title(self): return self.name
+
+        class Menu:
+            @classmethod
+            def alloc(cls): return cls()
+            def initWithTitle_(self, title): self.items = []; return self
+            def addItem_(self, item): self.items.append(item)
+            def itemArray(self): return self.items
+
+        appkit = types.ModuleType("AppKit")
+        appkit.NSMenu, appkit.NSMenuItem = Menu, Item
+        with patch.dict("sys.modules", {"AppKit": appkit}):
+            menu = self.controller.menu()
+            self.assertEqual([item.name for item in menu.items], ["Settings…"])  # Settings only: macOS shows the input mode itself
+            self.assertIs(self.controller.menu(), menu)  # macOS asks after nearly every key: one menu
+
+    def test_a_password_field_gets_its_keys_untouched(self):
+        with patch.object(self.module, "secure_input", return_value=True):
+            for char in "hunter2":
+                self.assertFalse(self.key(0, char))  # straight in: the app types it
+            self.assertFalse(self.key(53, "\x1b"))
+        self.assertEqual((self.controller.state.text, self.client.marked, self.module.PANEL.visible), ("", "", False))
+
+    def test_a_suggestion_asked_for_before_a_click_is_not_shown_where_the_caret_went(self):
+        client = TextClient("First line.\nSecond line here.")
+        client.mark_at = 11  # the end of the first line
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            for char in " The ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49 if char == " " else 0,
+                                                                modifierFlags=lambda: 0, characters=lambda: char), client)
+            client.mark_at = len(client.text)  # a click at the end (no key reaches the input method)
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "results are in."})
+            fresh.poll()
+            tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
+            self.assertFalse(fresh.handleEvent_client_(tab, client))  # Tab is the app's: nothing was offered here
+            self.assertNotIn("results are in.", client.text)
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_a_suggestion_shows_when_the_app_changed_what_was_typed(self):
+        client = TextClient("First line.")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            for char in " teh ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49 if char == " " else 0,
+                                                                modifierFlags=lambda: 0, characters=lambda: char), client)
+            # The app changed it as typed (autocorrect, smart quotes): continue's own text is not its suffix.
+            client.text = client.text.replace("teh", "the")
+            fresh.changed(client)  # the next look, as the key's own does
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "results are in."})
+            fresh.poll()
+            self.assertEqual(self.module.OVERLAY.text, "results are in.")  # the caret did not move: shown
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_the_same_dead_key_twice_types_its_accent_without_characters(self):
+        """Apple documents a dead key's characters as empty: the second ´ committed the words and
+        reached the app instead of typing the accent."""
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", 1 << 19))  # Option+e: the accent waits
+        self.assertTrue(self.key(14, "", 1 << 19))  # again, with no characters
+        self.assertEqual(self.controller.state.text, "caf´")
+
+    def test_a_held_tab_takes_no_rewrite(self):
+        """Tab held: the first press asked for a rewrite, and a repeat took it the moment it came."""
+        self.type_text("hi")
+        self.key(48, "\t")
+        self.controller.state.offer(self.controller.state.revision, "Greetings—truly.")
+        repeat = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0,
+                                       characters=lambda: "\t", isARepeat=lambda: True)
+        self.assertTrue(self.controller.handleEvent_client_(repeat, self.client))
+        self.assertEqual((self.controller.state.text, self.controller.state.converted), ("hi", True))  # still shown
+
+    def test_a_held_return_or_esc_is_one_press_after_it_emptied_the_composition(self):
+        """Return kept your words (the composition is empty now); its repeats sent the message.
+        Esc dropped them; its repeats closed the sheet. A key cd_AI did not take repeats as usual."""
+        def repeat(code):
+            return self.controller.handleEvent_client_(types.SimpleNamespace(
+                type=lambda: 10, keyCode=lambda: code, modifierFlags=lambda: 0, characters=lambda: "",
+                isARepeat=lambda: True), self.client)
+        for code in (36, 53):
+            self.type_text("hi")
+            self.assertTrue(self.key(code, "\r" if code == 36 else "\x1b"))
+            self.assertEqual(self.controller.state.text, "")
+            self.assertTrue(repeat(code))
+        self.assertFalse(self.key(36, "\r"))  # nothing composed: Return is the app's
+        self.assertFalse(repeat(36))  # and so are its repeats
+
+    def test_an_accent_left_waiting_goes_in_when_the_composition_ends(self):
+        """U.S. International: " is a dead key. "ok" then Return committed "ok, without the
+        closing quote it drew; macOS types the accent before a key it cannot go on with."""
+        option = 1 << 19
+        self.type_text("caf")
+        self.assertTrue(self.key(14, "´", option))
+        self.key(36, "\r")  # Return keeps your words, the accent with them
+        self.assertEqual(self.client.commits[-1], "caf´")
+        self.type_text("ok")
+        self.assertTrue(self.key(14, "´", option))
+        self.controller.commitComposition_(None)  # a click elsewhere
+        self.assertEqual(self.client.commits[-1], "ok´")
+        self.assertTrue(self.key(14, "´", option))  # alone, then a click
+        self.controller.commitComposition_(None)
+        self.assertEqual(self.client.commits[-1], "´")
+
+    def test_a_suggestion_past_the_screen_edge_is_cut_to_what_shows(self):
+        """A text box at the screen's right edge: the suggestion ran past it, and Tab took all of it."""
+        client = TextClient("Note:")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        self.module.OVERLAY.room = 12
+        try:
+            fresh.state.mode = "continue"
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 49, modifierFlags=lambda: 0,
+                                                            characters=lambda: " "), client)
+            fresh.worker.result = (fresh.state.revision, {"text": fresh.state.text + "the results are in."})
+            fresh.poll()
+            self.assertEqual((self.module.OVERLAY.text, fresh.state.ghost), ("the results", "the results"))
+        finally:
+            self.module.OVERLAY.room = 1000
+            fresh.inputControllerWillClose()
+
+    def test_a_shortcut_in_continue_leaves_a_selected_word_alone(self):
+        client = TextClient("keep this word")
+        client.chosen = (5, 4)  # "this", selected in the app
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 14,
+                                                            modifierFlags=lambda: 1 << 18, characters=lambda: "e"), client)
+            self.assertEqual(client.whole(), "keep this word")
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_without_a_caret_the_panel_goes_by_the_pointer_not_a_corner(self):
+        client = TextClient("x")
+        client.attributesForCharacterIndex_lineHeightRectangle_ = lambda index, rect: ({}, ((0, 0), (1, 18)))
+        client.firstRectForCharacterRange_actualRange_ = lambda span, actual: ((0, 0), (0, 0))
+        self.assertEqual(self.controller.caret(client), ((500, 282), (0, 18)))
+
+    def test_line_rect_uses_inline_offsets_after_existing_text(self):
+        client = TextClient("https://example.test/")
+        seen = []
+        original = client.attributesForCharacterIndex_lineHeightRectangle_
+        def line_rect(index, rect):
+            seen.append(index)
+            return original(index, rect)
+        client.attributesForCharacterIndex_lineHeightRectangle_ = line_rect
+        self.controller.caret(client)
+        self.assertEqual(seen.pop(), 0)  # no composition: ask for the current selection
+        client.setMarkedText_selectionRange_replacementRange_("ok", (2, 0), (self.module.NSNotFound, 0))
+        start = self.controller.caret(client, start=True)
+        self.assertEqual(seen.pop(), 0)
+        end = self.controller.caret(client)
+        self.assertEqual(seen.pop(), 2)
+        self.assertEqual(end[0][0] - start[0][0], 20)
+        # The fallback remains in document coordinates, not the inline offset.
+        absolute = []
+        client.attributesForCharacterIndex_lineHeightRectangle_ = lambda index, rect: ({}, ((0, 0), (0, 0)))
+        def first_rect(span, actual):
+            absolute.append(span)
+            return ((200, 400), (1, 18)), span
+        client.firstRectForCharacterRange_actualRange_ = first_rect
+        self.controller.caret(client, start=True)
+        self.assertEqual(absolute, [(len("https://example.test/"), 0)])
+
+    def test_shift_esc_brings_a_held_exchange_back_without_asking_again(self):
+        """Codex: restoring a running instruction scheduled it a second time (two sessions, the
+        second without the text around the caret). Its request is still running."""
+        self.type_text("say hi")
+        self.key(36, "\r", 1 << 17)  # Shift+Enter: sent
+        asked = list(self.controller.worker.modes)
+        self.key(0, "a", 1 << 20)  # Cmd+A: a shortcut holds the exchange
+        self.assertIsNotNone(self.controller.state.held)
+        self.assertEqual(self.module.TOAST.spec["status"], "working on what you asked")  # its pill, at once
+        self.assertTrue(self.key(53, "\x1b", 1 << 17))  # Shift+Esc: back
+        self.assertEqual((self.controller.state.text, self.controller.worker.modes), ("say hi", asked))
+
+    def test_the_panel_starts_where_the_composition_starts(self):
+        """Under the composition's start, whatever the caret: typed,
+        dropped (its toast), or brought back whole by Shift+Esc (docs/design/design.md, Placement)."""
+        client = TextClient("Dear Sam, ")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        start = ((100, 400), (1, 18))  # "Dear Sam, " is 10 characters
+        try:
+            for char in "say hi":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                                                characters=lambda c=char: c), client)
+            self.assertEqual(self.module.PANEL.rect, start)  # not the caret, 6 characters on
+            escape = lambda flags=0: fresh.handleEvent_client_(types.SimpleNamespace(
+                type=lambda: 10, keyCode=lambda: 53, modifierFlags=lambda: flags, characters=lambda: "\x1b"), client)
+            escape()  # dropped: said where the words were
+            self.assertEqual((self.module.TOAST.spec["status"], self.module.TOAST.rect), ("dropped", start))
+            escape(self.module.NSEventModifierFlagShift)  # back, whole
+            self.assertEqual((client.marked_text(), self.module.PANEL.rect), ("say hi", start))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_continue_starts_from_the_text_box_and_the_suggestion_is_grey(self):
+        client = TextClient("Thanks for the review ")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "continue"
+            event = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                          characters=lambda: "o")
+            fresh.handleEvent_client_(event, client)
+            self.assertEqual(fresh.state.text, "Thanks for the review o")  # the app's text, then the key
+            client.text, client.mark_at = "Thanks for the review ", 22  # the o deleted: as continue now has it
+            fresh.state.change("Thanks for the review ")
+            fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
+            fresh.changed(client)
+            # Nothing follows on the line: our overlay draws it grey after the caret, nothing is marked.
+            self.assertEqual((self.module.OVERLAY.text, client.marked), ("on the parser.", ""))
+            # The caret moves without a key (a click): macOS says nothing, so the suggestion is
+            # dropped when the caret is seen elsewhere, and Tab cannot take it unseen.
+            fresh.ghost_checked = 0
+            fresh.caret = lambda _client: ((500.0, 300.0), (2.0, 17.0))
+            fresh.check_ghost()
+            self.assertEqual((self.module.OVERLAY.text, fresh.state.ghost), ("", ""))
+            del fresh.caret
+            fresh.state.offer(fresh.state.revision, "Thanks for the review on the parser.")
+            fresh.changed(client)
+            # Text after the caret on its line: nothing covers it.
+            client.text, client.mark_at = "Thanks for the review  today.", len("Thanks for the review ")
+            fresh.changed(client)
+            self.assertEqual((self.module.OVERLAY.text, client.marked), ("", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_continue_is_quiet_in_a_terminal(self):
+        client = TextClient("~ % ")
+        client.bundleIdentifier = lambda: "com.apple.Terminal"
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            for char in "ls ":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0, modifierFlags=lambda: 0,
+                                                                characters=lambda char=char: char), client)
+            self.assertTrue(fresh.state.quiet)
+            self.assertNotIn("continue", fresh.worker.modes)  # a command line is not prose: nothing unasked
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_an_instruction_takes_the_text_box_but_not_itself(self):
+        client = TextClient("Dear Ana,\n\n")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "compose"
+            for char in "say hi":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
+                                          modifierFlags=lambda: 0, characters=lambda c=char: c), client)
+            self.assertEqual(client.whole(), "Dear Ana,\n\nsay hi")  # the instruction is marked text
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 36,
+                                      modifierFlags=lambda: 1 << 17, characters=lambda: "\r"), client)  # Shift+Enter
+            self.assertEqual(fresh.worker.sent, ("say hi", "Dear Ana,\n\n", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_a_rewrite_knows_where_it_goes(self):
+        client = TextClient("Dear Ana,\n\n")
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "compose"
+            for char in "thanks":
+                fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 0,
+                                          modifierFlags=lambda: 0, characters=lambda c=char: c), client)
+            fresh.handleEvent_client_(types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48,
+                                      modifierFlags=lambda: 0, characters=lambda: "\t"), client)
+            self.assertEqual(fresh.worker.sent, ("thanks", "Dear Ana,\n\n", ""))
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_tab_on_a_selection_makes_it_your_words(self):
+        """Owner: Tab on a selection is a switch to compose: the selection becomes the composition,
+        as if just typed; then Tab rewrites it or Shift+Enter sends it."""
+        client = TextClient("Dear Ana, this is important. Thanks.")
+        client.chosen = (10, 18)  # "this is important."
+        fresh = self.new_controller(client)
+        fresh.activateServer_(None)
+        try:
+            fresh.state.mode = "compose"
+            tab = types.SimpleNamespace(type=lambda: 10, keyCode=lambda: 48, modifierFlags=lambda: 0, characters=lambda: "\t")
+            self.assertTrue(fresh.handleEvent_client_(tab, client))
+            self.assertEqual((fresh.state.text, client.marked_text(), fresh.worker.modes), ("this is important.", "this is important.", []))
+            self.assertEqual(client.whole(), "Dear Ana, this is important. Thanks.")  # in its place, marked
+            self.assertTrue(fresh.handleEvent_client_(tab, client))  # then Tab rewrites it
+            self.assertEqual((fresh.worker.modes[-1], fresh.worker.sent[0]), ("rewrite", "this is important."))
+            fresh.worker.result = (fresh.state.revision, {"text": "This is of utmost significance."})
+            fresh.pollSuggestions_(None)
+            self.assertEqual(self.module.PANEL.spec["body"], "This is of utmost significance.")
+            self.assertTrue(fresh.handleEvent_client_(tab, client))  # Tab inserts it
+            self.assertEqual(client.whole(), "Dear Ana, This is of utmost significance. Thanks.")
+        finally:
+            fresh.inputControllerWillClose()
+
+    def test_a_client_without_text_access_gives_no_context(self):
+        self.assertEqual(self.controller.around_caret(self.client), ("", ""))  # Client lacks selectedRange
+
+    def test_bundle_registration_names_match_controller(self):
+        with (ROOT / "platforms/macos/Info.plist").open("rb") as source:
+            info = plistlib.load(source)
+        self.assertEqual(info["InputMethodServerControllerClass"], self.module.ClaudishInputController.__name__)
+        self.assertEqual(info["InputMethodConnectionName"], "Claudish_Connection")
+        self.assertEqual(info["TISIntendedLanguage"], "en")
+
+
+    def test_a_rewrite_that_comes_with_a_key_leaves_the_key_to_your_words(self):
+        """Tab, then typing on: the rewrite arrives at the Space (polled at it), unseen; the Space
+        and the words after it are yours, as if the key had come first (the rewrite goes)."""
+        self.type_text("hello")
+        self.assertTrue(self.key(48, "\t"))
+        state = self.controller.state
+        self.controller.worker.result = (state.revision, {"text": "Hello."})
+        self.key(49, " ")
+        self.controller.worker.result = None
+        self.type_text("world")
+        self.assertEqual((state.text, state.reply, state.converted), ("hello world", "", False))
+
+    def test_a_shift_tap_into_continue_takes_the_pill_down(self):
+        self.type_text("hello")
+        self.key(53, "\x1b")  # dropped: "Shift+Esc restore"
+        self.assertTrue(self.module.TOAST.visible)
+        self.shift_tap()
+        self.assertEqual(self.controller.state.mode, "continue")
+        self.assertFalse(self.module.TOAST.visible)
+
+    def test_a_private_use_character_is_typed_into_the_composition(self):
+        self.type_text("Hello ")
+        self.assertTrue(self.key(40, "\uf8ff", 1 << 19 | 1 << 17))  # Option+Shift+K
+        self.assertEqual((self.controller.state.text, self.client.commits), ("Hello \uf8ff", []))
+
+    def test_tab_after_a_dead_key_takes_the_suggestion(self):
+        """Option+e then Tab in continue: the accent goes (as on Linux) and Tab takes the
+        suggestion; the caret check does not take the accent's marking for a click."""
+        self.client = TextClient("")
+        self.controller.client = lambda: self.client
+        self.controller.state.mode = "continue"
+        self.type_text("Thanks. ")
+        state = self.controller.state
+        self.controller.worker.result = (state.revision, {"text": state.text + "See you soon."})
+        self.controller.pollSuggestions_(None)
+        self.controller.worker.result = None
+        self.assertEqual(state.ghost, "See you soon.")
+        self.key(14, "\u00b4", 1 << 19)  # Option+e
+        self.assertTrue(self.key(48, "\t"))
+        self.assertEqual(self.client.text, "Thanks. See you soon.")
+
+    def test_typing_on_in_continue_drops_the_request_that_was_due(self):
+        self.client = TextClient("")
+        self.controller.client = lambda: self.client
+        self.controller.state.mode = "continue"
+        self.type_text("Thanks. S")
+        self.assertEqual(self.controller.worker.sent[0], "")  # "Thanks. " is not asked after all
+
+    def test_a_waiting_panel_follows_its_text_when_the_window_moves(self):
+        self.client = TextClient("")
+        self.controller.client = lambda: self.client
+        self.type_text("hello there")
+        self.assertTrue(self.module.PANEL.visible)
+        original = self.client.attributesForCharacterIndex_lineHeightRectangle_
+
+        def moved(index, rect):  # the window dragged down 300 pt: no key, no call from IMK
+            attributes, ((x, y), size) = original(index, rect)
+            return attributes, ((x, y - 300), size)
+        self.client.attributesForCharacterIndex_lineHeightRectangle_ = moved
+        self.controller.panel_checked = 0.0
+        self.controller.poll()
+        self.assertEqual(self.module.PANEL.rect, self.controller.caret(self.client, start=True))
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TraceTests(unittest.TestCase):
+    def test_a_traced_failure_says_its_type_and_place_never_its_message(self):
+        """An exception's message can hold the text it was about; the trace has where it happened."""
+        import tempfile
+        module = load_adapter()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "trace.log"
+            with patch.object(module, "TRACE", str(path)):
+                try:
+                    raise ValueError("my secret words")
+                except ValueError:
+                    module.failed("key")
+            written = path.read_text()
+        self.assertIn("key failed ValueError test_macos_adapter.py:", written)
+        self.assertNotIn("secret", written)
+
+
+class HalfEmojiTests(unittest.TestCase):
+    def test_a_window_edge_through_an_emoji_drops_its_half(self):
+        whole = load_adapter().whole
+        self.assertEqual(whole("\udc4d fine \ud83d"), " fine ")
+        self.assertEqual(whole("thumbs 👍"), "thumbs 👍")
+
+
+class BundleEnvironmentTests(unittest.TestCase):
+    def test_programs_cd_ai_runs_do_not_get_the_bundles_python_settings(self):
+        """py2app's launcher sets PYTHONHOME/PYTHONPATH to the bundle and SSL_CERT_DIR to a missing
+        folder; another Python started from cd_AI (an MCP server) loaded the bundle's packages."""
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as bundle:
+            cert = Path(bundle) / "cacert.pem"
+            cert.write_text("")
+            launcher = {"PYTHONHOME": bundle, "PYTHONPATH": bundle, "SSL_CERT_FILE": str(cert),
+                        "SSL_CERT_DIR": bundle + "/openssl.ca/no-such-file", "EXECUTABLEPATH": bundle + "/Claudish"}
+            with patch.dict(os.environ, launcher):
+                spec = importlib.util.spec_from_file_location("claudish_macos_main", ROOT / "platforms/macos/main.py")
+                spec.loader.exec_module(importlib.util.module_from_spec(spec))
+                for name in ("PYTHONHOME", "PYTHONPATH", "SSL_CERT_DIR"):
+                    self.assertNotIn(name, os.environ)
+                self.assertEqual((os.environ["SSL_CERT_FILE"], os.environ["EXECUTABLEPATH"]),
+                                 (str(cert), bundle + "/Claudish"))
+                from claudish.children import OWN_ENV, environment
+                self.assertNotIn("SSL_CERT_FILE", environment("/opt/homebrew/bin/npx"))  # the system's, for them
+                self.assertTrue(environment("/opt/homebrew/bin/npx")["PATH"].startswith("/opt/homebrew/bin"))
+                OWN_ENV.discard("SSL_CERT_FILE")
+
+
+class TerminalEndTests(unittest.TestCase):
+    """A command's exception was py2app's "Launch error" window on the screen (`Claudish mcp list | head`)."""
+
+    def load_main(self):
+        spec = importlib.util.spec_from_file_location("claudish_macos_main_end", ROOT / "platforms/macos/main.py")
+        module = importlib.util.module_from_spec(spec)
+        import os
+        with patch.dict(os.environ, {"SSL_CERT_FILE": __file__}):  # set, as py2app's launcher does
+            spec.loader.exec_module(module)
+        from claudish.children import OWN_ENV
+        OWN_ENV.discard("SSL_CERT_FILE")
+        return module
+
+    def test_an_exception_is_a_traceback_and_exit_status_1(self):
+        import io
+        main = self.load_main()
+        def fails():
+            raise ValueError("boom")
+        with patch.object(main, "command_line", fails), patch("sys.stderr", io.StringIO()) as err:
+            with self.assertRaises(SystemExit) as ended:
+                main.from_terminal()
+        self.assertEqual(ended.exception.code, 1)
+        self.assertIn("ValueError: boom", err.getvalue())
+
+    def test_a_closed_pipe_ends_quietly_and_a_commands_own_exit_stays(self):
+        import os
+        main = self.load_main()
+        def piped():
+            raise BrokenPipeError
+        saved = os.dup(1)
+        try:
+            with patch.object(main, "command_line", piped), self.assertRaises(SystemExit) as ended:
+                main.from_terminal()
+            self.assertEqual(ended.exception.code, 1)
+        finally:
+            os.dup2(saved, 1)
+            os.close(saved)
+        def exits():
+            raise SystemExit(2)  # argparse's usage error: its own status
+        with patch.object(main, "command_line", exits), self.assertRaises(SystemExit) as ended:
+            main.from_terminal()
+        self.assertEqual(ended.exception.code, 2)

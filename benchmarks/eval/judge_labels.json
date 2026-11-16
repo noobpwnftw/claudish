@@ -1,0 +1,586 @@
+{
+ "labels": {
+  "same": "same meaning; style changes only",
+  "adds": "adds a fact, claim, request, or opinion",
+  "reply": "answers the text instead of rewriting it",
+  "changed": "loses or alters meaning, target, or facts",
+  "language": "switches language"
+ },
+ "labeled_by": "maintainer (Claude), 2026-10-22, from Qwen2.5 0.5B outputs in G03/G11",
+ "pairs": [
+  {
+   "id": "name-1",
+   "set": "shipped-prompt",
+   "source": "Tell Priya the deploy is done.",
+   "output": "Priya, the deployment is complete.",
+   "label": "changed"
+  },
+  {
+   "id": "name-2",
+   "set": "shipped-prompt",
+   "source": "Marcus and Aiko will join the call.",
+   "output": "Marcus and Aiko will be joining the call.",
+   "label": "same"
+  },
+  {
+   "id": "name-3",
+   "set": "shipped-prompt",
+   "source": "Ask Dr. Okafor about the results.",
+   "output": "Dr. Okafor, could you provide an update on the findings?",
+   "label": "changed"
+  },
+  {
+   "id": "name-4",
+   "set": "shipped-prompt",
+   "source": "Can you send this to Zoë at Fjordline?",
+   "output": "Could you send this to Zoë at Fjordline?",
+   "label": "same"
+  },
+  {
+   "id": "number-1",
+   "set": "shipped-prompt",
+   "source": "We raised $2.5 million.",
+   "output": "We raised $2.5 million.",
+   "label": "same"
+  },
+  {
+   "id": "number-2",
+   "set": "shipped-prompt",
+   "source": "The build takes 14 minutes.",
+   "output": "The build takes 14 minutes.",
+   "label": "same"
+  },
+  {
+   "id": "number-3",
+   "set": "shipped-prompt",
+   "source": "Only 3 of the 40 tests failed.",
+   "output": "Only three out of the forty tests failed.",
+   "label": "same"
+  },
+  {
+   "id": "number-4",
+   "set": "shipped-prompt",
+   "source": "Latency dropped by 37%.",
+   "output": "Latency decreased by 37%.",
+   "label": "same"
+  },
+  {
+   "id": "date-1",
+   "set": "shipped-prompt",
+   "source": "The meeting moved to March 4 at 3pm.",
+   "output": "The meeting is scheduled for March 4 at 3pm.",
+   "label": "changed"
+  },
+  {
+   "id": "date-2",
+   "set": "shipped-prompt",
+   "source": "Release is planned for 2027.",
+   "output": "This project is scheduled for 2027.",
+   "label": "changed"
+  },
+  {
+   "id": "date-3",
+   "set": "shipped-prompt",
+   "source": "I'm out until Friday.",
+   "output": "I'll be gone until Friday.",
+   "label": "same"
+  },
+  {
+   "id": "neg-1",
+   "set": "shipped-prompt",
+   "source": "Do not merge this yet.",
+   "output": "This is not advisable at this juncture.",
+   "label": "changed"
+  },
+  {
+   "id": "neg-2",
+   "set": "shipped-prompt",
+   "source": "I don't think we need a new server.",
+   "output": "I don't think we need a new server.",
+   "label": "same"
+  },
+  {
+   "id": "neg-3",
+   "set": "shipped-prompt",
+   "source": "The fix never reached production.",
+   "output": "The solution did not make it to production.",
+   "label": "same"
+  },
+  {
+   "id": "neg-4",
+   "set": "shipped-prompt",
+   "source": "No one reviewed the change.",
+   "output": "No one has reviewed the update.",
+   "label": "same"
+  },
+  {
+   "id": "neg-5",
+   "set": "shipped-prompt",
+   "source": "We can't ship without tests.",
+   "output": "We cannot ship without thorough testing.",
+   "label": "same"
+  },
+  {
+   "id": "code-1",
+   "set": "shipped-prompt",
+   "source": "Run npm install before building.",
+   "output": "It's recommended to run `npm install` before building your project.",
+   "label": "same"
+  },
+  {
+   "id": "code-2",
+   "set": "shipped-prompt",
+   "source": "The bug is in parse_config.",
+   "output": "The issue lies within the parse_config function.",
+   "label": "same"
+  },
+  {
+   "id": "code-3",
+   "set": "shipped-prompt",
+   "source": "See https://example.com/docs for details.",
+   "output": "For further information, please refer to the documentation at https://example.com/docs.",
+   "label": "same"
+  },
+  {
+   "id": "code-4",
+   "set": "shipped-prompt",
+   "source": "Set MAX_RETRIES to 5.",
+   "output": "Increase MAX_RETRIES to 5.",
+   "label": "changed"
+  },
+  {
+   "id": "question-1",
+   "set": "shipped-prompt",
+   "source": "Can we talk tomorrow?",
+   "output": "Could we have a conversation tomorrow?",
+   "label": "same"
+  },
+  {
+   "id": "question-2",
+   "set": "shipped-prompt",
+   "source": "Why is the build slow?",
+   "output": "Why is the build lagging?",
+   "label": "same"
+  },
+  {
+   "id": "question-3",
+   "set": "shipped-prompt",
+   "source": "Did anyone check the logs?",
+   "output": "Anyone else has checked the logs?",
+   "label": "changed"
+  },
+  {
+   "id": "short-1",
+   "set": "shipped-prompt",
+   "source": "Thanks!",
+   "output": "You're welcome!",
+   "label": "reply"
+  },
+  {
+   "id": "short-2",
+   "set": "shipped-prompt",
+   "source": "Sounds good.",
+   "output": "That sounds like a good idea.",
+   "label": "same"
+  },
+  {
+   "id": "short-3",
+   "set": "shipped-prompt",
+   "source": "On it.",
+   "output": "This is on the go.",
+   "label": "changed"
+  },
+  {
+   "id": "short-4",
+   "set": "shipped-prompt",
+   "source": "lgtm",
+   "output": "This is accepted.",
+   "label": "same"
+  },
+  {
+   "id": "casual-1",
+   "set": "shipped-prompt",
+   "source": "gonna grab lunch, back in 20",
+   "output": "I'll be back in 20 minutes.",
+   "label": "changed"
+  },
+  {
+   "id": "casual-2",
+   "set": "shipped-prompt",
+   "source": "this is kinda broken tbh",
+   "output": "This is somewhat flawed, to say the least.",
+   "label": "same"
+  },
+  {
+   "id": "casual-3",
+   "set": "shipped-prompt",
+   "source": "my bad, wrong file",
+   "output": "I apologize, I made a mistake.",
+   "label": "changed"
+  },
+  {
+   "id": "multi-1",
+   "set": "shipped-prompt",
+   "source": "The tests passed. Let's merge it.",
+   "output": "The tests have all passed; let's merge them.",
+   "label": "same"
+  },
+  {
+   "id": "multi-2",
+   "set": "shipped-prompt",
+   "source": "I fixed the typo. I also updated the docs.",
+   "output": "I've fixed the typo, and I've updated the documentation.",
+   "label": "same"
+  },
+  {
+   "id": "formal-1",
+   "set": "shipped-prompt",
+   "source": "Please find the attached report for your review.",
+   "output": "Please find the attached report for your review.",
+   "label": "same"
+  },
+  {
+   "id": "formal-2",
+   "set": "shipped-prompt",
+   "source": "I appreciate your patience in this matter.",
+   "output": "I thank you for your understanding in this matter.",
+   "label": "same"
+  },
+  {
+   "id": "tone-1",
+   "set": "shipped-prompt",
+   "source": "Sorry for the late reply.",
+   "output": "I apologize for the delay in my response.",
+   "label": "same"
+  },
+  {
+   "id": "tone-2",
+   "set": "shipped-prompt",
+   "source": "I'm really frustrated with this bug.",
+   "output": "This bug is causing me considerable frustration.",
+   "label": "same"
+  },
+  {
+   "id": "tone-3",
+   "set": "shipped-prompt",
+   "source": "Great work on the launch!",
+   "output": "The launch was a success!",
+   "label": "changed"
+  },
+  {
+   "id": "dash-1",
+   "set": "shipped-prompt",
+   "source": "It works—mostly.",
+   "output": "It operates effectively—mostly.",
+   "label": "same"
+  },
+  {
+   "id": "emoji-1",
+   "set": "shipped-prompt",
+   "source": "Shipped it 🎉",
+   "output": "It was delivered 🎉",
+   "label": "same"
+  },
+  {
+   "id": "lang-fr",
+   "set": "shipped-prompt",
+   "source": "La réunion est reportée à demain.",
+   "output": "The meeting is scheduled for tomorrow.",
+   "label": "language"
+  },
+  {
+   "id": "lang-es",
+   "set": "shipped-prompt",
+   "source": "Gracias por tu ayuda con el proyecto.",
+   "output": "Thank you for your assistance with the project.",
+   "label": "language"
+  },
+  {
+   "id": "name-1",
+   "set": "terse-system",
+   "source": "Tell Priya the deploy is done.",
+   "output": "Tell Priya the deploy is done—she'll be pleased.",
+   "label": "adds"
+  },
+  {
+   "id": "name-2",
+   "set": "terse-system",
+   "source": "Marcus and Aiko will join the call.",
+   "output": "Marcus and Aiko will join the call—please let them know.",
+   "label": "adds"
+  },
+  {
+   "id": "name-3",
+   "set": "terse-system",
+   "source": "Ask Dr. Okafor about the results.",
+   "output": "Dr. Okafor, can you provide an update on the results?",
+   "label": "changed"
+  },
+  {
+   "id": "name-4",
+   "set": "terse-system",
+   "source": "Can you send this to Zoë at Fjordline?",
+   "output": "Could you send this to Zoë at Fjordline?",
+   "label": "same"
+  },
+  {
+   "id": "number-1",
+   "set": "terse-system",
+   "source": "We raised $2.5 million.",
+   "output": "We raised $2.5 million—thank you for your generous support.",
+   "label": "adds"
+  },
+  {
+   "id": "number-2",
+   "set": "terse-system",
+   "source": "The build takes 14 minutes.",
+   "output": "The build takes 14 minutes—please proceed with caution.",
+   "label": "adds"
+  },
+  {
+   "id": "number-3",
+   "set": "terse-system",
+   "source": "Only 3 of the 40 tests failed.",
+   "output": "Only 3 of the 40 tests failed—this is disappointing.",
+   "label": "adds"
+  },
+  {
+   "id": "number-4",
+   "set": "terse-system",
+   "source": "Latency dropped by 37%.",
+   "output": "Latency dropped by 37%—a notable improvement.",
+   "label": "adds"
+  },
+  {
+   "id": "date-1",
+   "set": "terse-system",
+   "source": "The meeting moved to March 4 at 3pm.",
+   "output": "The meeting is scheduled for March 4 at 3pm—please confirm.",
+   "label": "adds"
+  },
+  {
+   "id": "date-2",
+   "set": "terse-system",
+   "source": "Release is planned for 2027.",
+   "output": "Release is planned for 2027—please note.",
+   "label": "adds"
+  },
+  {
+   "id": "date-3",
+   "set": "terse-system",
+   "source": "I'm out until Friday.",
+   "output": "I'm out until Friday—stay tuned.",
+   "label": "adds"
+  },
+  {
+   "id": "neg-1",
+   "set": "terse-system",
+   "source": "Do not merge this yet.",
+   "output": "Please do not merge this yet—let's proceed.",
+   "label": "changed"
+  },
+  {
+   "id": "neg-2",
+   "set": "terse-system",
+   "source": "I don't think we need a new server.",
+   "output": "I don't think we need a new server—there's no need.",
+   "label": "same"
+  },
+  {
+   "id": "neg-3",
+   "set": "terse-system",
+   "source": "The fix never reached production.",
+   "output": "The fix never made it to production—there's no need to worry.",
+   "label": "adds"
+  },
+  {
+   "id": "neg-4",
+   "set": "terse-system",
+   "source": "No one reviewed the change.",
+   "output": "No one reviewed the change—there was no review.",
+   "label": "same"
+  },
+  {
+   "id": "neg-5",
+   "set": "terse-system",
+   "source": "We can't ship without tests.",
+   "output": "We cannot ship without tests—this is crucial.",
+   "label": "adds"
+  },
+  {
+   "id": "code-1",
+   "set": "terse-system",
+   "source": "Run npm install before building.",
+   "output": "Run npm install before building—this ensures your project is up-to-date.",
+   "label": "adds"
+  },
+  {
+   "id": "code-2",
+   "set": "terse-system",
+   "source": "The bug is in parse_config.",
+   "output": "The bug is in parse_config—please review the code.",
+   "label": "adds"
+  },
+  {
+   "id": "code-3",
+   "set": "terse-system",
+   "source": "See https://example.com/docs for details.",
+   "output": "See <https://example.com/docs> for details.",
+   "label": "same"
+  },
+  {
+   "id": "code-4",
+   "set": "terse-system",
+   "source": "Set MAX_RETRIES to 5.",
+   "output": "Set MAX_RETRIES to 5—this will ensure maximum retries.",
+   "label": "adds"
+  },
+  {
+   "id": "question-1",
+   "set": "terse-system",
+   "source": "Can we talk tomorrow?",
+   "output": "Could we talk tomorrow?",
+   "label": "same"
+  },
+  {
+   "id": "question-2",
+   "set": "terse-system",
+   "source": "Why is the build slow?",
+   "output": "Why is the build slow?",
+   "label": "same"
+  },
+  {
+   "id": "question-3",
+   "set": "terse-system",
+   "source": "Did anyone check the logs?",
+   "output": "Did anyone check the logs?",
+   "label": "same"
+  },
+  {
+   "id": "short-1",
+   "set": "terse-system",
+   "source": "Thanks!",
+   "output": "You're welcome!",
+   "label": "reply"
+  },
+  {
+   "id": "short-2",
+   "set": "terse-system",
+   "source": "Sounds good.",
+   "output": "Sounds good—let's keep it that way.",
+   "label": "adds"
+  },
+  {
+   "id": "short-3",
+   "set": "terse-system",
+   "source": "On it.",
+   "output": "On it—let's get this done.",
+   "label": "adds"
+  },
+  {
+   "id": "short-4",
+   "set": "terse-system",
+   "source": "lgtm",
+   "output": "Great!",
+   "label": "changed"
+  },
+  {
+   "id": "casual-1",
+   "set": "terse-system",
+   "source": "gonna grab lunch, back in 20",
+   "output": "I'll grab lunch, back in 20—let's plan accordingly.",
+   "label": "adds"
+  },
+  {
+   "id": "casual-2",
+   "set": "terse-system",
+   "source": "this is kinda broken tbh",
+   "output": "This is kinda broken—let's work on it.",
+   "label": "adds"
+  },
+  {
+   "id": "casual-3",
+   "set": "terse-system",
+   "source": "my bad, wrong file",
+   "output": "My apologies, I have a file—please check.",
+   "label": "changed"
+  },
+  {
+   "id": "multi-1",
+   "set": "terse-system",
+   "source": "The tests passed. Let's merge it.",
+   "output": "The tests passed. Let's merge it—this is a good start.",
+   "label": "adds"
+  },
+  {
+   "id": "multi-2",
+   "set": "terse-system",
+   "source": "I fixed the typo. I also updated the docs.",
+   "output": "I fixed the typo—I also updated the docs.",
+   "label": "same"
+  },
+  {
+   "id": "formal-1",
+   "set": "terse-system",
+   "source": "Please find the attached report for your review.",
+   "output": "Please find the attached report for your review—thank you.",
+   "label": "adds"
+  },
+  {
+   "id": "formal-2",
+   "set": "terse-system",
+   "source": "I appreciate your patience in this matter.",
+   "output": "I appreciate your patience in this matter—please feel free to contact me.",
+   "label": "adds"
+  },
+  {
+   "id": "tone-1",
+   "set": "terse-system",
+   "source": "Sorry for the late reply.",
+   "output": "Sorry for the late reply—I appreciate your understanding.",
+   "label": "adds"
+  },
+  {
+   "id": "tone-2",
+   "set": "terse-system",
+   "source": "I'm really frustrated with this bug.",
+   "output": "I'm really frustrated with this bug—please help.",
+   "label": "adds"
+  },
+  {
+   "id": "tone-3",
+   "set": "terse-system",
+   "source": "Great work on the launch!",
+   "output": "Thank you! I'm glad you enjoyed the launch.",
+   "label": "reply"
+  },
+  {
+   "id": "dash-1",
+   "set": "terse-system",
+   "source": "It works—mostly.",
+   "output": "It works—mostly—thank you.",
+   "label": "adds"
+  },
+  {
+   "id": "emoji-1",
+   "set": "terse-system",
+   "source": "Shipped it 🎉",
+   "output": "Shipped it 🎉—I'm glad it's done.",
+   "label": "adds"
+  },
+  {
+   "id": "lang-fr",
+   "set": "terse-system",
+   "source": "La réunion est reportée à demain.",
+   "output": "La réunion est reportée à demain—espero que no se repita.",
+   "label": "language"
+  },
+  {
+   "id": "lang-es",
+   "set": "terse-system",
+   "source": "Gracias por tu ayuda con el proyecto.",
+   "output": "¡De nada! Gracias por tu ayuda con el proyecto. ¡Espero que tengas éxito!",
+   "label": "reply"
+  }
+ ]
+}

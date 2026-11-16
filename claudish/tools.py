@@ -1,0 +1,275 @@
+"""Agentic instruct (G17): an instruction may call the profile's MCP tools, then draft.
+
+Profile: "tools": ["notes", {"server": "github", "trust": ["get_pull_request"]}] names entries of
+mcp_servers. Tools the server marks read-only (readOnlyHint), and the ones the user vouches for
+with "trust", run unasked; tools that write or destroy are offered only when the instruction can
+ask, and are asked about before they run; "deny" names tools never offered. Every call is listed
+in "consulted", the loop is bounded in steps and time, and the result is still only a candidate.
+Claudish's own read-only tools (the text box) join them, with or without MCP.
+"""
+import json
+import re
+import threading
+import time
+
+from .context import Provider
+
+MAX_STEPS = 4
+SEPARATOR = "__"  # tool names reach the model as server__tool
+
+
+def field(item, name):
+    """An MCP SDK field by its 2.x name (read_only_hint) or its 1.x/wire name (readOnlyHint)."""
+    head, *rest = name.split("_")
+    return getattr(item, name, None) or getattr(item, head + "".join(part.title() for part in rest), None)
+
+
+def api_name(name):
+    """A name as tool APIs take it: letters, digits, _ and -, the rest as _ (an MCP tool's own name
+    may have dots; Claude Code names a server's tools this way too)."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", name)
+
+
+def parse(spec):
+    """A "tools" entry -> (server name, trusted tool names, denied tool names)."""
+    if isinstance(spec, str):
+        return spec, set(), set()
+    if isinstance(spec, dict) and isinstance(spec.get("server"), str) and set(spec) <= {"server", "trust", "deny"}:
+        lists = [spec.get(key) or [] for key in ("trust", "deny")]
+        if all(isinstance(names, list) and all(isinstance(n, str) for n in names) for names in lists):
+            return spec["server"], set(lists[0]), set(lists[1])
+    raise ValueError('tools entries are server names or {"server": NAME, "trust": [TOOL, ...], "deny": [TOOL, ...]}')
+
+
+def classify(tool, trust, deny):
+    """read (runs), write (asks), destructive (asks every time), or denied (never offered)."""
+    annotations = getattr(tool, "annotations", None)
+    if tool.name in deny:
+        return "denied"
+    if field(annotations, "read_only_hint") or tool.name in trust:
+        return "read"
+    return "destructive" if field(annotations, "destructive_hint") else "write"
+
+
+class Toolbox:
+    def __init__(self, specs, servers, timeout=60):
+        self.timeout = timeout
+        self.servers = []
+        self.configs = {}  # name -> the config's own (Claude-style) entry, for an agent's --mcp-config
+        for spec in specs:
+            name, trust, deny = parse(spec)
+            if name not in (servers or {}):
+                raise ValueError('tools: server %r is not in "mcp_servers"' % name)
+            if SEPARATOR in name:
+                raise ValueError("tools: server names may not contain %r" % SEPARATOR)
+            # Connection settings only; tools are chosen per call.
+            provider = Provider({"type": "mcp", "server": name, "timeout": timeout}, None, servers, listing=True)
+            self.servers.append((name, trust, deny, provider))
+            self.configs[name] = dict(servers[name])
+
+    def policy(self):
+        """name -> (trusted tools, denied tools): the same rule for an agent's permission requests."""
+        return {name: (trust, deny) for name, trust, deny, _ in self.servers}
+
+    def run(self, ask, messages, approve=None, progress=None, local=None, words=None, stopped=None):
+        """Run the loop. ask(messages, tools) -> the model's message (OpenAI shape).
+        approve(server, tool, arguments, kind) -> (allowed, reason) is asked before each write or
+        destructive call; without it those tools are not offered. progress(text) hears each call.
+        local: {"server__tool": (description, parameters, function(arguments) -> text[, kind[, question]])},
+        tools served by Claudish itself (the text box, questions to the user, helpers): read-only
+        unless kind says "write", and then asked about like any write, in the words of question
+        (a function of the arguments) when given. MCP servers need the SDK; local tools do not.
+        words: what a refused or a broken call's result says (templates.json box, the profile's).
+        Returns (the answer's content, consulted, messages with the tool calls and results appended)."""
+        if words is None:
+            from .modes import TEMPLATES
+            words = TEMPLATES["box"]
+        from contextlib import ExitStack
+        consulted, kinds, callers, offered, questions = [], {}, {}, [], {}
+        origins = {}  # an offered name -> (server, tool) as the server names them
+        spent = 0.0  # model and tool time; waiting for your answer does not count
+
+        def timed(call, *args):
+            nonlocal spent
+            started = time.monotonic()
+            try:
+                return call(*args)
+            finally:
+                spent += time.monotonic() - started
+
+        def stop():  # Esc: no more model requests and no more tool calls
+            if stopped and stopped():
+                raise Cancelled("cancelled")
+
+        def awaited(function, *args):
+            """An MCP call on the portal, given up at Esc (not at the end of its budget)."""
+            import concurrent.futures
+            future = portal.start_task_soon(function, *args)
+            while True:
+                try:
+                    return future.result(timeout=0.1)
+                except concurrent.futures.TimeoutError:
+                    if stopped and stopped():
+                        future.cancel()
+                        raise Cancelled("cancelled")
+
+        def offer(name, description, parameters):
+            offered.append({"type": "function", "function": {
+                "name": name, "description": (description or "").strip()[:500],
+                "parameters": parameters or {"type": "object", "properties": {}}}})
+
+
+        for name, spec in (local or {}).items():
+            description, parameters, function = spec[:3]
+            kind = spec[3] if len(spec) > 3 else "read"
+            if kind != "read" and approve is None:
+                continue  # a tool that acts is only offered when someone can say yes
+            kinds[name], callers[name] = kind, function
+            questions[name] = spec[4] if len(spec) > 4 else None
+            offer(name, description, parameters)
+        stack = ExitStack()
+        try:
+            if self.servers:
+                from anyio.from_thread import start_blocking_portal
+                portal = stack.enter_context(start_blocking_portal())
+                for name, trust, deny, provider in self.servers:
+                    if spent >= self.timeout:  # the budget went on starting the others: left out, and said
+                        consulted.append("%s (unavailable: no time left)" % name)
+                        continue
+                    limit = max(1.0, self.timeout - spent)  # starting counts: every server within the one budget
+                    try:  # a server that does not start is left out, as a context provider is
+                        session = timed(stack.enter_context, portal.wrap_async_context_manager(opened(provider, limit)))
+                        tools = timed(awaited, listed, session, max(1.0, self.timeout - spent))
+                    except Cancelled:
+                        raise
+                    except Exception as exc:
+                        consulted.append("%s (unavailable: %s)" % (name, type(exc).__name__))
+                        continue
+                    for tool in tools:
+                        kind = classify(tool, trust, deny)
+                        if kind == "denied" or (kind != "read" and approve is None):
+                            continue  # side effects are only offered when someone can approve them
+                        full = api_name(name + SEPARATOR + tool.name)[:64]  # the call still reaches it (callers)
+                        if full in kinds:
+                            continue  # Claudish's own tools come first (and a name taken once stays its first tool's)
+                        kinds[full], origins[full] = kind, (name, tool.name)
+                        callers[full] = (lambda arguments, session=session, tool=tool.name: timed(
+                            awaited, called, session, tool, arguments, max(1.0, self.timeout - spent)))
+                        offer(full, tool.description, field(tool, "input_schema"))
+            messages = list(messages)
+            for step in range(MAX_STEPS + 1):
+                final = step == MAX_STEPS or not offered or spent >= self.timeout
+                stop()
+                reply = timed(ask, messages, None if final else offered)
+                calls = reply.get("tool_calls") or []
+                if not calls:
+                    return (reply.get("content") or "").strip(), consulted, messages
+                messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
+                for call in calls:
+                    function = call.get("function") or {}
+                    server, _, tool = origins.get(function.get("name")) and (
+                        origins[function["name"]][0], None, origins[function["name"]][1]) or \
+                        (function.get("name") or "").partition(SEPARATOR)
+                    kind = kinds.get(function.get("name"))
+                    try:
+                        arguments = json.loads(function.get("arguments") or "{}")
+                    except ValueError:
+                        arguments = None
+                    if kind is None or not isinstance(arguments, dict):
+                        result = words["invalid_call"]
+                    else:
+                        summary = "%s.%s(%s)" % (server, tool, ", ".join(
+                            "%s=%s" % (k, json.dumps(v, ensure_ascii=False)[:40]) for k, v in arguments.items()))
+                        allowed, reason = True, None
+                        if kind != "read":
+                            question = questions.get(function["name"])
+                            allowed, reason = (approve(server, tool, arguments, kind, question(arguments))
+                                               if question else approve(server, tool, arguments, kind))
+                        if not allowed:
+                            result = words["declined"].rstrip(".") + ": " + reason if reason else words["declined"]
+                        else:
+                            consulted.append(summary)
+                            if progress:
+                                progress(summary)
+                            try:
+                                result = str(callers[function["name"]](arguments))[:8000]
+                            except (Finished, Cancelled):
+                                raise
+                            except Exception as exc:  # a failed tool is information for the model
+                                result = "error: %s" % (str(exc) or type(exc).__name__)  # a timeout says nothing itself
+                    messages.append({"role": "tool", "tool_call_id": call.get("id") or "", "content": result})
+                    stop()
+        finally:
+            # The servers end after the answer is back, not before it (each may take seconds to go).
+            threading.Thread(target=stack.close).start()  # not a daemon: a program that exits next waits for it
+        raise RuntimeError("the tool loop did not finish")
+
+
+class Cancelled(RuntimeError):
+    """The instruction was stopped (Esc, or a question nobody answered): the loop ends, and the
+    model is not asked again."""
+
+
+class Finished(RuntimeError):
+    """A tool settled the turn (an answer you read and chose, a handoff): the loop stops without
+    asking the model again."""
+
+
+def opened(provider, limit):
+    """An initialized MCP client session for a configured server (an async context manager)."""
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def session():
+        import anyio
+        from mcp import ClientSession
+        from .context import connector
+        async with connector(provider) as streams:
+            async with ClientSession(streams[0], streams[1]) as client:
+                with anyio.fail_after(limit):
+                    await client.initialize()
+                yield client
+    return session()
+
+
+async def listed(session, limit):
+    """Every tool the server offers, page after page (a server may page its list)."""
+    import anyio
+    tools, cursor = [], None
+    with anyio.fail_after(limit):
+        while True:
+            if cursor is None:
+                page = await session.list_tools()
+            else:
+                from mcp.types import PaginatedRequestParams
+                page = await session.list_tools(params=PaginatedRequestParams(cursor=cursor))
+            tools += page.tools
+            cursor = getattr(page, "nextCursor", None) or getattr(page, "next_cursor", None)
+            if not cursor or len(tools) > 1000:
+                return tools
+
+
+async def called(session, tool, arguments, limit):
+    import anyio
+    with anyio.fail_after(limit):
+        outcome = await session.call_tool(tool, arguments)
+    text = "\n".join(filter(None, (said(block) for block in outcome.content or [])))
+    if not text and field(outcome, "structured_content") is not None:
+        text = json.dumps(field(outcome, "structured_content"), ensure_ascii=False)
+    return "error: " + text if field(outcome, "is_error") else text
+
+
+def said(block):
+    """A tool result's block as text for the model: what is not text says what it was."""
+    kind = getattr(block, "type", "")
+    if kind == "text":
+        return block.text
+    if kind == "resource":
+        resource = getattr(block, "resource", None)
+        text = getattr(resource, "text", None)
+        return text if isinstance(text, str) else "[binary resource %s]" % getattr(resource, "uri", "")
+    if kind == "resource_link":
+        return "[resource %s]" % getattr(block, "uri", "")
+    if kind in ("image", "audio"):
+        return "[%s omitted (%s)]" % (kind, field(block, "mime_type") or "")
+    return ""

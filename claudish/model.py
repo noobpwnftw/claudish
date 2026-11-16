@@ -1,0 +1,941 @@
+import base64
+import json
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+from urllib.error import HTTPError
+from urllib.request import Request, build_opener, ProxyHandler
+
+RECENT = 8  # requests kept for `claudish recent`, for RECENT_SECONDS at most
+RECENT_SECONDS = 600
+NO_MODEL = "no model is set up"  # said in the panel, where Tab or Shift+Enter asked
+NOT_USED = "the config is not used: %s"  # the service runs with no model until the config reads
+NO_CREDENTIALS = "no Claude credentials: save a key in cd_AI's settings (`claudish settings`), or set ANTHROPIC_API_KEY"
+
+
+
+def one_message(prompt, examples, said, words, history=()):
+    """For a backend that takes one message (Claude Code, Codex, a command): the system prompt, the
+    examples and the conversation's earlier turns as tagged text and output pairs (chat turns
+    elsewhere), then the text, tagged too. words: templates.json box.one_message."""
+    def tagged(messages, tag):
+        pairs = [(m["content"], n["content"], "note" if n.get("settled") else "output")
+                 for m, n in zip(messages, messages[1:])
+                 if m["role"] == "user" and n["role"] == "assistant" and not n.get("tool_calls")]
+        return "".join("\n<%s>\n<text>%s</text>\n<%s>%s</%s>\n</%s>" % (tag, text, kind, output, kind, tag)
+                       for text, output, kind in pairs)
+    shots, earlier = tagged(examples, "example"), tagged(history, "turn")
+    if not (shots or earlier):
+        return prompt + "\n\n" + words["plain"] + "\n" + said
+    message = prompt + ("\n\n" + words["examples"] + shots if shots else "")
+    message += "\n\n" + words["earlier"] + earlier if earlier else ""
+    return message + "\n\n" + words["text"] + "\n<text>%s</text>" % said
+
+
+def rules(text):
+    """Explicit model-free demo, not a substitute for neural rewriting."""
+    text = text.replace("--", "—")
+    for word, replacement in [("use", "leverage"), ("explore", "delve into"),
+                              ("important", "crucial"), ("very", "particularly")]:
+        def replace(match):
+            value = replacement
+            if match[0].isupper():
+                return value.upper()
+            return value.capitalize() if match[0][0].isupper() else value
+        text = re.sub(r"\b" + word + r"\b", replace, text, flags=re.IGNORECASE)
+    return text
+
+
+def user_content(text, image, style, intro=""):
+    """The user turn: the text, or the text after a picture of the focused window (PNG bytes) and
+    what it is (intro: templates.json box.picture)."""
+    if image is None:
+        return text
+    data = base64.b64encode(image).decode("ascii")
+    if style == "claude":
+        picture = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}
+    else:  # OpenAI-compatible: llama.cpp with a vision model (--mmproj), vLLM, Ollama, hosted APIs
+        picture = {"type": "image_url", "image_url": {"url": "data:image/png;base64," + data}}
+    return [picture, {"type": "text", "text": intro + "\n\n" + text}]
+
+
+from .children import environment, kill, spawn  # noqa: E402
+from .config import DEFAULT_MODELS, DEFAULTS, MODEL_URL, loopback  # noqa: E402
+
+
+def model_ids(listing):
+    """The model names in a /v1/models answer ({"data": [{"id": ...}]}; {"data": null} lists none).
+    ValueError when it is not a model list (a web page, say)."""
+    data = listing.get("data") if isinstance(listing, dict) else ()
+    if not isinstance(data, (list, type(None))):
+        raise ValueError("not a model list")
+    return [m["id"] for m in data or [] if isinstance(m, dict) and isinstance(m.get("id"), str)]
+
+
+def said_by(error):
+    """The reason an OpenAI-compatible server gives with an HTTP error ({"error": {"message": ...}}
+    and its variants, or its text), short; read once, so the error says it wherever it is shown."""
+    if getattr(error, "said", None) is None:
+        try:
+            body = error.read(4096).decode("utf-8", "replace") if error.fp is not None else ""
+        except Exception:
+            body = ""
+        try:
+            data = json.loads(body)
+            found = data.get("error", data) if isinstance(data, dict) else data
+            found = found.get("message", found) if isinstance(found, dict) else found
+            body = found if isinstance(found, str) else body
+        except ValueError:
+            pass
+        error.said = " ".join(body.split())[:200]
+    return error.said
+
+
+def opener_for(url):
+    """Loopback traffic never goes through HTTP_PROXY; a remote endpoint may need it. (Building one
+    loads the system CA bundle, about 12 ms.)"""
+    return build_opener(ProxyHandler({})) if loopback(url) else build_opener()
+
+
+CLAUDE_MODEL = DEFAULT_MODELS["claude"]  # the claude backend's model when a profile names none
+LENGTH = "the answer ran past its length budget; use a shorter phrase"
+THOUGHT = "the model spent its length budget thinking; turn its reasoning off (llama-server: --reasoning off)"
+DECLINED = "Claude declined this; your wording is unchanged"
+
+CUT_OFF = ("max_tokens", "model_context_window_exceeded")  # stop reasons that cut the answer off
+# Claude models that refuse an effort setting (older than Haiku 4.5 included).
+NO_EFFORT = ("claude-3", "claude-haiku-4", "claude-sonnet-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0",
+             "claude-opus-4-2025", "claude-sonnet-4-2025")  # the dated 4.0 ids: claude-opus-4-20250514
+FALLBACK_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
+
+
+def refuse_cut_off(choice):
+    """Never offer a sentence chopped off by the limit: say why it stopped, its text too long or a
+    reasoning model's thinking (reasoning_content, as llama.cpp, Ollama and LM Studio send it)."""
+    if choice.get("finish_reason") == "length":
+        message = choice.get("message") or {}
+        raise RuntimeError(THOUGHT if message.get("reasoning_content") and not (message.get("content") or "").strip()
+                           else LENGTH)
+
+
+class Claude:
+    """The Anthropic API (the default backend): typed text is sent to it."""
+
+    def __init__(self, model, timeout=0):
+        import anthropic  # every installer has it; a checkout: pip install -e ".[claude]"
+        from .keys import claude_credential, stored
+        # Credentials come from ANTHROPIC_API_KEY, the key saved in cd_AI's settings (claudish/keys.py:
+        # a login service sees no shell variables), or an `ant auth login` profile.
+        # A stale suggestion is useless, so fail fast instead of retrying.
+        self.credential = claude_credential()[0]  # what this client was made with (/health says it)
+        saved = stored() if self.credential == "saved" else None
+        # The profile's timeout, where it is longer: a rewrite waits at least 10 s, a turn 60 s.
+        self.client = anthropic.Anthropic(timeout=max(10.0, timeout), max_retries=0, **({"api_key": saved} if saved else {}))
+        self.model, self.turn_timeout = model, max(60.0, timeout)
+
+    def options(self, shaped=False):
+        """What this model takes: low effort (not on Haiku 4.5 or older models, which refuse it), the
+        answer's schema (shaped), and server-side refusal fallbacks where the API offers them."""
+        options = {}
+        if not self.model.startswith(NO_EFFORT):
+            options["output_config"] = {"effort": "low"}
+        if shaped:
+            from .shapes import CLAUDE_API_ANSWER
+            options.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": CLAUDE_API_ANSWER}
+        if self.model in FALLBACK_MODELS:
+            options.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        return options
+
+    def converse(self, messages, tools=None, max_tokens=1024, shaped=False):
+        """One Messages API call for the tool loop: (an OpenAI-shaped reply, usage). shaped: the
+        answer's text is held to claudish/shapes.py's schema (tool calls stay the API's own)."""
+        system, conversation = claude_messages(messages)
+        options = self.options(shaped)
+        if tools:
+            options["tools"] = [{"name": tool["function"]["name"], "description": tool["function"].get("description", ""),
+                                 "input_schema": tool["function"].get("parameters") or {"type": "object", "properties": {}}}
+                                for tool in tools]
+        else:
+            # The last round answers without tools, but the API takes earlier tool blocks only with
+            # their tools declared: declare the ones used, and let none be called.
+            used = sorted({block["name"] for message in conversation if isinstance(message["content"], list)
+                           for block in message["content"] if block.get("type") == "tool_use"})
+            if used:
+                options["tools"] = [{"name": name, "input_schema": {"type": "object", "properties": {}}} for name in used]
+                options["tool_choice"] = {"type": "none"}
+        # An instruction's turn (tools, history) takes the turn's time, not a rewrite's.
+        response, text, usage = self.create(self.client.with_options(timeout=self.turn_timeout), model=self.model,
+                                            max_tokens=max_tokens, system=system, messages=conversation, **options)
+        reply = {"content": text}
+        calls = [{"id": block.id, "type": "function",
+                  "function": {"name": block.name, "arguments": json.dumps(block.input)}}
+                 for block in response.content if block.type == "tool_use"]
+        if calls:
+            reply["tool_calls"] = calls
+        finish = "length" if response.stop_reason in CUT_OFF else "stop"
+        return {"message": reply, "finish_reason": finish}, usage
+
+    def rewrite(self, text, system, examples, image=None, intro="", max_tokens=2048):
+        """One request without tools: (the answer's content, usage); max_tokens: the mode's budget."""
+        options = self.options(shaped=True)
+        response, output, usage = self.create(
+            self.client, model=self.model, max_tokens=max_tokens, system=system,
+            messages=examples + [{"role": "user", "content": user_content(text, image, "claude", intro)}], **options)
+        if response.stop_reason in CUT_OFF:
+            raise RuntimeError(LENGTH)
+        return output, usage
+
+    @staticmethod
+    def create(client, **request):
+        """One Messages request: (response, its text, usage). A refusal raises DECLINED."""
+        import anthropic
+        try:
+            response = client.beta.messages.create(**request)
+        except TypeError as exc:  # Raised by the SDK before any request when no credentials resolve.
+            if "authentication" not in str(exc):
+                raise
+            raise RuntimeError(NO_CREDENTIALS) from exc
+        except getattr(anthropic, "APIStatusError", ()) as exc:  # () for a stand-in SDK
+            if exc.status_code not in (400, 404, 413):
+                raise
+            # Anthropic's reason, in the form failure() reads for every model API.
+            error = exc.body.get("error") if isinstance(exc.body, dict) else None
+            reason = (error.get("message") if isinstance(error, dict) else None) or exc.message
+            raise RuntimeError("HTTP Error %d: %s: %s" % (exc.status_code, type(exc).__name__, reason)) from exc
+        if response.stop_reason == "refusal":
+            raise RuntimeError(DECLINED)
+        text = "".join(block.text for block in response.content if block.type == "text").strip()
+        return response, text, {"input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens}
+
+
+def claude_messages(messages):
+    """(system, messages) for the Messages API from the tool loop's OpenAI-shaped messages: tool
+    calls become tool_use blocks, tool results tool_result blocks (consecutive ones in one user
+    message), and a picture an image block."""
+    system, out = "", []
+
+    def add(role, blocks):
+        if out and out[-1]["role"] == role:
+            out[-1]["content"].extend(blocks)
+        else:
+            out.append({"role": role, "content": list(blocks)})
+    for message in messages:
+        role, content = message["role"], message.get("content")
+        if role == "system":
+            system += content or ""
+        elif role == "tool":
+            add("user", [{"type": "tool_result", "tool_use_id": message.get("tool_call_id") or "",
+                          "content": content or ""}])
+        elif role == "assistant":
+            blocks = [{"type": "text", "text": content}] if content else []
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") or {}
+                try:
+                    arguments = json.loads(function.get("arguments") or "{}")
+                except ValueError:
+                    arguments = {}
+                blocks.append({"type": "tool_use", "id": call.get("id") or "", "name": function.get("name") or "",
+                               "input": arguments})
+            add("assistant", blocks or [{"type": "text", "text": "OK"}])
+        elif isinstance(content, list):  # text with a picture (user_content, OpenAI style)
+            blocks = []
+            for part in content:
+                if part.get("type") == "image_url":
+                    data = part["image_url"]["url"].split(",", 1)[1]
+                    blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}})
+                elif part.get("text"):
+                    blocks.append({"type": "text", "text": part["text"]})
+            add("user", blocks)
+        else:
+            add("user", [{"type": "text", "text": content or " "}])
+    return system, out
+
+
+# Loading a routed profile (and starting its model process) happens once, whoever asks first.
+ROUTING = threading.Lock()
+
+
+LOOPS = ("llama", "openai", "claude")  # the backends with tool calls and a conversation (Rewriter.loops)
+SCHEMA_REFUSED = (400, 422, 501)  # what a server without json_schema answers response_format with
+
+
+class Unshaped(Exception):
+    """A model server refused the answer's schema (response_format)."""
+
+
+def warm_key(warm):
+    """What makes two model processes the same one: their kind, command and model."""
+    return type(warm), tuple(warm.command), warm.configured, json.dumps(getattr(warm, "words", None), sort_keys=True)
+
+
+class Rewriter:
+    """backend: "llama"/"openai" (any OpenAI-compatible server), "claude", or "rules"."""
+
+    @classmethod
+    def from_settings(cls, settings, templates=None, context=None, profile=None):
+        """Build from config.resolve() output; ImportError if the claude backend lacks the Anthropic SDK."""
+        from .keys import for_profile
+        api_key = for_profile(settings)
+        if settings["api_key_env"] and not api_key:
+            # The service still starts (a login service that exits is no input method at all); the
+            # server says no to each request until a key is there.
+            print("%s is not set, and no key is saved for %s: set it, or save the key in cd_AI's settings"
+                  % (settings["api_key_env"], settings["model_url"]), file=sys.stderr, flush=True)
+        rewriter = cls(settings["backend"], settings["model_url"], model=settings["model"], api_key=api_key,
+                       timeout=settings["timeout"], templates=templates, context=context, modes=settings["modes"],
+                       command=settings["command"], bindings=settings["bindings"], tone=settings.get("tone"))
+        rewriter.profile = profile
+        rewriter.look_command = settings.get("look_command")
+        rewriter.read_terminal = settings.get("read_terminal", True)
+        rewriter.helper = settings.get("helper")
+        rewriter.launcher = settings.get("launcher")
+        rewriter.session_command = settings.get("session_command")
+        rewriter.summon = settings.get("summon", "Shift+Enter")
+        rewriter.hints = settings.get("hints", True)
+        rewriter.max_context_chars = settings.get("max_context_chars", DEFAULTS["max_context_chars"])
+        if settings.get("tools"):
+            # The profile's agent (session_command) calls the tools itself (--mcp-config): any backend then.
+            if settings["backend"] not in LOOPS and not settings.get("session_command"):
+                raise ValueError("tools need a backend with tool calls (llama.cpp, any OpenAI-compatible server, or "
+                                 "Claude); the %s backend cannot use them" % settings["backend"])
+            from .tools import Toolbox
+            from .conversation import TURN_TIMEOUT  # the loop's budget: at least a model step's time (ask_model)
+            rewriter.toolbox = Toolbox(settings["tools"], settings.get("mcp_servers") or {},
+                                       timeout=max(settings["timeout"], TURN_TIMEOUT))
+        return rewriter
+
+    def __init__(self, backend="llama", endpoint=MODEL_URL, max_tokens=2048, model=None, api_key=None, timeout=3, templates=None,
+                 context=None, modes=None, command=None, bindings=(), tone=None):
+        from . import modes as invocation
+        self.backend = backend
+        self.endpoint = endpoint.rstrip("/")
+        self.max_tokens = max_tokens
+        self.model = model
+        self.api_key = api_key
+        self.timeout = timeout
+        self.context = context
+        self.max_context_chars = DEFAULTS["max_context_chars"]  # (from_settings sets the profile's)
+        self.bindings = list(bindings)
+        from .sessions import Sessions
+        self.sessions = Sessions()  # instructions as sessions: events, questions, a result (G18)
+        import collections
+        # The last requests, in memory only (never on disk): what was sent, to whom, and what came
+        # back, for `claudish recent` (G41). Shared with routed profiles, like the sessions.
+        self.recent = collections.deque(maxlen=RECENT)
+        from .conversation import Conversations
+        self.conversations = Conversations()  # one per text box (docs/design/architecture.md)
+        self.session_command = None  # profile "session_command": a stream-json agent such as Claude Code
+        self.toolbox = None  # profile "tools": read-only MCP tools an instruction may call (G17)
+        self.look_command = None  # profile "look_command": argv that writes a PNG of the focused window
+        self.read_terminal = True  # profile "read_terminal": a terminal's last lines go with an instruction
+        self.helper = None  # profile "helper": an agent (or named agents) an instruction may hand the task to (G39)
+        self.launcher = None  # profile "launcher": how a helper opens (["tmux", "new-window", "{command}"])
+        self.profile = None  # the profile's name in the config file
+        self.problem = None  # why the config is not used (the service runs with no model meanwhile)
+        self.unavailable = None  # why its model cannot run here (the Anthropic SDK missing): no model meanwhile
+        self.summon = "Shift+Enter"  # config "keys": the key that sends your words to the model
+        self.hints = True  # config "hints": the panel's key hints
+        self.url = None  # this service's address, for the agent's textbox MCP server
+        self.loader = None  # name -> Rewriter for another profile: bindings route an app to it
+        self.routed = {}
+        self.adoptable = {}  # model processes a reload handed over (hand_over), by warm_key
+        self.handed = []  # this one's processes a newer rewriter took over: never stopped from here
+        self.takes = {}  # (mode, text) -> how many times it was asked: a repeat is another take
+        self.schema = True  # an OpenAI-compatible server takes response_format (False once it refused it)
+        # name -> spec (modes.defaults): the shipped templates, with the profile's own over them.
+        self.modes = invocation.defaults(templates, tone)
+        for name, route in (modes or {}).items():  # which profile answers a mode
+            if name not in self.modes:
+                raise ValueError("mode %r is routed, but no template has it" % name)
+            self.modes[name]["profile"] = route["profile"]
+        self.finish = invocation.finish
+        self.lock = threading.Lock()
+        self.local = loopback(self.endpoint)
+        self.opener = None
+        self.warm = None  # Claude Code, Codex or a local model's server, run beside the service (claudish/warm.py)
+        if backend in ("command", "claude-code", "codex"):
+            if not command:
+                raise ValueError('the %s backend needs a "command" list in the profile' % backend)
+            self.command = command
+        if backend in ("claude-code", "codex"):
+            from . import config, warm
+            self.warm = warm.make(backend, command, model, str(config.default_path().parent),
+                                  self.modes["instruct"]["box"]["cli"])
+        elif backend == "llama" and command:  # the local model's server, which the service runs
+            from . import warm
+            self.warm = warm.ModelServer(command, self.endpoint)
+        self.claude = Claude(model or CLAUDE_MODEL, timeout) if backend == "claude" else None
+
+    @property
+    def autocompletes(self):
+        """Whether continue asks this model at every pause unasked: a local one (or the rules
+        stand-in) costs nothing; a hosted one only where a profile routes continue to it."""
+        return self.backend == "rules" or (self.backend in ("llama", "openai") and self.local)
+
+    def start_model(self):
+        """At service start: a model process cd_AI runs (Claude Code, Codex, a local model) starts."""
+        if self.warm:
+            self.warm.start()
+
+    def stop_model(self):
+        """At service stop, or when the settings replace this profile: its model process ends, with
+        the routed profiles' and those a reload left that nothing took up."""
+        for rewriter in [self] + list(self.routed.values()):
+            if rewriter.warm and not any(rewriter.warm is each for each in self.handed):
+                rewriter.warm.stop()
+        while self.adoptable:
+            self.adoptable.popitem()[1].stop()
+
+    def hand_over(self):
+        """At a reload: the routed profiles' model processes, for the new rewriter to take up when
+        it routes to them again (an edit is not a cold start of every model). They stay this one's
+        too: a request already running here finishes with its process."""
+        kept = {}
+        for rewriter in self.routed.values():
+            warm = rewriter.warm
+            if warm and not warm.state.startswith("failed") and warm_key(warm) not in kept:
+                kept[warm_key(warm)] = warm
+                self.handed.append(warm)
+        return kept
+
+    @property
+    def model_state(self):
+        """"warm", "starting", "restarting", "failed: why", or None when cd_AI runs no model process."""
+        return self.warm.state if self.warm else None
+
+    def route(self, app, mode=None):
+        """Which AI answers here: the app's binding may name a profile, and that profile may name
+        another one for this mode (a small model for continue, a strong one for instructions).
+        Routed profiles share this service's sessions, conversations, and recent requests."""
+        chosen = self.bound(app)
+        name = (chosen.modes.get(mode) or {}).get("profile") if mode else None
+        if name and name != chosen.profile:
+            chosen = self.load(name)
+        return chosen
+
+    def bound(self, app):
+        """The profile the app's binding names, else this one."""
+        for binding in self.bindings:
+            if binding.profile and binding.matches(app):
+                return self.load(binding.profile)
+        return self
+
+    def continues(self, app):
+        """Whether continue suggests in this app: its profile routes continue to a model, or the
+        model that would answer costs nothing per pause (autocompletes)."""
+        return bool((self.bound(app).modes.get("continue") or {}).get("profile")) or self.route(app, "continue").autocompletes
+
+    def load(self, name):
+        if name == self.profile or self.loader is None:
+            return self
+        with ROUTING:  # two requests at once start one model process, not two
+            return self._load(name)
+
+    def _load(self, name):
+        if name not in self.routed:
+            other = self.loader(name)
+            other.sessions, other.conversations, other.recent = self.sessions, self.conversations, self.recent
+            other.url = self.url
+            other.loader, other.routed = self.loader, self.routed  # one cache for the whole service
+            # The service's bindings and context: one set of providers, one cache, whichever profile
+            # answers (each reads them within its own max_context_chars).
+            other.bindings, other.context = self.bindings, self.context
+            other.adoptable = self.adoptable
+            kept = self.adoptable.pop(warm_key(other.warm), None) if other.warm else None
+            if kept is not None:  # the same model process, from before the config was edited
+                other.warm = kept
+            else:
+                other.start_model()  # its model process, as the service's own starts with the service
+            self.routed[name] = other
+        return self.routed[name]
+
+    def sections(self, app=None, failed=None):
+        """The context and the focused app's bindings (a supported text box), within this profile's
+        max_context_chars: [(name, text)];
+        failed gets (name, why) for those that could not be read."""
+        extra = [provider for binding in self.bindings if binding.matches(app) for provider in binding.providers]
+        if not (self.context or extra):
+            return []
+        from .context import Context
+        return (self.context or Context()).sections(extra, failed, self.max_context_chars)
+
+    def box(self, mode, app=None, purpose=None, before="", after="", look=False, screen=None, trusted=True):
+        """The text box this request is for, with what its mode calls for observed. screen: a
+        terminal's last lines given instead of read (tests, the terminal evaluation); trusted: False
+        for the demo's requests (no token), which get nothing but their text."""
+        from .turn import Box, observe
+        if look:
+            if mode != "instruct":
+                raise ValueError("a window picture is only taken for an instruction")
+            if self.backend in ("command", "claude-code", "codex"):
+                raise RuntimeError("the %s backend cannot take a window picture; use claude or a vision model" % self.backend)
+            if self.session_command:  # the agent gets the instruction as text only
+                raise RuntimeError("the profile's agent (session_command) cannot take a window picture")
+        box = Box(app, "terminal" if screen else purpose, before, after)
+        box.trusted = trusted  # nor the profile's tools
+        if trusted:
+            observe(self, box, mode, look, screen)
+        return box
+
+    def make_driver(self, app=None, conversation=None, before="", after="", look=False, purpose=None, screen=None):
+        """The driver for an instruction: the profile's agent (session_command), else the model
+        driver, which runs it as a turn in the text box's conversation."""
+        if self.session_command:
+            from .agent import AgentProcess, ClaudeCodeDriver
+            if not conversation:
+                return ClaudeCodeDriver(self.session_command)  # a process for this turn only
+            from .textbox import Textbox
+            kept = self.conversations.get(conversation)
+            kept.textbox = Textbox(before, after)  # what its textbox tools read this turn
+            config = self.agent_mcp_config(kept)
+            textbox = self.url and "textbox" in ((config or {}).get("mcpServers") or {})
+            command = self.session_command + self.agent_arguments()
+            if kept.agent is not None and (kept.agent.command != command or kept.agent.mcp_config != config):
+                kept.close()  # the settings changed its agent (command, model, denied tools): a new one
+            kept.agent = kept.agent or AgentProcess(command, config)
+            self.conversations.rest_agents(kept)
+            # The same description of the text box a model gets, and the same observations.
+            box = self.box("instruct", app, purpose, before, after, look, screen=screen)
+            words = self.modes["instruct"]["box"]
+            context = box.describe("instruct", retrieval=bool(textbox), words=words)
+            if textbox and (box.before or box.after):
+                context += " " + words["textbox"]["agent"]
+            if box.observations:
+                context += "\n\n" + box.material("", words).strip()
+            policy = self.toolbox.policy() if self.toolbox else {}
+            driver = ClaudeCodeDriver(self.session_command, agent=kept.agent, context=context, policy=policy,
+                                      words=self.modes["instruct"]["box"])
+            driver.kind = box.kind  # as observed: accessibility may have found a terminal
+            return driver
+        from .conversation import ModelDriver
+        kept = self.conversations.get(conversation)
+        kept.close()  # an agent from settings that had one ends: this profile runs no agent
+        return ModelDriver(self, kept, app, before, after, look, purpose, screen)
+
+    def agent_mcp_config(self, conversation):
+        """--mcp-config for an agent: the profile's tool servers (as configured for Claudish, not the
+        agent's own), and Claudish's textbox server when the MCP SDK is here to run it."""
+        import importlib.util
+        servers = {}
+        from .context import for_agent
+        for name, server in (self.toolbox.configs.items() if self.toolbox else ()):
+            server = dict(server)
+            for field in ("env", "headers"):  # $NAME as Claude Code expands it itself: no secret in the file
+                if isinstance(server.get(field), dict):
+                    server[field] = {key: for_agent(value) for key, value in server[field].items()}
+            if server.get("command"):  # npx, uvx: where the agent's PATH (the service's, short) misses them
+                from .settings import located
+                given = os.path.expanduser(server["command"])
+                server["command"] = located(given)
+                path = environment(server["command"]).get("PATH")
+                if server["command"] != given and path != os.environ.get("PATH") and "PATH" not in (server.get("env") or {}):
+                    server["env"] = dict(server.get("env") or {}, PATH=path)  # its node beside it
+            if server.get("url"):  # Claude Code skips a url without its type
+                server["type"] = "sse" if server.get("type") == "sse" else "http"
+            servers[name] = server
+        url = self.url
+        if url and importlib.util.find_spec("mcp") is not None:
+            from .service import itself
+            package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            argv = itself("textbox-mcp")
+            servers["textbox"] = {
+                "command": argv[0], "args": argv[1:],
+                "env": {"CLAUDISH_URL": url, "CLAUDISH_CONVERSATION": conversation.key,
+                        "CLAUDISH_TOKEN": conversation.token, "PYTHONPATH": package}}
+        return {"mcpServers": servers} if servers else None
+
+    def agent_arguments(self):
+        """Extra agent CLI arguments from the policy: denied tools are never offered."""
+        from .agent import wire_prefix
+        from .tools import api_name
+        denied = [wire_prefix(server) + api_name(tool) for server, (_, deny) in (self.toolbox.policy().items()
+                                                                          if self.toolbox else ()) for tool in sorted(deny)]
+        return ["--disallowedTools", ",".join(denied)] if denied else []
+
+    def start_session(self, text, app=None, conversation=None, before="", after="", look=False, purpose=None,
+                      screen=None, draft=None):
+        """draft: a follow-up's draft, the one in view and not yet in the text."""
+        from .turn import Box
+        driver = self.make_driver(app, conversation, before, after, look, purpose, screen)
+        kind = getattr(driver, "kind", None) or ("terminal" if screen else Box(app, purpose).kind)
+        driver.draft = draft
+        if draft and self.session_command:  # an agent gets one message: the draft in view goes in it
+            text = self.modes["instruct"]["box"]["in_view"].format(draft=draft, text=text)
+        return self.sessions.start(driver, text, one_line=kind == "terminal")
+
+    def server_model(self, headers):
+        """A profile without "model": the server's only model (Ollama, LM Studio and hosted APIs
+        want one named; llama.cpp does not). Asked until the server answers (it may start after the
+        service), then again only when it refuses the name (chat). None when the server lists none."""
+        if not hasattr(self, "listed_model"):
+            try:
+                with self.opener.open(Request(self.endpoint + "/v1/models", headers=headers), timeout=5) as response:
+                    names = model_ids(json.load(response))
+            except HTTPError as exc:
+                if exc.code >= 500:
+                    return None  # loading (503): asked again at the next request
+                names = []
+            except OSError:
+                return None  # not answering yet: asked again at the next request
+            except ValueError:
+                names = []
+            if len(names) > 1:
+                raise RuntimeError('%s has several models (%s): name one with "model" in the profile, or pick it '
+                                   "in cd_AI's settings" % (self.endpoint, ", ".join(names[:8])))
+            self.listed_model = names[0] if names else None
+        return self.listed_model
+
+    def request_headers(self):
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = "Bearer " + self.api_key
+        return headers
+
+    def chat(self, payload, headers, image=None, timeout=None):
+        """(the first choice, usage) from /v1/chat/completions; timeout: seconds, else the profile's."""
+        if self.opener is None:  # built once
+            self.opener = opener_for(self.endpoint)
+        if self.warm:
+            self.warm.retry()  # a local model that loaded too slowly starts again
+        if "model" not in payload and self.backend == "openai":
+            named = self.server_model(headers)
+            if named:
+                payload = dict(payload, model=named)
+        req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(), headers=headers)
+        try:
+            with self.opener.open(req, timeout=timeout or self.timeout) as response:
+                data = json.load(response)
+        except HTTPError as exc:
+            refusal = "response_format" in payload and exc.code in SCHEMA_REFUSED  # asked again in plain text
+            if image is not None and exc.code in (400, 500, 501) and not refusal:
+                said = said_by(exc)  # its own reason (a picture too large for its context), else the likely one
+                raise RuntimeError("this model server did not accept the window picture: %s" % said[:120] if said else
+                                   "this model server did not accept the window picture; it needs a vision "
+                                   "model (llama.cpp: --mmproj)") from exc
+            said = None if refusal else said_by(exc)
+            if said:
+                exc.msg = "%s: %s" % (exc.msg, said)
+            if exc.code in (400, 404) and getattr(self, "listed_model", None) and payload.get("model") == self.listed_model:
+                del self.listed_model  # the server's model changed (another one loaded): asked again next time
+            raise
+        return data["choices"][0], data.get("usage", {})
+
+    def rewrite(self, text, before="", after="", mode="rewrite", app=None, look=False, purpose=None, screen=None,
+                context=True, again=True, draft=""):
+        """One answer for a /suggest request (continue, rewrite, or instruct without a session).
+        look: a picture of the focused window (instruct only; F8); before/after: the text box
+        around the caret; purpose: the field's kind; screen: a terminal's last lines, given instead
+        of read; context: False for the demo's requests (no token): no observations; again: False for a
+        measurement, whose repeats are not other takes (they stay deterministic)."""
+        if mode not in self.modes:
+            raise ValueError("unknown mode %r; available: %s" % (mode, ", ".join(self.modes)))
+        box = self.box(mode, app, purpose, before, after, look, screen, trusted=context)
+        box.draft = draft or None  # a follow-up about the draft in view, framed as the input methods' are
+        return self.answer(mode, text, box, again=again)
+
+    def answer(self, mode, text, box, conversation=None, approve=None, progress=None, local=None, serial=True,
+               again=True, stopped=None):
+        """The one loop: describe the request, call the model with the tools this mode may use, run
+        tool calls (asking through approve when policy says so), and fit the result to the box.
+        serial: a request while typing, which fails fast instead of queueing behind another."""
+        if self.backend == "none":
+            raise RuntimeError(NOT_USED % self.problem if self.problem else self.unavailable or NO_MODEL)
+        started = time.perf_counter()
+        spec = self.modes[mode]
+        local = local or {}
+        # The profile's tools only for the input methods (with the service's token), not the demo's.
+        tools = mode == "instruct" and self.loops() and bool(self.toolbox or local) and getattr(box, "trusted", True)
+        prompt, examples, said, sent, history = self.prompt_for(mode, text, box, spec, conversation, local, tools)
+        count = spec.get("candidates") or 1
+        consulted, usage, new = list(box.consulted), {}, []
+        record = {"time": time.time(), "profile": self.profile, "backend": self.backend,
+                  "model": self.model or (self.claude.model if self.claude else None),
+                  "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
+                  "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
+        self.recent.append(record)
+        if serial and not self.lock.acquire(blocking=False):
+            record["outcome"] = "busy"
+            raise RuntimeError("the model is busy; keep typing or retry")
+        refused = False
+        try:
+            if self.backend == "rules":
+                outputs = self.stand_in(mode, text, box, count)
+            elif self.backend == "command":
+                outputs = [self.run_command(one_message(prompt, sent, said, spec["box"]["one_message"], history))]
+            elif self.backend in ("claude-code", "codex"):
+                from .conversation import TURN_TIMEOUT  # an instruction gets a turn's time, as on every backend
+                outputs = [self.warm.ask(one_message(prompt, sent, said, spec["box"]["one_message"], history),
+                                          self.timeout if serial else max(self.timeout, TURN_TIMEOUT))]
+            elif self.claude and not (tools or history or conversation is not None):
+                output, usage = self.claude.rewrite(said, prompt, sent, box.image, spec["box"]["picture"],
+                                                    spec["max_tokens"] or self.max_tokens)  # a mode with none: the same budget everywhere
+                if not output:
+                    raise RuntimeError("Claude returned no text")
+                outputs = [output]  # one request: alternatives would multiply the cost
+            else:
+                # The loop: an OpenAI-compatible server, or Claude when there are tools or a
+                # conversation (one reading: alternatives would multiply the cost).
+                outputs, usage, new, called = self.ask_model(mode, prompt, sent, history, said, box,
+                                                             1 if self.claude else count,
+                                                             tools, approve, progress, local, serial,
+                                                             take=self.take(mode, said) if again else 0, stopped=stopped)
+                consulted += called
+        except Exception as exc:
+            from .tools import Finished
+            # With MCP servers open the error comes wrapped in a task group ("unhandled errors in a
+            # TaskGroup"): the one inside is what happened, for the panel and for recent.
+            inner = exc
+            while getattr(inner, "exceptions", None):
+                inner = inner.exceptions[0]
+            if not isinstance(inner, Unshaped):
+                # A tool that settled the turn (an answer chosen, a handoff) is how it ended, not a failure.
+                record["outcome"] = ("settled: %s" if isinstance(inner, Finished) else "failed: %s") % inner
+                if inner is not exc:
+                    raise inner from exc
+                raise
+            record["outcome"] = "schema refused: asked again in plain text"
+            refused = True
+        finally:
+            if serial:
+                self.lock.release()
+        if refused:  # the turn again without the shape; refused plain too, the schema was not why
+            if again and self.takes.get((mode, said)):
+                self.takes[(mode, said)] -= 1  # the same take, asked again: not another one
+            try:
+                return self.answer(mode, text, box, conversation, approve, progress, local, serial, again, stopped)
+            except HTTPError as exc:
+                if exc.code in SCHEMA_REFUSED:
+                    self.schema = True
+                raise
+            except RuntimeError:
+                if box.image is not None:  # the window picture was refused, not the schema
+                    self.schema = True
+                raise
+        candidates = self.candidates_from(mode, text, box, outputs, examples)
+        if not candidates:
+            record["outcome"] = "nothing offered"
+            raise RuntimeError("the model offered nothing for this %s" % mode)
+        record.update(outcome="answered", candidates=candidates,
+                      consulted=consulted, elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
+        turn = None
+        if conversation is not None:
+            # For the conversation to keep, unless the instruction was cancelled meanwhile: the
+            # instruction as typed (without what was observed), the tool calls and results, and the drafts.
+            from . import shapes
+            answered = candidates[0] if len(candidates) == 1 else shapes.answered(candidates)  # every draft offered
+            turn = [{"role": "user", "content": text}] + new + [{"role": "assistant", "content": answered}]
+        return {"text": candidates[0], "candidates": candidates, "backend": self.backend, "mode": mode, **({"turn": turn} if turn else {}),
+                "profile": self.profile,
+                "consulted": consulted,
+                "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                "usage": usage}
+
+    def prompt_for(self, mode, text, box, spec, conversation, local, tools):
+        """What the model is sent: (system prompt, examples, the turn as said, the examples as sent,
+        the conversation's earlier messages)."""
+        from .turn import system
+        prompt = system(spec, mode, box, retrieval=any(name.startswith("textbox__") for name in local), tools=tools)
+        examples = spec["examples"] if box.prose or spec.get("custom") else []
+        in_place = mode == "rewrite" and box.prose and bool(box.before.strip() or box.after.strip())
+        if in_place:  # a part of the text: the examples are parts too (none: the instruction alone)
+            examples = spec.get("parts") or []
+            # Your words sit inside the box's text (a part you selected or typed mid-sentence): the
+            # turn shows them in their place, and the rewrite is only that part.
+            framed = spec["box"]["in_place"].format(before=box.before[-300:], text=text, after=box.after[:200])
+        else:
+            framed = spec["frame"].replace("{text}", text) if spec.get("frame") else text
+        if box.draft:  # a follow-up about the draft in view, not yet in the text
+            framed = spec["box"]["in_view"].format(draft=box.draft, text=framed)
+        said = box.material(framed, spec["box"])
+        history = list(conversation.messages) if conversation is not None else []
+        sent = examples
+        if self.shaped():  # the answer is {"drafts": [...]} (claudish/shapes.py): earlier answers were so too
+            from . import shapes
+            sent, history = shapes.as_answered(examples), shapes.as_answered(history)
+            prompt += "\n\n" + spec["box"]["shape"]
+        else:  # one output rule either way: the shape, or this
+            prompt += "\n\n" + spec["box"]["output"]
+        return prompt, examples, said, sent, history
+
+    def candidates_from(self, mode, text, box, outputs, examples):
+        """The drafts in the model's outputs, fitted to the box: each once, and none that only
+        repeats your words or an example."""
+        from . import quirks, shapes
+        from .modes import parroted
+        candidates = []
+        for output in outputs:
+            found = shapes.drafts(output)
+            if found is None and self.shaped() and shapes.is_object(output):
+                found = []  # the schema's answer with no draft in it ({"drafts": [""]}): nothing offered
+            elif found is None:  # a plain answer (no schema on this backend): read through the quirks
+                plain = quirks.plain(text, output, box.kind == "terminal") or ""
+                found = shapes.drafts(plain)  # the schema's answer after all, in a fence or after a line
+                if found is None:
+                    found = [plain]
+            else:
+                found = [quirks.unmarked(text, draft) for draft in found]  # the part, as it was marked
+            for draft in found:
+                draft = box.fit(mode, self.finish(mode, text, draft))
+                if parroted(mode, text, draft, examples):
+                    continue
+                if draft and draft not in candidates:
+                    candidates.append(draft)
+        return candidates
+
+    def loops(self):
+        """Whether this backend runs the tool loop with the conversation's history; the others
+        (Claude Code, Codex, a command, rules) get one message per turn."""
+        return self.backend in LOOPS
+
+    def shaped(self):
+        """Whether this backend is held to the answer's schema (claudish/shapes.py): an
+        OpenAI-compatible server until it refuses response_format, the Claude API, Claude Code."""
+        if self.backend in ("llama", "openai"):
+            return self.schema
+        if self.claude:
+            return True
+        return bool(self.warm and self.warm.shaped)
+
+    def take(self, mode, said):
+        """How many times this text was asked in this mode before: Esc then Tab on a rewrite asks
+        again, for another take (the last few texts are remembered)."""
+        key = (mode, said)
+        taken = self.takes.pop(key, 0)
+        self.takes[key] = taken + 1
+        for old in list(self.takes)[:-32]:
+            del self.takes[old]
+        return taken
+
+    def ask_model(self, mode, prompt, examples, history, said, box, count, tools, approve, progress, local, serial,
+                  take=0, stopped=None):
+        """An OpenAI-compatible server: the first answer deterministic (what the evaluation
+        measures), with the tool loop when this mode has tools, then extra readings sampled over the
+        same results; asked again (take), the first is sampled too, for a different one. (outputs,
+        usage, the turn's tool messages, what the tools consulted)."""
+        from .conversation import TURN_TIMEOUT
+        spec = self.modes[mode]
+        history = [{k: v for k, v in m.items() if k != "settled"} for m in history]  # Claudish's own mark
+        messages = ([{"role": "system", "content": prompt}] + examples + history
+                    + [{"role": "user", "content": user_content(said, box.image, "openai", spec["box"]["picture"])}])
+        max_tokens = spec["max_tokens"] or self.max_tokens
+        usage = {}
+
+        from . import shapes
+        steps = [0]
+
+        def ask(messages, offered, **sampling):
+            nonlocal usage
+            payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False}
+            if self.local:
+                payload["cache_prompt"] = True  # llama.cpp's; a hosted API may refuse fields it does not know
+            payload.update(sampling)
+            if self.model:
+                payload["model"] = self.model
+            if self.claude:
+                choice, used = self.claude.converse(messages, offered, max_tokens, shaped=True)
+                usage = usage or used
+                if choice.get("finish_reason") == "length":
+                    raise RuntimeError(LENGTH)
+                return choice["message"]
+            timeout = None if serial else max(self.timeout, TURN_TIMEOUT)
+            if self.schema:
+                # Held to the schema: a step is a call or the answer, and the history is told in steps.
+                told = shapes.with_tools(messages, offered, spec["box"]["steps"]) if offered else messages
+                shaped = dict(payload, messages=shapes.as_steps(told, spec["box"]),
+                              response_format=shapes.step_format(offered) if offered else shapes.answer_format())
+                try:
+                    try:
+                        choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
+                    except HTTPError as exc:
+                        if exc.code not in SCHEMA_REFUSED or not offered or steps[0]:
+                            raise
+                        # A tool's own argument schema the server cannot hold: any-object arguments.
+                        shaped["response_format"] = shapes.step_format(offered, loose=True)
+                        choice, used = self.chat(shaped, self.request_headers(), box.image, timeout=timeout)
+                except HTTPError as exc:
+                    # Refused after this turn's shaped steps were answered: not the schema (a request
+                    # past the model's context, say), and the turn's tools must not run again.
+                    if exc.code not in SCHEMA_REFUSED or steps[0]:
+                        raise
+                    self.schema = False  # a server without json_schema: the turn again, in plain text
+                    raise Unshaped() from exc
+                else:
+                    usage = usage or used
+                    refuse_cut_off(choice)
+                    content = choice["message"].get("content")
+                    if not offered and not steps[0] and shapes.unheld(content):
+                        # Taken but not held (an object of its own): the turn again, in plain text.
+                        self.schema = False
+                        raise Unshaped()
+                    steps[0] += 1
+                    return shapes.as_message(content, steps[0])
+            if offered:
+                payload["tools"] = offered
+            try:
+                choice, used = self.chat(payload, self.request_headers(), box.image, timeout=timeout)
+            except HTTPError:
+                if not offered:
+                    raise
+                # A server without tool calls (an old llama.cpp without --jinja): answer without tools.
+                payload.pop("tools")
+                choice, used = self.chat(payload, self.request_headers(), box.image, timeout=timeout)
+            usage = usage or used
+            refuse_cut_off(choice)
+            return choice["message"]
+
+        called, with_tools = [], messages
+        if tools:
+            from .tools import Toolbox
+            first, called, with_tools = (self.toolbox or Toolbox([], {})).run(
+                ask, messages, approve=approve, progress=progress, local=local, words=spec["box"], stopped=stopped)
+        else:
+            again = {"temperature": 0.9, "seed": 100 + take} if take else {}
+            first = (ask(messages, None, **again).get("content") or "").strip()
+        if not first:
+            raise RuntimeError("the model returned no text")
+        outputs = [first]
+        if len(shapes.drafts(first) or ()) > 1:
+            count = 1  # the versions asked for are in the answer
+        for index in range(1, count):  # a failed extra reading only shortens the list
+            try:
+                more = (ask(with_tools, None, temperature=0.9, seed=index).get("content") or "").strip()
+            except Exception:
+                continue
+            if more:
+                outputs.append(more)
+        return outputs, usage, with_tools[len(messages):], called
+
+    def stand_in(self, mode, text, box, count):
+        """The rules backend: deterministic answers, so the demo and tests work without a model."""
+        output = {"rewrite": rules(text), "continue": "and then some—naturally.",
+                  "instruct": "As requested—" + text.strip().rstrip(".") + "."}.get(mode, rules(text))
+        if box.image is not None:
+            output = output[:-1] + ", having looked at the window."
+        elif mode == "instruct" and any(name.startswith("terminal screen") for name, _ in box.observations):
+            output = output[:-1] + ", having read the terminal."
+        return [output] + ["%s—%s" % (lead, output[0].lower() + output[1:])
+                           for lead in ("Certainly", "Of course")][:count - 1]
+
+    def run_command(self, prompt):
+        """An agent CLI (claude -p, ollama run, ...): the prompt on stdin, never through a shell."""
+        command = [os.path.expanduser(part) if part.startswith("~") else part for part in self.command]
+        from . import settings
+        command[0] = settings.located(command[0])
+        process = spawn(command, "the agent", job=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                        env=environment(command[0]))
+        try:
+            out, err = process.communicate(prompt, timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            kill(process)  # a .cmd's CLI too, which would keep the output open (claudish/children.py)
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass  # what it started holds the output: it is left, the request is not
+            raise RuntimeError("the agent took longer than %g s" % self.timeout)
+        if process.returncode != 0:
+            raise RuntimeError("the agent failed (exit %d): %s" % (process.returncode, err.strip()[-300:]))
+        return out.strip()

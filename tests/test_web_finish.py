@@ -1,0 +1,48 @@
+"""The static demo's copy of modes.finish (claudish/web/browser.js) answers as the service's."""
+import json
+import shutil
+import subprocess
+import unittest
+from pathlib import Path
+
+from claudish import modes
+
+BROWSER = Path(__file__).resolve().parents[1] / "claudish/web/browser.js"
+RUN = """
+const src = require("fs").readFileSync(process.argv[1], "utf8");
+const finish = new Function(src.slice(src.indexOf("function finish"), src.indexOf("\\n}\\n", src.indexOf("function finish")) + 3)
+                            + "; return finish;")();
+console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([text, output]) => finish("continue", text, output))));
+"""
+CASES = [["I", "In fact, yes"], ["We", "We're aligned"], ["aligned\u2014", "fully"], ['He said "', "hello"],
+         ["(", "see below"], ["caf", "\u0301 time"], ["I ", "in fact, we are thrilled."], ["A ", "As a team, we ship."], ['She said "we are ', 'ready to launch."'],
+         ["Dear Sam,", '"I hope this finds you well."'], ["hello ", "Hello, how are you today?"],
+         ["Thanks for", "Thanks for the review."], ["It works", "—mostly."], ["Thanks", "  "],
+         ["Shipped it 🎉", "See you tomorrow."], ["Great", "👍 thanks"]]
+
+
+@unittest.skipUnless(shutil.which("node"), "needs Node.js")
+class WebFinishTests(unittest.TestCase):
+    def test_the_demo_joins_a_continuation_as_the_service_does(self):
+        ran = subprocess.run(["node", "-e", RUN, str(BROWSER), json.dumps(CASES)], capture_output=True, text=True,
+                             timeout=10, check=True)
+        self.assertEqual(json.loads(ran.stdout), [modes.finish("continue", text, output) for text, output in CASES])
+
+    def test_the_demo_drops_a_parroted_answer_as_the_service_does(self):
+        examples = [{"role": "user", "content": "tttt"}, {"role": "assistant", "content": "Thanks for the update."},
+                    {"role": "user", "content": "Hi"}, {"role": "assistant", "content": "the team"}]
+        cases = [["rewrite", "qqqq", "Thanks for the update.", examples], ["rewrite", "tttt", "thanks for the update.", examples],
+                 ["rewrite", "hello", "Hello there.", examples], ["continue", "Thanks for", "Thanks for", examples],
+                 ["continue", "Thanks for", "Thanks for the team", examples],
+                 ["continue", "we shipped the release today and then ", "we shipped the release today and then the release today", []],
+                 ["continue", "we shipped it ", "we shipped it on time", []], ["continue", "abc", "xyz", []]]
+        run = RUN.replace("const finish", "const parroted").replace('indexOf("function finish")', 'indexOf("function parroted")') \
+            .replace('"; return finish;"', '"; return parroted;"').replace("finish(\"continue\", text, output)", "parroted(...c)") \
+            .replace("([text, output]) => ", "(c) => ").replace('src.indexOf("function finish")', 'src.indexOf("function parroted")')
+        ran = subprocess.run(["node", "-e", run, str(BROWSER), json.dumps(cases)], capture_output=True, text=True,
+                             timeout=10, check=True)
+        self.assertEqual(json.loads(ran.stdout), [modes.parroted(*case) for case in cases])
+
+
+if __name__ == "__main__":
+    unittest.main()

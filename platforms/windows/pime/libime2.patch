@@ -1,0 +1,1635 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index c2ae974..4ba6510 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -40,8 +40,13 @@ add_library(libIME2_static STATIC
+     MessageWindow.h
+     CandidateWindow.h
+     CandidateWindow.cpp
++    Panel.h
++    Panel.cpp
++    Style.h
+ )
+ 
+ target_link_libraries(libIME2_static
+     shlwapi.lib
++    d2d1.lib
++    dwrite.lib
+ )
+diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
+index 4a4149f..b5372b0 100644
+--- a/src/CandidateWindow.cpp
++++ b/src/CandidateWindow.cpp
+@@ -21,6 +21,8 @@
+ #include "DrawUtils.h"
+ #include "TextService.h"
+ #include "EditSession.h"
++#include "Style.h"
++#include "Panel.h"
+ 
+ #include <algorithm>
+ #include <cassert>
+@@ -36,26 +38,14 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
+     ImeWindow(service),
+     shown_(false),
+     candPerRow_(1),
+-    textWidth_(0),
+-    itemHeight_(0),
+     currentSel_(0),
+     hasResult_(false),
+     useCursor_(true),
+-    selKeyWidth_(0) {
+-
+-    if(service->isImmersive()) { // windows 8 app mode
+-        margin_ = 10;
+-        rowSpacing_ = 8;
+-        colSpacing_ = 12;
+-    }
+-    else { // desktop mode
+-        margin_ = 5;
+-        rowSpacing_ = 4;
+-        colSpacing_ = 8;
+-    }
++    spin_(0.0f) {
+ 
+     HWND parent = service->compositionWindow(session);
+-    create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
++    // Layered: the panel paints its own rounded corners, border and shadow (PanelPainter::present).
++    create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_LAYERED);
+ }
+ 
+ CandidateWindow::~CandidateWindow(void) {
+@@ -182,125 +172,48 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+             break;
+         case WM_MOUSEACTIVATE:
+             return MA_NOACTIVATE;
++        case WM_TIMER:  // the spinner turns while something is happening
++            spin_ += 0.35f;
++            painter_.present(hwnd_, spin_);
++            break;
+         default:
+             return Window::wndProc(msg, wp, lp);
+     }
+     return 0;
+ }
+ 
++// Claudish: the window draws the panel the input method describes (Panel.h, the design lab's
++// Windows 11 mock); the items stay for TSF's candidate list UI element (apps that draw their own).
+ void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
+-    // TODO: check isImmersive_, and draw the window differently
+-    // in Windows 8 app immersive mode to follow windows 8 UX guidelines
+     PAINTSTRUCT ps;
+-    BeginPaint(hwnd_, &ps);
+-    HDC hDC = ps.hdc;
+-    HFONT oldFont;
+-    RECT rc;
+-
+-    oldFont = (HFONT)SelectObject(hDC, font_);
+-
+-    GetClientRect(hwnd_,&rc);
+-    SetTextColor(hDC, GetSysColor(COLOR_WINDOWTEXT));
+-    SetBkColor(hDC, GetSysColor(COLOR_WINDOW));
+-
+-    // paint window background and border
+-    // draw a flat black border in Windows 8 app immersive mode
+-    // draw a 3d border in desktop mode
+-    if(isImmersive()) {
+-        HPEN pen = ::CreatePen(PS_SOLID, 3, RGB(0, 0, 0));
+-        HGDIOBJ oldPen = ::SelectObject(hDC, pen);
+-        ::Rectangle(hDC, rc.left, rc.top, rc.right, rc.bottom);
+-        ::SelectObject(hDC, oldPen);
+-        ::DeleteObject(pen);
+-    }
+-    else {
+-        // draw a 3d border in desktop mode
+-        ::FillSolidRect(ps.hdc, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, GetSysColor(COLOR_WINDOW));
+-        ::Draw3DBorder(hDC, &rc, GetSysColor(COLOR_3DFACE), 0);
+-    }
+-
+-    // paint items
+-    int col = 0;
+-    int x = margin_, y = margin_;
+-    for(int i = 0, n = items_.size(); i < n; ++i) {
+-        paintItem(hDC, i, x, y);
+-        ++col; // go to next column
+-        if(col >= candPerRow_) {
+-            col = 0;
+-            x = margin_;
+-            y += itemHeight_ + rowSpacing_;
+-        }
+-        else {
+-            x += colSpacing_ + selKeyWidth_ + textWidth_;
+-        }
+-    }
+-    SelectObject(hDC, oldFont);
++    BeginPaint(hwnd_, &ps);  // a layered window keeps what present() gave it
+     EndPaint(hwnd_, &ps);
+ }
+ 
+ void CandidateWindow::recalculateSize() {
+-    if(items_.empty()) {
+-        resize(margin_ * 2, margin_ * 2);
+-    }
++    SIZE size = painter_.layout(panel_);
++    resize(size.cx, size.cy);
++    painter_.present(hwnd_, spin_);
++    if (panel_.busy)
++        ::SetTimer(hwnd_, 1, 80, NULL);
++    else
++        ::KillTimer(hwnd_, 1);
++}
+ 
+-    HDC hDC = ::GetWindowDC(hwnd());
+-    int height = 0;
+-    int width = 0;
+-    selKeyWidth_ = 0;
+-    textWidth_ = 0;
+-    itemHeight_ = 0;
+-
+-    HGDIOBJ oldFont = ::SelectObject(hDC, font_);
+-    vector<wstring>::const_iterator it;
+-    for(int i = 0, n = items_.size(); i < n; ++i) {
+-        SIZE selKeySize;
+-        int lineHeight = 0;
+-        // the selection key string
+-        wchar_t selKey[] = L"?. ";
+-        selKey[0] = selKeys_[i];
+-        ::GetTextExtentPoint32W(hDC, selKey, 3, &selKeySize);
+-        if(selKeySize.cx > selKeyWidth_)
+-            selKeyWidth_ = selKeySize.cx;
+-
+-        // the candidate string
+-        SIZE candidateSize;
+-        wstring& item = items_.at(i);
+-        ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
+-        if(candidateSize.cx > textWidth_)
+-            textWidth_ = candidateSize.cx;
+-        int itemHeight = max(candidateSize.cy, selKeySize.cy);
+-        if(itemHeight > itemHeight_)
+-            itemHeight_ = itemHeight;
+-    }
+-    ::SelectObject(hDC, oldFont);
+-    ::ReleaseDC(hwnd(), hDC);
++void CandidateWindow::setPanel(const PanelSpec& panel) {
++    panel_ = panel;
++}
+ 
+-    if(items_.empty()) {
+-        resize(0, 0);
+-        return;
+-    }
+-    int safeCandPerRow = candPerRow_ > 0 ? candPerRow_ : 1;
++int CandidateWindow::textInset() const {
++    return painter_.textInset();
++}
+ 
+-    if(items_.size() <= (size_t)safeCandPerRow) {
+-        width = items_.size() * (selKeyWidth_ + textWidth_);
+-        if (items_.size() > 1) {
+-            width += colSpacing_ * (items_.size() - 1);
+-        }
+-        width += margin_ * 2;
+-        height = itemHeight_ + margin_ * 2;
+-    }
+-    else {
+-        width = safeCandPerRow * (selKeyWidth_ + textWidth_);
+-        if (safeCandPerRow > 1) {
+-            width += colSpacing_ * (safeCandPerRow - 1);
+-        }
+-        width += margin_ * 2;
+-        int rowCount = items_.size() / safeCandPerRow;
+-        if(items_.size() % safeCandPerRow)
+-            ++rowCount;
+-        height = itemHeight_ * rowCount + rowSpacing_ * (rowCount - 1) + margin_ * 2;
+-    }
+-    resize(width, height);
++int CandidateWindow::bottomInset() const {
++    return painter_.bottomInset();
++}
++
++int CandidateWindow::topInset() const {
++    return painter_.topInset();
+ }
+ 
+ void CandidateWindow::setCandPerRow(int n) {
+@@ -372,42 +285,9 @@ void CandidateWindow::setUseCursor(bool use) {
+         ::InvalidateRect(hwnd_, NULL, TRUE);
+ }
+ 
+-void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
+-    RECT textRect = {x, y, 0, y + itemHeight_};
+-    wchar_t selKey[] = L"?. ";
+-    selKey[0] = selKeys_[i];
+-    textRect.right = textRect.left + selKeyWidth_;
+-    // FIXME: make the color of strings configurable.
+-    COLORREF selKeyColor = RGB(0, 0, 255);
+-    COLORREF oldColor = ::SetTextColor(hDC, selKeyColor);
+-    // paint the selection key
+-    ::ExtTextOut(hDC, textRect.left, textRect.top, ETO_OPAQUE, &textRect, selKey, 3, NULL);
+-    ::SetTextColor(hDC, oldColor); // restore text color
+-
+-    // paint the candidate string
+-    wstring& item = items_.at(i);
+-    textRect.left += selKeyWidth_;
+-    textRect.right = textRect.left + textWidth_;
+-    // paint the candidate string
+-    ::ExtTextOut(hDC, textRect.left, textRect.top, ETO_OPAQUE, &textRect, item.c_str(), item.length(), NULL);
+-
+-    if(useCursor_ && i == currentSel_) { // invert the selected item
+-        int left = textRect.left; // - selKeyWidth_;
+-        int top = textRect.top;
+-        int width = textRect.right - left;
+-        int height = itemHeight_;
+-        ::BitBlt(hDC, left, top, width, itemHeight_, hDC, left, top, NOTSRCCOPY);
+-    }
+-}
+-
+ void CandidateWindow::itemRect(int i, RECT& rect) {
+-    int row, col;
+-    row = i / candPerRow_;
+-    col = i % candPerRow_;
+-    rect.left = margin_ + col * (selKeyWidth_ + textWidth_ + colSpacing_);
+-    rect.top = margin_ + row * (itemHeight_ + rowSpacing_);
+-    rect.right = rect.left + (selKeyWidth_ + textWidth_);
+-    rect.bottom = rect.top + itemHeight_;
++    // The panel is painted whole (Panel.h).
++    GetClientRect(hwnd_, &rect);
+ }
+ 
+ 
+diff --git a/src/CandidateWindow.h b/src/CandidateWindow.h
+index 2ea3635..0c7e652 100644
+--- a/src/CandidateWindow.h
++++ b/src/CandidateWindow.h
+@@ -24,6 +24,7 @@
+ #include <string>
+ #include <vector>
+ #include "ComObject.h"
++#include "Panel.h"
+ 
+ namespace Ime {
+ 
+@@ -100,10 +101,16 @@ public:
+ 
+     void setUseCursor(bool use);
+ 
++    // Claudish: what the window draws (Panel.h); the items stay for TSF's candidate list element.
++    void setPanel(const PanelSpec& panel);
++    // The x of the rows' text from the window's left edge, to line it up with the composition.
++    int textInset() const;
++    int topInset() const;  // the panel's top edge, below its shadow's margin
++    int bottomInset() const;  // the panel's bottom edge, above its shadow's margin
++
+ protected:
+     LRESULT wndProc(UINT msg, WPARAM wp , LPARAM lp);
+     void onPaint(WPARAM wp, LPARAM lp);
+-    void paintItem(HDC hDC, int i, int x, int y);
+     void itemRect(int i, RECT& rect);
+ 
+ protected: // COM object should not be deleted directly. calling Release() instead.
+@@ -112,17 +119,16 @@ protected: // COM object should not be deleted directly. calling Release() inste
+ private:
+     BOOL shown_;
+ 
+-    int selKeyWidth_;
+-    int textWidth_;
+-    int itemHeight_;
+     int candPerRow_;
+-    int colSpacing_;
+-    int rowSpacing_;
+     std::vector<wchar_t> selKeys_;
+     std::vector<std::wstring> items_;
+     int currentSel_;
+     bool hasResult_;
+     bool useCursor_;
++
++    PanelSpec panel_;
++    PanelPainter painter_;
++    float spin_;
+ };
+ 
+ }
+diff --git a/src/ImeModule.cpp b/src/ImeModule.cpp
+index 4e3c48e..2ba0913 100644
+--- a/src/ImeModule.cpp
++++ b/src/ImeModule.cpp
+@@ -356,7 +356,7 @@ HRESULT ImeModule::unregisterServer() {
+         if(::IsWindows8OrGreater()) {
+             // Windows 8 support
+             categoryMgr->UnregisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, textServiceClsid_);
+-            categoryMgr->RegisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, textServiceClsid_);
++            categoryMgr->UnregisterCategory(textServiceClsid_, GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, textServiceClsid_);  // Claudish: was RegisterCategory, which left the TIP key behind
+         }
+ 
+         categoryMgr->Release();
+diff --git a/src/KeyEvent.cpp b/src/KeyEvent.cpp
+index 80cdd48..92a0f99 100644
+--- a/src/KeyEvent.cpp
++++ b/src/KeyEvent.cpp
+@@ -29,18 +29,25 @@ KeyEvent::KeyEvent(UINT type, WPARAM wp, LPARAM lp):
+     if(!::GetKeyboardState(keyStates_)) // get state of all keys
+         ::memset(keyStates_, 0, sizeof(keyStates_));
+ 
+-    // try to convert the key event to an ASCII character
+-    // ToAscii API tries to convert Ctrl + printable characters to
+-    // ASCII 0x00 - 0x31 non-printable escape characters, which we don't want
+-    // So here is a hack: pretend that Ctrl key is not pressed
+-    WORD result[2] = {0, 0};
+-    BYTE ctrlState = keyStates_[VK_CONTROL];
+-    keyStates_[VK_CONTROL] = 0;
+-    if(::ToAscii(keyCode_, scanCode(), keyStates_, result, 0) == 1)
+-        charCode_ = (UINT)result[0];
+-    else
+-        charCode_ = 0;
+-    keyStates_[VK_CONTROL] = ctrlState;
++    // The character the key types. Ctrl + a printable key would give a control character, so Ctrl is
++    // left out, but not with Alt: Ctrl+Alt is how AltGr arrives (AltGr characters such as €).
++    // Claudish: ToUnicode, not ToAscii (the euro sign is not an ANSI byte), with flag 0x4: this runs twice per
++    // key, and must not change the dead-key state the app's TranslateMessage needs.
++    BYTE states[256];
++    ::memcpy(states, keyStates_, sizeof(states));
++    if (!(states[VK_MENU] & 0x80))
++        states[VK_CONTROL] = states[VK_LCONTROL] = states[VK_RCONTROL] = 0;
++    WCHAR result[4] = {0};
++    charCount_ = ::ToUnicode(keyCode_, scanCode(), states, result, 4, 0x4);
++    charCode_ = (charCount_ == 1) ? (UINT)result[0] : 0;
++    for (int i = 0; i < 4; ++i)  // Claudish: what it types (a waiting accent, then the key's own)
++        chars_[i] = (i < charCount_) ? result[i] : 0;
++    chars_[4] = 0;
++}
++
++void KeyEvent::useDeadKeyState() const {
++    WCHAR result[4];
++    ::ToUnicode(keyCode_, scanCode(), keyStates_, result, 4, 0);
+ }
+ 
+ KeyEvent::~KeyEvent(void) {
+diff --git a/src/KeyEvent.h b/src/KeyEvent.h
+index fd320b7..333972c 100644
+--- a/src/KeyEvent.h
++++ b/src/KeyEvent.h
+@@ -46,6 +46,26 @@ public:
+         return (charCode_ != 0);
+     }
+ 
++    // Claudish: a dead key (its accent waits for the next key, which brings the accented letter).
++    bool isDead() const {
++        return charCount_ < 0;
++    }
++
++    // Claudish: how many characters the key types: 2 for a waiting accent that does not combine
++    // with it, then its own; -1 for a dead key.
++    int charCount() const {
++        return charCount_;
++    }
++
++    // Claudish: the characters the key types (a waiting accent, then the key's own), or "".
++    const wchar_t* chars() const {
++        return chars_;
++    }
++
++    // Claudish: a key the input method took never reaches the app's TranslateMessage, where a
++    // waiting accent is used up; this uses it up, or it would land on a later key.
++    void useDeadKeyState() const;
++
+     LPARAM lParam() const {
+         return lParam_;
+     }
+@@ -57,7 +77,7 @@ public:
+ 
+     unsigned char scanCode() const {
+         // bits 16-23
+-        return (unsigned char)(lParam_ & 0xff0000);
++        return (unsigned char)((lParam_ >> 16) & 0xff);  // Claudish: was always 0
+     }
+ 
+     bool isExtended() const {
+@@ -81,6 +101,8 @@ private:
+     UINT type_;
+     UINT keyCode_;
+     UINT charCode_;
++    int charCount_;
++    wchar_t chars_[5];
+     LPARAM lParam_;
+     BYTE keyStates_[256];
+ };
+diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
+index 581f89f..2fefebb 100644
+--- a/src/MessageWindow.cpp
++++ b/src/MessageWindow.cpp
+@@ -20,6 +20,7 @@
+ #include "MessageWindow.h"
+ #include "TextService.h"
+ #include "DrawUtils.h"
++#include "Style.h"
+ 
+ namespace Ime {
+ 
+@@ -28,6 +29,7 @@ MessageWindow::MessageWindow(TextService* service, EditSession* session):
+ 
+     HWND parent = service->compositionWindow(session);
+     create(parent, WS_POPUP|WS_CLIPCHILDREN, WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
++    painter_.setToast(true);  // Claudish: the message window shows toasts
+ }
+ 
+ MessageWindow::~MessageWindow(void) {
+@@ -46,6 +48,15 @@ void MessageWindow::recalculateSize() {
+         size.cx + margin_ * 2, size.cy + margin_ * 2, SWP_NOACTIVATE|SWP_NOMOVE);
+ }
+ 
++void MessageWindow::setPanel(const PanelSpec& panel) {
++    panel_ = panel;
++    SIZE size = painter_.layout(panel_);
++    // A toast is a panel: layered, with its own corners, border and shadow (PanelPainter::present).
++    SetWindowLongPtr(hwnd_, GWL_EXSTYLE, GetWindowLongPtr(hwnd_, GWL_EXSTYLE) | WS_EX_LAYERED);
++    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, size.cx, size.cy, SWP_NOACTIVATE | SWP_NOMOVE);
++    painter_.present(hwnd_, 0);
++}
++
+ void MessageWindow::setText(std::wstring text) {
+     // FIXMEl: use different appearance under immersive mode
+     text_ = text;
+@@ -75,6 +86,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
+     int len = text_.length();
+     RECT rc, textrc = {0};
+     GetClientRect(hwnd_, &rc);
++    if (!panel_.empty())
++        return;  // Claudish: layered, setPanel() gave it its picture (a toast)
+ 
+     // draw a flat black border in Windows 8 app immersive mode
+     // draw a 3d border in desktop mode
+diff --git a/src/MessageWindow.h b/src/MessageWindow.h
+index 41e3a33..a2bff25 100644
+--- a/src/MessageWindow.h
++++ b/src/MessageWindow.h
+@@ -23,6 +23,7 @@
+ #include "ImeWindow.h"
+ #include "EditSession.h"
+ #include <string>
++#include "Panel.h"
+ 
+ namespace Ime {
+ 
+@@ -37,6 +38,17 @@ public:
+         return text_;
+     }
+     void setText(std::wstring text);
++    // Claudish: a panel instead of plain text (a toast: the mode switch, a drop, the pill, a helper's done line), drawn like the candidate window.
++    void setPanel(const PanelSpec& panel);
++    int topInset() const {  // the panel's top edge, below its shadow's margin
++        return painter_.topInset();
++    }
++    int bottomInset() const {  // the panel's bottom edge, above its shadow's margin
++        return painter_.bottomInset();
++    }
++    int textInset() const {
++        return painter_.textInset();
++    }
+ 
+     TextService* textService() {
+         return textService_;
+@@ -49,6 +61,8 @@ protected:
+ 
+ private:
+     std::wstring text_;
++    PanelSpec panel_;
++    PanelPainter painter_;
+ };
+ 
+ }
+diff --git a/src/Panel.cpp b/src/Panel.cpp
+new file mode 100644
+index 0000000..dd1fcaf
+--- /dev/null
++++ b/src/Panel.cpp
+@@ -0,0 +1,542 @@
++//
++//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
++//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/design.md).
++//
++
++#include "Panel.h"
++#include "Style.h"
++
++#include <algorithm>
++#include <cmath>
++
++#pragma comment(lib, "d2d1.lib")
++#pragma comment(lib, "dwrite.lib")
++
++namespace Ime {
++
++// The skin's geometry in pixels at 96 DPI (design.css, .host.windows).
++static const float PAD = 4, ROW_X = 10, ROW_Y = 5, TAKE = 48, HEAD_GAP = 2;
++static const float FONT = 14, SMALL = 12, MONO = 13, MIN_WIDTH = 240, MAX_WIDTH = 440, ROW_RADIUS = 4;
++static const float TILE = 18, CAP_X = 5, CAP_H = 18, KEY_GAP = 5, ITEM_GAP = 12;
++// A toast (a panel with only a footer: the mode switch, a drop, the pill, a helper's done line): one line, as .k-toast.
++static const float TOAST_LEFT = 6, TOAST_RIGHT = 10, TOAST_Y = 5, TOAST_GAP = 7;
++// The panel's corners and shadow (the lab's Windows skin: --k-radius 8px; --k-shadow 0 8px 16px,
++// 14% black in light, 0 8px 20px, 50% in dark).
++static const float RADIUS = 8, SHADOW_Y = 8, SHADOW_BLUR = 16, SHADOW_BLUR_DARK = 20;
++
++static ID2D1Factory* d2d = nullptr;
++static IDWriteFactory* dwrite = nullptr;
++
++template <class T> static void releaseOne(T*& p) {
++    if (p) {
++        p->Release();
++        p = nullptr;
++    }
++}
++
++static D2D1_COLOR_F color(COLORREF c, float alpha = 1.0f) {
++    return D2D1::ColorF(GetRValue(c) / 255.0f, GetGValue(c) / 255.0f, GetBValue(c) / 255.0f, alpha);
++}
++
++// Segoe UI Variable on Windows 11; Segoe UI where it is missing.
++static const wchar_t* uiFont() {
++    static const wchar_t* chosen = nullptr;
++    if (!chosen) {
++        chosen = L"Segoe UI";
++        IDWriteFontCollection* fonts = nullptr;
++        if (dwrite && SUCCEEDED(dwrite->GetSystemFontCollection(&fonts, FALSE))) {
++            UINT32 index = 0;
++            BOOL exists = FALSE;
++            if (SUCCEEDED(fonts->FindFamilyName(L"Segoe UI Variable Text", &index, &exists)) && exists)
++                chosen = L"Segoe UI Variable Text";
++            fonts->Release();
++        }
++    }
++    return chosen;
++}
++
++PanelPainter::PanelPainter() {
++    scale_ = scaled(1000) / 1000.0f;
++}
++
++PanelPainter::~PanelPainter() {
++    release();
++    releaseOne(text_);
++    releaseOne(small_);
++    releaseOne(label_format_);
++    releaseOne(mono_);
++    releaseOne(tile_);
++}
++
++bool PanelPainter::ensureFactories() {
++    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
++        return false;
++    if (!dwrite && FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
++                                              reinterpret_cast<IUnknown**>(&dwrite))))
++        return false;
++    if (!text_) {
++        const wchar_t* ui = uiFont();
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(FONT), L"", &text_);
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(SMALL), L"", &small_);
++        dwrite->CreateTextFormat(ui, nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(SMALL), L"", &label_format_);
++        dwrite->CreateTextFormat(L"Cascadia Mono", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(MONO), L"", &mono_);
++        dwrite->CreateTextFormat(L"Consolas", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL,
++                                 DWRITE_FONT_STRETCH_NORMAL, px(10), L"", &tile_);
++    }
++    return text_ && small_ && label_format_ && mono_ && tile_;
++}
++
++IDWriteTextLayout* PanelPainter::makeLayout(const std::wstring& text, IDWriteTextFormat* format, float maxWidth) {
++    IDWriteTextLayout* layout = nullptr;
++    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, maxWidth, 10000.0f, &layout);
++    return layout;
++}
++
++static void measure(IDWriteTextLayout* layout, float* w, float* h) {
++    DWRITE_TEXT_METRICS m = {};
++    if (layout)
++        layout->GetMetrics(&m);
++    *w = std::ceil(m.widthIncludingTrailingWhitespace);
++    *h = std::ceil(m.height);
++}
++
++void PanelPainter::release() {
++    releaseOne(label_.layout);
++    releaseOne(body_.layout);
++    for (auto& line : turns_)
++        releaseOne(line.layout);
++    turns_.clear();
++    for (auto& line : rows_)
++        releaseOne(line.layout);
++    for (auto& item : foot_)
++        releaseOne(item.layout);
++    releaseOne(take_);
++    rows_.clear();
++    rowTop_.clear();
++    rowHeight_.clear();
++    foot_.clear();
++}
++
++int PanelPainter::textInset() const {  // the content's left edge (a toast's tile) goes under the caret
++    return (int)(std::ceil(shadowSide_) + (toast_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X)));
++}
++
++SIZE PanelPainter::layout(const PanelSpec& spec) {
++    release();
++    spec_ = spec;
++    SIZE none = { 0, 0 };
++    if (spec.empty() || !ensureFactories())
++        return none;
++    const float inner = px(MAX_WIDTH) - 2 * px(PAD) - 2 * px(ROW_X);
++    const bool footOnly = spec.rows.empty() && spec.body.empty() && spec.thread.empty();
++    float widest = footOnly ? 0 : px(MIN_WIDTH);
++    float y = toast_ ? px(TOAST_Y) : px(PAD);
++    // The exchange so far: your earlier turns as context, one line each (cut with an ellipsis),
++    // muted, at full size, a neutral rule beside each.
++    for (const auto& turn : spec.thread) {
++        std::wstring words = turn.first + L"  " + turn.second;
++        Line line;
++        line.layout = makeLayout(words, text_, inner);
++        if (line.layout) {
++            DWRITE_TEXT_RANGE head = { 0, (UINT32)turn.first.size() };
++            line.layout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, head);
++            line.layout->SetFontSize(px(SMALL), head);
++            DWRITE_TEXT_RANGE yours = { (UINT32)turn.first.size() + 2, (UINT32)turn.second.size() };
++            line.layout->SetUnderline(TRUE, yours);  // your words, underlined as they were at the caret
++            line.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
++            DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
++            IDWriteInlineObject* ellipsis = nullptr;
++            if (SUCCEEDED(dwrite->CreateEllipsisTrimmingSign(text_, &ellipsis))) {
++                line.layout->SetTrimming(&trimming, ellipsis);
++                ellipsis->Release();
++            }
++        }
++        measure(line.layout, &line.w, &line.h);
++        line.x = px(PAD) + px(ROW_X);
++        line.y = y + px(ROW_Y) - 1;
++        y += line.h + px(ROW_Y) + 2;
++        widest = (std::max)(widest, (std::min)(line.w, inner) + 2 * (px(PAD) + px(ROW_X)));
++        turns_.push_back(line);
++    }
++    if (!spec.thread.empty() && !spec.body.empty())
++        y += px(3);
++    // The header: a small label, then the content as is.
++    if (!spec.body.empty()) {
++        y += px(ROW_Y) + 1;
++        if (!spec.label.empty()) {
++            label_.layout = makeLayout(spec.label, label_format_, inner);
++            measure(label_.layout, &label_.w, &label_.h);
++            label_.x = px(PAD) + px(ROW_X);
++            label_.y = y;
++            y += label_.h + px(HEAD_GAP);
++            widest = (std::max)(widest, label_.w + 2 * (px(PAD) + px(ROW_X)));
++        }
++        body_.layout = makeLayout(spec.body, spec.code ? mono_ : text_, inner);
++        measure(body_.layout, &body_.w, &body_.h);
++        body_.x = px(PAD) + px(ROW_X);
++        body_.y = y;
++        y += body_.h + px(ROW_Y);
++        widest = (std::max)(widest, body_.w + 2 * (px(PAD) + px(ROW_X)));
++    }
++    // The rows: the text (its legend muted); a list with a highlight keeps a trailing column on
++    // every row for the key that takes the highlighted one, so every row wraps alike.
++    const bool takes = (spec.on >= 0 && spec.on < (int)spec.rows.size()) || (spec.column && !spec.rows.empty());
++    const float textX = px(PAD) + px(ROW_X);
++    const float textMax = inner - (takes ? px(TAKE) : 0);
++    for (size_t i = 0; i < spec.rows.size(); ++i) {
++        const PanelRow& row = spec.rows[i];
++        std::wstring words = row.text + (row.legend.empty() ? L"" : L" \u2014 " + row.legend);
++        Line line;
++        line.layout = makeLayout(words, text_, textMax);
++        measure(line.layout, &line.w, &line.h);
++        float h = (std::max)(line.h, px(18)) + 2 * px(ROW_Y);
++        rowTop_.push_back(y);
++        rowHeight_.push_back(h);
++        line.x = textX;
++        line.y = y + px(ROW_Y);
++        rows_.push_back(line);
++        widest = (std::max)(widest, textX + line.w + (takes ? px(TAKE) : 0) + px(ROW_X) + px(PAD));
++        y += h;
++    }
++    if (takes)
++        take_ = makeLayout(spec.take, small_, 200);
++    // The footer: the AI tile (or a warning mark), what is happening, each key with its verb, and
++    // the free words.
++    if (!spec.rows.empty() || !spec.body.empty())
++        y += px(2);
++    footTop_ = y;
++    footHeight_ = toast_ ? px(TILE) : px(20) + 2 * px(ROW_Y) - 1;
++    float x = toast_ ? px(TOAST_LEFT) : px(PAD) + px(ROW_X);
++    const float gap = toast_ ? px(TOAST_GAP) : px(ITEM_GAP);  // between items (.k-toast, .k-foot)
++    auto add = [&](FootItem::Kind kind, const std::wstring& text, IDWriteTextFormat* format, float gap) {
++        FootItem item;
++        item.kind = kind;
++        item.text = text;
++        if (kind == FootItem::Tile || kind == FootItem::Warn) {
++            item.w = item.h = px(TILE);
++        } else if (kind == FootItem::Spinner) {
++            item.w = item.h = px(12);
++        } else {
++            item.layout = makeLayout(text, format, 1000);
++            measure(item.layout, &item.w, &item.h);
++            if (kind == FootItem::Cap)
++                item.w += 2 * px(CAP_X);
++        }
++        item.x = x;
++        x += item.w + gap;
++        foot_.push_back(item);
++    };
++    add(spec.tile == L"warn" ? FootItem::Warn : FootItem::Tile, spec.tile == L"cd" ? L"cd" : L"AI", nullptr, gap);
++    if (!spec.status.empty()) {
++        if (spec.busy)
++            add(FootItem::Spinner, L"", nullptr, px(6));
++        add(FootItem::Text, spec.status, small_, gap);
++    }
++    if (!spec.failed.empty())
++        add(FootItem::Error, spec.failed, small_, gap);
++    for (const auto& key : spec.foot) {
++        add(FootItem::Cap, key.first, small_, px(KEY_GAP));
++        add(FootItem::Verb, key.second, small_, gap);
++    }
++    if (!spec.tail.empty())
++        add(FootItem::Verb, spec.tail, small_, gap);
++    // A long status (an agent's progress) or failure gives way, so the keys after it always show: it
++    // is trimmed with an ellipsis to the panel's width, and what follows it moves left.
++    const float over = x - gap + (toast_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)) - px(MAX_WIDTH);
++    for (size_t i = 0; over > 0 && i < foot_.size(); ++i) {
++        FootItem& item = foot_[i];
++        if ((item.kind != FootItem::Text && item.kind != FootItem::Error) || item.w <= over + px(24))
++            continue;
++        item.layout->SetMaxWidth(item.w - over);
++        item.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
++        IDWriteInlineObject* dots = nullptr;
++        if (SUCCEEDED(dwrite->CreateEllipsisTrimmingSign(small_, &dots))) {
++            DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
++            item.layout->SetTrimming(&trimming, dots);
++            dots->Release();
++        }
++        item.w -= over;
++        for (size_t j = i + 1; j < foot_.size(); ++j)
++            foot_[j].x -= over;
++        x -= over;
++        break;
++    }
++    widest = (std::max)(widest, x - gap + (toast_ ? px(TOAST_RIGHT) : px(ROW_X) + px(PAD)));
++    y += footHeight_ + (toast_ ? px(TOAST_Y) : px(PAD));
++    width_ = (std::min)(px(MAX_WIDTH), widest);
++    height_ = y;
++    const float blur = px(appsUseDarkTheme() ? SHADOW_BLUR_DARK : SHADOW_BLUR);
++    shadowSide_ = blur;
++    shadowTop_ = (std::max)(0.0f, blur - px(SHADOW_Y));
++    shadowBottom_ = blur + px(SHADOW_Y);
++    SIZE size = { (LONG)(std::ceil(shadowSide_) * 2 + std::ceil(width_)),
++                  (LONG)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_)) };
++    return size;
++}
++
++void PanelPainter::paint(HDC dc, const RECT& rc, float spin) {
++    if (spec_.empty() || !ensureFactories())
++        return;
++    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
++        D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
++    ID2D1DCRenderTarget* target = nullptr;
++    if (FAILED(d2d->CreateDCRenderTarget(&props, &target)) || FAILED(target->BindDC(dc, &rc))) {
++        releaseOne(target);
++        return;
++    }
++    Palette colors = currentPalette();
++    ID2D1SolidColorBrush *brush = nullptr, *muted = nullptr;
++    target->CreateSolidColorBrush(color(colors.text), &brush);
++    target->CreateSolidColorBrush(color(colors.muted), &muted);
++    auto fill = [&](const D2D1_RECT_F& r, float radius, COLORREF c) {
++        ID2D1SolidColorBrush* b = nullptr;
++        target->CreateSolidColorBrush(color(c), &b);
++        target->FillRoundedRectangle(D2D1::RoundedRect(r, radius, radius), b);
++        b->Release();
++    };
++    auto text = [&](IDWriteTextLayout* layout, float x, float y, ID2D1Brush* b) {
++        if (layout)
++            target->DrawTextLayout(D2D1::Point2F(x, y), layout, b, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
++    };
++
++    target->BeginDraw();
++    target->Clear(D2D1::ColorF(0, 0, 0, 0));
++    // The shadow: rounded rectangles that grow and fade, under the panel and offset down (a blur
++    // without effects), then the panel itself: its surface, rounded, with a 1 px border. High
++    // contrast draws no shadow, only the border in the text colour.
++    const float left = std::ceil(shadowSide_), top = std::ceil(shadowTop_);
++    const D2D1_RECT_F panel = D2D1::RectF(left, top, left + width_, top + height_);
++    if (!colors.contrast) {
++        const bool dark = appsUseDarkTheme();
++        const int steps = 10;
++        const float blur = shadowSide_, opacity = dark ? 0.5f : 0.14f;
++        ID2D1SolidColorBrush* shade = nullptr;
++        target->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, opacity / steps), &shade);
++        for (int i = 0; i < steps; ++i) {
++            const float grow = blur * (steps - i) / steps - blur / 2;
++            D2D1_RECT_F r = D2D1::RectF(panel.left - grow, panel.top + px(SHADOW_Y) - grow,
++                                        panel.right + grow, panel.bottom + px(SHADOW_Y) + grow);
++            const float radius = (std::max)(0.0f, px(RADIUS) + grow);
++            target->FillRoundedRectangle(D2D1::RoundedRect(r, radius, radius), shade);
++        }
++        shade->Release();
++    }
++    fill(panel, px(RADIUS), colors.surface);
++    {
++        ID2D1SolidColorBrush* edge = nullptr;
++        target->CreateSolidColorBrush(color(colors.contrast ? colors.text
++                                            : mix(colors.surface, appsUseDarkTheme() ? RGB(255, 255, 255) : RGB(0, 0, 0), 10)), &edge);
++        target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(panel.left + 0.5f, panel.top + 0.5f, panel.right - 0.5f,
++                                                                   panel.bottom - 0.5f), px(RADIUS), px(RADIUS)), edge);
++        edge->Release();
++    }
++    target->SetTransform(D2D1::Matrix3x2F::Translation(left, top));  // the content, in the panel's coordinates
++    for (size_t i = 0; i < turns_.size(); ++i) {  // the label muted, your words in the text colour
++        const Line& turn = turns_[i];
++        DWRITE_TEXT_RANGE head = { 0, (UINT32)spec_.thread[i].first.size() };
++        turn.layout->SetDrawingEffect(muted, head);
++        text(turn.layout, turn.x, turn.y, brush);
++    }
++    text(label_.layout, label_.x, label_.y, muted);
++    text(body_.layout, body_.x, body_.y, brush);
++    for (size_t i = 0; i < rows_.size(); ++i) {
++        const bool on = (int)i == spec_.on;
++        const float top = rowTop_[i], h = rowHeight_[i];
++        if (on) {  // a neutral fill, the system accent bar inside it, and the row's Tab
++            fill(D2D1::RectF(px(PAD), top, width_ - px(PAD), top + h), px(ROW_RADIUS), colors.selection);
++            fill(D2D1::RectF(px(PAD) + px(2), top + px(7), px(PAD) + px(5), top + h - px(7)), px(1.5f), colors.accent);
++            if (take_ && !spec_.replying) {  // replying: the draft in view, which Tab does not take now
++                float w, th;
++                measure(take_, &w, &th);
++                float capW = w + 2 * px(CAP_X), x = width_ - px(PAD) - px(ROW_X) - capW, y = top + (h - px(CAP_H)) / 2;
++                ID2D1SolidColorBrush* edge = nullptr;
++                if (spec_.nudge && !colors.contrast)  // lit: a key that does nothing here pointed at it (the accent, tinted, behind it)
++                    fill(D2D1::RectF(x, y, x + capW, y + px(CAP_H)), px(4), mix(colors.surface, colors.accent, 20));
++                target->CreateSolidColorBrush(color(colors.contrast || spec_.nudge ? colors.accent : colors.cap), &edge);
++                target->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x + 0.5f, y + 0.5f, x + capW - 0.5f,
++                                                                           y + px(CAP_H) - 0.5f), px(4), px(4)), edge);
++                edge->Release();
++                text(take_, x + px(CAP_X), y + (px(CAP_H) - th) / 2, brush);
++            }
++        }
++        ID2D1SolidColorBrush* ink = brush;
++        ID2D1SolidColorBrush* inverse = nullptr;
++        if (on && colors.contrast) {  // high contrast: the highlight's own text colour
++            target->CreateSolidColorBrush(color(colors.accent), &inverse);
++            ink = inverse;
++        }
++        const PanelRow& row = spec_.rows[i];
++        if (!row.legend.empty() && rows_[i].layout) {  // the legend in the muted colour
++            DWRITE_TEXT_RANGE range = { (UINT32)row.text.size(), (UINT32)(row.legend.size() + 3) };
++            rows_[i].layout->SetDrawingEffect(on && colors.contrast ? (IUnknown*)ink : (IUnknown*)muted, range);
++        }
++        text(rows_[i].layout, rows_[i].x, rows_[i].y, spec_.replying ? muted : ink);
++        releaseOne(inverse);
++    }
++    // The footer.
++    const float mid = footTop_ + footHeight_ / 2;
++    for (const FootItem& item : foot_) {
++        switch (item.kind) {
++        case FootItem::Tile: {
++            D2D1_RECT_F r = D2D1::RectF(item.x, mid - item.h / 2, item.x + item.w, mid + item.h / 2);
++            const bool ai = item.text == L"AI";  // continue's tile is neutral: only compose wears the accent
++            fill(r, px(4), ai ? colors.tile : mix(colors.surface, colors.text, 12));
++            IDWriteTextLayout* glyph = makeLayout(item.text, tile_, item.w);
++            float w, h;
++            measure(glyph, &w, &h);
++            ID2D1SolidColorBrush* ink = nullptr;
++            target->CreateSolidColorBrush(ai ? D2D1::ColorF(1, 1, 1) : color(colors.text), &ink);
++            text(glyph, item.x + (item.w - w) / 2, mid - h / 2, ink);
++            ink->Release();
++            releaseOne(glyph);
++            break;
++        }
++        case FootItem::Warn: {  // a failure reads without colour: a mark, then why
++            ID2D1SolidColorBrush* red = nullptr;
++            target->CreateSolidColorBrush(color(colors.error), &red);
++            target->FillEllipse(D2D1::Ellipse(D2D1::Point2F(item.x + item.w / 2, mid), item.w / 2, item.w / 2), red);
++            red->Release();
++            IDWriteTextLayout* mark = makeLayout(L"!", label_format_, item.w);
++            float w, h;
++            measure(mark, &w, &h);
++            ID2D1SolidColorBrush* surface = nullptr;
++            target->CreateSolidColorBrush(color(colors.surface), &surface);
++            text(mark, item.x + (item.w - w) / 2, mid - h / 2, surface);
++            surface->Release();
++            releaseOne(mark);
++            break;
++        }
++        case FootItem::Spinner: {  // a ring with a turning arc
++            const float r = item.w / 2 - px(1), cx = item.x + item.w / 2;
++            ID2D1SolidColorBrush* faint = nullptr;
++            target->CreateSolidColorBrush(color(colors.muted, 0.35f), &faint);
++            target->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(cx, mid), r, r), faint, px(1.5f));
++            faint->Release();
++            ID2D1PathGeometry* arc = nullptr;
++            if (SUCCEEDED(d2d->CreatePathGeometry(&arc))) {
++                ID2D1GeometrySink* sink = nullptr;
++                arc->Open(&sink);
++                const float a0 = spin, a1 = spin + 1.6f;
++                sink->BeginFigure(D2D1::Point2F(cx + r * std::cos(a0), mid + r * std::sin(a0)), D2D1_FIGURE_BEGIN_HOLLOW);
++                sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(cx + r * std::cos(a1), mid + r * std::sin(a1)),
++                                              D2D1::SizeF(r, r), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
++                sink->EndFigure(D2D1_FIGURE_END_OPEN);
++                sink->Close();
++                sink->Release();
++                target->DrawGeometry(arc, muted, px(1.5f));
++                arc->Release();
++            }
++            break;
++        }
++        case FootItem::Cap: {
++            ID2D1SolidColorBrush* edge = nullptr;
++            target->CreateSolidColorBrush(color(colors.cap), &edge);
++            D2D1_RECT_F r = D2D1::RectF(item.x + 0.5f, mid - px(CAP_H) / 2 + 0.5f, item.x + item.w - 0.5f,
++                                        mid + px(CAP_H) / 2 - 0.5f);
++            target->DrawRoundedRectangle(D2D1::RoundedRect(r, px(4), px(4)), edge);
++            edge->Release();
++            text(item.layout, item.x + px(CAP_X), mid - item.h / 2, brush);
++            break;
++        }
++        case FootItem::Error: {
++            ID2D1SolidColorBrush* red = nullptr;
++            target->CreateSolidColorBrush(color(colors.error), &red);
++            text(item.layout, item.x, mid - item.h / 2, red);
++            red->Release();
++            break;
++        }
++        case FootItem::Text:
++            text(item.layout, item.x, mid - item.h / 2, brush);
++            break;
++        default:  // a verb, the free words
++            text(item.layout, item.x, mid - item.h / 2, muted);
++        }
++    }
++    target->EndDraw();
++    releaseOne(brush);
++    releaseOne(muted);
++    releaseOne(target);
++}
++
++// A premultiplied 32-bit bitmap, painted by draw(memory, area), then handed to the layered window:
++// where it is (at nullptr) or at `at`.
++template <class Draw>
++static void presentLayered(HWND hwnd, int width, int height, POINT* at, Draw draw) {
++    BITMAPINFO info = {};
++    info.bmiHeader.biSize = sizeof(info.bmiHeader);
++    info.bmiHeader.biWidth = width;
++    info.bmiHeader.biHeight = -height;
++    info.bmiHeader.biPlanes = 1;
++    info.bmiHeader.biBitCount = 32;
++    void* bits = nullptr;
++    HDC screen = GetDC(nullptr);
++    HDC memory = CreateCompatibleDC(screen);
++    HBITMAP bitmap = CreateDIBSection(memory, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
++    HGDIOBJ old = SelectObject(memory, bitmap);
++    RECT area = { 0, 0, width, height };
++    draw(memory, area);
++    POINT origin = { 0, 0 };
++    SIZE extent = { width, height };
++    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
++    UpdateLayeredWindow(hwnd, screen, at, &extent, memory, &origin, 0, &blend, ULW_ALPHA);
++    SelectObject(memory, old);
++    DeleteObject(bitmap);
++    DeleteDC(memory);
++    ReleaseDC(nullptr, screen);
++}
++
++void PanelPainter::present(HWND hwnd, float spin) {
++    if (spec_.empty())
++        return;
++    const int width = (int)(std::ceil(shadowSide_) * 2 + std::ceil(width_));
++    const int height = (int)(std::ceil(shadowTop_) + std::ceil(height_) + std::ceil(shadowBottom_));
++    presentLayered(hwnd, width, height, nullptr, [&](HDC memory, const RECT& area) { paint(memory, area, spin); });
++}
++
++void GhostPainter::show(HWND hwnd, const std::wstring& text, const RECT& caret) {
++    if (!d2d && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d)))
++        return;
++    if (!dwrite && FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
++                                              reinterpret_cast<IUnknown**>(&dwrite))))
++        return;
++    // The UI font at the caret's height (the line is about 1.25 times the font's size).
++    const float size = (std::max)(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
++    IDWriteTextFormat* format = nullptr;
++    dwrite->CreateTextFormat(uiFont(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
++                             DWRITE_FONT_STRETCH_NORMAL, size, L"", &format);
++    if (!format)
++        return;
++    IDWriteTextLayout* layout = nullptr;
++    dwrite->CreateTextLayout(text.c_str(), (UINT32)text.size(), format, 4000, 1000, &layout);
++    float w, h;
++    measure(layout, &w, &h);
++    const int width = (std::max)(1, (int)w + 2), height = (std::max)(1, (int)h);
++    // From the caret's own x (an empty selection's rectangle can be a character wide): the space
++    // you typed is the only gap before the suggestion.
++    POINT at = { caret.left + scaled(2), caret.top + ((caret.bottom - caret.top) - height) / 2 };
++    presentLayered(hwnd, width, height, &at, [&](HDC memory, const RECT& area) {
++        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
++            D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
++        ID2D1DCRenderTarget* target = nullptr;
++        if (SUCCEEDED(d2d->CreateDCRenderTarget(&props, &target)) && SUCCEEDED(target->BindDC(memory, &area))) {
++            ID2D1SolidColorBrush* grey = nullptr;
++            target->CreateSolidColorBrush(color(currentPalette().ghost), &grey);
++            target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);  // ClearType needs an opaque background
++            target->BeginDraw();
++            target->Clear(D2D1::ColorF(0, 0, 0, 0));
++            target->DrawTextLayout(D2D1::Point2F(1, 0), layout, grey);
++            target->EndDraw();
++            grey->Release();
++        }
++        releaseOne(target);
++    });
++    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
++    releaseOne(layout);
++    releaseOne(format);
++}
++
++} // namespace Ime
+diff --git a/src/Panel.h b/src/Panel.h
+new file mode 100644
+index 0000000..8c454f7
+--- /dev/null
++++ b/src/Panel.h
+@@ -0,0 +1,170 @@
++//
++//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
++//    Windows 11 skin; docs/design/design.md), painted with Direct2D and DirectWrite (GDI cannot
++//    anti-alias the rounded keycaps and tile, nor draw Segoe UI Variable well). LGPL like the rest
++//    of libIME2.
++//
++
++#ifndef IME_PANEL_H
++#define IME_PANEL_H
++
++#include "Window.h"
++#include <windows.h>
++#include <d2d1.h>
++#include <dwrite.h>
++#include <cmath>
++#include <string>
++#include <utility>
++#include <vector>
++
++namespace Ime {
++
++// What the panel shows: Claudish's Composition.panel(), sent by the input method as JSON.
++struct PanelRow {
++    std::wstring text;
++    std::wstring legend;
++};
++
++struct PanelSpec {
++    std::vector<std::pair<std::wstring, std::wstring>> thread;  // earlier turns: (label, your words)
++    bool replying = false;  // you are typing at the caret: the choices fade
++    std::wstring label;   // the header: who asks or what this is (small)
++    std::wstring body;    // then the content as is
++    bool code = false;    // the body is a command (monospace)
++    std::vector<PanelRow> rows;
++    int on = -1;          // the highlighted row; -1: none (an approval)
++    std::vector<std::pair<std::wstring, std::wstring>> foot;  // (key, verb)
++    std::wstring tail;    // free words after the keys ("or type a reply")
++    std::wstring tile = L"ai";  // "ai"; "warn" when a request failed; "cd" in continue (a toast)
++    std::wstring status;  // what is happening
++    bool busy = false;    // with a spinner
++    std::wstring failed;  // why a request failed
++    std::wstring take = L"Tab";  // the highlighted row's key: Tab takes a draft or a choice
++    bool nudge = false;   // a key that does nothing here pointed at it: the highlighted row's Tab is lit
++    bool column = false;  // the rows keep the key's column from the start (an approval before ↓)
++
++    bool empty() const {
++        return thread.empty() && body.empty() && rows.empty() && foot.empty() && status.empty() && failed.empty();
++    }
++};
++
++// Lays out and paints a PanelSpec. Sizes are device pixels (the system DPI).
++class PanelPainter {
++public:
++    PanelPainter();
++    ~PanelPainter();
++
++    // The panel's size for this spec; keeps the layout for paint().
++    SIZE layout(const PanelSpec& spec);
++    // Paints the last layout into the DC (a premultiplied bitmap of layout()'s size: the shadow,
++    // then the panel); spin: the spinner's angle.
++    void paint(HDC dc, const RECT& rc, float spin);
++    // Paints the last layout and hands it to a layered window (WS_EX_LAYERED), which keeps its
++    // position: the panel draws its own rounded corners, border and shadow, as the design lab
++    // does, since DWM gives a popup none of them without a GPU (a VM) or on Windows 10.
++    void present(HWND hwnd, float spin);
++    // The x of the content's left edge, from the window's: the window is placed so that it starts
++    // under the caret (the shadow's margin included).
++    int textInset() const;
++    // Painting toasts (the toast window): one compact line, as the lab's .k-toast.
++    void setToast(bool toast) { toast_ = toast; }
++    // The panel's top edge, from the window's (the shadow's margin above it).
++    int topInset() const { return (int)std::ceil(shadowTop_); }
++    // The panel's bottom edge, from the window's (the shadow's margin below it).
++    int bottomInset() const { return (int)std::ceil(shadowBottom_); }
++
++private:
++    struct Line {
++        IDWriteTextLayout* layout = nullptr;
++        float x = 0, y = 0, w = 0, h = 0;
++    };
++    struct FootItem {
++        enum Kind { Tile, Warn, Spinner, Text, Error, Cap, Verb } kind;
++        std::wstring text;
++        IDWriteTextLayout* layout = nullptr;
++        float x = 0, w = 0, h = 0;
++    };
++
++    bool ensureFactories();
++    IDWriteTextLayout* makeLayout(const std::wstring& text, IDWriteTextFormat* format, float maxWidth);
++    void release();
++    float px(float dips) const { return dips * scale_; }
++
++    PanelSpec spec_;
++    float scale_ = 1.0f;
++    float width_ = 0, height_ = 0;
++    Line label_, body_;
++    std::vector<Line> turns_;     // the thread, one line each
++    std::vector<Line> rows_;      // the rows' text
++    std::vector<float> rowTop_, rowHeight_;
++    std::vector<FootItem> foot_;
++    float footTop_ = 0, footHeight_ = 0;
++    float shadowSide_ = 0, shadowTop_ = 0, shadowBottom_ = 0;  // the shadow's margin around the panel
++    bool toast_ = false;  // this painter paints toasts (the toast window's)
++    IDWriteTextLayout* take_ = nullptr;  // the highlighted row's "Tab"
++
++    IDWriteTextFormat* text_ = nullptr;
++    IDWriteTextFormat* small_ = nullptr;
++    IDWriteTextFormat* label_format_ = nullptr;
++    IDWriteTextFormat* mono_ = nullptr;
++    IDWriteTextFormat* tile_ = nullptr;
++};
++
++// Continue's suggestion: cd_AI's own grey text right after the caret, in the UI font at the
++// caret's height, on a transparent layered window that never takes the mouse or the keyboard.
++class GhostPainter {
++public:
++    // Paints text into a layered window placed at the caret rectangle's right end.
++    static void show(HWND hwnd, const std::wstring& text, const RECT& caret);
++};
++
++// Its own window class, without a frame: text drawn after the caret, not a panel.
++class GhostWindow {
++public:
++    explicit GhostWindow(HWND parent): parent_(parent) {
++        static ATOM atom = 0;
++        HINSTANCE instance = (HINSTANCE)GetModuleHandleW(nullptr);
++        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
++                           (LPCWSTR)&GhostWindow::proc, &instance);
++        if (!atom) {
++            WNDCLASSEXW wc = { sizeof(wc) };
++            wc.lpfnWndProc = GhostWindow::proc;
++            wc.hInstance = instance;
++            wc.lpszClassName = L"ClaudishGhost";
++            atom = RegisterClassExW(&wc);
++        }
++        hwnd_ = CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
++                                L"ClaudishGhost", L"", WS_POPUP, 0, 0, 1, 1, parent, nullptr, instance, nullptr);
++    }
++    ~GhostWindow() {
++        if (hwnd_ && IsWindow(hwnd_))
++            DestroyWindow(hwnd_);
++    }
++    // Usable for this owner: the window is there (Windows destroys an owned popup with its owner).
++    bool alive(HWND parent) const {
++        return hwnd_ && IsWindow(hwnd_) && parent_ == parent;
++    }
++    void show(const std::wstring& text, const RECT& caret) {
++        if (hwnd_)
++            GhostPainter::show(hwnd_, text, caret);
++    }
++    void hide() {
++        if (hwnd_)
++            ShowWindow(hwnd_, SW_HIDE);
++    }
++
++private:
++    static LRESULT CALLBACK proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
++        if (msg == WM_MOUSEACTIVATE)
++            return MA_NOACTIVATE;
++        if (msg == WM_NCHITTEST)
++            return HTTRANSPARENT;  // the mouse goes to the app underneath
++        return DefWindowProcW(hwnd, msg, wp, lp);
++    }
++    HWND hwnd_ = nullptr;
++    HWND parent_ = nullptr;
++};
++
++} // namespace Ime
++
++#endif
+diff --git a/src/Style.h b/src/Style.h
+new file mode 100644
+index 0000000..dadfca2
+--- /dev/null
++++ b/src/Style.h
+@@ -0,0 +1,97 @@
++//
++//    Claudish: the look of the candidate and message windows, after Windows 11's own popups
++//    (a rounded corner, the system shadow, the app theme's colours). Header-only, LGPL like
++//    the rest of libIME2.
++//
++
++#ifndef IME_STYLE_H
++#define IME_STYLE_H
++
++#include <windows.h>
++#include <string>
++
++namespace Ime {
++
++// The Windows 11 skin's tokens (claudish/web/design.css, .host.windows): light and dark, the
++// system accent for the highlighted row's bar, and high contrast's system colours.
++struct Palette {
++    COLORREF surface;
++    COLORREF text;
++    COLORREF muted;      // numbers, labels, the footer's words (4.5:1 or more on the surface)
++    COLORREF ghost;      // continue's suggestion (3:1 or more)
++    COLORREF selection;  // the highlighted row's neutral fill
++    COLORREF accent;     // its bar: the system accent
++    COLORREF error;
++    COLORREF cap;        // a keycap's border
++    COLORREF tile;       // the AI tile: Claudish's own colour, the one place it appears
++    bool contrast;       // high contrast: system colours, no fills but the highlight
++};
++
++// The apps' theme (Settings > Personalization > Colors), which is what the app under the caret uses.
++inline bool appsUseDarkTheme() {
++    DWORD value = 1, size = sizeof(value);
++    if (::RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
++                       L"AppsUseLightTheme", RRF_RT_REG_DWORD, NULL, &value, &size) != ERROR_SUCCESS)
++        return false;
++    return value == 0;
++}
++
++inline COLORREF mix(COLORREF a, COLORREF b, int percentOfB) {
++    return RGB((GetRValue(a) * (100 - percentOfB) + GetRValue(b) * percentOfB) / 100,
++               (GetGValue(a) * (100 - percentOfB) + GetGValue(b) * percentOfB) / 100,
++               (GetBValue(a) * (100 - percentOfB) + GetBValue(b) * percentOfB) / 100);
++}
++
++// The accent colour the user chose (DWM keeps it as 0xAABBGGRR); Windows 11's default blue if none.
++inline COLORREF systemAccent(bool dark) {
++    DWORD value = 0, size = sizeof(value);
++    if (::RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM", L"AccentColor",
++                       RRF_RT_REG_DWORD, NULL, &value, &size) != ERROR_SUCCESS)
++        return dark ? RGB(0x60, 0xcd, 0xff) : RGB(0x00, 0x5f, 0xb8);
++    COLORREF accent = value & 0xffffff;  // already 0x00BBGGRR, a COLORREF
++    return dark ? mix(accent, RGB(255, 255, 255), 45) : accent;  // as Windows lightens it on dark
++}
++
++inline bool highContrast() {
++    HIGHCONTRASTW contrast = { sizeof(contrast) };
++    return ::SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)
++        && (contrast.dwFlags & HCF_HIGHCONTRASTON);
++}
++
++inline Palette currentPalette() {
++    const COLORREF tile = RGB(217, 119, 87);
++    if (highContrast()) {
++        COLORREF window = GetSysColor(COLOR_WINDOW), text = GetSysColor(COLOR_WINDOWTEXT);
++        return { window, text, text, GetSysColor(COLOR_GRAYTEXT), GetSysColor(COLOR_HIGHLIGHT),
++                 GetSysColor(COLOR_HIGHLIGHTTEXT), text, text, tile, true };
++    }
++    if (appsUseDarkTheme())
++        return { RGB(44, 44, 44), RGB(255, 255, 255), RGB(197, 197, 197), RGB(139, 139, 139),
++                 mix(RGB(44, 44, 44), RGB(255, 255, 255), 11), systemAccent(true), RGB(255, 153, 164),
++                 RGB(143, 143, 143), tile, false };  // keycap borders 3:1 or more (round 5)
++    return { RGB(249, 249, 249), RGB(26, 26, 26), RGB(92, 92, 92), RGB(134, 134, 134),
++             mix(RGB(249, 249, 249), RGB(26, 26, 26), 7), systemAccent(false), RGB(196, 43, 28),
++             RGB(138, 138, 138), tile, false };
++}
++
++// Pixels at 96 DPI to device pixels (the system DPI, as the candidate font's size is computed).
++inline int scaled(int pixels) {
++    static int dpi = 0;
++    if (!dpi) {
++        HDC dc = ::GetDC(NULL);
++        dpi = dc ? ::GetDeviceCaps(dc, LOGPIXELSY) : 96;
++        if (dc)
++            ::ReleaseDC(NULL, dc);
++    }
++    return ::MulDiv(pixels, dpi, 96);
++}
++
++inline void fillRect(HDC dc, const RECT& rc, COLORREF color) {
++    HBRUSH brush = ::CreateSolidBrush(color);
++    ::FillRect(dc, &rc, brush);
++    ::DeleteObject(brush);
++}
++
++} // namespace Ime
++
++#endif
+diff --git a/src/TextService.cpp b/src/TextService.cpp
+index ea37cdc..c689cb9 100644
+--- a/src/TextService.cpp
++++ b/src/TextService.cpp
+@@ -24,6 +24,7 @@
+ #include "DisplayAttributeInfoEnum.h"
+ #include "ImeModule.h"
+ 
++#include <InputScope.h>
+ #include <assert.h>
+ #include <string>
+ #include <algorithm>
+@@ -224,6 +225,13 @@ void TextService::endComposition(ITfContext* context) {
+                         selection.range->Release();
+                     }
+                 }
++                // Claudish: a composition the input method asked to clear (an instruction sent to the
++                // model) is emptied here too, when libIME ends it itself (another input method, the
++                // keyboard closed, the selection left it), as OnCompositionTerminated does when TSF does.
++                if (clearOnTerminate_ && compositionRange) {
++                    compositionRange->SetText(cookie, 0, L"", 0);
++                    clearOnTerminate_ = false;
++                }
+                 // end composition and clean up
+                 composition_->EndComposition(cookie);
+                 // do some cleanup in the derived class here
+@@ -238,25 +246,105 @@ void TextService::endComposition(ITfContext* context) {
+ std::wstring TextService::compositionString(EditSession* session) const {
+     std::wstring result;
+     if (composition_) {
+-        ComPtr<ITfRange> compositionRange;
+-        if (composition_->GetRange(&compositionRange) == S_OK) {
+-            auto rangeAcp = compositionRange.query<ITfRangeACP>();
+-            if (rangeAcp) {
+-                LONG anchor, bufLen;
+-                rangeAcp->GetExtent(&anchor, &bufLen);  // get length of the text.
+-                auto buf = std::make_unique<wchar_t[]>(size_t(bufLen) + 1);
+-
+-                ULONG textLen = 0;
+-                if (compositionRange->GetText(session->editCookie(), 0, buf.get(), bufLen, &textLen) == S_OK) {
+-                    buf[textLen] = '\0';
+-                    result = buf.get();
+-                }
++        // Claudish: read through the range itself, as Microsoft's SampleIME does: an app whose text
++        // store is anchor-based has no ITfRangeACP, and the composition read as "" ended it at every key.
++        ComPtr<ITfRange> compositionRange, rest;
++        if (composition_->GetRange(&compositionRange) == S_OK && compositionRange->Clone(&rest) == S_OK) {
++            wchar_t buf[256];
++            ULONG textLen = 0;
++            while (rest->GetText(session->editCookie(), TF_TF_MOVESTART, buf, ARRAYSIZE(buf), &textLen) == S_OK && textLen > 0) {
++                result.append(buf, textLen);
++                if (textLen < ARRAYSIZE(buf))
++                    break;
+             }
+         }
+     }
+     return result;
+ }
+ 
++bool TextService::surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit,
++                                  std::wstring* selected) const {
++    TfEditCookie cookie = session->editCookie();
++    ComPtr<ITfRange> anchor;
++    if (composition_) {
++        if (composition_->GetRange(&anchor) != S_OK || !anchor) {
++            return false;
++        }
++    }
++    else {
++        TF_SELECTION selection;
++        ULONG fetched = 0;
++        if (session->context()->GetSelection(cookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched) != S_OK || fetched == 0) {
++            return false;
++        }
++        ITfRange* range = selection.range;
++        anchor = ComPtr<ITfRange>::takeover(std::move(range));
++        if (selected != nullptr) {  // the selection itself, when nothing is composed
++            auto buf = std::make_unique<wchar_t[]>(size_t(limit) + 1);
++            ULONG got = 0;
++            if (anchor->GetText(cookie, 0, buf.get(), ULONG(limit), &got) == S_OK) {
++                selected->assign(buf.get(), got);
++            }
++        }
++    }
++    auto read = [&](bool backward, std::wstring& out) {
++        ComPtr<ITfRange> range;
++        if (anchor->Clone(&range) != S_OK || !range) {
++            return;
++        }
++        LONG moved = 0;
++        if (backward) {
++            range->Collapse(cookie, TF_ANCHOR_START);
++            range->ShiftStart(cookie, -limit, &moved, nullptr);
++        }
++        else {
++            range->Collapse(cookie, TF_ANCHOR_END);
++            range->ShiftEnd(cookie, limit, &moved, nullptr);
++        }
++        auto buf = std::make_unique<wchar_t[]>(size_t(limit) + 1);
++        ULONG got = 0;
++        if (range->GetText(cookie, 0, buf.get(), ULONG(limit), &got) == S_OK) {
++            out.assign(buf.get(), got);
++        }
++    };
++    read(true, before);
++    read(false, after);
++    return true;
++}
++
++// GUID_PROP_INPUTSCOPE: declared by msctf.h, defined in no library PIME links.
++static const GUID kInputScopeProperty = {0x1713dd5a, 0x68e7, 0x4a5b, {0x9a, 0xf6, 0x59, 0x2a, 0x59, 0x5c, 0x77, 0x8d}};
++
++std::vector<int> TextService::inputScopes(EditSession* session) const {
++    std::vector<int> result;
++    TfEditCookie cookie = session->editCookie();
++    TF_SELECTION selection;
++    ULONG fetched = 0;
++    if (session->context()->GetSelection(cookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched) != S_OK || fetched == 0) {
++        return result;
++    }
++    ITfRange* raw = selection.range;
++    auto range = ComPtr<ITfRange>::takeover(std::move(raw));
++    ComPtr<ITfReadOnlyProperty> property;
++    if (session->context()->GetAppProperty(kInputScopeProperty, &property) != S_OK || !property) {
++        return result;
++    }
++    VARIANT value;
++    VariantInit(&value);
++    if (property->GetValue(cookie, range, &value) == S_OK && value.vt == VT_UNKNOWN && value.punkVal) {
++        if (auto scope = ComPtr<ITfInputScope>::queryFrom(value.punkVal)) {
++            InputScope* scopes = nullptr;
++            UINT count = 0;
++            if (scope->GetInputScopes(&scopes, &count) == S_OK && scopes) {
++                result.assign(scopes, scopes + count);
++                CoTaskMemFree(scopes);
++            }
++        }
++    }
++    VariantClear(&value);
++    return result;
++}
++
+ void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
+     ITfContext* context = session->context();
+     if(context) {
+@@ -650,6 +738,11 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+ }
+ 
+ STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
++    // Claudish: a document has the focus again (the app's window came back to the front, or another
++    // text box in it): the same as the key event sink's focus, which does not come for that.
++    if (pDocMgrFocus) {
++        onSetFocus();
++    }
+     return S_OK;
+ }
+ 
+@@ -750,7 +843,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
+             // We use TF_ES_SYNC here, so the request becomes synchronus and blocking.
+             // KeyEditSession::DoEditSession() and TextService::doKeyEditSession() will be
+             // called before RequestEditSession() returns.
+-            pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult);
++            // Claudish: an app that refuses the edit session (busy, read-only) gets its key back, not
++            // a key eaten with nothing typed.
++            if (FAILED(pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult))
++                || FAILED(sessionResult))
++                *pfEaten = FALSE;
+         }
+     }
+     return S_OK;
+@@ -784,7 +881,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
+                     *pfEaten = onKeyUp(keyEvent, session);
+                 }
+             );
+-            pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult);
++            if (FAILED(pContext->RequestEditSession(clientId_, session, TF_ES_SYNC|TF_ES_READWRITE, &sessionResult))
++                || FAILED(sessionResult))
++                *pfEaten = FALSE;  // Claudish: refused, the key-up is the app's
++
+         }
+     }
+     return S_OK;
+@@ -803,6 +903,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+     // grabbed by others, we're ``forced'' to terminate current composition.
+     // If we end the composition by calling ITfComposition::EndComposition() ourselves,
+     // this event is not triggered.
++    // Claudish: a composition the input method asked to clear (an instruction sent to the model) is
++    // emptied with the write cookie TSF gives here, so the app keeps nothing of it.
++    if (clearOnTerminate_ && pComposition) {
++        ComPtr<ITfRange> range;
++        if (pComposition->GetRange(&range) == S_OK && range)
++            range->SetText(ecWrite, 0, L"", 0);
++        clearOnTerminate_ = false;
++    }
+     onCompositionTerminated(true);
+     composition_ = nullptr;
+     return S_OK;
+@@ -911,6 +1019,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+     return ret;
+ }
+ 
++// Claudish: a rectangle that says where something is (an app without layout yet answers all zeros).
++static bool placed(const RECT& rect) {
++    return rect.left || rect.top || rect.right || rect.bottom;
++}
++
++// Claudish: the system caret of this (the app's UI) thread, on the screen: what an app that gives TSF
++// no text rectangle (a custom-drawn editor through the IMM32 bridge) still shows.
++static bool systemCaret(RECT* rect) {
++    GUITHREADINFO info = { sizeof(info) };
++    if (!GetGUIThreadInfo(GetCurrentThreadId(), &info) || !info.hwndCaret || !placed(info.rcCaret))
++        return false;
++    POINT corners[2] = { { info.rcCaret.left, info.rcCaret.top }, { info.rcCaret.right, info.rcCaret.bottom } };
++    MapWindowPoints(info.hwndCaret, NULL, corners, 2);
++    *rect = { corners[0].x, corners[0].y, corners[1].x, corners[1].y };
++    return true;
++}
++
++// Claudish: the caret's rectangle with or without a composition (continue's suggestion is drawn
++// after the caret while nothing is composed; selectionRect answers only while composing). An app
++// that has no layout yet (TF_E_NOLAYOUT), none at all, or all zeros: the system caret, else none.
++bool TextService::caretRect(EditSession* session, RECT* rect) const {
++    bool ret = false;
++    ComPtr<ITfContextView> view;
++    if(session && session->context()->GetActiveView(&view) == S_OK) {
++        BOOL clipped;
++        TF_SELECTION selection;
++        ULONG selectionNum;
++        if(session->context()->GetSelection(session->editCookie(), TF_DEFAULT_SELECTION, 1, &selection, &selectionNum) == S_OK) {
++            if(view->GetTextExt(session->editCookie(), selection.range, rect, &clipped) == S_OK && placed(*rect))
++                ret = true;
++            selection.range->Release();
++        }
++    }
++    return ret || systemCaret(rect);
++}
++
++// Claudish: where a panel or a toast is anchored: the composition's start, or the caret when
++// nothing is composed (docs/design/design.md, Placement).
++bool TextService::anchorRect(EditSession* session, RECT* rect) const {
++    if(session && isComposing()) {
++        ComPtr<ITfContextView> view;
++        ComPtr<ITfRange> range, start;
++        BOOL clipped;
++        if(session->context()->GetActiveView(&view) == S_OK && composition_->GetRange(&range) == S_OK
++           && range->Clone(&start) == S_OK && start->Collapse(session->editCookie(), TF_ANCHOR_START) == S_OK
++           && view->GetTextExt(session->editCookie(), start, rect, &clipped) == S_OK && placed(*rect))
++            return true;
++    }
++    return caretRect(session, rect);
++}
++
+ HWND TextService::compositionWindow(EditSession* session) const {
+     HWND hwnd = NULL;
+     ComPtr<ITfContextView> view;
+diff --git a/src/TextService.h b/src/TextService.h
+index f2c1c09..1743fa9 100644
+--- a/src/TextService.h
++++ b/src/TextService.h
+@@ -125,6 +125,10 @@ public:
+     // text composition handling
+     bool isComposing() const;
+ 
++    // Claudish: when the app ends the composition itself (a focus change), clear its text instead of
++    // leaving it in the document.
++    void setClearOnTerminate(bool clear) { clearOnTerminate_ = clear; }
++
+     // is keyboard disabled for the context (nullptr means current context)
+     bool isKeyboardDisabled(ITfContext* context = nullptr) const;
+     
+@@ -137,9 +141,17 @@ public:
+     void endComposition(ITfContext* context);
+     bool compositionRect(EditSession* session, RECT* rect) const;
+     bool selectionRect(EditSession* session, RECT* rect) const;
++    bool caretRect(EditSession* session, RECT* rect) const;  // Claudish: also with nothing composed
++    bool anchorRect(EditSession* session, RECT* rect) const;  // Claudish: the composition's start, else the caret
+     HWND compositionWindow(EditSession* session) const;
+ 
+     std::wstring compositionString(EditSession* session) const;
++    // The text before and after the composition (or the selection, when not composing), up to
++    // limit characters each; false when the context does not share its text.
++    bool surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit,
++                         std::wstring* selected = nullptr) const;
++    // The input scopes (IS_URL, IS_EMAIL_SMTPEMAILADDRESS, ...) the app declares at the caret.
++    std::vector<int> inputScopes(EditSession* session) const;
+     void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
+     void setCompositionCursor(EditSession* session, int pos) const;
+ 
+@@ -281,6 +293,7 @@ private:
+     DWORD langBarSinkCookie_;
+ 
+     ComPtr<ITfComposition> composition_; // acquired when starting composition, released when ending composition
++    bool clearOnTerminate_ = false;
+     ComPtr<ITfLangBarMgr> langBarMgr_;
+     std::vector<ComPtr<LangBarButton>> langBarButtons_;
+     std::vector<PreservedKey> preservedKeys_;
+diff --git a/src/Window.cpp b/src/Window.cpp
+index cff3d7e..4680a32 100644
+--- a/src/Window.cpp
++++ b/src/Window.cpp
+@@ -90,7 +90,7 @@ bool Window::registerClass(HINSTANCE hinstance) {
+ 
+     WNDCLASSEX wc;
+     wc.cbSize         = sizeof(WNDCLASSEX);
+-    wc.style          = CS_IME; // FIXME: is this needed?
++    wc.style          = CS_IME;  // Claudish: no CS_DROPSHADOW, the panel draws its own shadow (Panel.cpp)
+     wc.lpfnWndProc    = (WNDPROC)Window::_wndProc;
+     wc.cbClsExtra     = 0;
+     wc.cbWndExtra     = 0;

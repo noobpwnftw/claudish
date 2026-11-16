@@ -1,0 +1,672 @@
+{
+ "labels": {
+  "good": "reads as the writer's own next words",
+  "echo": "repeats what is already written",
+  "off": "does not follow on: a non sequitur, a contradiction, a broken join (quotes, dangling words)",
+  "reply": "answers or addresses the writer instead of writing as them",
+  "meta": "talks about the text or the task"
+ },
+ "notes": "Hand labels (2026-10-24) of a seeded random sample (seed 53) of 110 distinct continue outputs from 13 local models on benchmarks/eval/continue_cases.json, labelled without seeing the model.",
+ "pairs": [
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " and perhaps a loaf of that sourdough bread we like so much?",
+   "label": "good"
+  },
+  {
+   "id": "prose-3",
+   "source": "In the first chapter, the author argues that ",
+   "output": "the narrative techniques employed to engage readers.",
+   "label": "off"
+  },
+  {
+   "id": "email-5",
+   "source": "Could you please confirm whether the shipment ",
+   "output": "please clarify the details so I can assist you accurately.",
+   "label": "off"
+  },
+  {
+   "id": "email-5",
+   "source": "Could you please confirm whether the shipment ",
+   "output": "confirmed",
+   "label": "off"
+  },
+  {
+   "id": "prose-1",
+   "source": "The rain had stopped by the time we reached the station, and ",
+   "output": "the heavy, humid air hung suspended over the platform like a damp veil.",
+   "label": "good"
+  },
+  {
+   "id": "short-3",
+   "source": "Sounds good, ",
+   "output": "I'm glad to hear that.",
+   "label": "good"
+  },
+  {
+   "id": "short-3",
+   "source": "Sounds good, ",
+   "output": "let us proceed with the aforementioned plan.",
+   "label": "good"
+  },
+  {
+   "id": "tech-6",
+   "source": "Run the tests with pytest -x, which stops at",
+   "output": " the first encountered failure to facilitate more efficient debugging.",
+   "label": "good"
+  },
+  {
+   "id": "email-7",
+   "source": "Unfortunately I won't be able to make the workshop on Thursday because",
+   "output": " I regret to inform you that unforeseen circumstances have prevented me from attending the workshop on Thursday.",
+   "label": "off"
+  },
+  {
+   "id": "question-3",
+   "source": "What's the best way to ",
+   "output": "to streamline your process effectively",
+   "label": "off"
+  },
+  {
+   "id": "tech-7",
+   "source": "This PR removes the legacy importer and ",
+   "output": "the legacy importer and the legacy importer's data.",
+   "label": "echo"
+  },
+  {
+   "id": "tech-2",
+   "source": "To reproduce the bug, open the settings page and ",
+   "output": "you'll need to go to the settings page and check the settings.",
+   "label": "echo"
+  },
+  {
+   "id": "tech-8",
+   "source": "The latency regression appeared after we upgraded",
+   "output": " the database schema, specifically following the deployment of the new indexing strategy.",
+   "label": "good"
+  },
+  {
+   "id": "chat-2",
+   "source": "did you see the",
+   "output": " yes, it was quite impressive.",
+   "label": "reply"
+  },
+  {
+   "id": "short-1",
+   "source": "Thanks for ",
+   "output": "thank you for your kind words and support.",
+   "label": "echo"
+  },
+  {
+   "id": "prose-3",
+   "source": "In the first chapter, the author argues that ",
+   "output": "the pervasive influence of digital isolation has fundamentally altered the landscape of human connection.",
+   "label": "good"
+  },
+  {
+   "id": "tech-8",
+   "source": "The latency regression appeared after we upgraded",
+   "output": " the team worked diligently to resolve the issue.",
+   "label": "off"
+  },
+  {
+   "id": "short-4",
+   "source": "I think ",
+   "output": "I believe that the proposed strategy offers the most viable path forward.",
+   "label": "off"
+  },
+  {
+   "id": "prose-2",
+   "source": "Most people underestimate how long it takes to",
+   "output": " “complete a complex project, truly.”",
+   "label": "off"
+  },
+  {
+   "id": "email-3",
+   "source": "Apologies for the delay on the invoice, our finance team ",
+   "output": "has been quite protracted in their review process.",
+   "label": "good"
+  },
+  {
+   "id": "email-8",
+   "source": "Best of luck with the launch, and ",
+   "output": "I look forward to seeing how it all unfolds.",
+   "label": "good"
+  },
+  {
+   "id": "question-1",
+   "source": "Does anyone know why the build ",
+   "output": "…the server’s exhibiting a peculiar anomaly?",
+   "label": "off"
+  },
+  {
+   "id": "short-1",
+   "source": "Thanks for ",
+   "output": "the clarity.",
+   "label": "good"
+  },
+  {
+   "id": "email-6",
+   "source": "Dear hiring team, I am excited to apply for the",
+   "output": " Dear hiring team, I’m eager to contribute and look forward to your response.",
+   "label": "echo"
+  },
+  {
+   "id": "tech-6",
+   "source": "Run the tests with pytest -x, which stops at",
+   "output": " the test suite.",
+   "label": "off"
+  },
+  {
+   "id": "email-7",
+   "source": "Unfortunately I won't be able to make the workshop on Thursday because",
+   "output": " an unforeseen and pressing professional commitment has arisen.",
+   "label": "good"
+  },
+  {
+   "id": "notes-4",
+   "source": "Idea for the blog: a short post about",
+   "output": " the blog: a short post about the new project launch.",
+   "label": "echo"
+  },
+  {
+   "id": "notes-4",
+   "source": "Idea for the blog: a short post about",
+   "output": " the subtle art of procrastination and how it can actually be a productive force.",
+   "label": "good"
+  },
+  {
+   "id": "prose-2",
+   "source": "Most people underestimate how long it takes to",
+   "output": " the process—slow and lengthy.",
+   "label": "off"
+  },
+  {
+   "id": "prose-3",
+   "source": "In the first chapter, the author argues that ",
+   "output": "the fundamental tension between individual autonomy and societal expectations serves as the primary catalyst for the protagonist's descent into madness.",
+   "label": "good"
+  },
+  {
+   "id": "prose-5",
+   "source": "When I moved to Berlin, the first thing I noticed was",
+   "output": " the vibrant culture and historic architecture that truly shaped my experience.",
+   "label": "good"
+  },
+  {
+   "id": "email-4",
+   "source": "I'm writing to let you know that the office will be closed on",
+   "output": " “Tuesday, the 18th, for a brief respite from the daily grind.”",
+   "label": "off"
+  },
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " home? I’m running low and the kids are asking for cereal.",
+   "label": "good"
+  },
+  {
+   "id": "tech-8",
+   "source": "The latency regression appeared after we upgraded",
+   "output": " the server infrastructure, which we are currently investigating with utmost diligence.",
+   "label": "good"
+  },
+  {
+   "id": "names-1",
+   "source": "Priya and Tomás reviewed the draft, and ",
+   "output": "“Their critiques, while insightful, leaned towards a slightly…optimistic interpretation of the narrative’s core.”",
+   "label": "off"
+  },
+  {
+   "id": "short-1",
+   "source": "Thanks for ",
+   "output": "your patience and continued support as we navigate these final stages.",
+   "label": "good"
+  },
+  {
+   "id": "notes-2",
+   "source": "Meeting notes: agreed to postpone the beta until",
+   "output": " the next week to ensure all issues are resolved.",
+   "label": "good"
+  },
+  {
+   "id": "notes-1",
+   "source": "TODO: refactor the parser so that ",
+   "output": "the logic is more modular and maintainable.",
+   "label": "good"
+  },
+  {
+   "id": "question-1",
+   "source": "Does anyone know why the build ",
+   "output": "the build process is taking longer than expected.",
+   "label": "echo"
+  },
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " home, and perhaps a few other essentials if you find the time?",
+   "label": "good"
+  },
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " home, if it isn't too much of an inconvenience?",
+   "label": "good"
+  },
+  {
+   "id": "prose-5",
+   "source": "When I moved to Berlin, the first thing I noticed was",
+   "output": " the pervasive, rhythmic hum of the U-Bahn echoing through the subterranean corridors.",
+   "label": "good"
+  },
+  {
+   "id": "email-7",
+   "source": "Unfortunately I won't be able to make the workshop on Thursday because",
+   "output": " I apologize for any inconvenience this may cause, but I have a pressing work commitment that requires my attention.",
+   "label": "off"
+  },
+  {
+   "id": "short-4",
+   "source": "I think ",
+   "output": "that the initial concept, while promising, requires a more rigorous refinement before we can confidently present it to the stakeholders.",
+   "label": "good"
+  },
+  {
+   "id": "email-1",
+   "source": "Hi Dana, thanks for sending over the contract. I had a quick look and ",
+   "output": "“It appears a most agreeable arrangement, wouldn’t you agree?",
+   "label": "off"
+  },
+  {
+   "id": "chat-8",
+   "source": "brb, my cat just",
+   "output": " decided to stage a dramatic protest upon the keyboard.",
+   "label": "good"
+  },
+  {
+   "id": "chat-6",
+   "source": "happy birthday!! hope you ",
+   "output": "have a truly splendid day, filled with joy and delight!",
+   "label": "good"
+  },
+  {
+   "id": "email-3",
+   "source": "Apologies for the delay on the invoice, our finance team ",
+   "output": "is currently undergoing a comprehensive audit of all outstanding accounts.",
+   "label": "good"
+  },
+  {
+   "id": "notes-2",
+   "source": "Meeting notes: agreed to postpone the beta until",
+   "output": " the end of the fiscal quarter, pending further refinement.",
+   "label": "good"
+  },
+  {
+   "id": "prose-4",
+   "source": "The recipe calls for two cups of flour, ",
+   "output": "The batter needs to be ready soon.",
+   "label": "off"
+  },
+  {
+   "id": "prose-6",
+   "source": "Our quarterly revenue grew by 12%, driven mostly by",
+   "output": " the successful launch of our flagship product line.",
+   "label": "good"
+  },
+  {
+   "id": "chat-6",
+   "source": "happy birthday!! hope you ",
+   "output": "have an absolutely magnificent day filled with joy.",
+   "label": "good"
+  },
+  {
+   "id": "names-2",
+   "source": "Thanks to Dr. Okafor for ",
+   "output": "his insightful presentation on the latest advancements in medical research.",
+   "label": "good"
+  },
+  {
+   "id": "question-2",
+   "source": "Would it be possible to move our 1:1 to",
+   "output": " “the cloud, for enhanced accessibility and collaboration?”",
+   "label": "off"
+  },
+  {
+   "id": "prose-1",
+   "source": "The rain had stopped by the time we reached the station, and ",
+   "output": "the air hung heavy with the scent of damp earth and the distant, rhythmic echo of a departing locomotive.",
+   "label": "good"
+  },
+  {
+   "id": "short-3",
+   "source": "Sounds good, ",
+   "output": "“Indeed, a most agreeable proposition, wouldn’t you agree?”",
+   "label": "off"
+  },
+  {
+   "id": "tech-5",
+   "source": "If the cache is cold, the first request ",
+   "output": "will necessitate a full re-computation, which I anticipate will take a moment.",
+   "label": "good"
+  },
+  {
+   "id": "short-1",
+   "source": "Thanks for ",
+   "output": "your patience and continued support in this endeavor.",
+   "label": "good"
+  },
+  {
+   "id": "email-2",
+   "source": "Following up on our call yesterday, I wanted to",
+   "output": " discuss the progress on the project and address any concerns that may have arisen since the last meeting.",
+   "label": "good"
+  },
+  {
+   "id": "notes-4",
+   "source": "Idea for the blog: a short post about",
+   "output": " the nuanced intricacies of sustainable urban development.",
+   "label": "good"
+  },
+  {
+   "id": "short-4",
+   "source": "I think ",
+   "output": "we might be overlooking a critical detail in the timeline.",
+   "label": "good"
+  },
+  {
+   "id": "question-4",
+   "source": "Is there a reason we're still",
+   "output": " for the delay.",
+   "label": "off"
+  },
+  {
+   "id": "chat-1",
+   "source": "running 10 min late, ",
+   "output": "“I’m encountering a rather significant logistical hurdle, requiring a slight… recalibration of my schedule.”",
+   "label": "off"
+  },
+  {
+   "id": "prose-5",
+   "source": "When I moved to Berlin, the first thing I noticed was",
+   "output": " the sheer, overwhelming vibrancy of the street life, a constant, beautiful cacophony that immediately captivated my senses.",
+   "label": "good"
+  },
+  {
+   "id": "names-1",
+   "source": "Priya and Tomás reviewed the draft, and ",
+   "output": "they’ve both suggested a few refinements to strengthen the narrative flow.",
+   "label": "good"
+  },
+  {
+   "id": "prose-6",
+   "source": "Our quarterly revenue grew by 12%, driven mostly by",
+   "output": " increased sales and marketing efforts.",
+   "label": "good"
+  },
+  {
+   "id": "question-2",
+   "source": "Would it be possible to move our 1:1 to",
+   "output": " tomorrow at 10 a.m.? I’ve had a scheduling conflict earlier today.",
+   "label": "good"
+  },
+  {
+   "id": "tech-6",
+   "source": "Run the tests with pytest -x, which stops at",
+   "output": " the first one.",
+   "label": "good"
+  },
+  {
+   "id": "chat-7",
+   "source": "no worries, we can ",
+   "output": "we can certainly make it up to you.",
+   "label": "echo"
+  },
+  {
+   "id": "question-1",
+   "source": "Does anyone know why the build ",
+   "output": "has been delayed? I'm hoping for an update soon.",
+   "label": "good"
+  },
+  {
+   "id": "email-2",
+   "source": "Following up on our call yesterday, I wanted to",
+   "output": " discuss—the intricacies of the project’s progression.",
+   "label": "off"
+  },
+  {
+   "id": "tech-8",
+   "source": "The latency regression appeared after we upgraded",
+   "output": " the production environment to the latest version of the database engine.",
+   "label": "good"
+  },
+  {
+   "id": "question-3",
+   "source": "What's the best way to ",
+   "output": "connect with the community?",
+   "label": "good"
+  },
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " sure, just a moment.",
+   "label": "reply"
+  },
+  {
+   "id": "email-8",
+   "source": "Best of luck with the launch, and ",
+   "output": "…we anticipate a most fruitful endeavor.",
+   "label": "off"
+  },
+  {
+   "id": "tech-1",
+   "source": "This function returns the number of active sessions, or ",
+   "output": "zero if no sessions are currently initialized.",
+   "label": "good"
+  },
+  {
+   "id": "email-8",
+   "source": "Best of luck with the launch, and ",
+   "output": "please do not hesitate to reach out should you require any further assistance.",
+   "label": "good"
+  },
+  {
+   "id": "chat-3",
+   "source": "lol that's exactly what I ",
+   "output": "was thinking, but I couldn't quite put my finger on it.",
+   "label": "good"
+  },
+  {
+   "id": "chat-7",
+   "source": "no worries, we can ",
+   "output": "No worries, we're back on track.",
+   "label": "echo"
+  },
+  {
+   "id": "question-2",
+   "source": "Would it be possible to move our 1:1 to",
+   "output": " the new hybrid model we've been discussing for the next quarter.",
+   "label": "off"
+  },
+  {
+   "id": "short-2",
+   "source": "Quick question: ",
+   "output": "Could you please clarify what you would like to know?",
+   "label": "reply"
+  },
+  {
+   "id": "tech-5",
+   "source": "If the cache is cold, the first request ",
+   "output": "will inevitably incur a significant latency penalty as the system fetches the data from the underlying storage.",
+   "label": "good"
+  },
+  {
+   "id": "question-1",
+   "source": "Does anyone know why the build ",
+   "output": "I'm happy to help with any questions you may have.",
+   "label": "reply"
+  },
+  {
+   "id": "email-7",
+   "source": "Unfortunately I won't be able to make the workshop on Thursday because",
+   "output": " an unavoidable scheduling conflict has arisen that I simply cannot move.",
+   "label": "good"
+  },
+  {
+   "id": "tech-1",
+   "source": "This function returns the number of active sessions, or ",
+   "output": "zero if no sessions are currently active, which is the expected behavior when the service is in a maintenance window.",
+   "label": "good"
+  },
+  {
+   "id": "names-2",
+   "source": "Thanks to Dr. Okafor for ",
+   "output": "your tireless dedication, truly commendable.",
+   "label": "off"
+  },
+  {
+   "id": "tech-2",
+   "source": "To reproduce the bug, open the settings page and ",
+   "output": "to ensure the issue is fully understood and addressed.",
+   "label": "off"
+  },
+  {
+   "id": "email-4",
+   "source": "I'm writing to let you know that the office will be closed on",
+   "output": ".",
+   "label": "off"
+  },
+  {
+   "id": "tech-3",
+   "source": "The migration adds a nullable column so that existing rows ",
+   "output": "can be safely dropped without data loss.",
+   "label": "off"
+  },
+  {
+   "id": "tech-4",
+   "source": "We chose SQLite over Postgres because",
+   "output": " we prioritized simplicity and ease of use in this decision.",
+   "label": "good"
+  },
+  {
+   "id": "chat-8",
+   "source": "brb, my cat just",
+   "output": " “begged for a tuna snack, a truly urgent plea.”",
+   "label": "off"
+  },
+  {
+   "id": "notes-3",
+   "source": "Packing list: passport, charger, ",
+   "output": "toothbrush, and a light jacket for the evening chill.",
+   "label": "good"
+  },
+  {
+   "id": "chat-5",
+   "source": "ok I pushed the fix, can someone ",
+   "output": "“it through to the servers, and it’s now stable.”",
+   "label": "off"
+  },
+  {
+   "id": "tech-1",
+   "source": "This function returns the number of active sessions, or ",
+   "output": "I'm glad to help with this—a quick check of the current state.",
+   "label": "reply"
+  },
+  {
+   "id": "email-8",
+   "source": "Best of luck with the launch, and ",
+   "output": "I look forward to celebrating your inevitable success.",
+   "label": "good"
+  },
+  {
+   "id": "tech-6",
+   "source": "Run the tests with pytest -x, which stops at",
+   "output": " “the first assertion, and then gracefully concludes its execution.”",
+   "label": "off"
+  },
+  {
+   "id": "short-2",
+   "source": "Quick question: ",
+   "output": "could you elaborate on the proposed timeline for implementation?",
+   "label": "good"
+  },
+  {
+   "id": "notes-3",
+   "source": "Packing list: passport, charger, ",
+   "output": "portable power bank, and perhaps a comfortable pair of noise-canceling headphones.",
+   "label": "good"
+  },
+  {
+   "id": "tech-8",
+   "source": "The latency regression appeared after we upgraded",
+   "output": " the system performance metrics, which we need to investigate further.",
+   "label": "off"
+  },
+  {
+   "id": "chat-7",
+   "source": "no worries, we can ",
+   "output": "absolutely proceed with the revised timeline.",
+   "label": "good"
+  },
+  {
+   "id": "email-3",
+   "source": "Apologies for the delay on the invoice, our finance team ",
+   "output": "have been working on it.",
+   "label": "good"
+  },
+  {
+   "id": "email-7",
+   "source": "Unfortunately I won't be able to make the workshop on Thursday because",
+   "output": " I have a family emergency that requires my full attention.",
+   "label": "good"
+  },
+  {
+   "id": "prose-6",
+   "source": "Our quarterly revenue grew by 12%, driven mostly by",
+   "output": " “significant increases in sales across all key sectors, a testament to our strategic diversification and unwavering focus on customer satisfaction.”",
+   "label": "off"
+  },
+  {
+   "id": "notes-3",
+   "source": "Packing list: passport, charger, ",
+   "output": "camera, headphones, and a few other essentials.",
+   "label": "good"
+  },
+  {
+   "id": "chat-1",
+   "source": "running 10 min late, ",
+   "output": "I'm sorry to hear that.",
+   "label": "reply"
+  },
+  {
+   "id": "email-3",
+   "source": "Apologies for the delay on the invoice, our finance team ",
+   "output": "has been working diligently to ensure everything is accurate and timely.",
+   "label": "good"
+  },
+  {
+   "id": "chat-2",
+   "source": "did you see the",
+   "output": " latest announcement regarding the upcoming changes to the project?",
+   "label": "good"
+  },
+  {
+   "id": "tech-1",
+   "source": "This function returns the number of active sessions, or ",
+   "output": "zero, which is the expected outcome for a dormant system.",
+   "label": "good"
+  },
+  {
+   "id": "email-6",
+   "source": "Dear hiring team, I am excited to apply for the",
+   "output": " please find my resume attached for your consideration.",
+   "label": "off"
+  },
+  {
+   "id": "chat-4",
+   "source": "can you grab some milk on the way",
+   "output": " I'll be back shortly with a glass of milk and a warm smile.",
+   "label": "reply"
+  }
+ ]
+}

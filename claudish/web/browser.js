@@ -1,0 +1,124 @@
+// In-browser backend for the static demo: llama.cpp compiled to WebAssembly (wllama), same templates
+// as the service (templates.json is generated from claudish/modes.py).
+// The page imports this module when you run the model or remove it; wllama loads only to run it.
+const WLLAMA = "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js";
+
+const WASM = { default: "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm" };
+
+// Port of claudish.modes.finish: a continuation is joined onto the typed text.
+function finish(mode, text, output) {
+  if (mode !== "continue") return output;
+  // Small models sometimes echo the text before continuing it: only a whole echo, up to a word's
+  // end ("I " then "in fact" is not one).
+  // "In" after "I", "We're" after "We"
+  const wordGoesOn = (at) => /^([\p{L}\p{N}]|['’]\p{L})/u.test(output.slice(at));
+  const echo = text.trim();
+  if (output.startsWith(text) && !(/[\p{L}\p{N}]$/u.test(text) && wordGoesOn(text.length))) output = output.slice(text.length);
+  else if (echo && output.toLowerCase().startsWith(echo.toLowerCase()) && !wordGoesOn(echo.length)) {
+    output = output.slice(echo.length);
+  }
+  output = output.trim();
+  // Or wrap all of it in quotes: a pair around the whole, not one that closes your open quote.
+  if (output.length > 2 && output[0] === '"' && output.endsWith('"') && !output.slice(1, -1).includes('"')
+      && (text.split('"').length - 1) % 2 === 0) output = output.slice(1, -1).trim();
+  if (/[ \n]$/.test(text)) output = output.replace(/^[,;: ]+/, "");
+  if (!output) return "";
+  // No space after an em dash, an opening bracket or a quote you opened, nor before a mark that
+  // goes on your last letter.
+  const opened = /[—(\[“‘]$/.test(text) || (text.endsWith('"') && (text.split('"').length - 1) % 2 === 1);
+  const joiner = /[ \n]$/.test(text) || ",.;:!?—)".includes(output[0]) || opened || /^\p{M}/u.test(output) ? "" : " ";
+  return text + joiner + output;
+}
+
+// What this page keeps in the browser's storage, and a way to remove it.
+// The page stores nothing but the model, so removing it clears the page's file storage.
+export async function removeStored() {
+  try {
+    const root = await navigator.storage.getDirectory();
+    for await (const name of root.keys()) await root.removeEntry(name, { recursive: true });
+  } catch {}
+}
+
+// Without room to store the model (a small quota: a guest profile, a full disk), it runs from memory:
+// downloaded each visit, never half-written into storage. wllama's own "no cache" path still writes.
+async function inMemory(modelUrl, onProgress) {
+  const response = await fetch(modelUrl);
+  if (!response.ok) throw new Error(`model download failed (${response.status})`);
+  const total = Number(response.headers.get("content-length")) || 0;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    onProgress(loaded, total);
+  }
+  return new Blob(chunks);
+}
+
+// Port of claudish.modes.parroted: the template's own example answers (a small model given nonsense,
+// "tttt", repeats its example), or words already before the caret, are not suggestions.
+function parroted(mode, text, candidate, examples) {
+  const answers = new Set(examples.filter((m) => m.role === "assistant").map((m) => m.content.trim().toLowerCase()));
+  if (mode !== "continue") {
+    const asked = new Set(examples.filter((m) => m.role === "user").map((m) => m.content.trim().toLowerCase()));
+    return answers.has(candidate.trim().toLowerCase()) && !asked.has(text.trim().toLowerCase());
+  }
+  if (!candidate.startsWith(text)) return false;
+  const rest = candidate.slice(text.length).trim().toLowerCase();
+  if (!rest) return true;
+  return answers.has(rest) || (rest.length >= 12 && text.toLowerCase().includes(rest));
+}
+
+// The turn as the service frames it: continue quotes the text as a task; a follow-up carries the
+// draft in view (templates.json's box.in_view, as the input methods send it).
+function framed(spec, text, draft) {
+  const said = spec.frame ? spec.frame.replace("{text}", text) : text;
+  return draft && spec.in_view ? spec.in_view.replace("{draft}", draft).replace("{text}", said) : said;
+}
+
+export async function createBrowserBackend(templates, modelUrl, onProgress, onNote = () => {}) {
+  const { Wllama } = await import(WLLAMA);
+  const wllama = new Wllama(WASM);
+  const options = { n_ctx: 2048, progressCallback: ({ loaded, total }) => onProgress(loaded, total) };
+  const cached = (await wllama.modelManager.getModels()).some((model) => model.url === modelUrl);
+  const { usage = 0, quota = Infinity } = (await navigator.storage?.estimate?.()) || {};
+  const fits = cached || quota - usage > templates.model_bytes * 1.05;
+  if (fits) {
+    try {
+      await wllama.loadModelFromUrl(modelUrl, options);
+    } catch (error) {
+      if (!/quota/i.test(`${error.name} ${error.message}`)) throw error;
+      await removeStored();  // a half-written copy only takes up room
+      onNote("This browser ran out of room for the model, so it runs from memory and downloads each visit.");
+      await wllama.loadModel([await inMemory(modelUrl, onProgress)], { n_ctx: 2048 });
+    }
+  } else {
+    onNote("This browser has no room to keep the model, so it runs from memory and downloads each visit.");
+    await wllama.loadModel([await inMemory(modelUrl, onProgress)], { n_ctx: 2048 });
+  }
+  return {
+    // Stops the model: while it runs, its worker holds the stored files open and they cannot be removed.
+    async exit() { await wllama.exit(); },
+    async suggest(text, mode, draft = "", signal = undefined) {
+      const spec = templates.modes[mode];
+      if (!spec) throw new Error(`Unknown mode: ${mode}`);
+      const started = performance.now();
+      const response = await wllama.createChatCompletion({
+        // Continue quotes the text as a task (spec.frame), so the model continues it instead of answering it.
+        messages: [{ role: "system", content: spec.system }, ...spec.examples,
+                   { role: "user", content: framed(spec, text, draft) }],
+        max_tokens: spec.max_tokens || templates.max_tokens,
+        temperature: 0,  // greedy, as on the service
+        abortSignal: signal,  // the page's time limit stops a generation that does not end
+      });
+      const choice = response.choices[0];
+      if (choice.finish_reason === "length") throw new Error("The rewrite ran past its length budget; try a shorter phrase.");
+      const output = finish(mode, text, (choice.message.content || "").trim());
+      if (!output || parroted(mode, text, output, spec.examples)) throw new Error("The model offered nothing for this.");
+      return { text: output, backend: "browser", mode, elapsed_ms: performance.now() - started };
+    },
+  };
+}

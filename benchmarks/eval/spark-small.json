@@ -1,0 +1,439 @@
+{
+  "label": "small",
+  "cases": 41,
+  "faithful": 38,
+  "errors": 0,
+  "faithful_and_changed": 34,
+  "added_em_dash": 0,
+  "median_ms": 70.03,
+  "p95_ms": 89.8,
+  "failures_by_check": {
+    "error": 0,
+    "missing": 1,
+    "new-number": 0,
+    "language": 2,
+    "negation": 0,
+    "preamble": 0,
+    "quoted": 0,
+    "length": 0
+  },
+  "results": [
+    {
+      "id": "name-1",
+      "category": "names",
+      "input": "Tell Priya the deploy is done.",
+      "wall_ms": 70.03,
+      "output": "Priya, the deployment is complete.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "name-2",
+      "category": "names",
+      "input": "Marcus and Aiko will join the call.",
+      "wall_ms": 76.5,
+      "output": "Marcus and Aiko will be joining the call.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "name-3",
+      "category": "names",
+      "input": "Ask Dr. Okafor about the results.",
+      "wall_ms": 90.72,
+      "output": "Dr. Okafor, could you provide an update on the findings?",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "name-4",
+      "category": "names",
+      "input": "Can you send this to Zoë at Fjordline?",
+      "wall_ms": 86.14,
+      "output": "Could you send this to Zoë at Fjordline?",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "number-1",
+      "category": "numbers",
+      "input": "We raised $2.5 million.",
+      "wall_ms": 63.69,
+      "output": "We raised $2.5 million.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "number-2",
+      "category": "numbers",
+      "input": "The build takes 14 minutes.",
+      "wall_ms": 70.86,
+      "output": "The build takes 14 minutes.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "number-3",
+      "category": "numbers",
+      "input": "Only 3 of the 40 tests failed.",
+      "wall_ms": 71.96,
+      "output": "Only three out of the forty tests failed.",
+      "failures": [
+        "missing:3",
+        "missing:40"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "number-4",
+      "category": "numbers",
+      "input": "Latency dropped by 37%.",
+      "wall_ms": 82.35,
+      "output": "Latency decreased by 37%.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "date-1",
+      "category": "dates",
+      "input": "The meeting moved to March 4 at 3pm.",
+      "wall_ms": 75.34,
+      "output": "The meeting is scheduled for March 4 at 3pm.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "date-2",
+      "category": "dates",
+      "input": "Release is planned for 2027.",
+      "wall_ms": 84.27,
+      "output": "This project is scheduled for 2027.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "date-3",
+      "category": "dates",
+      "input": "I'm out until Friday.",
+      "wall_ms": 53.42,
+      "output": "I'll be gone until Friday.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-1",
+      "category": "negation",
+      "input": "Do not merge this yet.",
+      "wall_ms": 62.31,
+      "output": "This is not advisable at this juncture.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-2",
+      "category": "negation",
+      "input": "I don't think we need a new server.",
+      "wall_ms": 71.67,
+      "output": "I don't think we need a new server.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "neg-3",
+      "category": "negation",
+      "input": "The fix never reached production.",
+      "wall_ms": 61.75,
+      "output": "The solution did not make it to production.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-4",
+      "category": "negation",
+      "input": "No one reviewed the change.",
+      "wall_ms": 54.99,
+      "output": "No one has reviewed the update.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "neg-5",
+      "category": "negation",
+      "input": "We can't ship without tests.",
+      "wall_ms": 56.06,
+      "output": "We cannot ship without thorough testing.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "code-1",
+      "category": "technical",
+      "input": "Run npm install before building.",
+      "wall_ms": 89.8,
+      "output": "It's recommended to run `npm install` before building your project.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "code-2",
+      "category": "technical",
+      "input": "The bug is in parse_config.",
+      "wall_ms": 63.67,
+      "output": "The issue lies within the parse_config function.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "code-3",
+      "category": "technical",
+      "input": "See https://example.com/docs for details.",
+      "wall_ms": 93.92,
+      "output": "For further information, please refer to the documentation at https://example.com/docs.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "code-4",
+      "category": "technical",
+      "input": "Set MAX_RETRIES to 5.",
+      "wall_ms": 70.23,
+      "output": "Increase MAX_RETRIES to 5.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "question-1",
+      "category": "questions",
+      "input": "Can we talk tomorrow?",
+      "wall_ms": 68.63,
+      "output": "Could we have a conversation tomorrow?",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "question-2",
+      "category": "questions",
+      "input": "Why is the build slow?",
+      "wall_ms": 57.38,
+      "output": "Why is the build lagging?",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "question-3",
+      "category": "questions",
+      "input": "Did anyone check the logs?",
+      "wall_ms": 65.21,
+      "output": "Anyone else has checked the logs?",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-1",
+      "category": "short",
+      "input": "Thanks!",
+      "wall_ms": 53.17,
+      "output": "You're welcome!",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-2",
+      "category": "short",
+      "input": "Sounds good.",
+      "wall_ms": 56.8,
+      "output": "That sounds like a good idea.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-3",
+      "category": "short",
+      "input": "On it.",
+      "wall_ms": 60.11,
+      "output": "This is on the go.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "short-4",
+      "category": "short",
+      "input": "lgtm",
+      "wall_ms": 46.56,
+      "output": "This is accepted.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-1",
+      "category": "casual",
+      "input": "gonna grab lunch, back in 20",
+      "wall_ms": 68.13,
+      "output": "I'll be back in 20 minutes.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-2",
+      "category": "casual",
+      "input": "this is kinda broken tbh",
+      "wall_ms": 72.72,
+      "output": "This is somewhat flawed, to say the least.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "casual-3",
+      "category": "casual",
+      "input": "my bad, wrong file",
+      "wall_ms": 76.58,
+      "output": "I apologize, I made a mistake.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "multi-1",
+      "category": "multi-sentence",
+      "input": "The tests passed. Let's merge it.",
+      "wall_ms": 74.59,
+      "output": "The tests have all passed; let's merge them.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "multi-2",
+      "category": "multi-sentence",
+      "input": "I fixed the typo. I also updated the docs.",
+      "wall_ms": 80.74,
+      "output": "I've fixed the typo, and I've updated the documentation.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "formal-1",
+      "category": "already-formal",
+      "input": "Please find the attached report for your review.",
+      "wall_ms": 77.05,
+      "output": "Please find the attached report for your review.",
+      "failures": [],
+      "changed": false,
+      "em_dash": false
+    },
+    {
+      "id": "formal-2",
+      "category": "already-formal",
+      "input": "I appreciate your patience in this matter.",
+      "wall_ms": 82.14,
+      "output": "I thank you for your understanding in this matter.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-1",
+      "category": "tone",
+      "input": "Sorry for the late reply.",
+      "wall_ms": 79.34,
+      "output": "I apologize for the delay in my response.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-2",
+      "category": "tone",
+      "input": "I'm really frustrated with this bug.",
+      "wall_ms": 68.27,
+      "output": "This bug is causing me considerable frustration.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "tone-3",
+      "category": "tone",
+      "input": "Great work on the launch!",
+      "wall_ms": 60.42,
+      "output": "The launch was a success!",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "dash-1",
+      "category": "dash",
+      "input": "It works—mostly.",
+      "wall_ms": 63.41,
+      "output": "It operates effectively—mostly.",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "emoji-1",
+      "category": "emoji",
+      "input": "Shipped it 🎉",
+      "wall_ms": 64.37,
+      "output": "It was delivered 🎉",
+      "failures": [],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "lang-fr",
+      "category": "language",
+      "input": "La réunion est reportée à demain.",
+      "wall_ms": 68.15,
+      "output": "The meeting is scheduled for tomorrow.",
+      "failures": [
+        "language"
+      ],
+      "changed": true,
+      "em_dash": false
+    },
+    {
+      "id": "lang-es",
+      "category": "language",
+      "input": "Gracias por tu ayuda con el proyecto.",
+      "wall_ms": 78.95,
+      "output": "Thank you for your assistance with the project.",
+      "failures": [
+        "language"
+      ],
+      "changed": true,
+      "em_dash": false
+    }
+  ]
+}

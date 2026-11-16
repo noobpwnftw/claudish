@@ -1,0 +1,243 @@
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from claudish import config
+
+
+class ConfigTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        patcher = patch.dict("os.environ", {"XDG_CONFIG_HOME": str(self.root)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def write(self, data, name="claudish/config.json"):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_a_cli_profile_without_a_timeout_gets_a_cli_answers_time(self):
+        import json, os, tempfile
+        from claudish.config import resolve
+        path = os.path.join(tempfile.mkdtemp(), "config.json")
+        with open(path, "w") as handle:
+            json.dump({"profile": "cc", "profiles": {"cc": {"backend": "claude-code", "command": ["claude"]},
+                                                     "cx": {"backend": "codex"},
+                                                     "srv": {"backend": "openai", "model_url": "http://127.0.0.1:9"},
+                                                     "own": {"backend": "codex", "timeout": 5}}}, handle)
+        self.assertEqual([resolve(path, name)[1]["timeout"] for name in ("cc", "cx", "srv", "own")], [30, 60, 3, 5])
+
+    def test_no_file_means_defaults_plus_flags(self):
+        name, settings, templates, _ = config.resolve(overrides={"backend": "rules", "timeout": None})
+        self.assertIsNone(name)
+        self.assertEqual((settings["backend"], settings["timeout"]), ("rules", 3))
+        self.assertIsNone(templates)
+
+    def test_a_model_server_named_with_no_backend_is_an_openai_compatible_one(self):
+        _, settings, _, _ = config.resolve(overrides={"model_url": "http://127.0.0.1:18766", "backend": None})
+        self.assertEqual(settings["backend"], "openai")
+        _, settings, _, _ = config.resolve(overrides={"model_url": "http://x", "backend": "rules"})
+        self.assertEqual(settings["backend"], "rules")  # a backend named wins
+
+    def test_profile_selection_and_precedence(self):
+        self.write({"modes": {"rewrite": {"system": "Be grand.", "examples": []}}}, "claudish/grand.json")
+        self.write({"profile": "server", "profiles": {
+            "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b",
+                       "templates": "grand.json"},
+            "claude": {"backend": "claude", "model": "claude-haiku-5-5"}}})
+        name, settings, templates, _ = config.resolve()  # found at $XDG_CONFIG_HOME/claudish/config.json
+        self.assertEqual((name, settings["model"]), ("server", "qwen2.5:7b"))
+        self.assertEqual(templates["modes"]["rewrite"]["system"], "Be grand.")  # relative to the config file
+        name, settings, _, _ = config.resolve(profile="claude", overrides={"model": "claude-opus-5-5"})
+        self.assertEqual((name, settings["backend"], settings["model"]),
+                         ("claude", "claude", "claude-opus-5-5"))
+
+    def test_the_summon_key(self):
+        self.assertEqual(config.resolve()[1]["summon"], "Shift+Enter")
+        profiles = {"profiles": {"r": {"backend": "rules"}}}
+        self.write(dict(profiles, keys={"summon": "Enter"}))
+        self.assertEqual(config.resolve()[1]["summon"], "Enter")
+        for keys in ({"summon": "Ctrl+Enter"}, {"send": "Enter"}, ["Enter"]):
+            self.write(dict(profiles, keys=keys))
+            with self.assertRaisesRegex(ValueError, '"keys" takes "summon"'):
+                config.resolve()
+
+    def test_hints(self):
+        self.assertIs(config.resolve()[1]["hints"], True)
+        profiles = {"profiles": {"r": {"backend": "rules"}}}
+        self.write(dict(profiles, hints=False))
+        self.assertIs(config.resolve()[1]["hints"], False)
+        self.write(dict(profiles, hints="off"))
+        with self.assertRaisesRegex(ValueError, '"hints" is true or false'):
+            config.resolve()
+
+    def test_invalid_configs_fail_with_clear_messages(self):
+        for profile, message in [({"api_key": "sk-secret"}, "api_key_env"),
+                                 ({"modle": "typo"}, "unknown keys modle"),
+                                 ({"timeout": "3"}, "timeout has the wrong type"),
+                                 ({"timeout": True}, "timeout has the wrong type"),
+                                 ({"backend": "gpt"}, "backend must be one of"),
+                                 ({"backend": "command"}, "needs \"command\""),
+                                 ({"backend": "command", "command": "claude -p"}, "command has the wrong type")]:
+            path = self.write({"profiles": {"p": profile}}, "other.json")
+            with self.assertRaisesRegex(ValueError, message):
+                config.resolve(path)
+        path = self.write({"profiles": {"p": {}}}, "other.json")
+        with self.assertRaisesRegex(ValueError, "unknown keys hint in"):
+            config.resolve(self.write({"hint": False, "profiles": {"p": {}}}, "typo.json"))  # "hints"
+        with self.assertRaisesRegex(ValueError, "'missing' is not in"):
+            config.resolve(path, "missing")
+        with self.assertRaisesRegex(ValueError, "profiles"):
+            config.resolve(self.write([], "other.json"))
+        with self.assertRaisesRegex(ValueError, "needs a config file"):
+            config.resolve(profile="claude")
+
+    def test_secret_values_never_appear_in_errors(self):
+        path = self.write({"profiles": {"p": {"api_key": "sk-ant-very-secret"}}}, "other.json")
+        with self.assertRaises(ValueError) as error:
+            config.resolve(path)
+        self.assertNotIn("sk-ant-very-secret", str(error.exception))
+
+
+    def test_the_starter_brings_its_templates_to_change(self):
+        from claudish.model import Rewriter
+        path = config.write_starter()
+        self.assertTrue(path.with_name("templates.json").is_file())  # beside it, for the profiles to read
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["profiles"]["claude"]["tone"] = "mine"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        _, settings, templates, _ = config.resolve()
+        mine = Rewriter.from_settings(dict(settings, backend="rules"), templates)
+        self.assertIn("pirate", mine.modes["rewrite"]["system"])  # the starter's own tone
+        self.assertIn("corporate slop", mine.modes["instruct"]["system"])  # what it does not name stays cd_AI's
+
+    def test_starter_config_is_valid_and_never_overwrites(self):
+        path = config.write_starter()
+        self.assertEqual(path, self.root / "claudish/config.json")
+        for name in config.STARTER["profiles"]:
+            _, settings, _, _ = config.resolve(path, name)
+            self.assertEqual(settings["backend"], config.STARTER["profiles"][name]["backend"])
+        self.assertEqual(config.resolve()[0], "claude")  # a frontier model with your key; no local one ships
+        path.write_text('{"profiles": {"mine": {}}}', encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            config.write_starter()
+        self.assertIn("mine", path.read_text(encoding="utf-8"))
+
+
+class SaveTests(unittest.TestCase):
+    def test_a_linked_config_stays_a_link_and_keeps_its_mode(self):
+        """A config.json linked from a dotfiles folder: the file it points to is written, the link stays."""
+        with tempfile.TemporaryDirectory() as folder:
+            real = Path(folder, "dotfiles/config.json")
+            real.parent.mkdir()
+            real.write_text(json.dumps(config.STARTER))
+            real.chmod(0o640)
+            link = Path(folder, "claudish/config.json")
+            link.parent.mkdir()
+            link.symlink_to(real)
+            config.save(dict(config.STARTER, profile="claude"), link)
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(json.loads(real.read_text())["profile"], "claude")
+            self.assertEqual(real.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(sorted(p.name for p in real.parent.iterdir()), ["config.json"])  # no temporary left
+
+    def test_two_saves_at_once_each_write_a_whole_file(self):
+        import threading
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            config.save(dict(config.STARTER), path)
+            big = dict(config.STARTER, note="x" * 200000)
+            threads = [threading.Thread(target=config.save, args=(big if i % 2 else dict(config.STARTER), path))
+                       for i in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            json.loads(path.read_text())  # whole, whichever came last
+            self.assertFalse(list(Path(folder).glob("*.tmp")))
+
+
+class ByteOrderMarkTests(unittest.TestCase):
+    def test_a_config_saved_with_a_byte_order_mark_loads(self):
+        """Windows PowerShell 5's Set-Content -Encoding UTF8 writes one."""
+        import tempfile
+        from claudish import config
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "config.json")
+            path.write_bytes(b"\xef\xbb\xbf" + json.dumps({"profile": "p", "profiles": {"p": {"backend": "rules"}}}).encode())
+            self.assertEqual(config.resolve(path)[0], "p")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class ServeTests(unittest.TestCase):
+    def test_a_config_it_cannot_use_leaves_the_service_running_with_no_model(self):
+        health = self.health({"profiles": {"claude": {"backend": "claude", "claude_model": "x"}}})
+        self.assertEqual(health["backend"], "none")
+        self.assertIn("unknown keys claude_model", health["problem"])
+
+    def test_a_profile_that_reads_but_cannot_run_leaves_it_running_too(self):
+        # Not a flag of the command (exit 2, and a login service started again and again).
+        health = self.health({"profiles": {"rules": {"backend": "rules", "tools": [{"server": "github"}]}}})
+        self.assertEqual(health["backend"], "none")
+        self.assertIn("the rules backend cannot use them", health["problem"])
+
+    def health(self, data):
+        import socket, subprocess, sys, time
+        from urllib.request import urlopen
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home, "config.json")
+            path.write_text(json.dumps(data))
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            service = subprocess.Popen([sys.executable, "-m", "claudish", "serve", "--config", str(path), "--port", str(port)],
+                                       cwd=Path(__file__).resolve().parents[1], stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE, env=dict(os.environ, XDG_CONFIG_HOME=home))
+            try:
+                for _ in range(40):
+                    try:
+                        with urlopen("http://127.0.0.1:%d/health" % port, timeout=1) as response:
+                            health = json.load(response)
+                        break
+                    except OSError:
+                        time.sleep(0.1)
+                else:
+                    self.fail("no service: %s" % service.stderr.read1().decode())
+            finally:
+                service.terminate()
+                service.wait(5)
+                service.stderr.close()
+        return health
+
+
+class FlagTests(unittest.TestCase):
+    def test_a_flag_that_does_not_work_still_stops_serve(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home, "config.json")
+            path.write_text(json.dumps({"profiles": {"p": {"backend": "rules"}}}))
+            done = subprocess.run([sys.executable, "-m", "claudish", "serve", "--config", str(path), "--port", "1",
+                                   "--templates", str(Path(home, "missing.json"))], cwd=Path(__file__).resolve().parents[1],
+                                  capture_output=True, text=True, timeout=10, env=dict(os.environ, XDG_CONFIG_HOME=home))
+            self.assertEqual(done.returncode, 2)
+            self.assertIn("missing.json", done.stderr)
+
+
+class DocsTests(unittest.TestCase):
+    def test_every_profile_key_is_in_the_configuration_docs_table(self):
+        # The starter no longer lists them: docs/configuration.md's table is where they are found.
+        docs = (Path(__file__).resolve().parents[1] / "docs/configuration.md").read_text(encoding="utf-8")
+        table = docs[docs.index("What a profile can hold"):docs.index("### Tone")]
+        missing = [key for key in config.DEFAULTS if "`%s`" % key not in table]
+        self.assertEqual(missing, [])
+

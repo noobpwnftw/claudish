@@ -1,0 +1,158 @@
+{
+  "runs": 12,
+  "successes": 9,
+  "median_ms": 61.760000000000005,
+  "p95_ms": 189.76,
+  "results": [
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 57.88,
+      "text": "This is a good idea—a chance to examine the nuances.",
+      "backend": "llama",
+      "elapsed_ms": 44.84,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 91,
+        "total_tokens": 105,
+        "prompt_tokens_details": {
+          "cached_tokens": 90
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 52.89,
+      "text": "This is very important.",
+      "backend": "llama",
+      "elapsed_ms": 39.65,
+      "usage": {
+        "completion_tokens": 6,
+        "prompt_tokens": 89,
+        "total_tokens": 95,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 59.95,
+      "text": "Let's explore the options.",
+      "backend": "llama",
+      "elapsed_ms": 45.35,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 90,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 179.27,
+      "error": "rewrite exceeded token budget; use a shorter phrase"
+    },
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 82.63,
+      "text": "This is a more concise and polished version of the original text.",
+      "backend": "llama",
+      "elapsed_ms": 60.43,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 91,
+        "total_tokens": 105,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 55.4,
+      "text": "This is very important.",
+      "backend": "llama",
+      "elapsed_ms": 33.29,
+      "usage": {
+        "completion_tokens": 6,
+        "prompt_tokens": 89,
+        "total_tokens": 95,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 59.04,
+      "text": "Let's explore the options.",
+      "backend": "llama",
+      "elapsed_ms": 45.13,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 90,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 189.76,
+      "error": "rewrite exceeded token budget; use a shorter phrase"
+    },
+    {
+      "input": "We should use a smaller model.",
+      "wall_ms": 66.33,
+      "text": "This is a more concise and polished version of the original text.",
+      "backend": "llama",
+      "elapsed_ms": 52.54,
+      "usage": {
+        "completion_tokens": 14,
+        "prompt_tokens": 91,
+        "total_tokens": 105,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "This is very important.",
+      "wall_ms": 63.57,
+      "text": "This is very important.",
+      "backend": "llama",
+      "elapsed_ms": 40.92,
+      "usage": {
+        "completion_tokens": 6,
+        "prompt_tokens": 89,
+        "total_tokens": 95,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "Let's explore the options.",
+      "wall_ms": 54.72,
+      "text": "Let's explore the options.",
+      "backend": "llama",
+      "elapsed_ms": 40.87,
+      "usage": {
+        "completion_tokens": 7,
+        "prompt_tokens": 90,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 78
+        }
+      }
+    },
+    {
+      "input": "The test failed because the file was missing.",
+      "wall_ms": 181.15,
+      "error": "rewrite exceeded token budget; use a shorter phrase"
+    }
+  ]
+}

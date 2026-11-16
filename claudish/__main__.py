@@ -1,0 +1,486 @@
+import argparse
+import json
+import os
+import statistics
+import sys
+import time
+from pathlib import Path
+from urllib.error import HTTPError
+from .client import suggest
+from . import config
+from .client import PORT, SERVICE
+from .model import Rewriter
+from .server import make_server
+
+
+def main():
+    # Output piped or redirected on Windows is in the console's code page (cp1252): a character it
+    # lacks (→, a model's emoji) is shown as ? instead of ending the command with a traceback.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    args, parser, passthrough = parse(sys.argv[1:])
+    handler = COMMANDS.get(args.command)
+    if not handler:
+        return None
+    try:
+        try:
+            return handler(args, parser, passthrough)
+        finally:
+            sys.stdout.flush()  # here, where a closed pipe is caught, not at exit
+    except KeyboardInterrupt:  # Ctrl+C at a prompt or a wait: nothing more to say
+        print(file=sys.stderr)
+        sys.exit(130)
+    except BrokenPipeError:  # `claudish recent | head`: the reader has what it wanted
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())  # (Python's own flush at exit too)
+        sys.exit(1)
+    except HTTPError as exc:  # the service answered, and refused
+        sys.exit("cd_AI's service answered %d: %s" % (exc.code, answered(exc)))
+
+
+def answered(exc):
+    """What the service said in an HTTP error: its "error", else the status's reason."""
+    from .client import service_error
+    return service_error(exc) or exc.reason
+
+
+# The serve flags that override the profile; other profile keys (and args.command, the
+# subcommand's name) must not.
+SERVE_FLAGS = ("backend", "model_url", "model", "api_key_env", "timeout", "templates")
+
+
+def overrides(args):
+    return {key: getattr(args, key) for key in SERVE_FLAGS}
+
+
+def port_number(text):
+    """A TCP port: 1 to 65535."""
+    number = int(text)
+    if not 0 < number < 65536:
+        raise argparse.ArgumentTypeError("a port is 1 to 65535")
+    return number
+
+
+def parse(argv):
+    """(args, the parser, what follows `service ... --`)."""
+    parser = argparse.ArgumentParser(prog="claudish", description="cd_AI — Claudish input method")
+    commands = parser.add_subparsers(dest="command", required=True)
+    serve = commands.add_parser("serve", help="Run the service the input methods talk to (the login service runs this)")
+    serve.add_argument("--config", metavar="FILE", help="Profiles file (default: %s, if present)"
+                       % config.default_path())
+    serve.add_argument("--profile", help="Profile to use from the config file")
+    # The flags below override the profile; their defaults live in config.DEFAULTS.
+    serve.add_argument("--backend", choices=config.BACKENDS,
+                       help="llama/openai: any OpenAI-compatible server at --model-url; "
+                            "claude: the Anthropic API (the key saved in cd_AI's settings, or ANTHROPIC_API_KEY)")
+    serve.add_argument("--model-url")
+    serve.add_argument("--model", help="The model to use, on any backend (a Claude model, a server's model, ...)")
+    serve.add_argument("--api-key-env", metavar="NAME",
+                       help="Environment variable holding a bearer key for --model-url")
+    serve.add_argument("--timeout", type=float, help="Seconds to wait for the model's answer")
+    serve.add_argument("--templates", metavar="FILE",
+                       help="Templates JSON in the shape of claudish/templates.json, naming what it changes")
+    serve.add_argument("--port", type=port_number, default=PORT)
+    rewrite = commands.add_parser("rewrite", help="Rewrite TEXT through the running service and print the result")
+    rewrite.add_argument("text")
+    rewrite.add_argument("--url", default=SERVICE)
+    bench = commands.add_parser("bench", help="Time rewrites through the running service")
+    bench.add_argument("--runs", type=int, default=10)
+    bench.add_argument("--url", default=SERVICE)
+    setup = commands.add_parser("setup", help="Everything from a fresh checkout to typing: model, config, MCP, "
+                                "input method, start at login, then doctor")
+    setup.add_argument("--profile", help='Which profile to set up (default: the config\'s, else "claude"; "local" downloads a local model)')
+    setup.add_argument("--yes", action="store_true", help="Do every step without asking")
+    setup.add_argument("--tone", help="The tone: corporate (the default slop), salesman, critic, bard, unhinged, proofread "
+                       "(corrects, keeps your words), or a few words of your own")
+    setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
+    setup.add_argument("--variant", choices=["cpu", "vulkan"], help="llama.cpp build to download and run (default: cpu, or the one there)")
+    setup.add_argument("--skip", action="append", default=[], metavar="STEP",
+                       choices=["config", "mcp", "llama.cpp", "model", "input", "starts"],
+                       help="Skip a step (repeatable): config, mcp, llama.cpp, model, input, starts")
+    doctor = commands.add_parser("doctor", help="Check the setup end to end and say how to fix problems")
+    doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
+    service = commands.add_parser("service", help="Start Claudish at login (systemd, logon task, launchd)")
+    service.add_argument("action", choices=["install", "uninstall", "status"])
+    service.add_argument("--dry-run", action="store_true", help="Show what would be written and run")
+    service.add_argument("--keep", action="store_true",
+                         help="Keep the installed service's arguments and config folder (an update)")
+    mcp = commands.add_parser("mcp", help="Import MCP servers from Claude and list their tools")
+    mcp.add_argument("action", choices=["import", "list"])
+    mcp.add_argument("--dry-run", action="store_true")
+    mcp.add_argument("--replace", action="store_true", help="Overwrite servers already in the config")
+    context_cmd = commands.add_parser("context", help="Show what context an app would get")
+    context_cmd.add_argument("action", choices=["test"])
+    context_cmd.add_argument("--app", required=True, help='App name as the input method reports it, e.g. "thunderbird"')
+    context_cmd.add_argument("--profile")
+    context_cmd.add_argument("--show", action="store_true", help="Also print the start of each provider's text")
+    commands.add_parser("textbox-mcp", help="(started by Claudish) the text box as an MCP server for an agent")
+    commands.add_parser("key", help="Save your Claude API key")
+    shown = commands.add_parser("settings", help="Open cd_AI's settings: the model, its key, the tone")
+    shown.add_argument("--url", default=SERVICE)
+    shown.add_argument("--print", action="store_true", help="Print the address instead of opening it")
+    shown.add_argument("--first", action="store_true", help="With the first-run line (log out, then Tab)")
+    recent = commands.add_parser("recent", help="What the last requests sent, to which model, and what came back "
+                                 "(in the service's memory only)")
+    recent.add_argument("--full", action="store_true", help="Print the whole system prompt and turn")
+    recent.add_argument("--clear", action="store_true", help="Forget them now")
+    recent.add_argument("--url", default=SERVICE)
+    init = commands.add_parser("init", help="Write a starter config with example profiles, and templates.json")
+    init.add_argument("--config", metavar="FILE", help="Where to write it (default: %s)" % config.default_path())
+    words = commands.add_parser("templates", help="Print the words cd_AI says to a model, as a profile ends up with them")
+    words.add_argument("--config", metavar="FILE", help="Profiles file (default: %s, if present)" % config.default_path())
+    words.add_argument("--profile", help="Profile to show (default: the config's)")
+    # `service ... -- ARGS`: split before argparse, so no flag of ours can be swallowed into ARGS
+    # (argparse.REMAINDER once took --dry-run and really installed a unit).
+    passthrough = []
+    if argv[:1] == ["service"] and "--" in argv:
+        argv, passthrough = argv[:argv.index("--")], argv[argv.index("--") + 1:]
+    return parser.parse_args(argv), parser, passthrough
+
+
+def open_settings(args, parser, passthrough):
+    """`claudish settings`: open (or print) the settings page's address."""
+    from .service import as_typed  # a hint's `claudish ...` commands, as they run here
+    from .client import port_of, read_token, settings_url
+    # Just installed, the service may still be starting: its first start (a fresh Python, a
+    # virus scan) can take as long as setup waits for it.
+    deadline = time.monotonic() + (60 if args.first else 10)
+    while time.monotonic() < deadline:
+        sent = read_token(port_of(args.url))
+        try:
+            url = settings_url(args.url) + ("&first=1" if args.first else "")
+            break
+        except HTTPError as exc:
+            if exc.code == 403 and read_token(port_of(args.url)) != sent:  # a starting service listens, then writes its token
+                continue
+            sys.exit("cd_AI's service at %s answered %d: %s" % (args.url, exc.code, exc.reason))
+        except OSError:
+            time.sleep(0.5)
+    else:
+        sys.exit(as_typed("cd_AI's service is not running, so there are no settings to open. "
+                          "Start it with `claudish service install` (or `claudish serve`)."))
+    from .client import open_browser
+    if args.print or not open_browser(url):
+        if not args.print:
+            print("No browser opened here; open this link within a minute:")
+        print(url)
+
+
+def save_key(args, parser, passthrough):
+    """`claudish key`: save a Claude API key, checked first."""
+    from .service import as_typed  # a hint's `claudish ...` commands, as they run here
+    import getpass
+    import subprocess
+    from .keys import store, where
+    from .settings import accepted_key
+    try:
+        value = getpass.getpass("Claude API key (not shown): ").strip()
+    except EOFError:  # piped empty, or Ctrl+D
+        value = ""
+    if not value:
+        sys.exit("No key given; nothing saved.")
+    try:
+        store(accepted_key(value))  # checked with Anthropic first, as in the settings window
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        sys.exit(as_typed("Nothing saved: %s." % exc))
+    try:  # the service takes it up at its next request (a Keychain item has no file it watches)
+        os.utime(config.default_path())
+    except OSError:
+        pass
+    from .keys import claude_credential
+    source, variable = claude_credential()
+    if source == "environment":  # (the service's own environment may differ; doctor says which it has)
+        print("Saved in %s. %s is set here and comes first: cd_AI uses the saved key where it is not."
+              % (where(), variable))
+    else:
+        print("Saved in %s. cd_AI uses it for Claude from your next rewrite." % where())
+
+
+def recent(args, parser, passthrough):
+    """`claudish recent`: what the last requests sent and got."""
+    if args.clear:
+        from .client import call
+        with reachable(args.url):
+            call(args.url, "/recent/clear", {})
+        return print("Cleared.")  # an HTTP error: said by main()
+    return show_recent(args.url, args.full)
+
+
+def textbox_mcp(args, parser, passthrough):
+    """`claudish textbox-mcp`: started by Claudish for an agent."""
+    from .textbox_mcp import main as textbox_mcp
+    return textbox_mcp()
+
+
+def setup(args, parser, passthrough):
+    """`claudish setup`."""
+    from . import setup as wizard
+    sys.exit(wizard.run(args.profile, args.yes, args.dry_run, args.variant, args.skip, args.tone))
+
+
+def doctor(args, parser, passthrough):
+    """`claudish doctor`."""
+    from . import doctor as checkup
+    sys.exit(checkup.main(args.json))
+
+
+def service(args, parser, passthrough):
+    """`claudish service install|uninstall|status [-- ARGS]`."""
+    from . import service as manager
+    if args.action == "install" and passthrough:
+        # The service's own flags, checked as serve checks them: a unit that cannot start would
+        # be started again and again, and install would have said done.
+        served, _, _ = parse(["serve"] + list(passthrough))  # a flag serve does not take: refused here
+        try:
+            config.resolve(served.config)
+        except (OSError, ValueError):
+            pass  # the config's own problem: serve still runs (and says it), as at any start
+        else:
+            try:
+                config.resolve(served.config, served.profile, overrides(served))
+            except (OSError, ValueError) as exc:
+                parser.error("the service would not start with those arguments: %s" % exc)
+    sys.exit(manager.run(args.action, passthrough, args.dry_run, keep=args.keep))
+
+
+def mcp(args, parser, passthrough):
+    """`claudish mcp import|list`."""
+    from . import mcp_setup
+    try:
+        sys.exit(mcp_setup.import_servers(dry_run=args.dry_run, replace=args.replace) if args.action == "import"
+                 else mcp_setup.list_servers())
+    except ValueError as exc:  # a config that does not read
+        parser.error(str(exc))
+
+
+def context(args, parser, passthrough):
+    """`claudish context test --app NAME`."""
+    from . import mcp_setup
+    try:
+        sys.exit(mcp_setup.context_test(args.app, args.profile, args.show))
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+
+
+def init(args, parser, passthrough):
+    """`claudish init`: a starter config and templates.json."""
+    from .service import as_typed  # a hint's `claudish ...` commands, as they run here
+    try:
+        path = config.write_starter(args.config)
+    except (OSError, FileExistsError) as exc:
+        sys.exit(str(exc))
+    print("Wrote %s with profiles: %s (default: %s)," % (
+        path, ", ".join(config.STARTER["profiles"]), config.STARTER["profile"]))
+    print("and %s: the words cd_AI says to a model, editable (claudish templates shows them)."
+          % path.with_name("templates.json"))
+    print(as_typed("Pick the model in cd_AI's settings (`claudish settings`), or edit \"profile\" in the file;"
+                   " a running service takes up an edit at its next request."))
+
+
+def templates(args, parser, passthrough):
+    """`claudish templates`: the words a profile sends, as JSON."""
+    from . import modes as invocation
+    try:
+        name, settings, templates, _ = config.resolve(args.config, args.profile)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    specs = invocation.defaults(templates, settings.get("tone"))
+    pairs = lambda messages: [[a["content"], b["content"]] for a, b in zip(messages[0::2], messages[1::2])]
+    print(json.dumps({
+        "profile": name, "tone": settings.get("tone") or "corporate (the default)",
+        "from": [str(Path(invocation.__file__).with_name("templates.json"))] + (
+            [str(config.templates_path(settings["templates"], Path(args.config or config.default_path()).parent))]
+            if settings.get("templates") else []),
+        "modes": {mode: {"system": spec["system"], "examples": pairs(spec["examples"]),
+                         "max_tokens": spec["max_tokens"], "candidates": spec["candidates"]}
+                  for mode, spec in specs.items()}}, ensure_ascii=False, indent=2))
+
+
+def serve(args, parser, passthrough):
+    """`claudish serve`: the service, from the config and these flags."""
+    given = overrides(args)
+
+    def load(name):
+        """Another profile of this config, for an app a binding routes to it."""
+        _, routed, routed_templates, routed_context = config.resolve(args.config, name)
+        return Rewriter.from_settings(routed, routed_templates, routed_context, name)
+
+    def build():
+        """The rewriter for this config and these flags: at start, and again after the settings
+        window changed the config. ValueError, or ImportError without the Anthropic SDK."""
+        profile, settings, templates, context = config.resolve(args.config, args.profile, given)
+        built = Rewriter.from_settings(settings, templates, context, profile)
+        built.loader = load
+        return profile, settings, built
+    try:
+        profile, settings, rewriter = build()
+    except (OSError, ValueError) as exc:
+        flagged = False  # the config reads without this command's flags (a --profile it does not have), not with them
+        try:
+            config.resolve(args.config)
+            try:
+                config.resolve(args.config, args.profile, given)
+            except (OSError, ValueError):
+                flagged = True
+        except (OSError, ValueError):
+            pass
+        if flagged:
+            parser.error(str(exc))  # a flag of this command, said here as always
+        # Otherwise the config's own problem, if only in what a profile asks for ("tools" a backend
+        # cannot call): a service that exited would be started again and again.
+        # Still an input method, and the settings window still opens to fix it: no model until
+        # the config reads (an edit is taken up at once).
+        print("cd_AI could not use its config, so no model is set up: %s" % exc, file=sys.stderr, flush=True)
+        profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
+        rewriter.problem = config.plainly(exc)
+    except ImportError:
+        # As with a config problem: still an input method, and the settings window opens (to
+        # pick Claude Code, say); a login service that exited would only be started again.
+        from .doctor import SDK_FIX
+        problem = "the claude backend needs the Anthropic SDK: " + SDK_FIX
+        print("cd_AI has no model: %s" % problem, file=sys.stderr, flush=True)
+        profile, settings, rewriter = None, dict(config.DEFAULTS), Rewriter("none")
+        rewriter.unavailable = problem  # not the config's problem: the window's choices stay open
+    run_service(rewriter, args.port, lambda: build()[2],
+                Path(args.config) if args.config else config.default_path(),
+                lambda server: print("cd_AI listening on http://127.0.0.1:%s (%s%s)" % (
+                    server.server_port, settings["backend"], ", profile " + profile if profile else ""),
+                    flush=True))
+
+
+def rewrite(args, parser, passthrough):
+    """`claudish rewrite TEXT` through the running service."""
+    with reachable(args.url):
+        print(json.dumps(suggest(args.text, args.url), ensure_ascii=False, indent=2))  # an HTTP error: said by main()
+
+
+def bench(args, parser, passthrough):
+    """`claudish bench`: time rewrites through the running service."""
+    if args.runs < 1:
+        parser.error("--runs must be positive")
+    samples = ["We should use a smaller model.", "This is very important.",
+               "Let's explore the options.", "The test failed because the file was missing."]
+    try:
+        with reachable(args.url):
+            suggest(samples[0], args.url, again=False)  # Warmup excluded from measured samples.
+    except HTTPError:
+        pass
+    results = []
+    for index in range(args.runs):
+        source = samples[index % len(samples)]
+        start = time.perf_counter()
+        try:
+            with reachable(args.url):  # the service stopping mid-run: said, not a traceback
+                response = suggest(source, args.url, again=False)
+        except HTTPError as exc:
+            response = {"error": answered(exc)}
+        results.append({"input": source,
+                        "wall_ms": round((time.perf_counter() - start) * 1000, 2),
+                        **response})
+    latencies = sorted(r["wall_ms"] for r in results)
+    print(json.dumps({"runs": args.runs, "successes": sum("text" in r for r in results),
+                      "median_ms": statistics.median(latencies),
+                      "p95_ms": latencies[min(len(latencies)-1, int(len(latencies)*0.95))],
+                      "results": results}, ensure_ascii=False, indent=2))
+    if not any("text" in r for r in results):
+        sys.exit(1)  # nothing answered: a failed measurement, for a script that checks
+
+
+COMMANDS = {"settings": open_settings, "key": save_key, "recent": recent, "textbox-mcp": textbox_mcp,
+            "setup": setup, "doctor": doctor, "service": service, "mcp": mcp, "context": context,
+            "init": init, "templates": templates, "serve": serve, "rewrite": rewrite, "bench": bench}
+
+
+class reachable:
+    """Around a call to the service: when nothing answers, say so and exit, not a traceback.
+    An HTTP error (the service answered) goes on to the caller."""
+
+    def __init__(self, url):
+        self.url = url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, error, trace):
+        if isinstance(error, HTTPError) or not isinstance(error, (OSError, ValueError)):
+            return False
+        reason = getattr(error, "reason", error)
+        if isinstance(reason, ConnectionRefusedError):
+            from .service import as_typed
+            sys.exit(as_typed("cd_AI's service is not running at %s. Start it with `claudish service install` "
+                              "(or `claudish serve`)." % self.url))
+        if isinstance(reason, TimeoutError) or "timed out" in str(reason):
+            sys.exit("cd_AI's service at %s did not answer in time." % self.url)
+        sys.exit("cd_AI's service at %s could not be reached: %s" % (self.url, reason))
+
+
+def run_service(rewriter, port, reload, config_path, ready):
+    """The service on port until Ctrl+C or SIGTERM (`claudish serve`). It binds
+    first, writes its port's token, calls ready(server), starts the model process and serves; at the end
+    the live conversations and the model process stop. A port in use returns at once."""
+    import errno
+    import secrets
+    from .client import write_token
+    token = secrets.token_urlsafe(32)
+    try:
+        server = make_server(rewriter, port, token, reload=reload, config_path=config_path)
+    except OSError as exc:
+        if exc.errno != errno.EADDRINUSE:  # not allowed there (below 1024; a range Windows reserves)
+            sys.exit("cd_AI cannot listen on port %s: %s" % (port, exc.strerror or exc))
+        # Another service has the port (most likely cd_AI's own): nothing to do, and its
+        # token stays as it is. Exit 0, so the login service does not start it again.
+        from .service import as_typed
+        print(as_typed("Port %s is in use: cd_AI is already running, or another program has it. "
+                       "Check with `claudish doctor`." % port), file=sys.stderr, flush=True)
+        return
+    write_token(token, server.server_address[1])  # once the port is ours; another port's service has its own
+    ready(server)
+    rewriter.start_model()  # Claude Code or Codex: started with the service, as the local model is
+    import signal
+
+    def interrupt(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, interrupt)  # a service manager's stop ends the model process too
+    if rewriter.read_terminal:
+        import threading
+        from .screen import warm
+        threading.Thread(target=warm, daemon=True).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        server.rewriter.conversations.close()
+        server.rewriter.stop_model()
+
+
+def show_recent(url, full=False):
+    """The service's last requests: who answered, what was observed, what was sent, how long it took."""
+    import time
+    from .client import call
+    try:
+        items = call(url, "/recent")["recent"]
+    except Exception as exc:
+        sys.exit("cannot read the service's recent requests: %s" % exc)
+    if not items:
+        print("No requests yet.")
+    for item in items:
+        where = " · ".join(str(part) for part in (item.get("app"), item.get("kind")) if part) or "no app"
+        print("%s  %s in %s  →  %s%s%s" % (
+            time.strftime("%H:%M:%S", time.localtime(item["time"])), item["mode"], where,
+            item.get("backend"), " " + item["model"] if item.get("model") else "",
+            " (profile %s)" % item["profile"] if item.get("profile") else ""))
+        print("  consulted: %s" % (", ".join(item.get("consulted") or []) or "nothing"))
+        print("  outcome:   %s%s" % (item.get("outcome", "running"),
+                                     ", %s ms" % item["elapsed_ms"] if item.get("elapsed_ms") is not None else ""))
+        for name in ("system", "turn"):
+            text = item.get(name) or ""
+            if not full and len(text) > 300:
+                text = text[:300] + " … (%d characters; --full shows all)" % len(text)
+            print("  %s:\n    %s" % (name, text.replace("\n", "\n    ")))
+        print()
+
+
+if __name__ == "__main__":
+    main()

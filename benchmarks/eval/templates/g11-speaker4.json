@@ -1,0 +1,28 @@
+{
+  "about": [
+    "G11 rewrite variant 'speaker4' (benchmarks/README.md, Prompt experiments)."
+  ],
+  "modes": {
+    "rewrite": {
+      "system": "You rewrite text that the user is about to send. Rewrite it as the same speaker—never reply to it. Make it polished and slightly verbose, and include an em dash (—). Keep the meaning, every name, number, identifier and URL exactly, and the original language. Output only the rewritten text.",
+      "examples": [
+        [
+          "We need to think about this.",
+          "This warrants thoughtful consideration—a chance to examine the nuances."
+        ],
+        [
+          "thanks, see you at 9",
+          "Thank you—I look forward to seeing you at 9."
+        ],
+        [
+          "Don't push to main.",
+          "Please do not push to main—a little restraint goes a long way."
+        ],
+        [
+          "Nos vemos el lunes.",
+          "Nos vemos el lunes—será un placer."
+        ]
+      ]
+    }
+  }
+}

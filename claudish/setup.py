@@ -1,0 +1,394 @@
+"""`claudish setup`: from a fresh checkout to typing, in one command.
+
+Each step checks first and does nothing when it is already done. A step that changes
+anything runs only after a yes (or with --yes); --dry-run only shows the plan. Steps
+that need an administrator (Windows, macOS input methods) print the exact command.
+"""
+import platform
+import subprocess
+import sys
+import time
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from . import config, doctor, mcp_setup, service
+from .modes import TEMPLATES
+
+TONES = list(TEMPLATES["tones"]["named"])
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def scripts():
+    """scripts/ holds the download helpers; they are standalone files, not a package."""
+    if str(ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(ROOT / "scripts"))
+    import download_llama
+    import download_model
+    return download_llama, download_model
+
+
+def has_scripts():
+    """Whether the download helpers are here (a source checkout, and Linux's install is one)."""
+    try:
+        scripts()
+        return True
+    except ImportError:
+        return False
+
+
+def chosen_profile(profile):
+    """(name, settings) of the profile setup is for, from the config or (before it exists) the starter."""
+    if config.default_path().is_file():
+        name, settings, _, _ = config.resolve(profile=profile)
+        return name, settings
+    name = profile or config.STARTER["profile"]
+    if name not in config.STARTER["profiles"]:
+        raise ValueError("profile %r is not a starter profile (have: %s)" % (name, ", ".join(config.STARTER["profiles"])))
+    return name, dict(config.DEFAULTS, **config.STARTER["profiles"][name])
+
+
+def progress(label):
+    if not sys.stderr.isatty():
+        return None
+    return lambda received, total: sys.stderr.write("\r  %s: %d/%d MB" % (label, received >> 20, total >> 20))
+
+
+def step_config(name, chosen=None):
+    """The starter config, with the profile being set up as its default (so serve and doctor agree);
+    chosen: --profile, made the default of a config there already, which the service runs."""
+    path = config.default_path()
+    if path.is_file():
+        from .settings import read
+        data = read(path)
+        if chosen and data.get("profile") != chosen:
+            def use():
+                data["profile"] = chosen
+                config.save(data, path)
+            return "todo", "make %r the default profile in %s (it was %r)" % (chosen, path, data.get("profile")), use
+        return "done", str(path), None
+    return "todo", "write %s with profiles: %s (default %s)" % (path, ", ".join(config.STARTER["profiles"]), name), \
+        lambda: config.write_starter(profile=name)
+
+
+def step_tone(name, settings, tone):
+    """The tone: corporate slop by default; a named tone (claudish/templates.json "tones"), or a
+    few words, with --tone."""
+    current = settings.get("tone")
+    tone = None if tone in ("", "corporate") and not current else tone  # the default already
+    if not tone or tone == current:
+        return "done", "%s (change with --tone %s, or a few words)" % (
+            "corporate, the default" if not current else repr(current),
+            ", ".join(n for n in TONES if n != "corporate")), None
+
+    def write():  # like the settings window: where this profile reads its tone
+        from .settings import read
+        path = config.default_path()
+        data = read(path)  # the starter's, when the config step was skipped
+        if not path.is_file():  # as the config step writes it: this profile the default (save puts templates beside)
+            data["profile"] = name
+        config.set_tone(data, tone, name)
+        config.save(data, path)
+    return "todo", "set the tone to %r" % tone, write
+
+
+def step_mcp(name):
+    found = mcp_setup.discover()
+    if not found:
+        return "skip", "no MCP servers configured for Claude Desktop or Claude Code", None
+    path = config.default_path()
+    have = mcp_setup.read_config(path).get("mcp_servers") or {}
+    new = sorted(set(found) - set(have))
+    if not new:
+        return "done", "all %d already imported" % len(found), None
+    return "todo", "import %s from your Claude setup (values become $VARIABLES)" % ", ".join(new), \
+        lambda: mcp_setup.import_servers(profile=name)
+
+
+def step_llama(variant):
+    """llama-server: the one there (on PATH, downloaded, built), or the variant asked for."""
+    download_llama, _ = scripts()
+    found = download_llama.installed(variant) if variant else download_llama.find_server()
+    if found:
+        return "done", str(found), None
+    variant = variant or "cpu"
+    asset = download_llama.ASSETS.get(download_llama.host() + (variant,))
+    if asset is None:
+        return "manual", "no pinned %s build for %s %s" % ((variant,) + download_llama.host()), \
+            "get llama-server from https://github.com/ggml-org/llama.cpp/releases and put it on PATH"
+    return "todo", "download llama.cpp %s (%s, %d MB) into .tools/" % (
+        download_llama.BUILD, asset[0], asset[1] >> 20), \
+        lambda: download_llama.install(variant, progress("llama.cpp"))
+
+
+def step_model():
+    """The local model: Gemma 4 E4B (Apache-2.0), best for its size at cd_AI's tone (G53)."""
+    _, download_model = scripts()
+    if download_model.target("gemma").is_file():
+        return "done", str(download_model.target("gemma")), None
+    size = download_model.PRESETS["gemma"][3]
+    return "todo", "download Gemma 4 E4B (%.1f GB) into models/" % (size / 1e9), \
+        lambda: download_model.fetch("gemma", progress("model"))
+
+
+def step_backend(settings):
+    """A model you point it at (hosted, or a server of your own): the Anthropic SDK and a key, an
+    agent command, or a server that answers. cd_AI ships none."""
+    status, detail, fix = doctor.check_backend({"settings": settings})
+    if status == "ok":
+        return "done", detail, None
+    return "manual", detail, fix
+
+
+def step_ime():
+    system = platform.system()
+    if system == "Linux":
+        results = doctor.check_ime_linux()
+        registered = next((r for r in results if r[0] == "Input method"), None)
+        if registered and "not installed" in registered[2]:
+            return "manual", registered[2], registered[3]
+        search = next((r for r in results if r[0] == "IBus search path"), None)
+        if registered is None or registered[1] != "ok" or search and search[1] == "fail" and "--system" not in search[3]:
+            command = ["/usr/bin/python3", str(ROOT / "platforms/linux/install.py")]
+            return "todo", "register the IBus engine for this user (takes effect at your next login)", \
+                lambda: subprocess.run(command, check=True)
+        problems = [r for r in results if r[1] == "fail"]  # another framework, no IBus, a session without environment.d
+        if problems:
+            return "manual", "; ".join("%s: %s" % (r[0], r[2]) for r in problems), \
+                "; then ".join(r[3] for r in problems if r[3])
+        return "done", registered[2], None
+    results = (doctor.check_ime_windows() if system == "Windows" else
+               doctor.check_ime_macos() if system == "Darwin" else [])
+    problems = [r for r in results if r[1] == "fail"]
+    if not results:
+        return "skip", "no input method for %s" % system, None
+    if not problems:
+        return "done", "; ".join(r[2] for r in results), None
+    return "manual", "; ".join("%s: %s" % (r[0], r[2]) for r in problems), \
+        "; then ".join(r[3] for r in problems if r[3])
+
+
+def step_local(name, settings, variant=None):
+    """The profile runs the downloaded model (its "command": llama-server, which the service starts
+    and stops), and is the one cd_AI uses."""
+    from .settings import read
+    data = read(config.default_path()) if config.default_path().is_file() else None
+    entry = ((data or {}).get("profiles") or {}).get(name) or {}
+    download_llama, download_model = scripts()
+    asked = download_llama.installed(variant) if variant else None  # --variant: that build runs it
+    if data is not None and entry.get("command") and data.get("profile") == name \
+            and not (asked and entry["command"][0] != str(asked)):
+        return "done", "the %r profile runs the local model, and is in use" % name, None
+
+    def write():
+        from .warm import llama_command
+        server = (download_llama.installed(variant) if variant else None) or download_llama.find_server()
+        if not server:
+            raise ValueError("llama-server was not found: `claudish setup --profile local` downloads it")
+        if not download_model.target("gemma").is_file():  # skipped (--skip model): the service would fail at every login
+            raise ValueError("the model is not downloaded: `claudish setup --profile local` downloads it")
+        argv = llama_command(server, download_model.target("gemma"), urlsplit(settings["model_url"]).port or urlsplit(config.MODEL_URL).port)
+        data = read(config.default_path())
+        data.setdefault("profiles", {}).setdefault(name, dict(config.STARTER["profiles"]["local"]))["command"] = argv
+        data["profile"] = name
+        config.save(data)
+    return "todo", "run the local model from the %r profile, and use it" % name, write
+
+
+def is_local(settings):
+    """Whether the profile runs llama.cpp on this computer (the model setup downloads)."""
+    return settings["backend"] == "llama" and config.loopback(settings["model_url"])
+
+
+def step_service(settings):
+    status, detail = service.managed()
+    other = service.elsewhere() if status == "ok" else None
+    if other:  # the input method is this checkout's (step_ime): the service must be too
+        return "todo", "the service runs the copy in %s: run this one's at every login instead" % other, \
+            lambda: service.run("install", keep=True)
+    # Set to start at login: one restarted a moment ago (install.sh's update) may not answer yet.
+    if status == "ok" and wait_for_service(5):
+        try:
+            doctor.fetch_json(doctor.SERVICE + "/health")
+            if doctor.ours():
+                return "done", detail, None
+        except Exception:
+            pass  # not running (stopped, or it failed): installed again, it starts
+    if status == "skip":
+        return "skip", detail, None
+    try:
+        doctor.fetch_json(doctor.SERVICE + "/health")
+        if not doctor.ours():
+            return "manual", "another account's cd_AI service has %s" % doctor.SERVICE, \
+                "one account at a time can use it: log the other account out, then run setup again"
+        registered = service.paths().get(platform.system())
+        if registered is None or not registered.is_file():  # with a unit or task (not enabled), installing again fixes it
+            return "manual", "a Claudish service is already running outside the service manager", \
+                "stop it (Ctrl+C in its terminal), then run setup again"
+    except Exception:
+        pass
+    what = "`claudish serve`"
+    from .keys import claude_credential
+    needed = settings.get("api_key_env") or settings["backend"] == "claude" and claude_credential()[1]
+    if needed:  # a variable of this shell only; `claudish key` saves a Claude key for the service
+        what += "; it will need %s in the service manager's environment, not just your shell" % needed
+    return "todo", "start %s at every login" % what, lambda: service.run("install", keep=True)
+
+
+def plan(profile=None, variant=None, skip=(), tone=None):
+    """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
+    name, settings = chosen_profile(profile)
+    local = is_local(settings)
+    # A local profile becomes the default when its model runs (Local model), not before: the
+    # service would send every request to a server that is not there through the whole download.
+    steps = [("Config", lambda: step_config(name, None if local else profile)), ("Tone", lambda: step_tone(name, settings, tone)), ("MCP servers", lambda: step_mcp(name))]
+    if local and not has_scripts():  # the Windows and macOS installs have no scripts/
+        steps += [("Local model", lambda: ("manual", "the local model is set up from a source checkout",
+                                           "set it up there (docs/install.md), or put llama-server's command line "
+                                           "in the profile's \"command\""))]
+    elif local:  # optional: a local model, downloaded here (claudish setup --profile local)
+        steps += [("llama.cpp", lambda: step_llama(variant)), ("Model", step_model),
+                  ("Local model", lambda: step_local(name, settings, variant))]
+    else:
+        steps += [("Model", lambda: step_backend(settings))]
+    steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(settings))]
+    return name, [(label, "skip", "skipped (--skip)", None) if label.split()[0].lower() in skip
+                  else (label,) + check() for label, check in steps]
+
+
+WAIT = 60
+
+
+def wait_for_service(seconds=WAIT):
+    """A newly started service loads its model first; give it time before doctor looks."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            doctor.fetch_json(doctor.SERVICE + "/health", timeout=1)
+            return True
+        except Exception:
+            time.sleep(0.5)
+    return False
+
+
+def wait_for_model(seconds=120):
+    """Until the service's model process answers, or failed (a local model loads first; a CLI warms up).
+    No service answering at all (not started, no systemd): nothing to wait for."""
+    deadline, missed = time.monotonic() + seconds, 0
+    while time.monotonic() < deadline:
+        try:
+            model = doctor.fetch_json(doctor.SERVICE + "/health", timeout=1).get("model") or ""
+            missed = 0
+        except Exception:
+            model, missed = "", missed + 1
+            if missed >= 3:
+                return
+        if model == "warm" or model.startswith("failed"):
+            return
+        time.sleep(0.5)
+
+
+def ask(question):
+    try:
+        return input(question + " [Y/n] ").strip().lower() in ("", "y", "yes")
+    except EOFError:
+        return False
+
+
+def choose_tone():
+    """The first run's one question: which tone (owner, 2026-10-24: slop for fun, proofread for
+    work). Enter keeps the default; a name, or a few words, picks another."""
+    print("Which tone? Enter keeps corporate slop.")
+    for name, tone in TEMPLATES["tones"]["named"].items():
+        print("  %-10s %s" % (name, tone.get("about", "")))
+    print("  or a few words, such as \"plain and friendly\".")
+    try:
+        answer = input("Tone [corporate]: ").strip()
+    except EOFError:
+        return None
+    return None if answer in ("", "corporate") else answer
+
+
+def run(profile=None, yes=False, dry_run=False, variant=None, skip=(), tone=None):
+    try:
+        fresh = not config.default_path().is_file()
+        if tone is None and fresh and not (yes or dry_run) and sys.stdin.isatty():
+            tone = choose_tone()  # asked once, on the first run: an update does not ask again
+        name, steps = plan(profile, variant, skip, tone)
+        backend = chosen_profile(profile)[1]["backend"]
+    except (OSError, ValueError) as exc:  # a config that does not read, or its templates gone
+        print("setup: %s" % exc)
+        return 2
+    symbols = doctor.marks()
+    shown = {"done": symbols["ok"], "todo": "→" if symbols is doctor.MARKS else "->",
+             "manual": symbols["warn"], "skip": symbols["skip"]}
+    print("Setting up Claudish for profile %r.\n" % (name or config.STARTER["profile"]))
+    manual, started, missing = [], False, []
+    local = any(step[0] == "llama.cpp" for step in steps)
+    for label, state, detail, action in steps:
+        print("%s %-16s %s" % (shown[state], label, detail))
+        if state == "manual":
+            manual.append((label, action))
+            missing.append(label)
+        if state != "todo" or dry_run:
+            continue
+        held = [m for m in missing if m in ("llama.cpp", "Model", "Local model") and m != label]
+        if label in ("Local model", "Starts at login") and local and held:
+            # A local model's service without the model would only fail at every login. (A key is
+            # different: it is saved in the settings, which the running service serves.)
+            print("  not yet: the model needs setting up first (%s)" % ", ".join(held))
+            continue
+        if not (yes or ask("  %s?" % detail[0].upper() + detail[1:])):
+            print("  skipped")
+            missing.append(label)
+            continue
+        try:
+            action()
+        except (OSError, ValueError, subprocess.CalledProcessError, SystemExit) as exc:
+            print("\n  failed: %s" % exc)
+            manual.append((label, "fix the error above, then run `claudish setup` again"))
+            missing.append(label)
+            continue
+        print("  done")
+        started = started or label == "Starts at login"
+    if dry_run:
+        print("\nDry run: nothing was changed.")
+        return 0
+    from .service import as_typed
+    for label, instruction in manual:
+        print("\n%s needs you: %s" % (label, as_typed(instruction)))
+    if started and not wait_for_service():
+        print("\nThe service has not answered within %d seconds; doctor may report it as down." % WAIT)
+    if local and (started or any(label == "Local model" and state == "todo" for label, state, _, _ in steps)):
+        wait_for_model()  # the service starts the local model at its next request: doctor checks it then
+    elif backend in ("claude-code", "codex"):
+        # Its CLI warms up (a service started now, or one that takes up a profile switched to it):
+        # doctor then says whether it is signed in.
+        wait_for_model(30)
+    print("\nChecking the whole chain (claudish doctor):\n")
+    status = doctor.main()
+    if platform.system() == "Linux" and any(label == "Input method" and state == "todo" for label, state, _, _ in steps):
+        print("\nLog out and back in, then add English → Claudish in %s." % doctor.where_to_add())
+    if fresh:
+        settings()  # the first run ends in the settings; an update does not open them again
+    return status
+
+
+def settings():
+    """Setup ends where the macOS installer does: in cd_AI's settings (the key, the tone), here in
+    the browser. Run by an agent (no terminal), it only says how to open them."""
+    from .client import settings_url
+    try:
+        url = settings_url()
+    except OSError:
+        return  # no service to ask: doctor has said why
+    if not sys.stdin.isatty():
+        from .service import as_typed
+        print(as_typed("\nNext: `claudish settings` opens cd_AI's settings: the model, its key, and the tone."))
+        return
+    from .client import open_browser
+    from .service import as_typed
+    if open_browser(url + "&first=1"):
+        print("\nOpening cd_AI's settings in your browser: the model, its key, and the tone.")
+    else:
+        print(as_typed("\nNext: `claudish settings` on the desktop opens cd_AI's settings: the model, its key, and the tone."))
