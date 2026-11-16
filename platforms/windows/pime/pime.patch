@@ -39,7 +39,7 @@ index d544c52..774cb28 100644
      info!("Starting PIMELauncher2 Worker on pipe: {}", pipe_name);
  
 diff --git a/PIMETextService/PIMEClient.cpp b/PIMETextService/PIMEClient.cpp
-index 0c7a8d5..aaed3d2 100644
+index 0c7a8d5..8dff344 100644
 --- a/PIMETextService/PIMEClient.cpp
 +++ b/PIMETextService/PIMEClient.cpp
 @@ -23,6 +23,8 @@
@@ -51,13 +51,12 @@ index 0c7a8d5..aaed3d2 100644
  
  #include "PIMETextService.h"
  #include <VersionHelpers.h> // Provided by Windows SDK >= 8.1
-@@ -63,7 +65,17 @@ Client::Client(TextService* service, REFIID langProfileGuid):
+@@ -63,7 +65,16 @@ Client::Client(TextService* service, REFIID langProfileGuid):
  	guid_{ uuidToString(langProfileGuid) } {
  }
  
 +// Per thread: a thread timer fires in the thread that set it, and each app thread has its own clients.
 +thread_local std::unordered_map<UINT_PTR, Client*> Client::timers_;
-+thread_local std::unordered_map<UINT_PTR, json> Client::replays_;
 +
  Client::~Client(void) {
 +	*alive_ = false;  // an edit session already queued for this client does nothing
@@ -69,7 +68,7 @@ index 0c7a8d5..aaed3d2 100644
  	state_ = State::Disconnected;
  	if (connector_) {
  		connector_->cancel();
-@@ -81,6 +93,9 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
+@@ -81,6 +92,9 @@ void Client::addKeyEventToRpcRequest(json& request, Ime::KeyEvent& keyEvent) {
  	request["repeatCount"] = keyEvent.repeatCount();
  	request["scanCode"] = keyEvent.scanCode();
  	request["isExtended"] = keyEvent.isExtended();
@@ -79,7 +78,7 @@ index 0c7a8d5..aaed3d2 100644
  	json keyStates = json::array();
  	const BYTE* states = keyEvent.keyStates();
  	for (int i = 0; i < 256; ++i) {
-@@ -96,11 +111,102 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
+@@ -96,11 +110,102 @@ bool Client::handleRpcResponse(json& msg, Ime::EditSession* session) {
  	}
  	bool success = jsonValueOr<bool>(msg, "success", false);
  	if (success) {
@@ -182,7 +181,7 @@ index 0c7a8d5..aaed3d2 100644
  void Client::updateUI(json& data) {
  	for (auto it = data.begin(); it != data.end(); ++it) {
  		const std::string& name = it.key();
-@@ -132,6 +238,15 @@ void Client::updateSelectionKeys(json& msg) {
+@@ -132,6 +237,15 @@ void Client::updateSelectionKeys(json& msg) {
  }
  
  void Client::updateMessageWindow(json& msg, Ime::EditSession* session, bool& endComposition) {
@@ -198,7 +197,7 @@ index 0c7a8d5..aaed3d2 100644
  	auto& showMessageVal = msg["showMessage"];
  	if (showMessageVal.is_object()) {
  		auto& message = showMessageVal["message"];
-@@ -170,6 +285,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
+@@ -170,6 +284,7 @@ void Client::updateCommitString(json& msg, Ime::EditSession* session) {
  				textService_->updateMessageWindow(session);
  			}
  			textService_->endComposition(session->context());
@@ -206,7 +205,7 @@ index 0c7a8d5..aaed3d2 100644
  		}
  	}
  }
-@@ -188,6 +304,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -188,6 +303,14 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  			if (textService_->isComposing() && !textService_->showingCandidates()) {
  				// when the composition buffer is empty and we are not showing the candidate list, end composition.
  				textService_->setCompositionString(session, L"", 0);
@@ -221,7 +220,7 @@ index 0c7a8d5..aaed3d2 100644
  				endComposition = true;
  			}
  		}
-@@ -196,6 +320,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
+@@ -196,6 +319,7 @@ void Client::updateComposition(json& msg, Ime::EditSession* session, bool& endCo
  				textService_->startComposition(session->context());
  			}
  			textService_->setCompositionString(session, compositionString.c_str(), compositionString.length());
@@ -229,7 +228,7 @@ index 0c7a8d5..aaed3d2 100644
  		}
  		// FIXME: update the position of candidate and message window when the composition string is changed.
  		if (textService_->candidateWindow_ != nullptr) {
-@@ -329,6 +454,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -329,6 +453,16 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  
  		updateComposition(msg, session, endComposition);
  
@@ -246,7 +245,7 @@ index 0c7a8d5..aaed3d2 100644
  	}
  
  	updateLanguageButtons(msg);
-@@ -345,6 +480,203 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
+@@ -345,6 +479,192 @@ void Client::updateStatus(json& msg, Ime::EditSession* session) {
  		// customize the UI
  		updateUI(customizeUIVal);
  	}
@@ -258,28 +257,17 @@ index 0c7a8d5..aaed3d2 100644
 +// Claudish: a key pressed again for the app after a commit ("replay": {"key": [code, extended],
 +// "modifiers": [[code, extended], ...]}), so one press of a shortcut or a navigation key both
 +// commits and acts. Sent from the app's own process, which an app running as administrator accepts
-+// (it refuses keys another program sends), 30 ms later: after this key's reply. A modifier that was
-+// down with the key and is up by then (a quick tap) is pressed with it again.
++// (it refuses keys another program sends). Sent now, with this key's reply, not on a timer: the
++// thread takes it after the commit (done in this key's edit session, or posted, which it takes before
++// input), and only a key typed while this one was being handled goes before it; a later key, or a
++// modifier pressed later, cannot. A modifier that was down with the key and is up by now (a quick
++// tap) is pressed with it again.
 +void Client::updateReplay(json& msg) {
 +	auto replayIt = msg.find("replay");
 +	if (replayIt == msg.end() || !replayIt->is_object()) {
 +		return;
 +	}
-+	UINT_PTR id = SetTimer(NULL, 0, 30, onReplayProc);
-+	if (id) {
-+		replays_[id] = *replayIt;
-+	}
-+}
-+
-+// static
-+void CALLBACK Client::onReplayProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time) {
-+	KillTimer(NULL, id);
-+	auto it = replays_.find(id);
-+	if (it == replays_.end()) {
-+		return;
-+	}
-+	json replay = it->second;
-+	replays_.erase(it);
++	const json& replay = *replayIt;
 +	auto input = [](const json& key, bool up) {
 +		INPUT one = {};
 +		one.type = INPUT_KEYBOARD;
@@ -450,7 +438,7 @@ index 0c7a8d5..aaed3d2 100644
  }
  
  void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
-@@ -352,11 +684,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -352,11 +672,8 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  	const auto& showCandidatesVal = msg["showCandidates"];
  	if (showCandidatesVal.is_boolean()) {
  		if (showCandidatesVal.get<bool>()) {
@@ -464,7 +452,7 @@ index 0c7a8d5..aaed3d2 100644
  			textService_->showCandidates(session);
  		}
  		else {
-@@ -364,7 +693,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
+@@ -364,7 +681,17 @@ void Client::updateCandidateList(json& msg, Ime::EditSession* session) {
  		}
  	}
  
@@ -482,7 +470,7 @@ index 0c7a8d5..aaed3d2 100644
  	if (candidateListVal.is_array()) {
  		// handle candidates
  		// FIXME: directly access private member is dirty!!!
-@@ -442,6 +781,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
+@@ -442,6 +769,19 @@ bool Client::filterKeyDown(Ime::KeyEvent& keyEvent) {
  
  	json req = createRpcRequest("filterKeyDown");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -502,7 +490,7 @@ index 0c7a8d5..aaed3d2 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -455,14 +807,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -455,14 +795,17 @@ bool Client::onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  	if (!ensureConnected()) {
  		return false;
  	}
@@ -522,7 +510,7 @@ index 0c7a8d5..aaed3d2 100644
  	}
  	return false;
  }
-@@ -490,6 +845,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
+@@ -490,6 +833,7 @@ bool Client::onKeyUp(Ime::KeyEvent& keyEvent, Ime::EditSession* session) {
  
  	json req = createRpcRequest("onKeyUp");
  	addKeyEventToRpcRequest(req, keyEvent);
@@ -530,7 +518,7 @@ index 0c7a8d5..aaed3d2 100644
  
  	json ret;
  	callRpcMethod(req, ret);
-@@ -529,10 +885,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
+@@ -529,10 +873,25 @@ bool Client::onCommand(UINT id, Ime::TextService::CommandType type) {
  
  	json ret;
  	callRpcMethod(req, ret);
@@ -559,7 +547,7 @@ index 0c7a8d5..aaed3d2 100644
  }
  
  bool Client::sendOnMenu(std::string button_id, json& result) {
-@@ -677,7 +1048,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
+@@ -677,7 +1036,7 @@ void Client::onKeyboardStatusChanged(bool opened) {
  
  // called just before current composition is terminated for doing cleanup.
  void Client::onCompositionTerminated(bool forced) {
@@ -568,7 +556,7 @@ index 0c7a8d5..aaed3d2 100644
  		return;
  	}
  
-@@ -804,7 +1175,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
+@@ -804,7 +1163,7 @@ wstring Client::getPipeName(const wchar_t* baseName) {
  	}
  
  	pipeName += username.get();
@@ -578,7 +566,7 @@ index 0c7a8d5..aaed3d2 100644
  	return pipeName;
  }
 diff --git a/PIMETextService/PIMEClient.h b/PIMETextService/PIMEClient.h
-index feb9813..c534059 100644
+index feb9813..6a21fe6 100644
 --- a/PIMETextService/PIMEClient.h
 +++ b/PIMETextService/PIMEClient.h
 @@ -92,6 +92,14 @@ public:
@@ -596,7 +584,7 @@ index feb9813..c534059 100644
  private:
  	void startAsyncConnect();
  	static std::wstring getPipeName(const wchar_t* baseName);
-@@ -119,6 +127,15 @@ private:
+@@ -119,6 +127,14 @@ private:
  	void updateKeyboardStatus(nlohmann::json& msg);
  	void updateCandidateList(nlohmann::json& msg, Ime::EditSession* session);
  	void updateUI(nlohmann::json& data);
@@ -608,17 +596,15 @@ index feb9813..c534059 100644
 +	void addSurroundingText(nlohmann::json& request, Ime::EditSession* session);
 +	void addOutsideText(nlohmann::json& request, Ime::EditSession* session);
 +	static void CALLBACK onTimerProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
-+	static void CALLBACK onReplayProc(HWND hwnd, UINT message, UINT_PTR id, DWORD time);
  	void updateStatus(nlohmann::json& msg, Ime::EditSession* session = nullptr);
  
  private:
-@@ -128,7 +145,14 @@ private:
+@@ -128,7 +144,13 @@ private:
  	std::shared_ptr<AsyncConnector> connector_;
  	std::unordered_map<std::string, Ime::ComPtr<PIME::LangBarButton>> buttons_; // map buttons to string IDs
  	unsigned int nextSeqNum_;
 +	UINT_PTR timerId_ = 0;
 +	static thread_local std::unordered_map<UINT_PTR, Client*> timers_;
-+	static thread_local std::unordered_map<UINT_PTR, nlohmann::json> replays_;
 +	std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);  // false once destroyed
  	bool isActivated_;
 +	// Claudish: the composition as last set, to tell text the app put into it (an Alt code) apart.

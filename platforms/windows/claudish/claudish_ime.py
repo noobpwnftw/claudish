@@ -140,7 +140,7 @@ MODIFIER_KEYS = (0x10, 0x11, 0x12, 0x5B, 0x5C)  # Shift, Ctrl, Alt, left and rig
 SIDED_KEYS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5)
 CHORD_KEYS = (0x11, 0x12, 0x5B, 0x5C)  # Ctrl, Alt, left and right Windows: with a key, a shortcut
 MEDIA_KEYS = tuple(range(0xA6, 0xB8))  # browser, volume, media and launch keys
-REPLAY_SECONDS = 0.5  # a replayed key arrives within this (PIME's 30 ms timer, then SendInput)
+REPLAY_SECONDS = 0.5  # a replayed key arrives within this (PIME sends it with the reply)
 SELECTING = (0x10, 0x11, 0x12)  # Shift, Ctrl, Alt: with an arrow or Delete, the app's (selection, words)
 
 
