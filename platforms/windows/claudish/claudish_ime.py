@@ -494,6 +494,7 @@ class ClaudishTextService(TextService):
         before the monitor's edge, or none in an app PIME cannot draw in): Tab takes only that, as
         macOS cuts it (Composition.fit_ghost). None from a PIME that does not say."""
         shown = getattr(self, "ghostShown", None)
+        trace("drawn", "sent=%d" % len(self.drawn_ghost), "shown=%s" % (None if shown is None else len(shown)))
         if shown is None or not self.drawn_ghost or shown == self.drawn_ghost:
             return
         self.drawn_ghost = self.state.fit_ghost(lambda ghost: len(ghost) <= len(shown))
@@ -532,6 +533,7 @@ class ClaudishTextService(TextService):
                 self.drop_live()  # not drawn over it, and continue starts again from the app's text
                 return
             self.drawn_ghost = "" if self.state.inside else self.state.ghost
+            trace("ghost", "len=%d" % len(self.state.ghost), "inside=%s" % self.state.inside)
             self.setGhost(self.drawn_ghost)
             self.setPanel(None)
             self.setCandidateList([])
