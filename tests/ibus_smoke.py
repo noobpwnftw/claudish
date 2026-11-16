@@ -261,6 +261,21 @@ try:
             assert engine.do_process_key_event(ord(key), 0, 0)
         assert engine.composition.text == "x" + made, engine.composition.text
         engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
+    # Ctrl+Shift+U, a hex code, Space: the character, as IBus's own engine types it (drawn as
+    # u and the digits meanwhile); Esc ends it, and its digits never go into the composition.
+    ctrl_shift = IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.SHIFT_MASK
+    engine.do_process_key_event(ord("x"), 0, 0)
+    assert engine.do_process_key_event(IBus.KEY_U, 0, ctrl_shift)
+    for char in "2014":
+        assert engine.do_process_key_event(ord(char), 0, 0)
+    assert engine.composition.drawn == "xu2014", engine.composition.drawn
+    assert engine.do_process_key_event(IBus.KEY_space, 0, 0)
+    assert engine.composition.text == "x\u2014" and engine.composition.drawn == "x\u2014", engine.composition.drawn
+    assert engine.do_process_key_event(IBus.KEY_U, 0, ctrl_shift)
+    for keyval in (ord("4"), IBus.KEY_Escape):
+        assert engine.do_process_key_event(keyval, 0, 0)
+    assert engine.composition.drawn == "x\u2014", engine.composition.drawn
+    engine.do_process_key_event(IBus.KEY_Escape, 0, 0)
     # A waiting accent goes in before Return or Tab, as GTK types it: U.S. International's
     # closing quote is a dead key.
     for char in "say 'hi":

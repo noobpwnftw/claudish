@@ -223,6 +223,7 @@ class ClaudishEngine(IBus.Engine):
         # The client's object path, GNOME's shared one, a Compose key's sequence, and the path IBus
         # 1.5.26 (no focus ids) gives this engine.
         self.context = self.shared = self.sequence = self.own_path = None
+        self.hexing = None  # Ctrl+Shift+U's hex digits so far (unicode_key)
         self.fresh_surrounding = True
         # The surrounding text each box last sent: the daemon forwards a box's text only when it
         # differs from what it sent last (any box's), so a box you come back to unchanged sends none.
@@ -534,6 +535,43 @@ class ClaudishEngine(IBus.Engine):
             return self.type_in(text)
         return True if typeable(IBus.keyval_to_unicode(keyval)) else None
 
+    def unicode_key(self, keyval, state):
+        """Ctrl+Shift+U, then a character's hex code, as IBus's own engine and GTK take it: drawn
+        at the cursor as u and the digits (in the accent's place, so whatever ends a waiting accent
+        ends it too); Space or Enter types the character, Backspace takes back a digit, Esc ends
+        it. Another key ends it and does its own (None, as for a key it does not take)."""
+        hexing = self.hexing is not None and self.composition.accent == "u" + self.hexing
+        if not hexing:
+            self.hexing = None
+            if keyval in (IBus.KEY_u, IBus.KEY_U) and state & IBus.ModifierType.CONTROL_MASK \
+                    and state & IBus.ModifierType.SHIFT_MASK and not state & IBus.ModifierType.MOD1_MASK:
+                self.dead, self.sequence, self.hexing = None, None, ""
+                self.composition.accent = "u"
+                self.render()
+                return True
+            return None
+        char = IBus.keyval_to_unicode(keyval)
+        if char and char in "0123456789abcdefABCDEF" and len(self.hexing) < 6:
+            self.hexing += char.lower()
+        elif keyval == IBus.KEY_BackSpace and self.hexing:
+            self.hexing = self.hexing[:-1]
+        elif keyval in (IBus.KEY_space, IBus.KEY_KP_Space, IBus.KEY_Return, IBus.KEY_KP_Enter) and self.hexing:
+            code, self.hexing, self.composition.accent = int(self.hexing, 16), None, ""
+            if code <= 0x10FFFF and not 0xD800 <= code <= 0xDFFF and code:
+                if self.composition.live:
+                    self.live_commit(chr(code))
+                else:
+                    self.type_in(chr(code))
+            self.render()
+            return True
+        else:  # Esc, Backspace on the u alone, or a key that is not a digit: it ends
+            self.hexing, self.composition.accent = None, ""
+            self.render()
+            return True if keyval in (IBus.KEY_Escape, IBus.KEY_BackSpace) else None
+        self.composition.accent = "u" + self.hexing
+        self.render()
+        return True
+
     def type_accent(self, text):
         """A waiting accent typed as it is (Composition.typed_accent)."""
         live = self.composition.live
@@ -602,6 +640,9 @@ class ClaudishEngine(IBus.Engine):
             return False
         if keyval in MODIFIER_KEYS:
             return False
+        handled = self.unicode_key(keyval, state)
+        if handled is not None:
+            return handled
         if self.dead and key_name(keyval) not in DEAD_KEYS \
                 and not typeable(IBus.keyval_to_unicode(keyval)):
             # An accent waiting for its letter: Return (and Tab while composing) types it first, as
