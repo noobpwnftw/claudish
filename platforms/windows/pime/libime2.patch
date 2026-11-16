@@ -1386,7 +1386,7 @@ index 0000000..7ab0140
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..a47a575 100644
+index ea37cdc..fd87301 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1411,7 +1411,7 @@ index ea37cdc..a47a575 100644
                  // end composition and clean up
                  composition_->EndComposition(cookie);
                  // do some cleanup in the derived class here
-@@ -238,25 +246,105 @@ void TextService::endComposition(ITfContext* context) {
+@@ -238,22 +246,102 @@ void TextService::endComposition(ITfContext* context) {
  std::wstring TextService::compositionString(EditSession* session) const {
      std::wstring result;
      if (composition_) {
@@ -1438,12 +1438,12 @@ index ea37cdc..a47a575 100644
 +                result.append(buf, textLen);
 +                if (textLen < ARRAYSIZE(buf))
 +                    break;
-             }
-         }
-     }
-     return result;
- }
- 
++            }
++        }
++    }
++    return result;
++}
++
 +bool TextService::surroundingText(EditSession* session, std::wstring& before, std::wstring& after, LONG limit,
 +                                  std::wstring* selected) const {
 +    TfEditCookie cookie = session->editCookie();
@@ -1520,16 +1520,13 @@ index ea37cdc..a47a575 100644
 +            if (scope->GetInputScopes(&scopes, &count) == S_OK && scopes) {
 +                result.assign(scopes, scopes + count);
 +                CoTaskMemFree(scopes);
-+            }
-+        }
-+    }
+             }
+         }
+     }
 +    VariantClear(&value);
-+    return result;
-+}
-+
- void TextService::setCompositionString(EditSession* session, const wchar_t* str, int len) const {
-     ITfContext* context = session->context();
-     if(context) {
+     return result;
+ }
+ 
 @@ -515,8 +603,11 @@ void TextService::installEventListeners() {
      if (auto source = threadMgr_.query<ITfSource>()) {
          threadMgrEventSink_ = SinkAdvice{ source, IID_ITfThreadMgrEventSink, static_cast<ITfThreadMgrEventSink*>(this) };
@@ -1543,7 +1540,7 @@ index ea37cdc..a47a575 100644
  
      // ITfKeyEventSink
      if (auto keystrokeMgr = threadMgr_.query<ITfKeystrokeMgr>()) {
-@@ -650,9 +741,25 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+@@ -650,9 +741,30 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
  }
  
  STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
@@ -1552,6 +1549,11 @@ index ea37cdc..a47a575 100644
 +    watchEdits(pDocMgrFocus);
 +    if (pDocMgrFocus) {
 +        onSetFocus();
++    }
++    else if (pDocMgrPrevFocus) {
++        // The focus went to a window of the app with no text (a toolbar, a list): what is drawn
++        // for the text box goes, as when the app loses the keyboard.
++        onKillFocus();
 +    }
      return S_OK;
  }
@@ -1569,7 +1571,7 @@ index ea37cdc..a47a575 100644
  STDMETHODIMP TextService::OnPushContext(ITfContext *pContext) {
      return S_OK;
  }
-@@ -664,42 +771,14 @@ STDMETHODIMP TextService::OnPopContext(ITfContext *pContext) {
+@@ -664,42 +776,14 @@ STDMETHODIMP TextService::OnPopContext(ITfContext *pContext) {
  
  // ITfTextEditSink
  STDMETHODIMP TextService::OnEndEdit(ITfContext *pContext, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord) {
@@ -1619,7 +1621,7 @@ index ea37cdc..a47a575 100644
      return S_OK;
  }
  
-@@ -750,7 +829,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
+@@ -750,7 +834,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
              // We use TF_ES_SYNC here, so the request becomes synchronus and blocking.
              // KeyEditSession::DoEditSession() and TextService::doKeyEditSession() will be
              // called before RequestEditSession() returns.
@@ -1632,7 +1634,7 @@ index ea37cdc..a47a575 100644
          }
      }
      return S_OK;
-@@ -784,7 +867,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
+@@ -784,7 +872,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
                      *pfEaten = onKeyUp(keyEvent, session);
                  }
              );
@@ -1644,7 +1646,7 @@ index ea37cdc..a47a575 100644
          }
      }
      return S_OK;
-@@ -803,6 +889,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+@@ -803,6 +894,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
      // grabbed by others, we're ``forced'' to terminate current composition.
      // If we end the composition by calling ITfComposition::EndComposition() ourselves,
      // this event is not triggered.
@@ -1659,7 +1661,7 @@ index ea37cdc..a47a575 100644
      onCompositionTerminated(true);
      composition_ = nullptr;
      return S_OK;
-@@ -911,6 +1005,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -911,6 +1010,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
