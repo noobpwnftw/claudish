@@ -17,7 +17,7 @@ index c2ae974..4ba6510 100644
 +    dwrite.lib
  )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..7de505f 100644
+index 4a4149f..87d1d57 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
 @@ -21,6 +21,8 @@
@@ -59,10 +59,16 @@ index 4a4149f..7de505f 100644
  }
  
  CandidateWindow::~CandidateWindow(void) {
-@@ -182,125 +172,49 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +172,55 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
              break;
          case WM_MOUSEACTIVATE:
              return MA_NOACTIVATE;
++        case WM_SETTINGCHANGE:  // light or dark, high contrast, the accent: drawn again in the new colours
++        case WM_SYSCOLORCHANGE:
++        case WM_DWMCOLORIZATIONCOLORCHANGED:
++            if (::IsWindowVisible(hwnd_))
++                painter_.present(hwnd_, spin_);
++            break;
 +        case WM_TIMER:  // the spinner turns while something is happening
 +            spin_ += 0.35f;
 +            painter_.present(hwnd_, spin_);
@@ -213,7 +219,7 @@ index 4a4149f..7de505f 100644
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -372,42 +286,9 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +292,9 @@ void CandidateWindow::setUseCursor(bool use) {
          ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
@@ -415,7 +421,7 @@ index fd320b7..333972c 100644
      BYTE keyStates_[256];
  };
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..7e099ab 100644
+index 581f89f..9e9c4f9 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -451,7 +457,20 @@ index 581f89f..7e099ab 100644
  void MessageWindow::setText(std::wstring text) {
      // FIXMEl: use different appearance under immersive mode
      text_ = text;
-@@ -75,6 +87,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
+@@ -65,6 +77,12 @@ LRESULT MessageWindow::wndProc(UINT msg, WPARAM wp, LPARAM lp) {
+         break;
+     case WM_MOUSEACTIVATE:
+         return MA_NOACTIVATE;
++    case WM_SETTINGCHANGE:  // light or dark, high contrast, the accent: drawn again in the new colours
++    case WM_SYSCOLORCHANGE:
++    case WM_DWMCOLORIZATIONCOLORCHANGED:
++        if (::IsWindowVisible(hwnd_))
++            painter_.present(hwnd_, 0);
++        break;
+     default:
+         return ImeWindow::wndProc(msg, wp, lp);
+     }
+@@ -75,6 +93,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
      int len = text_.length();
      RECT rc, textrc = {0};
      GetClientRect(hwnd_, &rc);
