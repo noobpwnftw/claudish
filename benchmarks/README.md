@@ -201,6 +201,24 @@ python benchmarks/judge.py --calibrate
 python benchmarks/judge.py --results benchmarks/eval/spark-small.json
 ```
 
+## The slop tone per backend (G65, 2026-11-17)
+
+`python3 benchmarks/evaluate.py --slop` on the 80 cases, the default tone, each backend behind its
+own service (`.tools/rigs/bench_backends.sh`); Gemma 4 E4B served with cd_AI's own llama-server
+flags (thinking off) and the local profile's 15 s timeout.
+
+| Backend | Faithful | Errors | Em dash added | Median |
+| --- | ---: | ---: | ---: | ---: |
+| Claude Code (haiku) | 77 / 80 | 0 | 75 / 80 | 1.3 s |
+| Codex (gpt-6-luna) | 78 / 80 | 0 | 76 / 80 | 2.6 s |
+| Gemma 4 E4B | 77 / 80 | 0 | 53 / 80 | 0.7 s |
+
+The rewrite examples' "ok" carried no em dash while the instruction asked for one; Gemma followed
+the example (18 / 80 with em dashes, 79 / 80 faithful). With an em dash in it: 53 / 80, 77 / 80
+faithful (one new miss: a "Q3" it added), and the hosted backends gained a case each. Most
+remaining "negation" failures keep the meaning in other words ("hold off on merging" for "do not
+merge"): the checker's strictness, not the models'.
+
 ## Choosing the models (G53, 2026-10-24)
 
 The question: which model makes cd_AI's default tone, full corporate slop that keeps the

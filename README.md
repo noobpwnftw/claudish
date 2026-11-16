@@ -7,7 +7,7 @@ English goes in. Em dashes come out.
 An input method that puts a language model at the caret of every app, on Linux,
 Windows, and macOS. Switch to it like a keyboard language, type, and press Tab:
 
-> **ok** → Absolutely! This is a fantastic opportunity to align on our shared vision, unlock
+> **ok** → Absolutely—this is a fantastic opportunity to align on our shared vision, unlock
 > meaningful synergies, and move forward with clarity, confidence, and a renewed sense of purpose.
 >
 > **nah** → While I appreciate the perspective you've brought to the table, I believe it's
