@@ -17,7 +17,7 @@ index c2ae974..4ba6510 100644
 +    dwrite.lib
  )
 diff --git a/src/CandidateWindow.cpp b/src/CandidateWindow.cpp
-index 4a4149f..b5372b0 100644
+index 4a4149f..7de505f 100644
 --- a/src/CandidateWindow.cpp
 +++ b/src/CandidateWindow.cpp
 @@ -21,6 +21,8 @@
@@ -59,7 +59,7 @@ index 4a4149f..b5372b0 100644
  }
  
  CandidateWindow::~CandidateWindow(void) {
-@@ -182,125 +172,48 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
+@@ -182,125 +172,49 @@ LRESULT CandidateWindow::wndProc(UINT msg, WPARAM wp , LPARAM lp) {
              break;
          case WM_MOUSEACTIVATE:
              return MA_NOACTIVATE;
@@ -130,6 +130,7 @@ index 4a4149f..b5372b0 100644
 -    if(items_.empty()) {
 -        resize(margin_ * 2, margin_ * 2);
 -    }
++    painter_.setDpi(windowDpi(hwnd_));
 +    SIZE size = painter_.layout(panel_);
 +    resize(size.cx, size.cy);
 +    painter_.present(hwnd_, spin_);
@@ -212,7 +213,7 @@ index 4a4149f..b5372b0 100644
  }
  
  void CandidateWindow::setCandPerRow(int n) {
-@@ -372,42 +285,9 @@ void CandidateWindow::setUseCursor(bool use) {
+@@ -372,42 +286,9 @@ void CandidateWindow::setUseCursor(bool use) {
          ::InvalidateRect(hwnd_, NULL, TRUE);
  }
  
@@ -414,7 +415,7 @@ index fd320b7..333972c 100644
      BYTE keyStates_[256];
  };
 diff --git a/src/MessageWindow.cpp b/src/MessageWindow.cpp
-index 581f89f..2fefebb 100644
+index 581f89f..7e099ab 100644
 --- a/src/MessageWindow.cpp
 +++ b/src/MessageWindow.cpp
 @@ -20,6 +20,7 @@
@@ -433,12 +434,13 @@ index 581f89f..2fefebb 100644
  }
  
  MessageWindow::~MessageWindow(void) {
-@@ -46,6 +48,15 @@ void MessageWindow::recalculateSize() {
+@@ -46,6 +48,16 @@ void MessageWindow::recalculateSize() {
          size.cx + margin_ * 2, size.cy + margin_ * 2, SWP_NOACTIVATE|SWP_NOMOVE);
  }
  
 +void MessageWindow::setPanel(const PanelSpec& panel) {
 +    panel_ = panel;
++    painter_.setDpi(windowDpi(hwnd_));
 +    SIZE size = painter_.layout(panel_);
 +    // A toast is a panel: layered, with its own corners, border and shadow (PanelPainter::present).
 +    SetWindowLongPtr(hwnd_, GWL_EXSTYLE, GetWindowLongPtr(hwnd_, GWL_EXSTYLE) | WS_EX_LAYERED);
@@ -449,7 +451,7 @@ index 581f89f..2fefebb 100644
  void MessageWindow::setText(std::wstring text) {
      // FIXMEl: use different appearance under immersive mode
      text_ = text;
-@@ -75,6 +86,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
+@@ -75,6 +87,8 @@ void MessageWindow::onPaint(PAINTSTRUCT& ps) {
      int len = text_.length();
      RECT rc, textrc = {0};
      GetClientRect(hwnd_, &rc);
@@ -499,10 +501,10 @@ index 41e3a33..a2bff25 100644
  }
 diff --git a/src/Panel.cpp b/src/Panel.cpp
 new file mode 100644
-index 0000000..9b8c872
+index 0000000..3e91f0c
 --- /dev/null
 +++ b/src/Panel.cpp
-@@ -0,0 +1,573 @@
+@@ -0,0 +1,587 @@
 +//
 +//    Claudish: the panel and the suggestion, painted with Direct2D and DirectWrite to the design
 +//    lab's Windows 11 mock (claudish/web/design.html#windows; docs/design/design.md).
@@ -595,6 +597,19 @@ index 0000000..9b8c872
 +                                 DWRITE_FONT_STRETCH_NORMAL, px(10), L"", &tile_);
 +    }
 +    return text_ && small_ && label_format_ && mono_ && tile_;
++}
++
++void PanelPainter::setDpi(UINT dpi) {
++    const float scale = dpi / 96.0f;
++    if (scale == scale_)
++        return;
++    scale_ = scale;
++    release();
++    releaseOne(text_);
++    releaseOne(small_);
++    releaseOne(label_format_);
++    releaseOne(mono_);
++    releaseOne(tile_);
 +}
 +
 +IDWriteTextLayout* PanelPainter::makeLayout(const std::wstring& text, IDWriteTextFormat* format, float maxWidth) {
@@ -1011,7 +1026,8 @@ index 0000000..9b8c872
 +                                              reinterpret_cast<IUnknown**>(&dwrite))))
 +        return L"";
 +    // The UI font at the caret's height (the line is about 1.25 times the font's size).
-+    const float size = (std::max)(11.0f * scaled(1000) / 1000.0f, (caret.bottom - caret.top) / 1.25f);
++    const float dpi = (float)windowDpi(hwnd);
++    const float size = (std::max)(11.0f * dpi / 96.0f, (caret.bottom - caret.top) / 1.25f);
 +    IDWriteTextFormat* format = nullptr;
 +    dwrite->CreateTextFormat(uiFont(), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
 +                             DWRITE_FONT_STRETCH_NORMAL, size, L"", &format);
@@ -1020,7 +1036,7 @@ index 0000000..9b8c872
 +    // From the caret's own x (an empty selection's rectangle can be a character wide): the space
 +    // you typed is the only gap before the suggestion. Up to its monitor's edge: the whole words
 +    // that fit there, as composition.py's fit_ghost cuts (Tab takes what was drawn, reported back).
-+    const int left = caret.left + scaled(2);
++    const int left = caret.left + (int)std::lround(2 * dpi / 96.0f);
 +    MONITORINFO monitor = { sizeof(monitor) };
 +    POINT point = { left, caret.top };
 +    const LONG edge = GetMonitorInfoW(MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST), &monitor)
@@ -1078,10 +1094,10 @@ index 0000000..9b8c872
 +} // namespace Ime
 diff --git a/src/Panel.h b/src/Panel.h
 new file mode 100644
-index 0000000..9d2249c
+index 0000000..902227b
 --- /dev/null
 +++ b/src/Panel.h
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,172 @@
 +//
 +//    Claudish: the panel next to the caret, as the design lab draws it (claudish/web/design.html,
 +//    Windows 11 skin; docs/design/design.md), painted with Direct2D and DirectWrite (GDI cannot
@@ -1152,6 +1168,8 @@ index 0000000..9d2249c
 +    int textInset() const;
 +    // Painting toasts (the toast window): one compact line, as the lab's .k-toast.
 +    void setToast(bool toast) { toast_ = toast; }
++    // The DPI to draw at (windowDpi): a change (another monitor, a new scale) makes the fonts again.
++    void setDpi(UINT dpi);
 +    // The panel's top edge, from the window's (the shadow's margin above it).
 +    int topInset() const { return (int)std::ceil(shadowTop_); }
 +    // The panel's bottom edge, from the window's (the shadow's margin below it).
@@ -1254,10 +1272,10 @@ index 0000000..9d2249c
 +#endif
 diff --git a/src/Style.h b/src/Style.h
 new file mode 100644
-index 0000000..dadfca2
+index 0000000..7ab0140
 --- /dev/null
 +++ b/src/Style.h
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,109 @@
 +//
 +//    Claudish: the look of the candidate and message windows, after Windows 11's own popups
 +//    (a rounded corner, the system shadow, the app theme's colours). Header-only, LGPL like
@@ -1344,6 +1362,18 @@ index 0000000..dadfca2
 +            ::ReleaseDC(NULL, dc);
 +    }
 +    return ::MulDiv(pixels, dpi, 96);
++}
++
++// The DPI a window of ours draws at: its owner's (the app window's monitor's for a per-monitor aware
++// app, the system's for a system-aware one, 96 for one Windows scales itself), as GetDpiForWindow
++// says (Windows 10 1607 and later); the system's before that.
++inline UINT windowDpi(HWND hwnd) {
++    using GetDpiForWindowFn = UINT (WINAPI*)(HWND);
++    static const auto get = reinterpret_cast<GetDpiForWindowFn>(
++        ::GetProcAddress(::GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
++    HWND owner = hwnd ? ::GetWindow(hwnd, GW_OWNER) : nullptr;
++    const UINT dpi = get && (owner || hwnd) ? get(owner ? owner : hwnd) : 0;
++    return dpi ? dpi : (UINT)scaled(96);
 +}
 +
 +inline void fillRect(HDC dc, const RECT& rc, COLORREF color) {
