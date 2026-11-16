@@ -448,12 +448,8 @@ def check_context(state):
 def check_helpers(state):
     """The profile's helpers the model is not offered, and why (handoff.why_not)."""
     from . import handoff
-    setting = (state.get("settings") or {}).get("helper")
-    named = {handoff.name(setting): setting} if isinstance(setting, list) else setting
-    if not isinstance(named, dict):
-        return []
     results = []
-    for key, template in named.items():
+    for key, template in handoff.configured((state.get("settings") or {}).get("helper")).items():
         reason = handoff.why_not(template)
         results.append(("Helper %s" % key, "warn" if reason else "ok",
                         "not offered: %s" % reason if reason else "offered to the model", None))

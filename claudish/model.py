@@ -639,6 +639,33 @@ class Rewriter:
         box.draft = draft or None  # a follow-up about the draft in view, framed as the input methods' are
         return self.answer(mode, text, box, again=again)
 
+    def take_turn(self, record):
+        """A request while typing (serial) gets the model after the one on its way, which Claude
+        Code and Codex stop (warm.supersede); one a newer request came after while it waited gives
+        way (a local model answers one at a time). RuntimeError, said in record, when it does not."""
+        warm = hasattr(self.warm, "supersede")
+        if warm:
+            self.warm.supersede()
+        with self.ticketing:
+            self.newest = ticket = self.newest + 1
+        if not self.lock.acquire(timeout=self.timeout):
+            outcome, said = "busy", "the model is busy; keep typing or retry"
+        elif ticket != self.newest:
+            self.lock.release()
+            from .warm import REPLACED
+            outcome, said = "replaced", REPLACED
+        else:
+            return
+        if warm:
+            self.warm.settled()
+        record["outcome"] = outcome
+        raise RuntimeError(said)
+
+    def leave_turn(self):
+        self.lock.release()
+        if hasattr(self.warm, "supersede"):
+            self.warm.settled()
+
     def answer(self, mode, text, box, conversation=None, approve=None, progress=None, local=None, serial=True,
                again=True, stopped=None):
         """The one loop: describe the request, call the model with the tools this mode may use, run
@@ -659,24 +686,8 @@ class Rewriter:
                   "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
         self.recent.append(record)
-        replaces = serial and hasattr(self.warm, "supersede")
-        if replaces:  # Claude Code, Codex: the stale one on its way stops, rather than answering first
-            self.warm.supersede()
         if serial:
-            with self.ticketing:
-                self.newest = ticket = self.newest + 1
-        if serial and not self.lock.acquire(timeout=self.timeout):
-            if replaces:
-                self.warm.settled()
-            record["outcome"] = "busy"
-            raise RuntimeError("the model is busy; keep typing or retry")
-        if serial and ticket != self.newest:  # a newer one came while it waited (a local model answers one at a time)
-            self.lock.release()
-            if replaces:
-                self.warm.settled()
-            from .warm import REPLACED
-            record["outcome"] = "replaced"
-            raise RuntimeError(REPLACED)
+            self.take_turn(record)
         refused = False
         try:
             if self.backend == "rules":
@@ -718,9 +729,7 @@ class Rewriter:
             refused = True
         finally:
             if serial:
-                self.lock.release()
-            if replaces:
-                self.warm.settled()
+                self.leave_turn()
         if refused:  # the turn again without the shape; refused plain too, the schema was not why
             if again and self.takes.get((mode, said)):
                 self.takes[(mode, said)] -= 1  # the same take, asked again: not another one

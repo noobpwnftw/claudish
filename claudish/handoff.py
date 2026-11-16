@@ -35,15 +35,18 @@ def display_name(name):
     return NAMES.get(str(name).lower(), str(name))
 
 
-def helpers(setting):
-    """{name: command} from a profile's "helper": one command, or named commands; only the ones
-    that can be offered (installed, supervised)."""
+def configured(setting):
+    """{name: command} as a profile's "helper" gives them: one command, or named commands."""
     if isinstance(setting, list):
-        setting = {name(setting): setting}
-    if not isinstance(setting, dict):
-        return {}
+        return {name(setting): setting}
+    return setting if isinstance(setting, dict) else {}
+
+
+def helpers(setting):
+    """The configured helpers that can be offered (installed, supervised)."""
     # A tool's name takes letters, digits and _: a helper "claude-opus" is offered as claude_opus.
-    return {re.sub(r"\W", "_", str(key)): value for key, value in setting.items() if available(value) and str(key)}
+    return {re.sub(r"\W", "_", str(key)): value for key, value in configured(setting).items()
+            if available(value) and str(key)}
 
 
 def available(template):
