@@ -353,6 +353,8 @@ class Rewriter:
             self.modes[name]["profile"] = route["profile"]
         self.finish = invocation.finish
         self.lock = threading.Lock()
+        self.newest = 0  # the latest request while typing (serial): an older one waiting gives way
+        self.ticketing = threading.Lock()
         self.local = loopback(self.endpoint)
         self.opener = None
         self.warm = None  # Claude Code, Codex or a local model's server, run beside the service (claudish/warm.py)
@@ -659,11 +661,21 @@ class Rewriter:
         replaces = serial and hasattr(self.warm, "supersede")
         if replaces:  # Claude Code, Codex: the stale one on its way stops, rather than answering first
             self.warm.supersede()
+        if serial:
+            with self.ticketing:
+                self.newest = ticket = self.newest + 1
         if serial and not self.lock.acquire(timeout=self.timeout):
             if replaces:
                 self.warm.settled()
             record["outcome"] = "busy"
             raise RuntimeError("the model is busy; keep typing or retry")
+        if serial and ticket != self.newest:  # a newer one came while it waited (a local model answers one at a time)
+            self.lock.release()
+            if replaces:
+                self.warm.settled()
+            from .warm import REPLACED
+            record["outcome"] = "replaced"
+            raise RuntimeError(REPLACED)
         refused = False
         try:
             if self.backend == "rules":

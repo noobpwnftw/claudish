@@ -1,6 +1,7 @@
 """Configurable backends: Claude via a stand-in SDK, and OpenAI-compatible endpoints (no live services)."""
 import importlib.util
 import json
+import time
 import os
 import tempfile
 import threading
@@ -127,6 +128,28 @@ class ClaudeBackendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "busy"):
                 rewriter.rewrite("Ship it.")
         self.assertEqual(self.sdk.calls, [])
+
+    def test_a_request_waiting_for_the_model_gives_way_to_a_newer_one(self):
+        """A local model answers one request at a time: of two waiting, only the newer runs."""
+        import threading
+        rewriter = Rewriter("rules", timeout=5)
+        said = {}
+
+        def ask(name):
+            try:
+                said[name] = rewriter.rewrite("ok " + name, mode="continue")["text"]
+            except RuntimeError as exc:
+                said[name] = str(exc)
+        rewriter.lock.acquire()  # the first, still answering
+        waiting = [threading.Thread(target=ask, args=(name,)) for name in ("older", "newer")]
+        for thread in waiting:
+            thread.start()
+            time.sleep(0.05)
+        rewriter.lock.release()
+        for thread in waiting:
+            thread.join(2)
+        self.assertEqual(said["older"], "a newer request replaced it")
+        self.assertIn("naturally", said["newer"])
 
     def test_health_reports_the_backend(self):
         for backend in ("claude", "rules"):

@@ -31,7 +31,7 @@ TRANSIENT = ("capacity", "rate limit", "overloaded", "try again", "temporar", "b
 
 
 ENDED = "the instruction had ended"
-REPLACED = "a newer rewrite replaced it"  # (claudish/composition.py's OWN_WORDS has these words for the panel)
+REPLACED = "a newer request replaced it"  # (claudish/composition.py's OWN_WORDS has these words for the panel)
 
 
 class Lines:

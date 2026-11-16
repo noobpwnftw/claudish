@@ -128,7 +128,7 @@ OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no a
              "too many agent sessions", "the model offered nothing",
              "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended (its process)
              "Claude declined", "Claude returned no text", "the model returned no text",
-             "the agent ", "the instruction had ended", "text must be",  # an agent session's, warm.ENDED, the service's checks
+             "the agent ", "the instruction had ended", "a newer request replaced it", "text must be",  # an agent session's, warm.ENDED, the service's checks
              "the model spent its length budget", "this model server did not accept the window picture",
              "the claude-code backend cannot take", "the profile's agent (session_command) cannot")  # claudish/model.py's
 
