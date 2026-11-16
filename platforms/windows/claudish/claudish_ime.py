@@ -560,6 +560,7 @@ class ClaudishTextService(TextService):
         kind = self.field()  # a console window is a terminal whatever runs in it (console_window)
         self.state.field(kind, kind == "terminal" or is_terminal(focused_app()))
         after = self.state.caret_after(self.around()[1] if self.state.live else "")
+        trace("changed", kind, "quiet=%s inside=%s automatic=%s" % (self.state.quiet, self.state.inside, self.state.automatic))
         if self.worker and self.state.automatic:
             # Continue asks at once at a word boundary (itself the pause); the timer shows the
             # answer as soon as it comes (await_result).
@@ -596,6 +597,8 @@ class ClaudishTextService(TextService):
             self.live_typed = False
             if self.state.live:
                 self.state.follow_app(self.around()[0])
+                trace("read", "before=%d" % len(self.around()[0]), "text=%d" % len(self.state.text),
+                      "automatic=%s" % self.state.automatic)
                 self.changed()
         away = self.owner and foreground() not in (None, self.owner) or \
             self.front is not None and foreground_window() not in (None, self.front)
@@ -643,6 +646,8 @@ class ClaudishTextService(TextService):
             self.state.follow(self.worker)  # the config's keys, and whether the service answers
         result = self.worker.poll() if self.worker else None
         kind = self.state.receive(*result) if result else None
+        if result:
+            trace("result", kind)
         toast = self.state.done_toast(result[1]["done"]) if kind == "done" else None
         if toast and not away:
             self.setToast(toast, 3)
