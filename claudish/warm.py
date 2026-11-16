@@ -450,8 +450,11 @@ def shaped(text):
 def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):
     """llama-server's argv for a downloaded model (claudish setup --profile local, scripts/run_model.py)."""
     # Gemma 4 thinks first unless told not to, which no request waits for (benchmarks/README.md).
-    # --reasoning off holds where a newer chat template ignores enable_thinking (it thought anyway).
-    extra = ["--jinja", "--reasoning", "off", "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "4096"] \
+    # --reasoning off holds where a newer chat template ignores enable_thinking (it thought anyway);
+    # --reasoning-budget 0 where an answer held to a schema lets it think first anyway (continue's
+    # 256 tokens went on "Thinking Process:", 76 of 86 suggestions, b11822 and later).
+    extra = ["--jinja", "--reasoning", "off", "--reasoning-budget", "0",
+             "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "4096"] \
         if gemma else ["-c", "2048"]
     return [str(server), "-m", str(model), "--host", "127.0.0.1", "--port", str(port),
             "-ngl", str(gpu_layers), "-t", "4", "-np", "1"] + extra

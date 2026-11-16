@@ -223,6 +223,7 @@ class EndpointBackendTests(unittest.TestCase):
         handlers, request, payload = self.call(rewriter)
         self.assertEqual(request.full_url, "http://localhost:11434/v1/chat/completions")
         self.assertEqual(payload["model"], "qwen2.5:7b")
+        self.assertEqual(payload["reasoning_budget"], 0)  # no thinking before a schema's answer (llama.cpp)
         self.assertIsNone(request.get_header("Authorization"))
         self.assertEqual(handlers[0].proxies, {})  # loopback bypasses HTTP_PROXY
 
@@ -254,9 +255,10 @@ class EndpointBackendTests(unittest.TestCase):
 
     def test_remote_endpoint_sends_key(self):
         rewriter = Rewriter("openai", "https://models.example.com", model="any-model", api_key="k-123")
-        handlers, request, _ = self.call(rewriter)
+        handlers, request, payload = self.call(rewriter)
         self.assertEqual(request.get_header("Authorization"), "Bearer k-123")
         self.assertEqual(handlers, ())  # default opener: system proxy settings apply
+        self.assertNotIn("reasoning_budget", payload)  # llama.cpp's: a hosted API may refuse it
 
 
     def test_without_a_model_name_the_servers_only_model_is_used(self):

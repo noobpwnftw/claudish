@@ -102,7 +102,8 @@ def opener_for(url):
 
 CLAUDE_MODEL = DEFAULT_MODELS["claude"]  # the claude backend's model when a profile names none
 LENGTH = "the answer ran past its length budget; use a shorter phrase"
-THOUGHT = "the model spent its length budget thinking; turn its reasoning off (llama-server: --reasoning off)"
+THOUGHT = ("the model spent its length budget thinking; turn its reasoning off "
+           "(llama-server: --reasoning off --reasoning-budget 0)")
 DECLINED = "Claude declined this; your wording is unchanged"
 
 CUT_OFF = ("max_tokens", "model_context_window_exceeded")  # stop reasons that cut the answer off
@@ -850,6 +851,10 @@ class Rewriter:
             payload = {"messages": messages, "max_tokens": max_tokens, "temperature": 0, "stream": False}
             if self.local:
                 payload["cache_prompt"] = True  # llama.cpp's; a hosted API may refuse fields it does not know
+                # llama.cpp's too: no thinking before an answer held to a schema, which --reasoning off
+                # alone let Gemma 4 do (continue's 256 tokens spent on it), also for a profile whose
+                # llama-server command an earlier setup wrote
+                payload["reasoning_budget"] = 0
             payload.update(sampling)
             if self.model:
                 payload["model"] = self.model

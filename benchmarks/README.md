@@ -219,6 +219,13 @@ faithful (one new miss: a "Q3" it added), and the hosted backends gained a case 
 remaining "negation" failures keep the meaning in other words ("hold off on merging" for "do not
 merge"): the checker's strictness, not the models'.
 
+Continue on Gemma 4 E4B (`benchmarks/evaluate_continue.py --slop`, 86 cases) passed 10: an answer
+held to the drafts schema let the model think first despite `--reasoning off`, and continue's 256
+tokens went on "Thinking Process:" (llama.cpp b11822, the pinned build, and the local CUDA build
+alike). cd_AI now sends `reasoning_budget: 0` with every request to a local server (an existing
+profile's llama-server command included) and starts llama-server with `--reasoning-budget 0`:
+86 / 86, median 0.78 s. Rewrites with it: 76 / 80 faithful, 49 / 80 with em dashes.
+
 ## Choosing the models (G53, 2026-10-24)
 
 The question: which model makes cd_AI's default tone, full corporate slop that keeps the
