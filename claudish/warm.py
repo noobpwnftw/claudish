@@ -30,7 +30,8 @@ CLI = TEMPLATES["box"]["cli"]
 TRANSIENT = ("capacity", "rate limit", "overloaded", "try again", "temporar", "busy")
 
 
-ENDED = "the instruction had ended"  # (claudish/composition.py's OWN_WORDS has these words for the panel)
+ENDED = "the instruction had ended"
+REPLACED = "a newer rewrite replaced it"  # (claudish/composition.py's OWN_WORDS has these words for the panel)
 
 
 class Lines:
@@ -71,6 +72,8 @@ class Warm:
         self.lifecycle = threading.RLock()
         self.asking = None  # the thread whose exchange runs now (abandon)
         self.abandoned = set()  # threads whose exchange was taken back before it ran
+        self.rewrites = set()  # threads with a rewrite on its way (supersede)
+        self.replaced = set()  # threads whose rewrite a newer one stopped (no warm-up after it)
         self.stopped = threading.Event()
         self.process = self.lines = None
 
@@ -182,9 +185,13 @@ class Warm:
                             self.state = "failed: %s" % str(exc).replace(self.name + ": ", "", 1)
                 raise
             except TimeoutError:
+                if self.was_replaced(owner):
+                    raise RuntimeError(REPLACED)
                 self.failed()  # a stuck one is not reused
                 raise RuntimeError("%s took longer than %g s" % (self.name, timeout))
             except Exception as exc:  # garbled output too: the process may still hold this prompt
+                if self.was_replaced(owner):
+                    raise RuntimeError(REPLACED) from exc
                 self.failed()
                 if not isinstance(exc, RuntimeError):
                     raise RuntimeError("%s: %s" % (self.name, exc)) from exc
@@ -207,6 +214,38 @@ class Warm:
                 self.kill(force=True)
             else:
                 self.abandoned.add(owner)
+
+    def supersede(self):
+        """A newer rewrite (or suggestion): the ones on their way stop now, as an instruction taken
+        back does (abandon). Their answers would be dropped as stale, and the CLI answers one
+        exchange at a time: the newer one would wait for a whole answer nobody takes."""
+        owner = threading.get_ident()
+        with self.lifecycle:
+            for older in self.rewrites - {owner}:
+                if self.asking == older:
+                    self.replaced.add(older)  # killed: the newer one starts the next process itself
+                self.abandon(older)
+            self.rewrites = {owner}
+
+    def settled(self):
+        """This thread's rewrite is done (answered, failed or replaced)."""
+        owner = threading.get_ident()
+        with self.lifecycle:
+            self.rewrites.discard(owner)
+            self.replaced.discard(owner)
+            self.abandoned.discard(owner)
+
+    def was_replaced(self, owner):
+        """Whether supersede stopped this thread's exchange: the process is gone, and the newer
+        request, waiting for the lock, starts the next one within its own time (no warm-up)."""
+        with self.lifecycle:
+            if owner not in self.replaced:
+                return False
+            self.replaced.discard(owner)
+            self.kill(force=True)
+            if self.state == "warm":
+                self.state = "restarting"
+            return True
 
     def forget(self, owner):
         """The instruction's thread is done: nothing of it is waiting any more."""

@@ -267,9 +267,9 @@ class WorkerTests(unittest.TestCase):
                 worker.close()
                 worker.thread.join(1)
 
-    def test_a_newer_rewrite_waits_for_the_one_on_its_way(self):
-        """The service answers one request at a time and refuses another as busy: a newer Tab is
-        asked once the stale one is back (round 81: two at once lost the newer answer)."""
+    def test_a_newer_rewrite_goes_beside_the_one_on_its_way(self):
+        """A newer Tab is asked at once (the service stops the stale one or answers it first); the
+        stale answer, back later, is dropped."""
         started, release, asked = threading.Event(), threading.Event(), []
 
         def transport(text, endpoint, **field):
@@ -285,10 +285,11 @@ class WorkerTests(unittest.TestCase):
                 worker.schedule(1, "old", immediate=True)
                 self.assertTrue(started.wait(1))
                 worker.schedule(2, "new", immediate=True)  # Esc, an edit, Tab again
-                time.sleep(0.05)
-                self.assertEqual(asked, ["old"])  # not beside it
+                self.assertEqual(poll_until(worker), (2, {"text": "NEW"}))  # not behind the stale one
                 release.set()
-                self.assertEqual(poll_until(worker), (2, {"text": "NEW"}))  # the stale answer dropped
+                time.sleep(0.05)
+                self.assertEqual(asked, ["old", "new"])
+                self.assertIsNone(poll_until(worker, 0.2))  # the stale answer dropped
             finally:
                 release.set()
                 worker.close()

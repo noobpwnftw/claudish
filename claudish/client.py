@@ -145,8 +145,8 @@ def call(endpoint, path, body=None, timeout=10):
 
 
 BOXES = 16  # text boxes whose conversations a worker keeps
-ASKING = 1  # rewrites and suggestions on their way at once (Suggestions._run): the service answers
-# one at a time and refuses another as busy, so a newer one waits (cancelling a stale one there: not yet)
+ASKING = 2  # rewrites and suggestions on their way at once (Suggestions._run): a newer one goes
+# beside the stale one, which the service stops (Claude Code, Codex) or answers first; its answer is dropped
 
 
 def service_error(exc):

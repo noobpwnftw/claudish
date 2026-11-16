@@ -640,7 +640,7 @@ class Rewriter:
                again=True, stopped=None):
         """The one loop: describe the request, call the model with the tools this mode may use, run
         tool calls (asking through approve when policy says so), and fit the result to the box.
-        serial: a request while typing, which fails fast instead of queueing behind another."""
+        serial: a request while typing, which replaces the one on its way (or waits for it)."""
         if self.backend == "none":
             raise RuntimeError(NOT_USED % self.problem if self.problem else self.unavailable or NO_MODEL)
         started = time.perf_counter()
@@ -656,7 +656,12 @@ class Rewriter:
                   "mode": mode, "app": box.app, "kind": box.kind, "system": prompt, "turn": said,
                   "examples": len(examples) // 2, "history": len(history), "picture": box.image is not None}
         self.recent.append(record)
-        if serial and not self.lock.acquire(blocking=False):
+        replaces = serial and hasattr(self.warm, "supersede")
+        if replaces:  # Claude Code, Codex: the stale one on its way stops, rather than answering first
+            self.warm.supersede()
+        if serial and not self.lock.acquire(timeout=self.timeout):
+            if replaces:
+                self.warm.settled()
             record["outcome"] = "busy"
             raise RuntimeError("the model is busy; keep typing or retry")
         refused = False
@@ -701,6 +706,8 @@ class Rewriter:
         finally:
             if serial:
                 self.lock.release()
+            if replaces:
+                self.warm.settled()
         if refused:  # the turn again without the shape; refused plain too, the schema was not why
             if again and self.takes.get((mode, said)):
                 self.takes[(mode, said)] -= 1  # the same take, asked again: not another one

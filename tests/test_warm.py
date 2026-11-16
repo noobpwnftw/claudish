@@ -117,9 +117,9 @@ class ClaudeCodeTests(unittest.TestCase):
         ready(self.backend)
         process = self.backend.process
         self.backend.lock.acquire()
-        threading.Timer(1.6, self.backend.lock.release).start()
+        threading.Timer(0.35, self.backend.lock.release).start()
         with self.assertRaisesRegex(RuntimeError, "busy"):
-            self.backend.ask("rewrite: ok", 2)
+            self.backend.ask("rewrite: ok", 0.4)
         self.assertIs(self.backend.process, process)
         self.assertEqual(self.backend.state, "warm")
 
@@ -235,6 +235,34 @@ class RewriterTests(unittest.TestCase):
                 self.assertTrue(wait_until(lambda: not session.running))  # its place among the service's sessions is free
             finally:
                 rewriter.stop_model()
+
+    def test_a_newer_rewrite_stops_the_stale_one_on_its_way(self):
+        from claudish.model import Rewriter
+        for backend, name in (("claude-code", "claude"), ("codex", "codex")):
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as folder, \
+                    patch.dict(os.environ, {"XDG_CONFIG_HOME": folder}):
+                rewriter = Rewriter(backend, command=[sys.executable, FAKE, name], timeout=10)
+                try:
+                    rewriter.start_model()
+                    self.assertEqual(ready(rewriter.warm), "warm")
+                    stale = []
+
+                    def first():
+                        try:
+                            rewriter.rewrite("make it slow please")  # 3 s
+                        except RuntimeError as exc:
+                            stale.append(str(exc))
+                    thread = threading.Thread(target=first)
+                    thread.start()
+                    time.sleep(0.4)
+                    started = time.monotonic()
+                    self.assertTrue(rewriter.rewrite("hello there"))
+                    self.assertLess(time.monotonic() - started, 2.0)  # not behind the 3 s exchange
+                    thread.join(5)
+                    self.assertEqual(stale, [warm.REPLACED])
+                    self.assertEqual(ready(rewriter.warm), "warm")  # the next one is ready again
+                finally:
+                    rewriter.stop_model()
 
     def test_an_exchange_taken_back_before_it_ran_never_runs(self):
         backend = warm.ClaudeCode([sys.executable, FAKE, "claude"])

@@ -122,7 +122,7 @@ class ClaudeBackendTests(unittest.TestCase):
             rewriter.rewrite("Ship it.")
 
     def test_one_request_at_a_time(self):
-        rewriter = Rewriter("claude")
+        rewriter = Rewriter("claude", timeout=0.1)
         with rewriter.lock:
             with self.assertRaisesRegex(RuntimeError, "busy"):
                 rewriter.rewrite("Ship it.")
