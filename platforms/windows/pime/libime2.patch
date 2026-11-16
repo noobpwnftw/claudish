@@ -1405,7 +1405,7 @@ index 0000000..7ab0140
 +
 +#endif
 diff --git a/src/TextService.cpp b/src/TextService.cpp
-index ea37cdc..fd87301 100644
+index ea37cdc..950bf26 100644
 --- a/src/TextService.cpp
 +++ b/src/TextService.cpp
 @@ -24,6 +24,7 @@
@@ -1559,7 +1559,7 @@ index ea37cdc..fd87301 100644
  
      // ITfKeyEventSink
      if (auto keystrokeMgr = threadMgr_.query<ITfKeystrokeMgr>()) {
-@@ -650,9 +741,30 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
+@@ -650,6 +741,43 @@ STDMETHODIMP TextService::OnUninitDocumentMgr(ITfDocumentMgr *pDocMgr) {
  }
  
  STDMETHODIMP TextService::OnSetFocus(ITfDocumentMgr *pDocMgrFocus, ITfDocumentMgr *pDocMgrPrevFocus) {
@@ -1574,23 +1574,36 @@ index ea37cdc..fd87301 100644
 +        // for the text box goes, as when the app loses the keyboard.
 +        onKillFocus();
 +    }
-     return S_OK;
- }
- 
++    return S_OK;
++}
++
 +// Claudish: the text edit sink follows the focused document's top context.
 +void TextService::watchEdits(ITfDocumentMgr* documentMgr) {
 +    textEditSink_.unadvise();
++    textLayoutSink_.unadvise();
 +    ComPtr<ITfContext> context;
 +    if (documentMgr && SUCCEEDED(documentMgr->GetTop(&context)) && context) {
-+        if (auto source = context.query<ITfSource>())
++        if (auto source = context.query<ITfSource>()) {
 +            textEditSink_ = SinkAdvice{ source, IID_ITfTextEditSink, static_cast<ITfTextEditSink*>(this) };
++            textLayoutSink_ = SinkAdvice{ source, IID_ITfTextLayoutSink, static_cast<ITfTextLayoutSink*>(this) };
++        }
 +    }
 +}
 +
- STDMETHODIMP TextService::OnPushContext(ITfContext *pContext) {
++// ITfTextLayoutSink
++STDMETHODIMP TextService::OnLayoutChange(ITfContext *pContext, TfLayoutCode lcode, ITfContextView *pView) {
++    if (lcode != TF_LC_CHANGE)
++        return S_OK;
++    // Read where the caret is now in an edit session of its own (none is open in this call).
++    auto session = ComPtr<EditSession>::make(pContext, [this](EditSession* session, TfEditCookie) {
++        onLayoutChange(session);
++    });
++    HRESULT result;
++    pContext->RequestEditSession(clientId_, session, TF_ES_ASYNC | TF_ES_READ, &result);
      return S_OK;
  }
-@@ -664,42 +776,14 @@ STDMETHODIMP TextService::OnPopContext(ITfContext *pContext) {
+ 
+@@ -664,42 +792,14 @@ STDMETHODIMP TextService::OnPopContext(ITfContext *pContext) {
  
  // ITfTextEditSink
  STDMETHODIMP TextService::OnEndEdit(ITfContext *pContext, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord) {
@@ -1640,7 +1653,7 @@ index ea37cdc..fd87301 100644
      return S_OK;
  }
  
-@@ -750,7 +834,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
+@@ -750,7 +850,11 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM
              // We use TF_ES_SYNC here, so the request becomes synchronus and blocking.
              // KeyEditSession::DoEditSession() and TextService::doKeyEditSession() will be
              // called before RequestEditSession() returns.
@@ -1653,7 +1666,7 @@ index ea37cdc..fd87301 100644
          }
      }
      return S_OK;
-@@ -784,7 +872,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
+@@ -784,7 +888,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lP
                      *pfEaten = onKeyUp(keyEvent, session);
                  }
              );
@@ -1665,7 +1678,7 @@ index ea37cdc..fd87301 100644
          }
      }
      return S_OK;
-@@ -803,6 +894,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
+@@ -803,6 +910,14 @@ STDMETHODIMP TextService::OnCompositionTerminated(TfEditCookie ecWrite, ITfCompo
      // grabbed by others, we're ``forced'' to terminate current composition.
      // If we end the composition by calling ITfComposition::EndComposition() ourselves,
      // this event is not triggered.
@@ -1680,7 +1693,7 @@ index ea37cdc..fd87301 100644
      onCompositionTerminated(true);
      composition_ = nullptr;
      return S_OK;
-@@ -911,6 +1010,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
+@@ -911,6 +1026,57 @@ bool TextService::selectionRect(EditSession* session, RECT* rect) const {
      return ret;
  }
  
@@ -1739,10 +1752,20 @@ index ea37cdc..fd87301 100644
      HWND hwnd = NULL;
      ComPtr<ITfContextView> view;
 diff --git a/src/TextService.h b/src/TextService.h
-index f2c1c09..860c764 100644
+index f2c1c09..a9fcfa0 100644
 --- a/src/TextService.h
 +++ b/src/TextService.h
-@@ -125,6 +125,10 @@ public:
+@@ -56,7 +56,8 @@ class TextService:
+         ComInterface<ITfCompositionSink>,
+         ComInterface<ITfCompartmentEventSink>,
+         ComInterface<ITfLangBarEventSink>,
+-        ComInterface<ITfActiveLanguageProfileNotifySink>
++        ComInterface<ITfActiveLanguageProfileNotifySink>,
++        ComInterface<ITfTextLayoutSink>
+     > {
+ 
+ public:
+@@ -125,6 +126,10 @@ public:
      // text composition handling
      bool isComposing() const;
  
@@ -1753,7 +1776,7 @@ index f2c1c09..860c764 100644
      // is keyboard disabled for the context (nullptr means current context)
      bool isKeyboardDisabled(ITfContext* context = nullptr) const;
      
-@@ -137,9 +141,17 @@ public:
+@@ -137,9 +142,17 @@ public:
      void endComposition(ITfContext* context);
      bool compositionRect(EditSession* session, RECT* rect) const;
      bool selectionRect(EditSession* session, RECT* rect) const;
@@ -1771,22 +1794,36 @@ index f2c1c09..860c764 100644
      void setCompositionString(EditSession* session, const wchar_t* str, int len) const;
      void setCompositionCursor(EditSession* session, int pos) const;
  
-@@ -165,6 +177,9 @@ public:
+@@ -165,6 +178,12 @@ public:
      virtual void onDeactivate();
  
      virtual void onSetFocus();
 +    // Claudish: an edit ended in the focused document while nothing is composed, and the selection
 +    // (the caret) changed: a click, the app's own edit, or ours (session: read-only, for the caret).
 +    virtual void onEndEdit(EditSession* session) {}
++    // Claudish: the focused document's text moved on screen (a scroll, the window moved); session:
++    // read-only, for the caret's new place.
++    virtual void onLayoutChange(EditSession* session) {}
      virtual void onKillFocus();
  
      virtual bool filterKeyDown(KeyEvent& keyEvent);
-@@ -277,10 +292,12 @@ private:
+@@ -223,6 +242,9 @@ public:
+     // ITfTextEditSink
+     STDMETHODIMP OnEndEdit(ITfContext *pContext, TfEditCookie ecReadOnly, ITfEditRecord *pEditRecord) override;
+ 
++    // ITfTextLayoutSink (Claudish: the text moved on screen, a scroll or the window moved)
++    STDMETHODIMP OnLayoutChange(ITfContext *pContext, TfLayoutCode lcode, ITfContextView *pView) override;
++
+     // ITfKeyEventSink
+     STDMETHODIMP OnSetFocus(BOOL fForeground) override;
+     STDMETHODIMP OnTestKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) override;
+@@ -277,10 +299,13 @@ private:
      SinkAdvice threadMgrEventSink_;
      SinkAdvice activateLanguageProfileNotifySink_;
      SinkAdvice keyboardOPenCloseSink_;
 -    SinkAdvice textEditSink_;
 +    SinkAdvice textEditSink_;  // on the focused document's context (watchEdits): TSF sends edits there
++    SinkAdvice textLayoutSink_;  // and layout changes
 +    void watchEdits(ITfDocumentMgr* documentMgr);
      DWORD langBarSinkCookie_;
  

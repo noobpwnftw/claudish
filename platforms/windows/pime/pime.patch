@@ -692,7 +692,7 @@ index 3e09587..1e5b6ab 100644
  		// load backend information
  		std::ifstream fp(programDir_ + L"\\backends.json", std::ifstream::binary);
 diff --git a/PIMETextService/PIMETextService.cpp b/PIMETextService/PIMETextService.cpp
-index 286246a..7493c4c 100644
+index 286246a..ccfce11 100644
 --- a/PIMETextService/PIMETextService.cpp
 +++ b/PIMETextService/PIMETextService.cpp
 @@ -96,6 +96,21 @@ void TextService::onDeactivate() {
@@ -753,7 +753,7 @@ index 286246a..7493c4c 100644
          }
      }
  }
-@@ -348,6 +366,87 @@ void TextService::hideCandidates() {
+@@ -348,6 +366,99 @@ void TextService::hideCandidates() {
  	showingCandidates_ = false;
  }
  
@@ -832,6 +832,18 @@ index 286246a..7493c4c 100644
 +		hideGhost();
 +}
 +
++// Claudish: the text moved on screen (a scroll, the window moved): an open panel and continue's
++// suggestion go with it, to where the caret is now.
++void TextService::onLayoutChange(Ime::EditSession* session) {
++	if (candidateWindow_ && candidateWindow_->isVisible())
++		updateCandidatesWindow(session);
++	RECT caret;
++	if (!ghostShown_.empty() && ghostWindow_ && caretRect(session, &caret) && !EqualRect(&caret, &ghostCaret_)) {
++		ghostShown_ = ghostWindow_->show(ghostShown_, caret);  // the words that fit there
++		ghostCaret_ = caret;
++	}
++}
++
 +void TextService::hideGhost() {
 +	ghostShown_.clear();
 +	if (ghostWindow_)
@@ -841,7 +853,7 @@ index 286246a..7493c4c 100644
  // message window
  void TextService::showMessage(Ime::EditSession* session, std::wstring message, int duration) {
  	// remove previous message if there's any
-@@ -371,14 +470,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
+@@ -371,14 +482,27 @@ void TextService::showMessage(Ime::EditSession* session, std::wstring message, i
  	messageTimerId_ = ::SetTimer(messageWindow_->hwnd(), 1, duration * 1000, (TIMERPROC)TextService::onMessageTimeout);
  }
  
@@ -873,7 +885,7 @@ index 286246a..7493c4c 100644
      }
  }
  
-@@ -431,6 +543,7 @@ void TextService::closeClient() {
+@@ -431,6 +555,7 @@ void TextService::closeClient() {
  		// detroy UI resources
  		hideMessage();
  		hideCandidates();
@@ -882,7 +894,7 @@ index 286246a..7493c4c 100644
  }
  
 diff --git a/PIMETextService/PIMETextService.h b/PIMETextService/PIMETextService.h
-index 303cf17..698f453 100644
+index 303cf17..fe04e19 100644
 --- a/PIMETextService/PIMETextService.h
 +++ b/PIMETextService/PIMETextService.h
 @@ -23,6 +23,8 @@
@@ -894,17 +906,18 @@ index 303cf17..698f453 100644
  #include <LibIME2/src/EditSession.h>
  #include <LibIME2/src/LangBarButton.h>
  #include "PIMEImeModule.h"
-@@ -46,6 +48,9 @@ public:
+@@ -46,6 +48,10 @@ public:
  	virtual void onDeactivate();
  
  	virtual void onFocus();
 +	virtual void onSetFocus();
 +	virtual void onEndEdit(Ime::EditSession* session);
++	virtual void onLayoutChange(Ime::EditSession* session);
 +	virtual void onKillFocus();
  
  	virtual bool filterKeyDown(Ime::KeyEvent& keyEvent);
  	virtual bool onKeyDown(Ime::KeyEvent& keyEvent, Ime::EditSession* session);
-@@ -122,6 +127,17 @@ public:
+@@ -122,6 +128,17 @@ public:
  		updateFont_ = true;
  	}
  
@@ -922,7 +935,7 @@ index 303cf17..698f453 100644
  	bool showingCandidates() {
  		return showingCandidates_;
  	}
-@@ -166,6 +182,15 @@ private:
+@@ -166,6 +183,15 @@ private:
  	std::wstring selKeys_;
  	bool candUseCursor_;
  	std::wstring candFontName_;
