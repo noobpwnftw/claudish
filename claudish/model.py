@@ -369,7 +369,7 @@ class Rewriter:
                                   self.modes["instruct"]["box"]["cli"])
         elif backend == "llama" and command:  # the local model's server, which the service runs
             from . import warm
-            self.warm = warm.ModelServer(command, self.endpoint)
+            self.warm = warm.ModelServer(command, self.endpoint, prime=self.prime)
         self.claude = Claude(model or CLAUDE_MODEL, timeout) if backend == "claude" else None
 
     @property
@@ -403,6 +403,17 @@ class Rewriter:
                 kept[warm_key(warm)] = warm
                 self.handed.append(warm)
         return kept
+
+    def prime(self):
+        """The local model's server reads the tone once it answers (ModelServer): a rewrite's
+        system prompt, which every mode's starts with, and one token of answer."""
+        payload = {"messages": [{"role": "system", "content": self.modes["rewrite"]["system"]},
+                                {"role": "user", "content": "ok"}],
+                   "max_tokens": 1, "temperature": 0, "stream": False, "cache_prompt": True, "reasoning_budget": 0}
+        req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(),
+                      headers=self.request_headers())
+        with opener_for(self.endpoint).open(req, timeout=120) as response:
+            response.read()
 
     @property
     def model_state(self):

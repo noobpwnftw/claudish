@@ -9,7 +9,7 @@ from download_model import PRESETS
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
-from claudish.warm import llama_command  # noqa: E402
+from claudish.warm import gpus, llama_command  # noqa: E402
 
 
 def arguments(parser):
@@ -26,7 +26,7 @@ def command(args):
     model = root / "models" / PRESETS[args.preset][2]
     if not model.is_file():
         raise ValueError("run python scripts/download_model.py " + args.preset)
-    return llama_command(server, model, args.port, args.preset == "gemma", args.gpu_layers)
+    return llama_command(server, model, args.port, args.preset == "gemma", args.gpu_layers, gpu=gpus(server))
 
 
 if __name__ == "__main__":

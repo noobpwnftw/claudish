@@ -181,13 +181,14 @@ def step_local(name, settings, variant=None):
         return "done", "the %r profile runs the local model, and is in use" % name, None
 
     def write():
-        from .warm import llama_command
+        from .warm import gpus, llama_command
         server = (download_llama.installed(variant) if variant else None) or download_llama.find_server()
         if not server:
             raise ValueError("llama-server was not found: `claudish setup --profile local` downloads it")
         if not download_model.target("gemma").is_file():  # skipped (--skip model): the service would fail at every login
             raise ValueError("the model is not downloaded: `claudish setup --profile local` downloads it")
-        argv = llama_command(server, download_model.target("gemma"), urlsplit(settings["model_url"]).port or urlsplit(config.MODEL_URL).port)
+        argv = llama_command(server, download_model.target("gemma"), urlsplit(settings["model_url"]).port or urlsplit(config.MODEL_URL).port,
+                             gpu=gpus(server))
         data = read(config.default_path())
         data.setdefault("profiles", {}).setdefault(name, dict(config.STARTER["profiles"]["local"]))["command"] = argv
         data["profile"] = name

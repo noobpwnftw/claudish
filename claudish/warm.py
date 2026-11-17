@@ -447,17 +447,41 @@ def shaped(text):
         return False
 
 
-def llama_command(server, model, port="18766", gemma=True, gpu_layers="99"):
-    """llama-server's argv for a downloaded model (claudish setup --profile local, scripts/run_model.py)."""
+def gpus(server):
+    """Whether llama-server has a GPU to run on (its --list-devices); None when it cannot say."""
+    import subprocess
+    try:
+        listed = subprocess.run([str(server), "--list-devices"], capture_output=True, text=True, timeout=30,
+                                env=environment(str(server))).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if "Available devices:" not in listed:
+        return None
+    return listed.split("Available devices:", 1)[1].strip() not in ("", "(none)")
+
+
+def llama_command(server, model, port="18766", gemma=True, gpu_layers="99", gpu=None):
+    """llama-server's argv for a downloaded model (claudish setup --profile local, scripts/run_model.py).
+    gpu: gpus(server); False adds -fa off, None leaves llama.cpp's own choice."""
     # Gemma 4 thinks first unless told not to, which no request waits for (benchmarks/README.md).
     # --reasoning off holds where a newer chat template ignores enable_thinking (it thought anyway);
     # --reasoning-budget 0 where an answer held to a schema lets it think first anyway (continue's
     # 256 tokens went on "Thinking Process:", 76 of 86 suggestions, b11822 and later).
+    # -c: an instruction in a full text box with a long tone and its follow-ups (4096 refused
+    # unhinged's first turn); Gemma 4's sliding-window cache makes 16384 about 190 MB more.
+    # --swa-full: Gemma 4's sliding-window cache could not go back to a prefix two requests share,
+    # so every rewrite read its whole prompt again; full, it reads from where they differ (about
+    # 600 MB at this -c), and the CPU build reads a prompt 1.6 times as fast.
+    # No -t: llama.cpp's default (the physical cores) reads a prompt about twice as fast on the CPU
+    # build as 4 threads did, and the prompt is most of a request's time there.
     extra = ["--jinja", "--reasoning", "off", "--reasoning-budget", "0",
-             "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "4096"] \
+             "--chat-template-kwargs", '{"enable_thinking":false}', "-c", "16384", "--swa-full"] \
         if gemma else ["-c", "2048"]
+    # -fa off on a CPU: its flash attention ("auto" turns it on) read Gemma 4 E4B's prompts a third as
+    # fast (unhinged's rewrite 4 s instead of 10 to 17); a GPU's (CUDA) is the faster one.
+    cpu = ["-fa", "off"] if gpu is False else []
     return [str(server), "-m", str(model), "--host", "127.0.0.1", "--port", str(port),
-            "-ngl", str(gpu_layers), "-t", "4", "-np", "1"] + extra
+            "-ngl", str(gpu_layers), "-np", "1"] + extra + cpu
 
 
 TIMED_OUT = "failed: the local model did not answer within 120 s"
@@ -472,8 +496,12 @@ class ModelServer:
     stops or the settings switch to another model. Requests go to it over HTTP (model_url)."""
     shaped = False
 
-    def __init__(self, command, url):
+    def __init__(self, command, url, prime=None):
         self.command, self.url, self.configured = list(command), url.rstrip("/"), None
+        # Read once it answers, before "warm": the tone, the system prompt every mode starts with,
+        # so a first request reads only its own part (unhinged's 2500 tokens took the CPU build
+        # longer than a rewrite's timeout). Failing changes nothing: requests read it themselves.
+        self.prime = prime
         self.state = "stopped"
         self.stopped = threading.Event()
         self.guard = threading.Lock()  # the process, between run() and stop()
@@ -542,6 +570,11 @@ class ModelServer:
                 if process is not None:
                     end(process)
                 return
+            if self.prime:
+                try:
+                    self.prime()
+                except Exception:
+                    pass
             self.state = "warm"
             process.wait()
             if self.stopped.is_set():

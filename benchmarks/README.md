@@ -240,6 +240,35 @@ Bard and unhinged had no example with a number; one each moved them a case or tw
 the tone's voice ("every number and date in digits as written"; "no numbers or facts of its own")
 did the rest. Unhinged's remaining misses are its commentary's arithmetic and jokes.
 
+## The local model's llama-server flags (2026-11-17)
+
+The pinned CPU build (b11822, what `claudish setup --profile local` downloads for most machines),
+Gemma 4 E4B, on the Spark's 20 Arm cores; the profile's 15 s timeout for a rewrite, 60 s for an
+instruction (`.tools/rigs/local_first.py`, `local_fit.py`, `cache_reuse.py`, `cpu_speed.sh`).
+
+- `-c 4096` refused unhinged's instruction in a full text box (4266 tokens). `-c 16384`: Gemma 4's
+  sliding-window cache makes it about 190 MB more.
+- `-t 4` read a prompt at 46 tokens/s; llama.cpp's default (the cores) at 88. A rewrite in a text
+  box is about 1100 prompt tokens: 14 s, and 24 s with 4 threads, against the 15 s timeout.
+- Every rewrite read its whole prompt again: the sliding-window cache cannot go back to a prefix
+  two requests share. `--swa-full` reads from where they differ (about 600 MB) and reads faster.
+- Flash attention ("auto" turns it on) read the prompt a third as fast on a CPU; on CUDA it is the
+  faster one (0.7 / 0.8 s a rewrite). Setup asks llama-server for its devices (`--list-devices`) and
+  writes `-fa off` when it has no GPU.
+- Unhinged's tone is 2500 tokens, read before every first request after the model starts (28 s on
+  this CPU). The service now has the model read it before calling it warm (8 s with these flags).
+
+| CPU build, a rewrite in a text box | Before | Now |
+| --- | ---: | ---: |
+| corporate | 14.7 s | 4.8–6.0 s |
+| unhinged | timed out | 4.8–5.1 s |
+| bard, salesman | | 2.5–4.8 s |
+| an instruction in a full box (corporate / unhinged) | 26.5 s / refused | 9.4 s / 21 s |
+
+The same answers: the 80 rewrites 77 / 80 faithful, 50 / 80 with em dashes; continue 86 / 86
+(median 2.2 s each, no text box). A profile an earlier setup wrote keeps its command; priming
+reaches it, the flags come with `claudish setup --profile local` writing a new one.
+
 ## Choosing the models (G53, 2026-10-24)
 
 The question: which model makes cd_AI's default tone, full corporate slop that keeps the

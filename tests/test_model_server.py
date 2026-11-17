@@ -267,9 +267,68 @@ class ModelServerTests(unittest.TestCase):
                     fresh.stop_model()
                     fresh.warm.thread.join(5)
 
+    def test_the_tone_is_read_before_the_model_is_warm(self):
+        """A first request reads only its own part: the server has read the tone, which every
+        mode's system prompt starts with, by the time it is called warm."""
+        import json
+        import socket
+        import tempfile
+        from claudish.model import Rewriter
+        recording = FAKE_LLAMA.replace("    def log_message", (
+            "    def do_POST(self):\n"
+            "        body = self.rfile.read(int(self.headers['Content-Length']))\n"
+            "        open(sys.argv[2], 'wb').write(body)\n"
+            "        self.send_response(200); self.end_headers(); self.wfile.write(b'{}')\n"
+            "    def log_message"))
+        with socket.socket() as probe, tempfile.TemporaryDirectory() as folder:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+            probe.close()
+            sent = os.path.join(folder, "sent.json")
+            rewriter = Rewriter("llama", "http://127.0.0.1:%d" % port, tone="unhinged",
+                                command=[sys.executable, "-c", recording, str(port), sent])
+            rewriter.start_model()
+            try:
+                deadline = time.monotonic() + 5
+                while rewriter.model_state != "warm" and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertEqual(rewriter.model_state, "warm")
+                payload = json.load(open(sent))
+            finally:
+                rewriter.stop_model()
+        system = payload["messages"][0]["content"]
+        self.assertTrue(system.startswith("# THE PROFESSIONALLY UNHINGED"))
+        for mode in ("rewrite", "continue", "instruct"):
+            self.assertTrue(rewriter.modes[mode]["system"].startswith(system[:10000]), mode)
+        self.assertEqual((payload["max_tokens"], payload["cache_prompt"]), (1, True))
+
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
         self.assertEqual(argv[:7], ["/x/llama-server", "-m", "/m/gemma.gguf", "--host", "127.0.0.1", "--port", "18766"])
+
+    def test_llama_command_fits_a_long_tone_and_uses_the_cores(self):
+        """Unhinged's instruction in a full text box was 4266 tokens (4096 refused it); a pinned
+        thread count halved the CPU build's prompt speed, llama.cpp's default is the cores; Gemma 4's
+        sliding-window cache, unless full, read every prompt again from its start."""
+        argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)
+        self.assertGreaterEqual(int(argv[argv.index("-c") + 1]), 16384)
+        self.assertNotIn("-t", argv)
+        self.assertIn("--swa-full", argv)  # a prefix two requests share is read once
+        self.assertNotIn("-fa", argv)  # a GPU, or not known: llama.cpp's own choice
+
+    def test_on_a_cpu_flash_attention_is_off(self):
+        """The CPU build's flash attention read prompts a third as fast; a GPU's is faster."""
+        import tempfile
+        argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766, gpu=False)
+        self.assertEqual(argv[argv.index("-fa") + 1], "off")
+        self.assertNotIn("-fa", warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766, gpu=True))
+        with tempfile.TemporaryDirectory() as folder:
+            for listed, expected in (("(none)", False), ("CUDA0: NVIDIA GB10 (126141 MiB)", True)):
+                server = Path(folder, "llama-server")
+                server.write_text("#!%s\nprint('Available devices:\\n  %s')\n" % (sys.executable, listed))
+                server.chmod(0o755)
+                self.assertIs(warm.gpus(server), expected, listed)
+            self.assertIsNone(warm.gpus(Path(folder, "missing")))
 
 
 if __name__ == "__main__":
