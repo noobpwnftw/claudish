@@ -1,24 +1,25 @@
 # Changelog
 
-## 0.4.8
+## 0.4.9
 
-- Accents: an accent left waiting on its dead key (U.S. International's closing quote) goes in
-  before Enter, and before Tab and Shift+Enter while you compose, on Linux, macOS and Windows: the
-  rewrite or instruction has the quote you saw.
-- Continue: a suggestion after any line break (Word's, a Qt app's Shift+Enter) or a no-break space
-  starts without a space; no suggestion right after £, €, ¥ or an en dash, as after $ and a hyphen;
-  a model that repeats your text across paragraphs (WordPad, Word) is not inserted twice. A preview
-  is never cut inside an emoji or a flag, and macOS takes a selection of emoji up to the same limit
-  as the other platforms.
-- Settings and `claudish doctor`: Claude Code or Codex signed out stays said (log in) after a
-  rewrite it refused, rather than turning ready. A config file that does not read is said as that,
-  with cd_AI keeping the settings it had until it does. The first-run settings say where to add
-  Claudish on Linux.
-- Linux desktops other than GNOME: `claudish doctor` accepts IBus reached through Wayland or XIM,
-  tells Sway and Hyprland to set the IBus modules, says when a session does not read
-  `environment.d` (use `--system`), and checks that Claudish is among IBus's input methods; the
-  install and docs say to add it in IBus Preferences there. `claudish setup` reports doctor's own
-  failure rather than registering again. The site's install-by-hand line keeps the system's
-  packages on Linux, so instructions in a terminal read its last lines.
-- Windows: the installer is 7.5 MB smaller.
-- macOS: `claudish doctor` names Text Input and Claudish — Compose, as System Settings does.
+- Local model: `claudish setup --profile local` writes a llama-server command that reads prompts
+  about three times as fast on a CPU (its own thread count, flash attention off when there is no
+  GPU, a full sliding-window cache so a shared prefix is read once) and has room for a long tone's
+  instruction in a full text box. The service has the model read the tone before it says it is
+  ready, also after a tone change in the settings. Continue on Gemma 4 no longer spends its answer
+  on thinking.
+- Rewrites: a newer rewrite stops one still on its way, on Claude Code, Codex and a local model.
+  The corporate tone's own example has its em dash; bard keeps numbers in digits, and unhinged adds
+  none of its own.
+- Continue: a suggestion at the screen's edge shows the whole words that fit, and Tab takes what is
+  shown. Windows asks after the same short pause as Linux and macOS.
+- Windows: a click elsewhere hides a suggestion that no longer belongs there; scrolling or moving
+  the window places it again; each window's DPI and a theme change are followed.
+- Linux: Ctrl+Shift+U enters a character by its code.
+- Instructions: an answer with no one-line command for a terminal says so. A helper's handoff note
+  and prompt use the profile's templates, and a helper started through a wrapper (`env claude`)
+  has its permission settings checked. `claudish doctor` says why a helper is not offered.
+- MCP: a context source's structured and resource results are read, as a tool's are, and its tools
+  are listed page by page. A server named `textbox` is refused (it is cd_AI's own).
+- Settings: requests go on while a saved change is taken up.
+- `claudish setup --skip` also takes `tone` and `local`.
