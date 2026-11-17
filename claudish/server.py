@@ -80,10 +80,10 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
         fresh.adoptable = old.hand_over()  # routed profiles' model processes go on, for fresh to take up
         routed = fresh.adoptable.pop(warm_key(fresh.warm), None) if fresh.warm and not same else None
         if same:  # the same model process goes on (a tone or a binding changed)
-            fresh.warm = old.warm  # and still old's for a request running there
+            fresh.adopt(old.warm)  # and still old's for a request running there
             old.handed.append(old.warm)
         elif routed is not None:  # a profile it routed to is now the one in use: its process goes on
-            fresh.warm = routed
+            fresh.adopt(routed)
         else:
             if old.warm:  # ended first: a local model's new server needs the port the old one has
                 old.warm.stop()
@@ -424,6 +424,9 @@ def make_server(rewriter, port=PORT, token=None, reload=None, config_path=None):
                     except Exception:
                         pass
                     return self.reply(500, {"error": "cd_AI could not save that (%s)" % (exc,)})
+                # Taken up here (swap): requests meanwhile go on with the model as it is, as at a
+                # hand edit's reload, not queued behind a model stopping and starting.
+                stamps[0] = stamp()
                 if reload is not None:
                     try:
                         swap()

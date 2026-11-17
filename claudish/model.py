@@ -352,7 +352,6 @@ class Rewriter:
             if name not in self.modes:
                 raise ValueError("mode %r is routed, but no template has it" % name)
             self.modes[name]["profile"] = route["profile"]
-        self.finish = invocation.finish
         self.lock = threading.Lock()
         self.newest = 0  # the latest request while typing (serial): an older one waiting gives way
         self.ticketing = threading.Lock()
@@ -404,11 +403,19 @@ class Rewriter:
                 self.handed.append(warm)
         return kept
 
+    def adopt(self, warm):
+        """A model process another rewriter started (a reload kept it): this one's from now on,
+        and a local model's server reads this one's tone."""
+        self.warm = warm
+        if hasattr(warm, "reprime"):  # a local model's server (warm.ModelServer)
+            warm.reprime(self.prime)
+
     def prime(self):
-        """The local model's server reads the tone once it answers (ModelServer): a rewrite's
-        system prompt, which every mode's starts with, and one token of answer."""
-        payload = {"messages": [{"role": "system", "content": self.modes["rewrite"]["system"]},
-                                {"role": "user", "content": "ok"}],
+        """The local model's server reads the tone once it answers (ModelServer): a rewrite's system
+        prompt (a named tone's persona, which every mode's starts with), its first example, and one
+        token of answer."""
+        spec = self.modes["rewrite"]
+        payload = {"messages": [{"role": "system", "content": spec["system"]}] + spec["examples"][:1],
                    "max_tokens": 1, "temperature": 0, "stream": False, "cache_prompt": True, "reasoning_budget": 0}
         req = Request(self.endpoint + "/v1/chat/completions", data=json.dumps(payload).encode(),
                       headers=self.request_headers())
@@ -460,7 +467,7 @@ class Rewriter:
             other.adoptable = self.adoptable
             kept = self.adoptable.pop(warm_key(other.warm), None) if other.warm else None
             if kept is not None:  # the same model process, from before the config was edited
-                other.warm = kept
+                other.adopt(kept)
             else:
                 other.start_model()  # its model process, as the service's own starts with the service
             self.routed[name] = other
@@ -804,7 +811,7 @@ class Rewriter:
         """The drafts in the model's outputs, fitted to the box: each once, and none that only
         repeats your words or an example."""
         from . import quirks, shapes
-        from .modes import parroted
+        from .modes import finish, parroted
         candidates = []
         for output in outputs:
             found = shapes.drafts(output)
@@ -818,7 +825,7 @@ class Rewriter:
             else:
                 found = [quirks.unmarked(text, draft) for draft in found]  # the part, as it was marked
             for draft in found:
-                draft = box.fit(mode, self.finish(mode, text, draft))
+                draft = box.fit(mode, finish(mode, text, draft))
                 if parroted(mode, text, draft, examples):
                     continue
                 if draft and draft not in candidates:

@@ -116,7 +116,11 @@ class Conversations:
                           key=lambda c: c.used)
             resting = [c.agent for c in live[:max(0, len(live) + 1 - MAX_AGENTS)] if not c.agent.running]
         for agent in resting:
-            agent.close()
+            if agent.turn_lock.acquire(blocking=False):  # not while a turn began meanwhile (it resumes after)
+                try:
+                    agent.close()
+                finally:
+                    agent.turn_lock.release()
 
     def sweeping(self):
         while True:
@@ -251,12 +255,13 @@ class ModelDriver:
                 own["check"],
                 {"type": "object", "properties": {}},
                 lambda arguments: "\n\n".join(handoff.progress(h) for h in self.conversation.handoffs[-3:]))
+        box_words = self.rewriter.modes["instruct"]["box"]  # the profile's (handoff, handoff_note)
         for title, helper in handoff.helpers(self.rewriter.helper).items():
             def hand_over(arguments, title=title, helper=helper):
                 import os
                 import uuid
                 task = str(arguments.get("task") or "").strip()[:500]
-                note = handoff.write_note(task, box.observations)
+                note = handoff.write_note(task, box.observations, box_words)
                 session = str(uuid.uuid4()) if any("{session}" in part for part in helper) else ""
                 # A handle, so a later "is it done?" in this text box can look (G44).
                 record = {"helper": title, "program": handoff.program(helper), "task": task, "session": session,
@@ -264,7 +269,7 @@ class ModelDriver:
                 if box.kind == "terminal":
                     # At a terminal prompt the helper's command is the draft: Tab puts it at the
                     # prompt and your Enter runs it there, in that folder; no window, no question.
-                    command = handoff.line(helper, note, session)
+                    command = handoff.line(helper, note, session, box_words)
                     if command:
                         self.drafted = [command]
                         self.conversation.handoffs.append(record)
@@ -272,7 +277,7 @@ class ModelDriver:
                         raise Finished(self.settled)
                 launcher = self.rewriter.launcher
                 window = "claudish-%s" % uuid.uuid4().hex[:6] if launcher and "{name}" in launcher else ""
-                if not handoff.launch(helper, note, launcher, session, window):
+                if not handoff.launch(helper, note, launcher, session, window, box_words):
                     return self.words()["no_window"].format(helper=title)
                 # A launcher's window starts where it chooses (tmux: its session's folder): any folder.
                 record.update(tmux=window if launcher and launcher[0] == "tmux" else "",
@@ -288,7 +293,7 @@ class ModelDriver:
                 # At a prompt its line is the draft, which you run: no question. A line that cannot be
                 # drafted there opens a window instead, which is asked about first, as elsewhere.
                 hand_over, "read" if box.kind == "terminal" and handoff.line(
-                    helper, os.path.join(handoff.notes_dir(), "h-00000000.md"), "session") else "write",  # its real folder
+                    helper, os.path.join(handoff.notes_dir(), "h-00000000.md"), "session", box_words) else "write",  # its real folder
                 lambda arguments, title=title: "Send this task to %s?" % title)
         return tools
 

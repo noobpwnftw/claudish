@@ -16,6 +16,8 @@ MAX_SESSIONS = 4
 KEEP_SECONDS = 600  # a finished session's events stay readable this long
 
 
+NO_ONE_LINE = "no one-line command for a terminal in that answer"  # said in the panel as it is (composition.OWN_WORDS)
+
 class Session:
     def __init__(self, driver, one_line=False):
         self.id = uuid.uuid4().hex
@@ -42,7 +44,7 @@ class Session:
                     fields["candidates"] = [one_line(c) for c in fields["candidates"] if one_line(c)]
                 if kind == "result" and said and not fields["text"] and not fields.get("candidates"):
                     # Nothing a prompt can take as one line: said, not an empty draft.
-                    kind, fields = "error", {"text": "no one-line command for a terminal in that answer"}
+                    kind, fields = "error", {"text": NO_ONE_LINE}
             event = dict(fields, seq=len(self.events), type=kind)
             self.events.append(event)
             if kind == "question":

@@ -323,8 +323,9 @@ if __name__ == "__main__":
 
 
 class LinuxInputMethodStepTests(unittest.TestCase):
-    def step(self, *rows):
+    def step(self, *rows, ibus=True):
         with patch("claudish.setup.platform.system", return_value="Linux"), \
+                patch("claudish.setup.shutil.which", return_value="/usr/bin/ibus-daemon" if ibus else None), \
                 patch("claudish.setup.doctor.check_ime_linux", return_value=list(rows)):
             return setup.step_ime()
 
@@ -347,7 +348,8 @@ class LinuxInputMethodStepTests(unittest.TestCase):
                                    ("IBus search path", "fail", "does not include it", "install.py"))[0], "todo")
         self.assertEqual(self.step(("Input method", "ok", "registered (x)", None),
                                    ("IBus search path", "warn", "next login", "log out"))[0], "done")
-        self.assertEqual(self.step(("Input method", "fail", "IBus is not installed", "sudo apt install ibus"))[0], "manual")
+        self.assertEqual(self.step(("Input method", "fail", "IBus is not installed", "sudo apt install ibus"),
+                                   ibus=False)[0], "manual")  # IBus itself: the system's packages, not registering
 
 
 class WaitTests(unittest.TestCase):

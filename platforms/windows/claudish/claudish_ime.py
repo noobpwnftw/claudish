@@ -5,7 +5,7 @@ import os
 import time
 import weakref
 
-from .composition import HELD_SECONDS, MODES, PAGE, Composition, ShiftTap, window
+from .composition import HELD_SECONDS, MODES, TOAST_SECONDS, PAGE, Composition, ShiftTap, window
 from .client import Suggestions
 from .screen import is_terminal
 
@@ -60,7 +60,7 @@ LAST_MODE = [None]
 PARKED = {}  # the foreground window's process id -> (Composition, Suggestions, when)
 # The held exchange's pill waits for your next key (which hides any toast), as on macOS and Linux:
 # as long as the exchange is held.
-PILL_SECONDS = 600
+PILL_SECONDS = HELD_SECONDS
 INSTANCES = weakref.WeakSet()  # the live instances: a parked worker one still uses is not closed
 UNSEEN = object()  # an instance that has not looked for a parked exchange since it was activated
 
@@ -275,7 +275,7 @@ class ClaudishTextService(TextService):
         self.setCommitString(kept)  # ends the composition; "" inserts nothing
         spec, lasting = self.state.switched()
         if spec and not self.sensitive():  # the mode switch briefly, or the held exchange's pill (not over a password)
-            self.setToast(spec, PILL_SECONDS if lasting else 2)
+            self.setToast(spec, PILL_SECONDS if lasting else TOAST_SECONDS)
         self.show_mode()
         self.changed()
 
@@ -562,10 +562,10 @@ class ClaudishTextService(TextService):
         after = self.state.caret_after(self.around()[1] if self.state.live else "")
         trace("changed", kind, "quiet=%s inside=%s automatic=%s" % (self.state.quiet, self.state.inside, self.state.automatic))
         if self.worker and self.state.automatic:
-            # Continue asks at once at a word boundary (itself the pause); the timer shows the
-            # answer as soon as it comes (await_result).
+            # Continue asks after a pause at a word boundary (the worker's debounce, as on Linux and
+            # macOS); the timer shows the answer as soon as it comes (await_result).
             self.worker.schedule(self.state.revision, self.state.text, self.state.mode, app=focused_app(),
-                                 immediate=self.state.live, after=after, purpose=self.field())
+                                 after=after, purpose=self.field())
             self.await_result()
         elif self.worker and not self.state.text:
             self.worker.schedule(self.state.revision, "")
@@ -650,7 +650,7 @@ class ClaudishTextService(TextService):
             trace("result", kind)
         toast = self.state.done_toast(result[1]["done"]) if kind == "done" else None
         if toast and not away:
-            self.setToast(toast, 3)
+            self.setToast(toast, TOAST_SECONDS)
         return kind
 
     def onKeyDown(self, event):
@@ -787,7 +787,7 @@ class ClaudishTextService(TextService):
                 return True
             toast = self.state.dropped_toast() if action in ("clear", "drop") else None
             if toast:  # words discarded: said, with the key that brings them back
-                self.setToast(toast, 2)
+                self.setToast(toast, TOAST_SECONDS)
             if action == "clear":  # the reply goes; the question stays
                 self.publish()
                 return True

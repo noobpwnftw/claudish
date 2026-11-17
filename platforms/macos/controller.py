@@ -11,7 +11,7 @@ from AppKit import NSAttributedString, NSColor, NSEvent, NSEventModifierFlagComm
 from Foundation import NSNotFound, NSTimer
 from InputMethodKit import IMKInputController
 
-from claudish.composition import ACCENTS, AROUND, MAX_COMPOSITION, PAGE, Composition, ShiftTap, accented, typeable, window
+from claudish.composition import ACCENTS, AROUND, LAG, MAX_COMPOSITION, TOAST_SECONDS, PAGE, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 from panel import Overlay, Panel, units  # cd_AI's own panel and suggestion overlay (G45)
@@ -65,7 +65,6 @@ OWNER = [None]  # the controller last activated: only it draws or hides them (an
 # The mode, as the menu bar shows it for every text box (one input source): a text box you come to
 # is in the mode you were in, as on Windows and IBus.
 LAST_MODE = [None]
-LAG = 3  # characters typed in continue an app may not show yet at the next key
 TOAST_TIMER = [None]  # the shared toast's hide timer: another text box's toast (or pill) replaces it
 
 
@@ -451,12 +450,12 @@ class ClaudishInputController(IMKInputController):
             return
         TOAST.show(self.caret(client, start=True), spec)
         if TOAST_TIMER[0] is not None:
-            TOAST_TIMER[0].invalidate()  # a newer toast gets its own two seconds, a pill none (any text box's)
+            TOAST_TIMER[0].invalidate()  # a newer toast gets its own TOAST_SECONDS, a pill none (any text box's)
             TOAST_TIMER[0] = None
         if lasting:  # a pill: until a key or a focus change ends it
             return
         TOAST_TIMER[0] = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            2.0, self, "hideToast:", None, False)
+            float(TOAST_SECONDS), self, "hideToast:", None, False)
 
     @objc.signature(b"v@:@")
     def hideToast_(self, timer):

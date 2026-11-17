@@ -536,8 +536,9 @@ class AskAndHelperTests(unittest.TestCase):
         self.assertEqual([c["label"] for c in asked[0]["choices"]], ["No", "Yes"])
         self.assertEqual((result["text"], result["candidates"], result["done"]),
                          ("", [], "claude opened in a new window"))
-        template, note, launcher, session, window = launch.call_args.args
+        template, note, launcher, session, window, words = launch.call_args.args
         self.assertIsNone(launcher)
+        self.assertIn("{note}", words["handoff"])  # the profile's templates box: its words reach the helper
         self.assertEqual(session, "")  # no {session} in the template: nothing to follow up on
         self.assertEqual(template, ["claude", "{prompt}"])
         self.assertTrue(note.startswith(folder))
@@ -789,6 +790,7 @@ class RestingAgentTests(unittest.TestCase):
         class Agent:
             def __init__(self, running=False):
                 self.running, self.closed = running, False
+                self.turn_lock = threading.Lock()
 
             def alive(self):
                 return not self.closed
@@ -806,3 +808,10 @@ class RestingAgentTests(unittest.TestCase):
             boxes.rest_agents(kept[3])
         self.assertEqual([box.agent.closed for box in kept], [False, True, False, False])
         self.assertEqual([box.agent is not None for box in kept], [True] * 4)  # sessions kept: they resume
+        # A turn that took its agent after the choice (not yet running): left to it, not closed under it.
+        for box in kept:
+            box.agent = Agent()
+        kept[0].agent.turn_lock.acquire()
+        with patch.object(conversation, "MAX_AGENTS", 2):
+            boxes.rest_agents(kept[3])
+        self.assertEqual([box.agent.closed for box in kept], [False, True, False, False])

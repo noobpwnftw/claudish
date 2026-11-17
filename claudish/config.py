@@ -35,6 +35,7 @@ def loopback(url):
 # Each backend's model when a profile names none, and the starter config's: one place to change them.
 DEFAULT_MODELS = {"claude": "claude-opus-5-5", "claude-code": "haiku", "codex": "gpt-6-luna"}
 TIMEOUTS = {"claude-code": 30, "codex": 60, "command": 30}  # seconds, when a profile names none (else 3)
+COMMANDS = {"claude-code": ["claude"], "codex": ["codex"]}  # the subscription CLIs, when a profile names none
 DEFAULTS = {"backend": "none", "model_url": MODEL_URL, "model": None, "api_key_env": None,
             "timeout": None, "templates": None,
             "max_context_chars": 6000, "modes": None, "command": None,
@@ -91,6 +92,8 @@ def resolve(path=None, profile=None, overrides=None):
         servers = data.get("mcp_servers") or {}
         if not (isinstance(servers, dict) and all(isinstance(v, dict) for v in servers.values())):
             raise ValueError('"mcp_servers" must map names to server objects')
+        if "textbox" in servers:  # cd_AI's own: the text box an instruction was typed in (textbox_mcp.py)
+            raise ValueError('"mcp_servers": "textbox" is cd_AI\'s own server; give yours another name')
         bindings, context_specs = data.get("bindings"), data.get("context")
         bindings, context_specs = [] if bindings is None else bindings, [] if context_specs is None else context_specs
         for key, value in (("bindings", bindings), ("context", context_specs)):
@@ -129,8 +132,8 @@ def resolve(path=None, profile=None, overrides=None):
         raise ValueError("backend must be one of: " + ", ".join(BACKENDS))
     if not settings["timeout"]:  # a CLI's answer takes seconds (the starter profiles' times); a server's less
         settings["timeout"] = TIMEOUTS.get(settings["backend"], 3)
-    if settings["backend"] in ("claude-code", "codex") and not settings["command"]:
-        settings["command"] = ["claude" if settings["backend"] == "claude-code" else "codex"]
+    if settings["backend"] in COMMANDS and not settings["command"]:
+        settings["command"] = list(COMMANDS[settings["backend"]])
     if settings["backend"] in ("command", "claude-code", "codex") or (settings["backend"] == "llama" and settings["command"]):
         command = settings["command"]
         if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
@@ -177,10 +180,10 @@ STARTER = {
     "profile": "claude",
     "profiles": {
         "claude": {"backend": "claude", "model": DEFAULT_MODELS["claude"], "templates": "templates.json"},
-        "claude-code": {"backend": "claude-code", "command": ["claude"], "model": DEFAULT_MODELS["claude-code"],
-                        "timeout": 30, "templates": "templates.json"},
-        "codex": {"backend": "codex", "command": ["codex"], "model": DEFAULT_MODELS["codex"], "timeout": 60,
-                  "templates": "templates.json"},
+        "claude-code": {"backend": "claude-code", "command": COMMANDS["claude-code"], "model": DEFAULT_MODELS["claude-code"],
+                        "timeout": TIMEOUTS["claude-code"], "templates": "templates.json"},
+        "codex": {"backend": "codex", "command": COMMANDS["codex"], "model": DEFAULT_MODELS["codex"],
+                  "timeout": TIMEOUTS["codex"], "templates": "templates.json"},
         "server": {"backend": "openai", "model_url": "http://127.0.0.1:11434", "timeout": 30,
                    "templates": "templates.json"},
         "local": {"backend": "llama", "model_url": MODEL_URL, "timeout": 15, "templates": "templates.json"},

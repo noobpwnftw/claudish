@@ -12,7 +12,7 @@ from AppKit import (NSBackingStoreBuffered, NSBezierPath, NSColor, NSEdgeInsetsM
                     NSFontWeightRegular, NSFontWeightSemibold, NSImage, NSMakeRect, NSPanel,
                     NSMutableParagraphStyle, NSProgressIndicator, NSScreen, NSTextField, NSView, NSVisualEffectView)
 
-from claudish.screen import opens_above
+from claudish.composition import opens_above
 
 # Every metric is the lab's macOS skin (claudish/web/design.css .host.macos) and kit.css's box model;
 # change them there first. INSET: an NSTextField label's own padding on each side, subtracted so a

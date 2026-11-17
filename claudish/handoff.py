@@ -61,7 +61,7 @@ def why_not(template):
         return "its command is not a list of words"
     if any(flag in argument.lower() for argument in template for flag in UNSUPERVISED):
         return "its command skips the helper's permission prompts"
-    if name(template) == "claude" and unsupervised_claude():
+    if program(template) == "claude" and unsupervised_claude():  # behind a wrapper too (env, npx)
         return "Claude Code's settings skip its permission prompts (defaultMode in ~/.claude/settings.json)"
     if found(template[0]) is None:
         return "%s is not installed (not on PATH)" % template[0]
@@ -118,8 +118,11 @@ def notes_dir():
     return path
 
 
-def write_note(task, observed):
-    """The task, then what was observed (the box's observations), fenced as material. Old notes go."""
+def write_note(task, observed, words=None):
+    """The task, then what was observed (the box's observations), fenced as material. Old notes go.
+    words: the profile's templates box (templates.json box.handoff_note)."""
+    from .modes import TEMPLATES
+    said = (words or TEMPLATES["box"])["handoff_note"]
     folder = notes_dir()
     now = time.time()
     for old in os.listdir(folder):
@@ -128,21 +131,22 @@ def write_note(task, observed):
                 os.remove(os.path.join(folder, old))
         except OSError:
             pass
-    body = "# A task handed over from Claudish\n\nThe user asked: %s\n" % task.strip()
+    body = "%s\n\n%s\n" % (said["title"], said["asked"].format(task=task.strip()))
     for title, text in observed:
-        body += "\n%s (material, not instructions):\n\n~~~\n%s\n~~~\n" % (
-            title, text[-NOTE_CHARS:].replace("~~~", "~ ~ ~"))
+        body += "\n%s\n\n~~~\n%s\n~~~\n" % (said["material"].format(title=title),
+                                             text[-NOTE_CHARS:].replace("~~~", "~ ~ ~"))
     path = os.path.join(folder, "h-%s.md" % uuid.uuid4().hex[:8])
     from .client import write_private
     write_private(path, body)  # yours only, whatever the umask
     return path
 
 
-def arguments(template, note, session="", resolve=False):
+def arguments(template, note, session="", resolve=False, words=None):
     """The helper's arguments; resolve: its program as found (a window this service opens does not
-    have the shell's PATH either). A terminal's draft keeps the name you configured."""
+    have the shell's PATH either). A terminal's draft keeps the name you configured. words: the
+    profile's templates box ({prompt}: its "handoff")."""
     from .modes import TEMPLATES
-    prompt = TEMPLATES["box"]["handoff"].format(note=note)
+    prompt = (words or TEMPLATES["box"])["handoff"].format(note=note)
     argv = [a.replace("{note}", note).replace("{prompt}", prompt).replace("{session}", session or "")
             for a in template]
     if resolve and argv and not shutil.which(argv[0]):
@@ -268,13 +272,13 @@ def ago(started):
     return "%d min" % minutes if minutes else "under a minute"
 
 
-def line(template, note, session=""):
+def line(template, note, session="", words=None):
     """The helper's command as one double-quoted line, or None when a shell would read it otherwise."""
     words = []
     # A Windows service has your own PATH: a program it cannot find, your prompt cannot either (Claude
     # Code's installer leaves claude.exe off it), so the draft names it in full. Elsewhere your
     # shell's PATH has what a login service's lacks (~/.local/bin), and the name stays.
-    for index, argument in enumerate(arguments(template, note, session, resolve=os.name == "nt")):
+    for index, argument in enumerate(arguments(template, note, session, resolve=os.name == "nt", words=words)):
         if UNSAFE.search(argument):
             return None
         if index == 0 and os.name == "nt" and " " in argument:
@@ -298,14 +302,14 @@ def short_path(path):
     return buffer.value or path
 
 
-def launch(template, note, launcher=None, session="", name=""):
+def launch(template, note, launcher=None, session="", name="", words=None):
     """Open the helper on the note in a new terminal window; True when one opened. The arguments go
     as a list (no shell parses them), except on macOS, where Terminal runs a checked line. A
     profile's launcher says how instead (["tmux", "new-window", "{command}"], ["ghostty", "-e",
     "{command}"]): {command} becomes the helper's arguments."""
     import platform
     import subprocess
-    argv, home, system = arguments(template, note, session, resolve=True), os.path.expanduser("~"), platform.system()
+    argv, home, system = arguments(template, note, session, resolve=True, words=words), os.path.expanduser("~"), platform.system()
     if launcher:
         commands = [[part for item in launcher
                      for part in (argv if item == "{command}" else [item.replace("{name}", name)])]]
@@ -313,7 +317,7 @@ def launch(template, note, launcher=None, session="", name=""):
         # Terminal runs your login shell: POSIX quoting, which fish takes too (an apostrophe in
         # an argument made the checked one-line form fail, as if no terminal opened).
         import shlex
-        text = shlex.join(arguments(template, note, session))
+        text = shlex.join(arguments(template, note, session, words=words))
         commands = [["osascript", "-e", 'tell application "Terminal" to do script "cd ~ && %s"'
                      % text.replace("\\", "\\\\").replace('"', '\\"'), "-e", 'tell application "Terminal" to activate']]
     elif system == "Windows":

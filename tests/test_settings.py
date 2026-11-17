@@ -4,6 +4,7 @@ import stat
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -566,6 +567,31 @@ class ServiceTests(Home):
         self.assertEqual(written["profiles"]["server"]["model"], "rig-model")
         self.assertEqual(written.get("tone"), "bard")
         self.assertEqual(self.call("/settings/state")[1]["tone"], "bard")
+
+    def test_requests_go_on_while_a_save_takes_up_its_change(self):
+        """A save's reload stops one model and starts another; a request meanwhile is answered by
+        the model as it is, not queued behind it (as at a hand edit's reload)."""
+        from concurrent.futures import ThreadPoolExecutor
+        config.write_starter()
+        self.call("/health")
+        building, proceed = threading.Event(), threading.Event()
+        reload = self.server_reload[0]
+
+        def slow():
+            building.set()
+            proceed.wait(2)
+            return reload()
+        self.server_reload[0] = slow
+        with ThreadPoolExecutor(max_workers=1) as workers:
+            saved = workers.submit(self.call, "/settings", {"tone": "bard"})
+            try:
+                self.assertTrue(building.wait(2), "the save did not reload")
+                started = time.monotonic()
+                self.assertEqual(self.call("/health")[0], 200)
+                self.assertLess(time.monotonic() - started, 1)
+            finally:
+                proceed.set()
+            self.assertEqual(saved.result(timeout=5)[0], 200)
 
     def test_a_refused_change_says_why_and_changes_nothing(self):
         status, answer = self.call("/settings", {"server": {"url": "nope", "model": "x"}})

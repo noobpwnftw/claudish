@@ -1,6 +1,6 @@
 import unittest
 
-from claudish.screen import opens_above
+from claudish.composition import opens_above
 
 
 class OpensAbove(unittest.TestCase):

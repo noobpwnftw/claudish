@@ -98,6 +98,9 @@ class ConfigTests(unittest.TestCase):
             config.resolve(self.write([], "other.json"))
         with self.assertRaisesRegex(ValueError, "needs a config file"):
             config.resolve(profile="claude")
+        with self.assertRaisesRegex(ValueError, "cd_AI's own server"):  # it would be replaced, unsaid
+            config.resolve(self.write({"profiles": {"p": {"backend": "rules"}},
+                                       "mcp_servers": {"textbox": {"command": "x"}}}, "other.json"))
 
     def test_secret_values_never_appear_in_errors(self):
         path = self.write({"profiles": {"p": {"api_key": "sk-ant-very-secret"}}}, "other.json")

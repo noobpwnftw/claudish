@@ -5,6 +5,7 @@ anything runs only after a yes (or with --yes); --dry-run only shows the plan. S
 that need an administrator (Windows, macOS input methods) print the exact command.
 """
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -145,7 +146,7 @@ def step_ime():
     if system == "Linux":
         results = doctor.check_ime_linux()
         registered = next((r for r in results if r[0] == "Input method"), None)
-        if registered and "not installed" in registered[2]:
+        if not shutil.which("ibus-daemon"):  # IBus itself: the system's packages (doctor says which)
             return "manual", registered[2], registered[3]
         search = next((r for r in results if r[0] == "IBus search path"), None)
         if registered is None or registered[1] != "ok" or search and search[1] == "fail" and "--system" not in search[3]:
@@ -236,6 +237,16 @@ def step_service(settings):
     return "todo", "start %s at every login" % what, lambda: service.run("install", keep=True)
 
 
+def skip_name(label):
+    """A step as --skip names it: its label's first word ("Starts at login": starts)."""
+    return label.split()[0].lower()
+
+
+# Every step's --skip name, in the order setup takes them (the labels in plan()).
+SKIPPABLE = tuple(skip_name(label) for label in ("Config", "Tone", "MCP servers", "llama.cpp", "Model",
+                                                  "Local model", "Input method", "Starts at login"))
+
+
 def plan(profile=None, variant=None, skip=(), tone=None):
     """[(name, state, detail, action)]: state is done, todo, manual (action is the instruction), or skip."""
     name, settings = chosen_profile(profile)
@@ -253,7 +264,8 @@ def plan(profile=None, variant=None, skip=(), tone=None):
     else:
         steps += [("Model", lambda: step_backend(settings))]
     steps += [("Input method", step_ime), ("Starts at login", lambda: step_service(settings))]
-    return name, [(label, "skip", "skipped (--skip)", None) if label.split()[0].lower() in skip
+    assert all(skip_name(label) in SKIPPABLE for label, _ in steps)
+    return name, [(label, "skip", "skipped (--skip)", None) if skip_name(label) in skip
                   else (label,) + check() for label, check in steps]
 
 

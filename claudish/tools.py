@@ -253,10 +253,17 @@ async def called(session, tool, arguments, limit):
     import anyio
     with anyio.fail_after(limit):
         outcome = await session.call_tool(tool, arguments)
+    text = result_text(outcome)
+    return "error: " + text if field(outcome, "is_error") else text
+
+
+def result_text(outcome):
+    """A tool's result as text: its blocks (said), else its structured content (a tool's call, or
+    a context source's: claudish/context.py)."""
     text = "\n".join(filter(None, (said(block) for block in outcome.content or [])))
     if not text and field(outcome, "structured_content") is not None:
         text = json.dumps(field(outcome, "structured_content"), ensure_ascii=False)
-    return "error: " + text if field(outcome, "is_error") else text
+    return text
 
 
 def said(block):

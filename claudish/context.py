@@ -306,8 +306,9 @@ def read_mcp(provider):
                 read_stream, write_stream = streams[0], streams[1]
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
+                    from .tools import field, listed, result_text  # (tools imports this module)
                     if provider.listing:
-                        tools = (await session.list_tools()).tools
+                        tools = await listed(session, provider.timeout)  # page after page, as instructions get them
                         try:
                             resources = (await session.list_resources()).resources
                         except Exception:  # Not every server offers resources.
@@ -316,9 +317,9 @@ def read_mcp(provider):
                                 "resources": [str(resource.uri) for resource in resources]}
                     if provider.tool:
                         result = await session.call_tool(provider.tool, provider.arguments)
-                        if getattr(result, "is_error", False) or not hasattr(result, "content"):
+                        if field(result, "is_error") or not hasattr(result, "content"):
                             raise RuntimeError("MCP tool %s failed" % provider.tool)
-                        return "\n".join(block.text for block in result.content if getattr(block, "type", "") == "text")
+                        return result_text(result)  # as a tool call's: its blocks, or its structured content
                     result = await session.read_resource(provider.resource)
                     return "\n".join(item.text for item in getattr(result, "contents", []) if getattr(item, "text", None))
 

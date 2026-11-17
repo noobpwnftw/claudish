@@ -40,7 +40,7 @@ class CompositionTests(unittest.TestCase):
     def test_a_held_exchange_expires_without_being_drawn(self):
         from claudish import composition
         state = Composition()
-        state.held, state.held_at = Composition(), 0.0
+        state.holds[state.here] = [Composition(), 0.0]  # held long ago
         state.held.revision = 7
         worker = type("W", (), {"summon": "Shift+Enter", "hints": True, "offline": False, "wanted": set()})()
         with patch.object(composition.time, "monotonic", return_value=composition.HELD_SECONDS + 1):
@@ -71,6 +71,8 @@ class CompositionTests(unittest.TestCase):
             "the claude-code backend cannot take a window picture; use claude or a vision model":
                 "the claude-code backend cannot take a window picture; use claude or a vision model",
         }
+        from claudish.sessions import NO_ONE_LINE
+        said[NO_ONE_LINE] = NO_ONE_LINE  # a terminal's answer with no command in it: why, not "failed"
         for error, words in said.items():
             self.assertEqual(failure(error), words)
 

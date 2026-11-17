@@ -109,7 +109,7 @@ def install(variant="cpu", progress=None):
     key = (system, machine, variant)
     if key not in ASSETS:
         raise ValueError("no pinned llama.cpp %s build for %s %s; get one from "
-                         "https://github.com/ggml-org/llama.cpp/releases and pass --server" % (variant, system, machine))
+                         "https://github.com/ggml-org/llama.cpp/releases and run scripts/run_model.py --server PATH" % (variant, system, machine))
     asset, size, digest = ASSETS[key]
     destination = TOOLS / ("llama-%s-%s" % (BUILD, variant))
     server = destination / executable_name(system)

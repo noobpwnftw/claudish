@@ -301,6 +301,48 @@ class ModelServerTests(unittest.TestCase):
         for mode in ("rewrite", "continue", "instruct"):
             self.assertTrue(rewriter.modes[mode]["system"].startswith(system[:10000]), mode)
         self.assertEqual((payload["max_tokens"], payload["cache_prompt"]), (1, True))
+        self.assertEqual(payload["messages"][1:], rewriter.modes["rewrite"]["examples"][:1])  # words of the templates
+
+    def test_a_reload_with_another_tone_primes_the_server_it_keeps(self):
+        """A settings reload keeps the running server (same command); it reads the new tone, not
+        the one it was started with."""
+        import json
+        import socket
+        import tempfile
+        from claudish.model import Rewriter
+        recording = FAKE_LLAMA.replace("    def log_message", (
+            "    def do_POST(self):\n"
+            "        body = self.rfile.read(int(self.headers['Content-Length']))\n"
+            "        open(sys.argv[2], 'wb').write(body)\n"
+            "        self.send_response(200); self.end_headers(); self.wfile.write(b'{}')\n"
+            "    def log_message"))
+        with socket.socket() as probe, tempfile.TemporaryDirectory() as folder:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+            probe.close()
+            sent = os.path.join(folder, "sent.json")
+            command = [sys.executable, "-c", recording, str(port), sent]
+            old = Rewriter("llama", "http://127.0.0.1:%d" % port, tone="unhinged", command=command)
+            old.start_model()
+            fresh = Rewriter("llama", "http://127.0.0.1:%d" % port, command=command)
+            try:
+                deadline = time.monotonic() + 5
+                while old.model_state != "warm" and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                fresh.adopt(old.warm)
+                corporate = fresh.modes["rewrite"]["system"]
+                while time.monotonic() < deadline:
+                    try:
+                        with open(sent) as file:
+                            if json.load(file)["messages"][0]["content"] == corporate:
+                                break
+                    except ValueError:  # being written
+                        pass
+                    time.sleep(0.05)
+                with open(sent) as file:
+                    self.assertEqual(json.load(file)["messages"][0]["content"], corporate)
+            finally:
+                old.stop_model()
 
     def test_llama_command_names_the_model_and_port(self):
         argv = warm.llama_command("/x/llama-server", "/m/gemma.gguf", 18766)

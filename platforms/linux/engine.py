@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import gi
 gi.require_version("IBus", "1.0")
 from gi.repository import Gio, GLib, IBus
-from claudish.composition import AROUND, MODES, PAGE, Composition, ShiftTap, accented, typeable, window
+from claudish.composition import AROUND, LAG, MODES, PAGE, Composition, ShiftTap, accented, typeable, window
 from claudish.client import Suggestions
 from claudish.screen import is_terminal
 
@@ -46,7 +46,6 @@ def key_name(keyval):
     return DEAD_BY_KEYVAL.get(keyval) or IBus.keyval_name(keyval) or ""
 
 
-LAG = 3  # characters typed in continue an app may not report yet at the next key (as on macOS)
 
 # Held with a key, these make it a shortcut: the app's, and the composition ends.
 SHORTCUT_MASK = (IBus.ModifierType.CONTROL_MASK | IBus.ModifierType.MOD1_MASK |
@@ -1008,7 +1007,7 @@ def main():
         path = "/org/freedesktop/IBus/Engine/Claudish/%d" % next(engines)
         try:  # has_focus_id makes IBus (1.5.27+) report which program has focus (do_focus_in_id)
             return ClaudishEngine(engine_name=name, connection=bus.get_connection(), has_focus_id=True, object_path=path)
-        except TypeError:  # an older IBus (Ubuntu 22.04's 1.5.26): plain focus-in, an engine per input context
+        except TypeError:  # an older IBus (Ubuntu 22.04's 1.5.26): plain focus-in (do_focus_in), one engine for every box
             engine = ClaudishEngine(engine_name=name, connection=bus.get_connection(), object_path=path)
             engine.own_path = path
             return engine

@@ -18,7 +18,7 @@ import time
 from .children import environment, kill, spawn, tail
 from .composition import signed_out
 from .config import DEFAULT_MODELS
-from .shapes import ANSWER
+from .shapes import ANSWER, is_object
 
 from .modes import TEMPLATES
 
@@ -429,7 +429,7 @@ class Codex(Warm):
         turn = done[0].get("turn") or {}
         error = turn.get("error") or {}
         failed = error or turn.get("status") not in (None, "completed")
-        if failed and not (texts and shaped(texts[-1])):  # a note on the way is not the answer
+        if failed and not (texts and is_object(texts[-1])):  # a note on the way is not the answer
             raise Answered("Codex: %s" % (error.get("message") or error or turn.get("status")))
         return texts[-1].strip() if texts else ""  # the final message: an earlier one is commentary
 
@@ -437,14 +437,6 @@ class Codex(Warm):
         self.served += 1
         if self.served >= self.restart_after:  # loaded threads add up: a fresh process now and then,
             self.retire()  # started by the next request (within its time), not before this answer
-
-
-def shaped(text):
-    """Whether a message is the answer the request's output schema asks for (a JSON object)."""
-    try:
-        return isinstance(json.loads(text), dict)
-    except ValueError:
-        return False
 
 
 def gpus(server):
@@ -460,7 +452,7 @@ def gpus(server):
     return listed.split("Available devices:", 1)[1].strip() not in ("", "(none)")
 
 
-def llama_command(server, model, port="18766", gemma=True, gpu_layers="99", gpu=None):
+def llama_command(server, model, port, gemma=True, gpu_layers="99", gpu=None):
     """llama-server's argv for a downloaded model (claudish setup --profile local, scripts/run_model.py).
     gpu: gpus(server); False adds -fa off, None leaves llama.cpp's own choice."""
     # Gemma 4 thinks first unless told not to, which no request waits for (benchmarks/README.md).
@@ -498,9 +490,10 @@ class ModelServer:
 
     def __init__(self, command, url, prime=None):
         self.command, self.url, self.configured = list(command), url.rstrip("/"), None
-        # Read once it answers, before "warm": the tone, the system prompt every mode starts with,
-        # so a first request reads only its own part (unhinged's 2500 tokens took the CPU build
-        # longer than a rewrite's timeout). Failing changes nothing: requests read it themselves.
+        # Read once it answers, before "warm": a rewrite's system prompt, and with it a named tone's
+        # persona, which every mode's starts with, so a first request reads only its own part
+        # (unhinged's 2500 tokens took the CPU build longer than a rewrite's timeout). Failing
+        # changes nothing: requests read it themselves.
         self.prime = prime
         self.state = "stopped"
         self.stopped = threading.Event()
@@ -571,16 +564,26 @@ class ModelServer:
                     end(process)
                 return
             if self.prime:
-                try:
-                    self.prime()
-                except Exception:
-                    pass
+                self.primed()
             self.state = "warm"
             process.wait()
             if self.stopped.is_set():
                 return
             self.state = "restarting"
             time.sleep(1)
+
+    def reprime(self, prime):
+        """Another rewriter took it up (a settings reload: another tone, perhaps): its prime from
+        now on, and read now if the server already answers (in the background: it may take a while)."""
+        self.prime = prime
+        if self.state == "warm":
+            threading.Thread(target=self.primed, daemon=True).start()
+
+    def primed(self):
+        try:
+            self.prime()
+        except Exception:  # requests read the tone themselves
+            pass
 
     def retry(self):
         """A request found it failed: one that took too long to load starts again (the next load

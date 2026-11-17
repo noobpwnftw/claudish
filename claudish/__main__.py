@@ -61,6 +61,20 @@ def port_number(text):
     return number
 
 
+def flags_problem(path, profile, given):
+    """Why these flags (--profile, --backend, ...) do not go with the config, or None: the config
+    reads without them, not with them. A config that does not read is its own problem, not theirs."""
+    try:
+        config.resolve(path)
+    except (OSError, ValueError):
+        return None
+    try:
+        config.resolve(path, profile, given)
+    except (OSError, ValueError) as exc:
+        return exc
+    return None
+
+
 def parse(argv):
     """(args, the parser, what follows `service ... --`)."""
     parser = argparse.ArgumentParser(prog="claudish", description="cd_AI — Claudish input method")
@@ -95,9 +109,9 @@ def parse(argv):
                        "(corrects, keeps your words), or a few words of your own")
     setup.add_argument("--dry-run", action="store_true", help="Show the plan; change nothing")
     setup.add_argument("--variant", choices=["cpu", "vulkan"], help="llama.cpp build to download and run (default: cpu, or the one there)")
-    setup.add_argument("--skip", action="append", default=[], metavar="STEP",
-                       choices=["config", "mcp", "llama.cpp", "model", "input", "starts"],
-                       help="Skip a step (repeatable): config, mcp, llama.cpp, model, input, starts")
+    from .setup import SKIPPABLE  # setup's own step names
+    setup.add_argument("--skip", action="append", default=[], metavar="STEP", choices=SKIPPABLE,
+                       help="Skip a step (repeatable): " + ", ".join(SKIPPABLE))
     doctor = commands.add_parser("doctor", help="Check the setup end to end and say how to fix problems")
     doctor.add_argument("--json", action="store_true", help="Machine-readable output for bug reports")
     service = commands.add_parser("service", help="Start Claudish at login (systemd, logon task, launchd)")
@@ -231,15 +245,9 @@ def service(args, parser, passthrough):
         # The service's own flags, checked as serve checks them: a unit that cannot start would
         # be started again and again, and install would have said done.
         served, _, _ = parse(["serve"] + list(passthrough))  # a flag serve does not take: refused here
-        try:
-            config.resolve(served.config)
-        except (OSError, ValueError):
-            pass  # the config's own problem: serve still runs (and says it), as at any start
-        else:
-            try:
-                config.resolve(served.config, served.profile, overrides(served))
-            except (OSError, ValueError) as exc:
-                parser.error("the service would not start with those arguments: %s" % exc)
+        refused = flags_problem(served.config, served.profile, overrides(served))
+        if refused:  # (the config's own problem: serve still runs, and says it, as at any start)
+            parser.error("the service would not start with those arguments: %s" % refused)
     sys.exit(manager.run(args.action, passthrough, args.dry_run, keep=args.keep))
 
 
@@ -315,16 +323,7 @@ def serve(args, parser, passthrough):
     try:
         profile, settings, rewriter = build()
     except (OSError, ValueError) as exc:
-        flagged = False  # the config reads without this command's flags (a --profile it does not have), not with them
-        try:
-            config.resolve(args.config)
-            try:
-                config.resolve(args.config, args.profile, given)
-            except (OSError, ValueError):
-                flagged = True
-        except (OSError, ValueError):
-            pass
-        if flagged:
+        if flags_problem(args.config, args.profile, given):
             parser.error(str(exc))  # a flag of this command, said here as always
         # Otherwise the config's own problem, if only in what a profile asks for ("tools" a backend
         # cannot call): a service that exited would be started again and again.

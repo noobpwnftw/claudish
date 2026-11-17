@@ -52,17 +52,17 @@ def typed():
     bundle's own command on macOS, else this Python with -m claudish."""
     import shutil
     if getattr(sys, "frozen", False) and os.environ.get("EXECUTABLEPATH"):
-        return shlex_quote(os.environ["EXECUTABLEPATH"])
+        return quoted_if_spaced(os.environ["EXECUTABLEPATH"])
     found = shutil.which("claudish")
     here = os.path.join(os.path.dirname(sys.executable), "claudish")
     windows = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "bin", "claudish.cmd")  # the installer's
     same = lambda path: os.path.normcase(os.path.realpath(path))  # Windows: which() may say claudish.CMD
     if found and same(found) in (same(here), same(here + ".exe"), same(windows)):
         return "claudish"
-    return "%s -m claudish" % shlex_quote(sys.executable)
+    return "%s -m claudish" % quoted_if_spaced(sys.executable)
 
 
-def shlex_quote(path):
+def quoted_if_spaced(path):
     return '"%s"' % path if " " in path else path
 
 
@@ -148,11 +148,11 @@ def launchd_plist(argv):
 
 def paths():
     home = Path.home()
-    config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+    from .config import default_path
     # The systemd user manager reads units from its own config folder (~/.config), not from an
     # XDG_CONFIG_HOME exported in a shell; the unit passes that one on (kept_environment).
     return {"Linux": home / (".config/systemd/user/%s.service" % NAME),
-            "Windows": config / NAME / "logon-task.xml",
+            "Windows": default_path().with_name("logon-task.xml"),
             "Darwin": home / ("Library/LaunchAgents/%s.plist" % LABEL)}
 
 

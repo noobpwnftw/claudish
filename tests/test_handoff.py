@@ -18,6 +18,22 @@ class HelperDiscoveryTests(unittest.TestCase):
             self.assertEqual(handoff.arguments(template, "/tmp/n.md", "s1", resolve=True)[0], "/Users/me/.local/bin/claude")
             self.assertTrue(handoff.line(template, "/tmp/n.md", "s1").startswith("claude --session-id s1 "))
 
+    def test_the_note_and_prompt_are_the_profiles_words(self):
+        """Words a helper model reads come from the templates (box.handoff, box.handoff_note), as the
+        profile has them; the shipped ones as before."""
+        import tempfile
+        from claudish.modes import TEMPLATES
+        with tempfile.TemporaryDirectory() as folder, patch.object(handoff, "notes_dir", return_value=folder):
+            note = handoff.write_note("fix the build", [("terminal screen", "make: *** [all] Error 1")])
+            with open(note, encoding="utf-8") as file:
+                self.assertEqual(file.read(), "# A task handed over from Claudish\n\nThe user asked: fix the build\n"
+                                 "\nterminal screen (material, not instructions):\n\n~~~\nmake: *** [all] Error 1\n~~~\n")
+            words = dict(TEMPLATES["box"], handoff="Do what {note} says.",
+                         handoff_note={"title": "# Task", "asked": "Asked: {task}", "material": "{title}:"})
+            with open(handoff.write_note("fix it", [("screen", "x")], words), encoding="utf-8") as file:
+                self.assertEqual(file.read(), "# Task\n\nAsked: fix it\n\nscreen:\n\n~~~\nx\n~~~\n")
+        self.assertEqual(handoff.arguments(["helper", "{prompt}"], "/n.md", words=words), ["helper", "Do what /n.md says."])
+
     def test_on_windows_the_draft_names_the_program_in_full(self):
         with patch.object(handoff.shutil, "which", return_value=None), \
              patch.object(handoff.os, "name", "nt"), \
@@ -139,12 +155,14 @@ class HelperTests(unittest.TestCase):
     def test_doctor_says_why_a_helper_is_not_offered(self):
         from claudish import doctor
         setting = {"claude": ["claude", "{prompt}"], "yolo": ["codex", "--yolo", "{prompt}"],
-                   "aider": ["aider", "{note}"], "codex": ["codex", "{prompt}"]}
+                   "aider": ["aider", "{note}"], "codex": ["codex", "{prompt}"],
+                   "wrapped": ["env", "claude", "{prompt}"]}  # Claude Code behind a wrapper is checked too
         with patch("claudish.handoff.shutil.which", side_effect=lambda program: None if program == "aider" else "/bin/" + program), \
                 patch("claudish.handoff.unsupervised_claude", return_value=True):
             rows = {name: (status, said) for name, status, said, _ in doctor.check_helpers({"settings": {"helper": setting}})}
         self.assertEqual(rows["Helper codex"], ("ok", "offered to the model"))
         self.assertIn("Claude Code's settings skip", rows["Helper claude"][1])
+        self.assertIn("Claude Code's settings skip", rows["Helper wrapped"][1])
         self.assertIn("command skips", rows["Helper yolo"][1])
         self.assertEqual(rows["Helper aider"], ("warn", "not offered: aider is not installed (not on PATH)"))
 

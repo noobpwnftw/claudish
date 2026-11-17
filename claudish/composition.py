@@ -113,6 +113,10 @@ MODES = ("compose", "continue")
 # nothing (owner, 2026-10-24; Enter and Shift+Enter swapped by default, 2026-10-25).
 SHIFT_TAP_SECONDS = 0.5  # Shift alone, released within this: a held Shift (a click, a selection) is not a tap
 ROLLED_SHIFT_SECONDS = 0.3  # Shift pressed this soon after another key is rolled typing, not a tap
+# Characters typed in continue an app may not report yet at the next key (a browser answers from a
+# copy it updates later): caret_stayed's lag where an adapter reads at the key (Linux, macOS).
+LAG = 3
+TOAST_SECONDS = 2  # a toast that is not a pill (done, dropped), on every platform
 HELD_SECONDS = 600  # an exchange held after a focus change is offered on return for this long
 HOLDS = 3  # text boxes with an exchange held at once: with the one on screen, the service's 4 sessions
 # The panel stays shorter than a screen (G64): about this many rows of text at about ROW characters.
@@ -129,7 +133,7 @@ OWN_WORDS = ("the model is busy", "the answer ran past its length budget", "no a
              "Claude Code ", "Codex ",  # claudish/warm.py's: busy, took longer, ended (its process)
              "Claude declined", "Claude returned no text", "the model returned no text",
              "the agent ", "the instruction had ended", "a newer request replaced it", "text must be",  # an agent session's, warm.ENDED, the service's checks
-             "the model spent its length budget", "this model server did not accept the window picture",
+             "the model spent its length budget", "no one-line command", "this model server did not accept the window picture",
              "the claude-code backend cannot take", "the profile's agent (session_command) cannot")  # claudish/model.py's
 
 
@@ -142,6 +146,12 @@ def signed_out(said):
     """Whether a subscription CLI's failure is its sign-in (not a key of yours)."""
     said = said.lower()
     return any(words in said for words in SIGNED_OUT)
+
+
+def opens_above(tall, below, above):
+    """Whether a panel `tall` high opens above its line, with `below` and `above` the room on each
+    side: when it does not fit below and there is more room above, as Windows' own panels do."""
+    return tall > below and above > below
 
 
 def failure(error):
@@ -1288,11 +1298,6 @@ class Composition:
     @property
     def held_at(self):
         return self.holds.get(self.here, (None, 0.0))[1]
-
-    @held_at.setter
-    def held_at(self, when):
-        if self.here in self.holds:
-            self.holds[self.here][1] = when
 
     def expire(self):
         """Held exchanges older than HELD_SECONDS go (their agent sessions with them); True if this

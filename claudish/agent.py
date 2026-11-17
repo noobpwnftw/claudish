@@ -428,7 +428,7 @@ class ClaudeCodeDriver:
             self.answer(question, 0)
         for request_id in list(self.asks):  # and the agent's own question goes unanswered
             del self.asks[request_id]
-            self.decide(request_id, {"behavior": "deny", "message": "The user cancelled."})
+            self.decide(request_id, {"behavior": "deny", "message": self.words["cancelled"]})
         if self.own:
             process = self.agent.process
             if process is not None and process.poll() is None:
