@@ -12,7 +12,7 @@
       "examples": [
         [
           "ok",
-          "Absolutely\u2014this is a fantastic opportunity to align on our shared vision, unlock meaningful synergies, and move forward with clarity, confidence, and a renewed sense of purpose."
+          "Absolutely—this is a fantastic opportunity to align on our shared vision, unlock meaningful synergies, and move forward with clarity, confidence, and a renewed sense of purpose."
         ],
         [
           "nah",
@@ -211,9 +211,13 @@
               [
                 "Tell Priya the deploy is done.",
                 "Hark, go forth and tell fair Priya: the deploy is done, and all the realm rejoiceth!"
+              ],
+              [
+                "Room 4B is booked until 11:30.",
+                "Hark! Room 4B is held until 11:30—let no knave disturb the chamber ere then!"
               ]
             ],
-            "voice": "the way a theatrical Elizabethan bard would declaim it to a packed playhouse: thee and thou, verily and forsooth, grand flourishes",
+            "voice": "the way a theatrical Elizabethan bard would declaim it to a packed playhouse: thee and thou, verily and forsooth, grand flourishes, and every number and date in digits as written",
             "length": "one to three sentences"
           },
           "continue": {
@@ -258,6 +262,10 @@
                 "Can we push the review to Friday? Nothing's on fire, I'd just like to read it first."
               ],
               [
+                "Room 4B is booked until 11:30.",
+                "Room 4B is booked until 11:30. Knocking will not make the meeting inside end any sooner."
+              ],
+              [
                 "the printer is jammed again",
                 "The printer is jammed again. At this point it's not a fault, it's a fucking lifestyle."
               ],
@@ -266,7 +274,7 @@
                 "They want the whole redesign done by tomorrow with no overtime, which works beautifully if time is a suggestion and the design team is a coven. Someone should tell them how weeks work."
               ]
             ],
-            "voice": "in the voice of the persona above, as they would have written it themselves: proportionate, so an ordinary line gets a short, dry touch (never the text unchanged) and something absurd gets the full, precise treatment",
+            "voice": "in the voice of the persona above, as they would have written it themselves: proportionate, so an ordinary line gets a short, dry touch (never the text unchanged) and something absurd gets the full, precise treatment, with no numbers or facts of its own",
             "length": "one to three sentences",
             "parts": [
               [
@@ -391,9 +399,11 @@
     "handoff": "Read the handoff note at {note} and work on the task in it.",
     "denied": "The user's profile denies this tool.",
     "invalid_call": "error: unknown tool or invalid arguments",
-    "cli": {"about": "Claude Code's system prompt and Codex's base instructions (cd_AI's own prompt is the message), and the warm-up.",
-            "system": "Do exactly what the user's message asks. Output only the result, nothing else.",
-            "ready": "Reply with the single word: ready"},
+    "cli": {
+      "about": "Claude Code's system prompt and Codex's base instructions (cd_AI's own prompt is the message), and the warm-up.",
+      "system": "Do exactly what the user's message asks. Output only the result, nothing else.",
+      "ready": "Reply with the single word: ready"
+    },
     "declined": "The user declined this tool call.",
     "own": {
       "about": "Claudish's own tools for an instruction, their results, and what a settled turn says it did.",

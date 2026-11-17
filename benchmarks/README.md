@@ -226,6 +226,20 @@ alike). cd_AI now sends `reasoning_budget: 0` with every request to a local serv
 profile's llama-server command included) and starts llama-server with `--reasoning-budget 0`:
 86 / 86, median 0.78 s. Rewrites with it: 76 / 80 faithful, 49 / 80 with em dashes.
 
+The named tones on Claude Code (haiku), the same 80 cases (`.tools/rigs/bench_tones.sh`):
+
+| Tone | Faithful | Mostly failing on |
+| --- | ---: | --- |
+| salesman | 79 / 80 | — |
+| critic | 76 / 80 | a name or number dropped in passing |
+| bard | 68 → 77 / 80 | numbers spelled out ("fourteen minutes") |
+| unhinged | 72 → 74 / 80 | numbers of its own ("which means 37 passed") |
+| proofread | 80 / 80 | — |
+
+Bard and unhinged had no example with a number; one each moved them a case or two. Saying it in
+the tone's voice ("every number and date in digits as written"; "no numbers or facts of its own")
+did the rest. Unhinged's remaining misses are its commentary's arithmetic and jokes.
+
 ## Choosing the models (G53, 2026-10-24)
 
 The question: which model makes cd_AI's default tone, full corporate slop that keeps the
